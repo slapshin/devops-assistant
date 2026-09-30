@@ -8,6 +8,7 @@
 **/data
 .git
 .env
+config.env
 **/.env
 .playwright-mcp
 docs

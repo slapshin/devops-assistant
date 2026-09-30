@@ -17,7 +17,7 @@ Assessed on 2026-09-30 on branch `implementation/first-release`.
 | Command | Result |
 | --- | --- |
 | `make check` | Passes. Backend: ruff format/check, mypy strict (54 files), contract and fixture drift checks, pytest **269 passed, 2 skipped**. Frontend: API-type drift check, vue-tsc, ESLint (0 warnings), Vitest **16 passed**, Vite build. |
-| `docker build -t devops-ai-assistant:local .` | Succeeds; health check `healthy` |
+| `docker build -f devops/docker/Dockerfile -t devops-ai-assistant:local .` (`make docker-build`) | Succeeds; health check `healthy` |
 
 ## Product workflows through the packaged application
 

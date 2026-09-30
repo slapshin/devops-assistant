@@ -13,14 +13,16 @@ It covers node exporter, cAdvisor, Docker Swarm, and OpenTelemetry HTTP/RPC metr
 ## Run
 
 ```sh
-docker compose up -d --build        # http://127.0.0.1:8000, metrics at http://host.docker.internal:8428
+make up                            # Docker: http://127.0.0.1:8000, metrics at http://host.docker.internal:8428
 # or natively
 make install && make serve          # http://127.0.0.1:8000, metrics at http://localhost:8428
 # offline demo, no metrics source or API key
-METRICS_URL=synthetic://incident AI_PROVIDER=fake docker compose up -d --build
+METRICS_URL=synthetic://incident AI_PROVIDER=fake make up
 ```
 
-Configuration, Docker networking, backups, budgets and troubleshooting are in **[docs/OPERATIONS.md](docs/OPERATIONS.md)**. Copy `.env.example` to `backend/.env` for settings such as `OPENAI_API_KEY` and `OPENAI_MODEL`.
+Configuration, Docker networking, backups, budgets and troubleshooting are in **[docs/OPERATIONS.md](docs/OPERATIONS.md)**. Copy `config.env.template` to `config.env` for settings such as `OPENAI_API_KEY` and `OPENAI_MODEL`.
+
+Layout: `devops/docker/Dockerfile` builds the image, `tools/compose/compose.yml` runs it locally (through `make up`/`make down`/`make stop`/`make logs`).
 
 ## Use
 

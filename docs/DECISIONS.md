@@ -61,7 +61,7 @@ CI fails if generated schema/types differ from committed files. Saved reports ca
 
 ## 2. Configuration
 
-All settings come from environment (optionally a `.env` file, never committed). Invalid settings fail startup with the variable name, the bad value (secrets masked), and the expected form.
+All settings come from environment (optionally the repository-root `config.env`, never committed; template `config.env.template`). Invalid settings fail startup with the variable name, the bad value (secrets masked), and the expected form.
 
 | Variable | Default | Notes |
 | --- | --- | --- |

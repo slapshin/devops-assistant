@@ -22,8 +22,12 @@ class ConfigError(Exception):
     """Startup configuration error listing each invalid variable."""
 
 
+CONFIG_ENV_FILE = Path(__file__).resolve().parents[2] / "config.env"
+"""Repository-root config.env (copied from config.env.template); ignored when absent."""
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore", frozen=True)
+    model_config = SettingsConfigDict(env_file=CONFIG_ENV_FILE, extra="ignore", frozen=True)
 
     metrics_url: str = "http://localhost:8428"
     metrics_bearer_token: SecretStr | None = None

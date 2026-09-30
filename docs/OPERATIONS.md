@@ -7,16 +7,17 @@ The assistant is a single process: a FastAPI backend that also serves the built 
 ### Docker (recommended)
 
 ```sh
-cp .env.example backend/.env        # optional: OPENAI_API_KEY, OPENAI_MODEL, …
-docker compose up -d --build        # http://127.0.0.1:8000
-docker compose logs -f assistant
-docker compose down                 # keeps the data volume (reports survive)
+cp config.env.template config.env  # optional: OPENAI_API_KEY, OPENAI_MODEL, …
+make up                            # http://127.0.0.1:8000
+make logs
+make down                          # keeps the data volume (reports survive)
 ```
 
-- The port is published on `127.0.0.1` only. Override it with `APP_PORT=18000 docker compose up -d`.
+- The image is built from `devops/docker/Dockerfile` (context: repository root); the compose file is `tools/compose/compose.yml`. The make targets wrap `docker compose -f tools/compose/compose.yml …` and export `config.env`. Compose project name is `ai-assistant`.
+- The port is published on `127.0.0.1` only. Override it with `APP_PORT=18000 make up`.
 - Inside the container `localhost` is the container itself. The default `METRICS_URL=http://host.docker.internal:8428` reaches a metrics source, or an SSH tunnel such as `ssh -N -L 8428:localhost:8428 <monitoring-host>`, running on the Docker host. `extra_hosts: host-gateway` makes this work on Linux as well as Docker Desktop.
-- To point at a network address instead: `METRICS_URL=http://vm.internal:8428 docker compose up -d`.
-- Reports live in the named volume `assistant-data` (mounted at `/data`). `docker compose down` and `up --force-recreate` keep it. **Only `docker compose down -v` deletes it.**
+- To point at a network address instead: `METRICS_URL=http://vm.internal:8428 make up`. A `METRICS_URL` set in `config.env` applies to Docker too, so leave it unset there if it points at `localhost`.
+- Reports live in the named volume `assistant-data` (mounted at `/data`). `make down` and `up --force-recreate` keep it. **Only `docker compose -f tools/compose/compose.yml down -v` deletes it.**
 
 ### Native
 
@@ -24,7 +25,7 @@ Requires uv 0.12+ (Python 3.14.7 is resolved from `backend/.python-version`) and
 
 ```sh
 make install                        # uv sync --locked; npm ci
-cp .env.example backend/.env        # METRICS_URL defaults to http://localhost:8428
+cp config.env.template config.env  # METRICS_URL defaults to http://localhost:8428
 (cd frontend && npm run build)      # the backend serves frontend/dist at /
 cd backend && uv run python -m app  # http://127.0.0.1:8000 (APP_HOST/APP_PORT)
 ```
@@ -37,7 +38,7 @@ For development, run `make dev-backend` and `make dev-frontend`. The Vite dev se
 
 ## Configuration
 
-All settings are environment variables, optionally read from `backend/.env` (never commit it). Invalid values stop startup with exit code 2 and name the variable, for example `METRICS_URL: expected an http(s) URL such as http://localhost:8428 (got 'localhost:8428')`. Secrets are never printed.
+All settings are environment variables, optionally read from `config.env` in the repository root (never commit it; the Makefile also exports it). Invalid values stop startup with exit code 2 and name the variable, for example `METRICS_URL: expected an http(s) URL such as http://localhost:8428 (got 'localhost:8428')`. Secrets are never printed.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -104,7 +105,7 @@ Typical measured figures on a real deployment (paas/production, 360 series): ≈
 - Startup applies Alembic migrations forward only. It never drops tables or deletes reports.
 - Report snapshots are immutable and reopen without the metrics source, even after the source's retention has passed.
 - On startup, jobs that were queued or running when the process stopped are marked `failed` with `interrupted_by_restart`. They are **not** resumed; use *Run again*.
-- Shutdown (`docker compose down` or Ctrl-C) cancels running work. The next start records it as interrupted.
+- Shutdown (`make down` or Ctrl-C) cancels running work. The next start records it as interrupted.
 - Reports are **never** deleted automatically.
 
 ### Backup and cleanup
@@ -116,8 +117,8 @@ uv run python -m app.maintenance prune --older-than 90          # dry run: lists
 uv run python -m app.maintenance prune --older-than 90 --yes    # deletes finished analyses
 
 # docker
-docker compose exec assistant /app/backend/.venv/bin/python -m app.maintenance backup /data/backup.sqlite3
-docker compose cp assistant:/data/backup.sqlite3 ./backup.sqlite3
+docker compose -f tools/compose/compose.yml exec assistant /app/backend/.venv/bin/python -m app.maintenance backup /data/backup.sqlite3
+docker compose -f tools/compose/compose.yml cp assistant:/data/backup.sqlite3 ./backup.sqlite3
 ```
 
 `backup` uses SQLite's online backup, which is safe while the app runs, and refuses to overwrite an existing file. `prune` never touches queued or running jobs, and deletes only when `--yes` is given.
@@ -133,7 +134,7 @@ docker compose cp assistant:/data/backup.sqlite3 ./backup.sqlite3
 | AI `not_configured` | Set `OPENAI_API_KEY` and `OPENAI_MODEL`, or use `AI_PROVIDER=none`. Numerical results are unaffected. |
 | AI `failed (…)` | A provider problem (timeout, rate limit, refusal, invalid output). Findings and evidence are still complete. |
 | `429 queue_full` | Wait for the running and queued analyses (up to 5 in total). |
-| Container stays `unhealthy` | Check `docker compose logs assistant`: usually an invalid configuration (exit code 2) or an unwritable `/data`. |
+| Container stays `unhealthy` | Check `make logs`: usually an invalid configuration (exit code 2) or an unwritable `/data`. |
 
 ## Verification record (T009, 2026-09-30)
 

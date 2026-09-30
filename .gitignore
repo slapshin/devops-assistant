@@ -1,4 +1,5 @@
 .env
+config.env
 data/
 backend/.venv/
 backend/data/

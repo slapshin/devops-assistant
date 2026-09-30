@@ -1,10 +1,21 @@
 # Local operation only: the port is published on 127.0.0.1. See docs/OPERATIONS.md.
+# Run through the Makefile (make up / make down), which also loads config.env.
+name: ai-assistant
+
+volumes:
+  assistant-data:
+
 services:
   assistant:
-    build: .
+    build:
+      context: ../..
+      dockerfile: devops/docker/Dockerfile
     image: devops-ai-assistant:local
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
+    env_file:
+      - path: ../../config.env
+        required: false
     environment:
       # Inside the container "localhost" is the container itself. host.docker.internal
       # reaches a metrics source or SSH tunnel listening on the Docker host.
@@ -12,15 +23,14 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-openai}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    env_file:
-      - path: backend/.env
-        required: false
+      # Container paths win over native values from config.env.
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      DATA_DIR: /data
+      STATIC_DIR: /app/static
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - assistant-data:/data
     restart: unless-stopped
     stop_grace_period: 20s
-
-volumes:
-  assistant-data:

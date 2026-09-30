@@ -1,5 +1,10 @@
 # Repository checks. Requires uv and Node.js 24.21 LTS (see docs/DECISIONS.md).
-.PHONY: install check check-backend check-frontend contracts fixtures dev-backend dev-frontend build serve docker-up docker-down backup
+-include ./config.env
+export
+
+COMPOSE_ARGS=-f tools/compose/compose.yml
+
+.PHONY: install check check-backend check-frontend contracts fixtures dev-backend dev-frontend build serve docker-build up down stop logs backup
 
 install:
 	cd backend && uv sync --locked
@@ -37,11 +42,21 @@ build:
 serve: build
 	cd backend && uv run python -m app
 
-docker-up:
-	docker compose up -d --build
+# -- compose --
+docker-build:
+	docker build -f devops/docker/Dockerfile -t devops-ai-assistant:local .
 
-docker-down:
-	docker compose down
+up:
+	docker compose ${COMPOSE_ARGS} up -d --build --remove-orphans
+
+down:
+	docker compose ${COMPOSE_ARGS} down
+
+stop:
+	docker compose ${COMPOSE_ARGS} stop
+
+logs:
+	docker compose ${COMPOSE_ARGS} logs -f assistant
 
 backup:
 	cd backend && uv run python -m app.maintenance backup ../backups/assistant-$$(date +%Y%m%d-%H%M%S).sqlite3
