@@ -22,13 +22,13 @@ The first release is assessed against agreed workflows with recorded evidence an
 
 ## Acceptance
 
-- [ ] T001–T009 are DONE with reviewable evidence and no unresolved implementation blocker.
-- [ ] All five product workflows pass through the packaged application.
-- [ ] Scope isolation, numerical evidence, baseline windows, and trend comparability hold end to end.
-- [ ] Missing capabilities and AI/source failures produce honest, usable results.
-- [ ] Persistence and interrupted-job behavior are verified across restart.
-- [ ] Live versus synthetic verification and any external access limitations are explicit.
-- [ ] README and release checklist match the delivered app and its actual verification.
+- [x] T001–T009 are DONE with reviewable evidence and no unresolved implementation blocker.
+- [x] All five product workflows pass through the packaged application.
+- [x] Scope isolation, numerical evidence, baseline windows, and trend comparability hold end to end.
+- [x] Missing capabilities and AI/source failures produce honest, usable results.
+- [x] Persistence and interrupted-job behavior are verified across restart.
+- [x] Live versus synthetic verification and any external access limitations are explicit.
+- [x] README and release checklist match the delivered app and its actual verification.
 
 ## Verification
 
@@ -43,11 +43,22 @@ Use synthetic data for committed tests and shareable screenshots. Add the live b
 
 ## Completion record
 
-Not started. Fill in after execution:
-
-- Completed date:
+- Completed date: 2026-09-30
 - Actual changed files and artifacts:
+  - `docs/RELEASE_CHECKLIST.md` (new)
+  - integration fixes: `backend/app/jobs.py` (cancelled jobs have no error) with a regression test in `backend/tests/test_api.py`; `frontend/src/api/queries.ts` (background polling)
+  - `README.md`, `PLAN.md`, `docs/tasks/README.md`
 - Commands/checks and results:
-- Decisions or dependency changes:
+  - `make check` passes (269 backend tests passed, 2 skipped; 16 frontend tests; build).
+  - `docker build` passes.
+  - All five product workflows passed through the packaged image, flows 1, 2 and 5 against the live tunnelled VictoriaMetrics. Details are in `docs/RELEASE_CHECKLIST.md`.
+  - Live large-scope run on paas-gpu/production took 200 s, with 292 findings, a 12.8 MB report and no truncation.
+- Decisions or dependency changes: none beyond the fixes listed above.
 - Remaining limitations or blockers:
-- Next ready task:
+  - OpenAI was not verified live (no key).
+  - Thresholds are noisy on bursty fleets and need owner tuning.
+  - Large reports are slow to load in the browser.
+  - No auth, CI file, or published image.
+  - Linux `host-gateway` was not exercised.
+  - See the checklist for the full list.
+- Next ready task: none. The first-release backlog is complete. Suggested follow-ups: live OpenAI check, threshold tuning with the owner, CI pipeline, access control before any non-local exposure, then the deferred CLI and scheduled reports.

@@ -209,6 +209,7 @@ def test_cancel_running_queued_and_finished(tmp_path: Path) -> None:
         assert res.status_code == 202 and res.json()["state"] == "cancelled"
         res = client.delete(f"/api/analyses/{rid}")
         assert res.status_code == 202 and res.json()["state"] == "cancelled"
+        assert res.json()["error"] is None  # contract: cancelled jobs carry no error
         assert client.get(f"/api/analyses/{rid}/report").json()["code"] == "report_unavailable"
         again = client.delete(f"/api/analyses/{rid}")
         assert again.status_code == 409 and again.json()["code"] == "analysis_not_active"

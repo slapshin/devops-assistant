@@ -2,7 +2,7 @@
 
 This is the execution index for the first usable DevOps AI assistant release. Read [the product plan](../PRODUCT_PLAN.md) and [architecture](../ARCHITECTURE.md) before starting. Web UI, project/env selection, 24-hour analysis, two-week trends, and OpenAI-first explanations are confirmed. The Vue.js frontend is an owner decision (2026-09-30); Python/FastAPI, TypeScript, SQLite, and Docker are proposed defaults made concrete in T001.
 
-T001–T009 are DONE (decisions through packaging); T010 is in progress. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
+All tasks T001–T010 are DONE. The first release is validated; see [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for evidence and remaining limitations. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
 
 ## Ordered backlog
 
@@ -17,7 +17,7 @@ T001–T009 are DONE (decisions through packaging); T010 is in progress. This in
 | T007 | [Analysis API, jobs, and report persistence](T007-analysis-api-and-persistence.md) | T004, T005, T006 | DONE |
 | T008 | [Web interface and evidence exploration](T008-web-interface.md) | T002, T007 | DONE |
 | T009 | [Local packaging and operation documentation](T009-packaging-and-operation.md) | T007, T008 | DONE |
-| T010 | [First-release acceptance and agent handoff](T010-release-validation.md) | T009 | IN_PROGRESS |
+| T010 | [First-release acceptance and agent handoff](T010-release-validation.md) | T009 | DONE |
 
 ## How the next agent should work
 
@@ -61,4 +61,4 @@ Shared fixtures allow UI design/prototyping while backend work proceeds, but T00
 
 ## Suggested assignment for the next agent
 
-> Read `docs/tasks/README.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/contracts.md`, `docs/telemetry-inventory.md`, and `docs/tasks/T004-metrics-client-and-queries.md`. Complete T004: implement the read-only, scope-enforcing `MetricsSource` (discovery, capabilities, chunked collection within budgets) and the query catalog for the verified families, with tests using fixtures and a bounded live check if the tunnel is available. T005 may run in parallel only if the assignment authorizes it.
+> The first-release backlog is complete. Read `docs/RELEASE_CHECKLIST.md` (remaining issues) before starting follow-up work: live OpenAI verification (`scripts.check_openai --structured`), threshold tuning with the owner (paas-gpu noise), a CI pipeline running `make check` and `docker build`, access control before any non-local exposure, then the deferred CLI and scheduled daily reports (reuse `app.service.AnalysisPipeline`).

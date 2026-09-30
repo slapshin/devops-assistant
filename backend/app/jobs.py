@@ -140,11 +140,7 @@ class JobRunner:
         return refreshed
 
     async def _finish_cancelled(self, analysis_id: str) -> None:
-        await self.repo.finish_job(
-            analysis_id,
-            JobState.CANCELLED,
-            JobError(code=ErrorCode.INTERNAL_ERROR, message="Cancelled by user."),
-        )
+        await self.repo.finish_job(analysis_id, JobState.CANCELLED, None)
 
     async def _worker(self) -> None:
         while True:

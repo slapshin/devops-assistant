@@ -9,4 +9,4 @@ Planning documents follow the product/architecture/task structure used by the fa
 
 The task index is the single source of implementation status. Each task contains its outcome, ownership, work, acceptance checklist, verification guidance, and completion record.
 
-T001 (decisions, UI blueprint), T002 (workspace foundations, [shared contracts](docs/contracts.md)), and T003 ([telemetry inventory](docs/telemetry-inventory.md)) are DONE. T004 and T005 are ready. Features beyond the foundations are not implemented yet.
+All implementation tasks T001–T010 are DONE (2026-09-30). The first release is validated against the packaged application and the live metrics source; evidence and remaining limitations are in [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). 

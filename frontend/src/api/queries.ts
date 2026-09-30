@@ -49,6 +49,7 @@ export function useAnalysis(id: MaybeRefOrGetter<string>) {
     queryKey: computed(() => ["analysis", toValue(id)]),
     queryFn: () => apiGet<AnalysisJob>(`/api/analyses/${encodeURIComponent(toValue(id))}`),
     refetchInterval: (query) => (query.state.data && !ACTIVE.has(query.state.data.state) ? false : POLL_MS),
+    refetchIntervalInBackground: true, // progress must not freeze in an unfocused tab
     retry: 3,
     retryDelay: (attempt) => Math.min(8000, 1000 * 2 ** attempt),
   });

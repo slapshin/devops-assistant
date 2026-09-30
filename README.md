@@ -38,4 +38,4 @@ make dev-backend    # :8000 (API docs at /api/docs)
 make dev-frontend   # :5173, proxies /api
 ```
 
-Docs: [plan](PLAN.md) · [product](docs/PRODUCT_PLAN.md) · [architecture](docs/ARCHITECTURE.md) · [decisions](docs/DECISIONS.md) · [UI spec](docs/UI_SPEC.md) · [contracts](docs/contracts.md) · [telemetry inventory](docs/telemetry-inventory.md) · [metrics catalog](docs/metrics-catalog.md) · [detection](docs/detection.md) · [tasks](docs/tasks/README.md)
+Docs: [release checklist](docs/RELEASE_CHECKLIST.md) · [plan](PLAN.md) · [product](docs/PRODUCT_PLAN.md) · [architecture](docs/ARCHITECTURE.md) · [decisions](docs/DECISIONS.md) · [UI spec](docs/UI_SPEC.md) · [contracts](docs/contracts.md) · [telemetry inventory](docs/telemetry-inventory.md) · [metrics catalog](docs/metrics-catalog.md) · [detection](docs/detection.md) · [tasks](docs/tasks/README.md)
