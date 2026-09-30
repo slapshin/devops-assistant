@@ -29,6 +29,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
   DATA_DIR=/data \
   STATIC_DIR=/app/static
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY --from=uv /uv /usr/local/bin/uv
 
 WORKDIR /app/backend
@@ -53,6 +57,6 @@ VOLUME ["/data"]
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["/app/backend/.venv/bin/python", "-c", "import urllib.request,os; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"APP_PORT\",\"8000\")}/api/health', timeout=4)"]
+  CMD curl -fsS --max-time 4 -o /dev/null "http://127.0.0.1:${APP_PORT}/api/health" || exit 1
 
 CMD ["/app/backend/.venv/bin/python", "-m", "app"]
