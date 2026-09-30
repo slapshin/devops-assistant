@@ -76,6 +76,8 @@ class FindingDigest(Contract):
     end: UtcDatetime
     observed: str = Field(description="Human-readable value with unit.")
     expected: str | None
+    related_finding_ids: list[str] = Field(default_factory=list)
+    host: str | None = Field(default=None, description="Verified host, if any.")
 
 
 class ExplanationInput(Contract):

@@ -68,9 +68,9 @@ All settings come from environment (optionally a `.env` file, never committed). 
 | `METRICS_URL` | `http://localhost:8428` | Owner-supplied native default. Any path prefix is preserved (`<METRICS_URL>/api/v1/...`). |
 | `METRICS_BEARER_TOKEN` / `METRICS_BASIC_AUTH_USER` + `METRICS_BASIC_AUTH_PASSWORD` | unset | Mutually exclusive; server-side only; never logged or stored in reports. |
 | `METRICS_TLS_VERIFY` | `true` | |
-| `AI_PROVIDER` | `openai` | `openai` or `none`. `none` produces numerical reports with explanation status `disabled`. |
+| `AI_PROVIDER` | `openai` | `openai`, `none`, or `fake`. `none` produces numerical reports with explanation status `disabled`. `fake` is a deterministic template provider for tests and offline demos; it makes no network calls. |
 | `OPENAI_API_KEY` | unset | If `AI_PROVIDER=openai` and the key is missing, the app starts and reports explanation status `not_configured` (numerical analysis must still work). |
-| `OPENAI_MODEL` | unset | Required for explanations; no model name is hard-coded in code. T006 verifies an available model with structured-output support and documents a suggested value in `.env.example`. |
+| `OPENAI_MODEL` | unset | Required for explanations; no model name is hard-coded in code. It must support Structured Outputs on the Responses API. No key was available during T006, so choose the model per account and check it with `uv run python -m scripts.check_openai [--structured]`. |
 | `OPENAI_BASE_URL` | unset | Optional, for compatible gateways. |
 | `DATA_DIR` | `./data` | SQLite and nothing else. |
 | `APP_HOST` / `APP_PORT` | `127.0.0.1` / `8000` | Local-only binding by default (no auth in this release). |
@@ -225,6 +225,12 @@ Retention: saved reports are **not deleted automatically** in this release. `GET
 All queries are read-only (`/api/v1/query`, `/query_range`, `/series`, `/labels`, `/label/<name>/values`, `/metadata`, `/status/buildinfo`). Every selector includes `project="<p>", env="<e>"`; the query builder rejects a selector without both (enforced by tests in T004).
 
 ## 7. AI explanations
+
+Implemented in T006 (`backend/app/ai/`):
+- `OpenAIExplanationProvider` calls `responses.parse` with a strict JSON Schema, `store=False`, at most 2,000 output tokens, a 60 s timeout, and 1 SDK retry. The SDK's own `httpx2` stack is used; it is the only module importing `openai`.
+- `FakeExplanationProvider` is used for tests and demos.
+- `explain_findings` never raises. Every failure becomes `status=failed` with a reason: `timeout`, `rate_limited`, `authentication_failed`, `permission_denied`, `model_not_found`, `unavailable`, `refusal`, `incomplete: <reason>`, `invalid_output`, or `provider_error_<status>`. An overall 150 s guard applies.
+- Label and title text is cleaned (control characters removed, URL credentials redacted, 200 characters per label). The instructions declare it untrusted data.
 
 - `ExplanationProvider` interface in the domain; `OpenAIExplanationProvider` is the only file importing `openai`.
 - Input: scope, windows, coverage summary, and finding digests (ID, entity, category, severity, confidence, observed/expected values, time span). Output model (Pydantic, strict): `summary`, `hypotheses[{text, finding_ids[], likelihood: plausible|possible|speculative}]`, `investigation_steps[{text, finding_ids[]}]`, `uncertainty`, `provider`, `model`.

@@ -89,10 +89,30 @@
           "title": "Finding Id",
           "type": "string"
         },
+        "host": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Verified host, if any.",
+          "title": "Host"
+        },
         "observed": {
           "description": "Human-readable value with unit.",
           "title": "Observed",
           "type": "string"
+        },
+        "related_finding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Finding Ids",
+          "type": "array"
         },
         "severity": {
           "$ref": "#/$defs/Severity"

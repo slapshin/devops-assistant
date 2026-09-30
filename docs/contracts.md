@@ -41,6 +41,7 @@ Interfaces (`domain/interfaces.py`). T004 added `DiscoveredValues` (values plus 
   - `ExplanationResult.explanation` is null unless `status=succeeded`.
 - **Severity** is `low | medium | high | critical`. **Confidence** is `low | medium | high`, with `confidence_reasons[{code, message}]` listing every lowering factor. The two are never combined.
 - **Finding lifecycle** (T005, additive): `state` (`ongoing | resolved`), `recurrence` (`new | repeated | recurring`) and `prior_episode_days`. `AnalysisReport.trend_summary` (`worsening | improving | stable | inconclusive`, with confidence and measures) is nullable.
+- **Explanation input** (T006, additive): `FindingDigest.related_finding_ids` and `host` pass verified relations to providers.
 - **Detection method**: `relative` needs `expected` and `peak_score`. `absolute` needs `threshold`, which is a diagnostic heuristic, never an SLO.
 
 ## Identifiers and ownership

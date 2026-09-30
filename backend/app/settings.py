@@ -14,6 +14,8 @@ from app.domain.explanation import ExplanationStatus
 class AIProvider(StrEnum):
     OPENAI = "openai"
     NONE = "none"
+    FAKE = "fake"
+    """Deterministic template provider for tests and offline demos (no network)."""
 
 
 class ConfigError(Exception):
@@ -91,6 +93,8 @@ class Settings(BaseSettings):
         """Static AI availability; PENDING means configured (per-report status varies)."""
         if self.ai_provider is AIProvider.NONE:
             return ExplanationStatus.DISABLED
+        if self.ai_provider is AIProvider.FAKE:
+            return ExplanationStatus.PENDING
         if self.openai_api_key is None or not self.openai_model:
             return ExplanationStatus.NOT_CONFIGURED
         return ExplanationStatus.PENDING
