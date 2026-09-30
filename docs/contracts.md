@@ -73,7 +73,7 @@ The analysis key is `project|env|T|config_hash` (T005). It deliberately excludes
 
 Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-api-conventions), and are visible in `docs/contracts/openapi.json`. Errors are `application/problem+json` with `{type, title, status, detail?, code, errors?}`. Validation errors list `errors[{field, message}]`, where `field` is a dotted location such as `body.env`.
 
-`not_implemented` (501) is a **foundation-only** code. Routes whose behaviour belongs to T004/T007 return it until then, so the contract is visible but the feature is visibly incomplete.
+`not_implemented` (501) was a foundation-only code; since T007 no route returns it. Cancelled jobs have `error: null`. An unreadable saved schema returns 404 with `code=schema_unsupported`. `METRICS_URL=synthetic://<healthy|incident|short-history|degraded>` selects the deterministic demo source; its reports carry `source.backend="synthetic"`.
 
 ## Schema versions
 

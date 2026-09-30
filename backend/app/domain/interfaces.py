@@ -3,14 +3,15 @@ storage and orchestration). Kept free of web framework and LLM SDK types."""
 
 import asyncio
 from collections.abc import Sequence
+from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
 from pydantic import Field
 
-from app.domain.common import Contract, Scope, UtcDatetime
+from app.domain.common import Contract, Scope, Severity, UtcDatetime
 from app.domain.detector_config import DetectorConfig
-from app.domain.explanation import Explanation, ExplanationInput
+from app.domain.explanation import Explanation, ExplanationInput, ExplanationStatus
 from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
 from app.domain.jobs import AnalysisJob, JobError, JobState, StageProgress
 from app.domain.metrics import MetricCapability, MetricSeries
@@ -155,7 +156,7 @@ class AnalysisService(Protocol):
 
 
 class ReportRepository(Protocol):
-    """SQLite-backed job and report persistence (T007)."""
+    """Job and report persistence (implemented by app.storage.repository, T007)."""
 
     async def create_job(self, job: AnalysisJob) -> None: ...
 
@@ -163,14 +164,25 @@ class ReportRepository(Protocol):
 
     async def find_active(self, request: AnalysisRequest) -> AnalysisJob | None: ...
 
+    async def count_active(self) -> dict[JobState, int]: ...
+
     async def list_jobs(
         self, scope: Scope | None, limit: int, cursor: str | None
     ) -> tuple[list[AnalysisJob], str | None]: ...
 
+    async def mark_running(self, analysis_id: str, at: datetime) -> AnalysisJob | None: ...
+
     async def update_stage(self, analysis_id: str, progress: StageProgress) -> None: ...
 
     async def finish_job(
-        self, analysis_id: str, state: JobState, error: JobError | None
+        self,
+        analysis_id: str,
+        state: JobState,
+        error: JobError | None,
+        *,
+        explanation_status: ExplanationStatus | None = None,
+        finding_counts: dict[Severity, int] | None = None,
+        report_available: bool = False,
     ) -> AnalysisJob: ...
 
     async def save_report(self, report: AnalysisReport) -> None: ...
@@ -179,4 +191,8 @@ class ReportRepository(Protocol):
 
     async def fail_interrupted(self) -> int:
         """Mark queued/running jobs failed with interrupted_by_restart; return the count."""
+        ...
+
+    async def stats(self) -> tuple[int, int]:
+        """(report count, database bytes)."""
         ...

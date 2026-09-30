@@ -23,12 +23,12 @@ Users can submit, track, cancel, and retrieve a complete analysis whose evidence
 
 ## Acceptance
 
-- [ ] Project/env discovery, analysis submission, progress, cancellation, and report retrieval follow the frozen contract.
-- [ ] Collection, numerical analysis, and optional AI use one immutable scope/end time/configuration version.
-- [ ] Job transitions, duplicate submissions, queue limits, cancellation, and restart recovery behave as documented.
-- [ ] Completed/partial report data and evidence survive restart in real SQLite storage.
-- [ ] Source failure, insufficient data, unsupported metrics, and AI failure remain distinct.
-- [ ] The application service is reusable by future CLI and scheduling adapters.
+- [x] Project/env discovery, analysis submission, progress, cancellation, and report retrieval follow the frozen contract.
+- [x] Collection, numerical analysis, and optional AI use one immutable scope/end time/configuration version.
+- [x] Job transitions, duplicate submissions, queue limits, cancellation, and restart recovery behave as documented.
+- [x] Completed/partial report data and evidence survive restart in real SQLite storage.
+- [x] Source failure, insufficient data, unsupported metrics, and AI failure remain distinct.
+- [x] The application service is reusable by future CLI and scheduling adapters.
 
 ## Verification
 
@@ -36,11 +36,35 @@ Use the real SQLite repository and deterministic source/provider adapters to exe
 
 ## Completion record
 
-Not started. Fill in after execution:
-
-- Completed date:
+- Completed date: 2026-09-30
 - Actual changed files and artifacts:
+  - `backend/app/storage/{db,repository}.py` and `backend/migrations/` (Alembic `0001_initial`, upgrade-only at startup)
+  - `backend/app/service.py` (`AnalysisPipeline`, the framework-independent entry point, with the report size budget)
+  - `backend/app/jobs.py` (`JobRunner`)
+  - `backend/app/container.py`, `backend/app/main.py` (lifespan wiring, `synthetic://` source), `backend/app/api/routes.py` (all routes implemented)
+  - `backend/app/domain/interfaces.py` (repository protocol), `app/settings.py`
+  - `backend/tests/test_api.py` (rewritten as integration tests)
+  - `docs/contracts.md`, `docs/DECISIONS.md` §4
 - Commands/checks and results:
+  - `make check` passes (266 backend tests passed, 2 skipped; ruff and mypy strict clean; 7 frontend tests; build).
+  - The integration tests use real SQLite in `tmp_path`, `TestClient` with lifespan, and deterministic synthetic/gated/flaky/down sources. They cover:
+    - discovery and 404s; end-time validation and flooring
+    - submit → progress → report with valid explanation references
+    - duplicate submissions (200 plus the same ID); `report_not_ready` (409); queue full (429 with `Retry-After`)
+    - cancelling running and queued jobs; 409 on terminal jobs
+    - AI failure and AI disabled keeping numerical reports; source exclusions giving `partial`; unreachable source giving `failed/metrics_source_unavailable`
+    - restart: a completed report stays identical and a running job becomes `failed/interrupted_by_restart`
+    - scope isolation and cursor pagination; tampered schema giving `schema_unsupported`
+    - the pipeline used without FastAPI; report size budget disclosure
+  - Live end-to-end (tunnel, read-only): uvicorn with `METRICS_URL=http://localhost:8428` and `AI_PROVIDER=fake`. paas/production completed in 43 s with 10 findings and a stable trend; the report was 214 KB. After restarting the server the report bytes were identical (MD5).
 - Decisions or dependency changes:
+  - Cancelled jobs have no error.
+  - `schema_unsupported` is returned as a 404 problem.
+  - The synthetic demo source is selected by `METRICS_URL=synthetic://…`.
+  - Report budget handling first drops secondary evidence, then truncates episode lists, and discloses both as `evidence_dropped`.
+  - No new dependencies.
 - Remaining limitations or blockers:
-- Next ready task:
+  - Jobs are not resumed after a restart (by design).
+  - The fake AI provider was used live; OpenAI remains unverified (see T006).
+  - Single process only; no authentication (local exposure).
+- Next ready task: T008.

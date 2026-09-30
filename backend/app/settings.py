@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     @classmethod
     def _valid_metrics_url(cls, value: str) -> str:
         parts = urlsplit(value)
+        if parts.scheme == "synthetic":
+            if not parts.netloc:
+                raise ValueError("expected synthetic://<scenario>, e.g. synthetic://incident")
+            return value
         if parts.scheme not in ("http", "https") or not parts.hostname:
             raise ValueError("expected an http(s) URL such as http://localhost:8428")
         if parts.username or parts.password:
@@ -112,6 +116,12 @@ class Settings(BaseSettings):
             if not value
         ]
         return f"Set {' and '.join(missing)} or AI_PROVIDER=none"
+
+    @property
+    def synthetic_scenario(self) -> str | None:
+        """Scenario name when METRICS_URL=synthetic://<scenario> (demo/testing only)."""
+        parts = urlsplit(self.metrics_url)
+        return parts.netloc if parts.scheme == "synthetic" else None
 
     @property
     def database_path(self) -> Path:

@@ -2,7 +2,7 @@
 
 This is the execution index for the first usable DevOps AI assistant release. Read [the product plan](../PRODUCT_PLAN.md) and [architecture](../ARCHITECTURE.md) before starting. Web UI, project/env selection, 24-hour analysis, two-week trends, and OpenAI-first explanations are confirmed. The Vue.js frontend is an owner decision (2026-09-30); Python/FastAPI, TypeScript, SQLite, and Docker are proposed defaults made concrete in T001.
 
-T001–T006 are DONE (decisions, foundations, contracts, telemetry, metrics client, detection, AI explanations); T007 is in progress. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
+T001–T007 are DONE (decisions, foundations, contracts, telemetry, metrics client, detection, AI explanations, API/persistence); T008 is in progress. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
 
 ## Ordered backlog
 
@@ -14,8 +14,8 @@ T001–T006 are DONE (decisions, foundations, contracts, telemetry, metrics clie
 | T004 | [Metrics client and scoped query catalog](T004-metrics-client-and-queries.md) | T002, T003 | DONE |
 | T005 | [Anomaly detection and two-week trends](T005-anomaly-detection-and-trends.md) | T002 | DONE |
 | T006 | [OpenAI explanations and provider abstraction](T006-ai-explanations.md) | T002, T005 | DONE |
-| T007 | [Analysis API, jobs, and report persistence](T007-analysis-api-and-persistence.md) | T004, T005, T006 | IN_PROGRESS |
-| T008 | [Web interface and evidence exploration](T008-web-interface.md) | T002, T007 | TODO |
+| T007 | [Analysis API, jobs, and report persistence](T007-analysis-api-and-persistence.md) | T004, T005, T006 | DONE |
+| T008 | [Web interface and evidence exploration](T008-web-interface.md) | T002, T007 | IN_PROGRESS |
 | T009 | [Local packaging and operation documentation](T009-packaging-and-operation.md) | T007, T008 | TODO |
 | T010 | [First-release acceptance and agent handoff](T010-release-validation.md) | T009 | TODO |
 

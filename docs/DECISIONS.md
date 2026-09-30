@@ -103,7 +103,7 @@ Error codes: `validation_error` (422), `project_not_found` / `env_not_found` (40
 - `completed`: all *supported* signal families were collected and analysed. Unsupported/insufficient signals do not make a job partial — they are expected coverage facts.
 - `partial`: a report was saved but some supported families hit source errors, timeouts, or budget truncation. The report lists each omission.
 - `failed`: no usable report (e.g. source unreachable at collection start, internal error, restart interruption).
-- `cancelled`: user cancellation; no report is saved.
+- `cancelled`: user cancellation; no report is saved (`error` is null). T007 cancels a running job by cancelling its task, which aborts in-flight source/provider requests immediately; the token is also checked between stages.
 - Explanation state is **separate**: `disabled | not_configured | pending | succeeded | failed | skipped_no_findings`. AI failure never changes a numerical `completed` to `failed` or `partial`.
 
 **Stages and progress** (stored on the job, exposed by `GET /api/analyses/{id}`): `discovery → collection → detection → trends → explanation → saving`, each `{stage, status, started_at, finished_at, done, total, message}`.
