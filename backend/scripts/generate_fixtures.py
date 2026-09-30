@@ -233,6 +233,213 @@ def capabilities(
     ]
 
 
+def observed_capabilities() -> list[MetricCapability]:
+    """paas/production capabilities verified live by T003 (docs/telemetry-inventory.md §4)."""
+    history = 28.4
+    http_labels = [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code",
+    ]
+    rpc_labels = ["project", "env", "job", "instance", "rpc_method", "rpc_response_status_code"]
+    node_labels = ["project", "env", "job", "instance"]
+
+    def cap(
+        family: SignalFamily,
+        signal: str,
+        status: CapabilityStatus,
+        metrics: list[str],
+        labels: list[str],
+        reason: str | None = None,
+    ) -> MetricCapability:
+        observed = [] if status is CapabilityStatus.UNSUPPORTED else metrics
+        return MetricCapability(
+            family=family,
+            signal=signal,
+            status=status,
+            verified=True,
+            required_metrics=metrics,
+            required_labels=labels,
+            observed_metrics=observed,
+            reason=reason,
+            history_days=None if status is CapabilityStatus.UNSUPPORTED else history,
+        )
+
+    ok, partial, unsupported = (
+        CapabilityStatus.SUPPORTED,
+        CapabilityStatus.PARTIAL,
+        CapabilityStatus.UNSUPPORTED,
+    )
+    return [
+        cap(
+            SignalFamily.CPU,
+            "cpu_utilization",
+            ok,
+            ["node_cpu_seconds_total"],
+            [*node_labels, "mode"],
+        ),
+        cap(SignalFamily.CPU, "cpu_iowait", ok, ["node_cpu_seconds_total"], [*node_labels, "mode"]),
+        cap(
+            SignalFamily.MEMORY,
+            "memory_utilization",
+            ok,
+            ["node_memory_MemAvailable_bytes", "node_memory_MemTotal_bytes"],
+            node_labels,
+        ),
+        cap(
+            SignalFamily.FILESYSTEM,
+            "filesystem_used_ratio",
+            ok,
+            ["node_filesystem_avail_bytes", "node_filesystem_size_bytes"],
+            [*node_labels, "device", "mountpoint", "fstype"],
+            "ext4 only by default; tmpfs, nfs4, overlay excluded.",
+        ),
+        cap(
+            SignalFamily.FILESYSTEM,
+            "filesystem_inodes_used_ratio",
+            ok,
+            ["node_filesystem_files", "node_filesystem_files_free"],
+            [*node_labels, "device", "mountpoint", "fstype"],
+        ),
+        cap(
+            SignalFamily.DISK_IO,
+            "disk_busy_ratio",
+            ok,
+            ["node_disk_io_time_seconds_total"],
+            [*node_labels, "device"],
+            "sr0 excluded.",
+        ),
+        cap(
+            SignalFamily.NETWORK,
+            "network_bytes",
+            ok,
+            ["node_network_receive_bytes_total", "node_network_transmit_bytes_total"],
+            [*node_labels, "device"],
+            "lo excluded.",
+        ),
+        cap(
+            SignalFamily.NETWORK,
+            "network_errors",
+            ok,
+            [
+                "node_network_receive_errs_total",
+                "node_network_transmit_errs_total",
+                "node_network_receive_drop_total",
+                "node_network_transmit_drop_total",
+            ],
+            [*node_labels, "device"],
+        ),
+        cap(
+            SignalFamily.CONTAINER,
+            "container_cpu",
+            partial,
+            ["container_cpu_usage_seconds_total"],
+            [*node_labels, "name", "id"],
+            "Named containers on 3 of 4 hosts; paas-production-4 exposes only the root cgroup.",
+        ),
+        cap(
+            SignalFamily.CONTAINER,
+            "container_memory_working_set",
+            partial,
+            ["container_memory_working_set_bytes"],
+            [*node_labels, "name", "id"],
+            "Same host coverage as container_cpu.",
+        ),
+        cap(
+            SignalFamily.CONTAINER,
+            "container_memory_limit_ratio",
+            unsupported,
+            ["container_spec_memory_limit_bytes"],
+            [*node_labels, "name"],
+            "container_spec_memory_limit_bytes is 0 for every container (no limits set).",
+        ),
+        cap(
+            SignalFamily.CONTAINER,
+            "container_throttling_ratio",
+            unsupported,
+            ["container_cpu_cfs_throttled_periods_total", "container_cpu_cfs_periods_total"],
+            [*node_labels, "name"],
+            "No container_cpu_cfs_* metrics exported.",
+        ),
+        cap(
+            SignalFamily.CONTAINER,
+            "container_oom",
+            ok,
+            ["container_oom_events_total"],
+            [*node_labels, "name"],
+        ),
+        cap(
+            SignalFamily.CONTAINER,
+            "container_restarts",
+            ok,
+            [
+                "docker_swarm_task_info",
+                "docker_swarm_service_replicas_running",
+                "container_start_time_seconds",
+            ],
+            ["project", "env", "service_name", "node_hostname"],
+            "Detect changes; exit-code series include historical tasks.",
+        ),
+        cap(
+            SignalFamily.REQUEST_TRAFFIC,
+            "request_rate",
+            ok,
+            ["http_server_request_duration_seconds_count"],
+            http_labels,
+        ),
+        cap(
+            SignalFamily.REQUEST_TRAFFIC,
+            "rpc_request_rate",
+            ok,
+            ["rpc_server_call_duration_seconds_count"],
+            rpc_labels,
+        ),
+        cap(
+            SignalFamily.REQUEST_FAILURES,
+            "server_error_ratio",
+            ok,
+            ["http_server_request_duration_seconds_count"],
+            http_labels,
+            "5xx extremely rare (2 in 27 days); classify by http_response_status_code only.",
+        ),
+        cap(
+            SignalFamily.REQUEST_FAILURES,
+            "rpc_error_ratio",
+            ok,
+            ["rpc_server_call_duration_seconds_count"],
+            rpc_labels,
+            'Failure = rpc_response_status_code != "OK".',
+        ),
+        cap(
+            SignalFamily.CLIENT_ERRORS,
+            "client_error_rate",
+            ok,
+            ["http_server_request_duration_seconds_count"],
+            http_labels,
+        ),
+        cap(
+            SignalFamily.LATENCY,
+            "latency_quantile",
+            ok,
+            ["http_server_request_duration_seconds_bucket"],
+            [*http_labels, "le"],
+            "Classic buckets 0.005-10 s; quantiles above 10 s are not resolvable.",
+        ),
+        cap(
+            SignalFamily.LATENCY,
+            "rpc_latency_quantile",
+            ok,
+            ["rpc_server_call_duration_seconds_bucket"],
+            [*rpc_labels, "le"],
+            "Classic buckets 0.005-10 s.",
+        ),
+    ]
+
+
 # --- series and evidence ----------------------------------------------------------------------
 
 
@@ -853,6 +1060,9 @@ def build() -> dict[str, BaseModel]:
         ),
         "metrics/capabilities_supplied_unverified.json": _Manifest(
             items=capabilities(history_days=None, histogram=True)
+        ),
+        "metrics/capabilities_paas_production_observed.json": _Manifest(
+            items=observed_capabilities()
         ),
     }
 

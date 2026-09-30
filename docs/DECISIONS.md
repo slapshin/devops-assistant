@@ -129,7 +129,7 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 ### Windows and resolution
 
 - Latest day `[T-24h, T)`; trend buckets `B_i = [T-(i+1)·24h, T-i·24h)`, `i = 0..13` (`B_0` is the latest day, so the latest-day findings and trend day 14 use identical calculations).
-- Collection range `[T-28d-lookback, T)` at **step 300 s**. Rate window `max(300s, 4 × scrape_interval)`; scrape interval from T003 (assume 30 s until verified → 300 s).
+- Collection range `[T-28d-lookback, T)` at **step 300 s**. Rate window `max(300s, 4 × scrape_interval)`. T003 verified a 10 s scrape interval for every paas/production job, so the window is 300 s. The source's 4-week retention puts `T-28d-5m` at the edge of the data: the oldest trend bucket's first baseline day may be partially covered, and the coverage rules below account for that rather than a longer range.
 - Baseline for a bucket: preceding days only, up to 14 days `[start-14d, start)`. Never the bucket itself or later data.
 
 ### Coverage
@@ -154,14 +154,14 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | CPU | non-idle utilisation from `node_cpu_seconds_total` (`1 - idle` rate per instance; iowait and steal reported separately) | up | +10 pp | ≥ 90 % for ≥ 15 min |
 | CPU | iowait share | up | +5 pp | ≥ 20 % for ≥ 15 min |
 | Memory | `1 - MemAvailable/MemTotal` | up | +10 pp | available < 10 % for ≥ 15 min |
-| Filesystem | used ratio / inode used ratio (device, mountpoint; excluding tmpfs/overlay by default) | up | +5 pp | free < 10 % (high) / < 5 % (critical) |
-| Disk I/O | device busy time ratio, read/write bytes | up | +20 pp busy | busy ≥ 90 % for ≥ 15 min |
-| Network | rx/tx bytes, errors, drops per device | both (bytes), up (errors/drops) | ×2 or ÷2 bytes; errors/drops > 0 when baseline ≈ 0 | — |
-| Container | CPU usage, memory working set, CPU throttling ratio, restarts/OOM (only if T003 verifies the metrics) | up | +25 % | memory ≥ 90 % of limit; throttling ≥ 25 %; any restart/OOM increase |
+| Filesystem | used ratio / inode used ratio (device, mountpoint; excluding fstypes tmpfs/overlay/nfs4 by default; T003) | up | +5 pp | free < 10 % (high) / < 5 % (critical) |
+| Disk I/O | device busy time ratio, read/write bytes (excluding `sr*` optical devices) | up | +20 pp busy | busy ≥ 90 % for ≥ 15 min |
+| Network | rx/tx bytes, errors, drops per device (excluding `lo`) | both (bytes), up (errors/drops) | ×2 or ÷2 bytes; errors/drops > 0 when baseline ≈ 0 | — |
+| Container | CPU usage, memory working set per swarm task/container (`name`), restarts (swarm task changes, `container_start_time_seconds` changes), OOM (`container_oom_events_total`) | up | +25 % | any restart/OOM increase. Memory ≥ 90 % of limit and throttling ≥ 25 % apply only when limits/CFS metrics exist. T003 found neither for paas/production, so those are `unsupported` there. |
 | HTTP/RPC traffic | request rate (service, route, method) | both | ×2 or ÷2 and ≥ 0.2 req/s change | — |
-| HTTP/RPC failure | 5xx ratio (`http_response_status_code=~"5.."` / all; RPC error status per T003) | up | +2 pp | ≥ 5 % over a step window with ≥ 30 requests |
+| HTTP/RPC failure | 5xx ratio (`http_response_status_code=~"5.."` / all); RPC failure ratio (`rpc_response_status_code!="OK"` / all). Baselines are ≈ 0 in practice (T003), so the absolute check is the main detector. | up | +2 pp | ≥ 5 % over a step window with ≥ 30 requests |
 | HTTP client errors | 4xx rate and 4xx ratio, 404 shown separately | up | ×2 and +1 pp | — (never a failure) |
-| Latency | p95/p99 from verified histograms; mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
+| Latency | p95/p99 from verified classic histograms (HTTP and RPC buckets 0.005–10 s; values at the top bucket are reported as "≥ 10 s"); mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
 
 - Rates are computed before aggregation; ratio numerator and denominator use the same selector scope (project, env, and entity labels).
 - A ratio step is evaluated only when the denominator has ≥ 30 requests in the step window; otherwise the step is not observed for that ratio (reduces coverage, not healthy).
@@ -196,7 +196,7 @@ Confidence = the minimum of these factors; every lowering factor is listed in `c
 
 ### Correlation
 
-Findings are grouped only when they share identity labels (same `(job, instance)`, same device, or an explicit mapping). Overlapping time windows across unrelated entities may be mentioned only as a hypothesis ("coincides with"), never as attribution. The node instance `paas-production` and HTTP instance `10.0.4.251:5555` are not related unless T003 finds a mapping.
+Findings are grouped only when they share identity labels (same `(job, instance)`, same device, or an explicit mapping). Overlapping time windows across unrelated entities may be mentioned only as a hypothesis ("coincides with"), never as attribution. The node instance `paas-production` and HTTP instance `10.0.4.251:5555` are not related by name. T003 verified a label mapping, applied per time step: `target_info.service_instance_id` → cAdvisor `id` → cAdvisor `instance` = node `instance`. Swarm `docker_swarm_task_info.node_hostname` gives a second one. This is how service findings may be attributed to a host ([telemetry inventory §5](telemetry-inventory.md#5-identity-and-cross-layer-mappings)).
 
 ### Trends
 
@@ -206,11 +206,12 @@ Per bucket: `episode_count`, `anomalous_minutes`, `peak_severity`, `affected_ent
 
 | Budget | Default |
 | --- | --- |
-| Per-query timeout | 30 s |
+| Per-query timeout | 30 s (equals the source's `search.maxQueryDuration=30s`) |
+| Range chunking | Split every range query into ≤ 7-day chunks, merged client-side. T003 measured 22.6 s for one 28-day CPU query on paas-gpu/production. |
 | Concurrent queries per job | 4 |
 | Max series per query | 500 → stop, mark family `truncated`, job `partial` |
 | Max series per job | 5,000 |
-| Max points per series | 30 days × 288 = 8,640 (within VictoriaMetrics and Prometheus per-series point limits; chunk the range if a source rejects it) |
+| Max points per series | 30 days × 288 = 8,640 (source limit `search.maxPointsPerTimeseries=30000`, verified) |
 | Discovery lookback | 28 days, results cached 5 min per scope |
 | Label value cardinality guard | max 200 projects / 50 envs per project shown; excess reported |
 | Evidence per finding | up to 3 series; window = episode ± 6 h at 300 s step, with baseline median and expected band |
@@ -243,7 +244,7 @@ docs/contracts/            (generated JSON Schema)
 
 ## 9. Revisit triggers
 
-- T003 finds a scrape interval ≠ 30 s, retention < 15 days, container/RPC metric names, or histograms → update §5/§6 and the fixtures.
+- Applied from T003 (2026-09-30): 10 s scrape interval, 4-week retention, container/RPC metric names, classic histograms, range chunking. Revisit if another scope differs (runtime discovery must not assume paas/production capabilities).
 - typescript-eslint supports TypeScript 7 → drop the TypeScript 6.0 exception.
 - openapi-typescript declares TypeScript 6+ support → remove the npm `overrides` entry.
 - Node 26 becomes LTS (scheduled October 2026) → consider moving from 24.

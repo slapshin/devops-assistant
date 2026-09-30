@@ -1,0 +1,477 @@
+{
+  "items": [
+    {
+      "family": "cpu",
+      "signal": "cpu_utilization",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "mode"
+      ],
+      "observed_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "cpu",
+      "signal": "cpu_iowait",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "mode"
+      ],
+      "observed_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "memory",
+      "signal": "memory_utilization",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_memory_MemAvailable_bytes",
+        "node_memory_MemTotal_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "node_memory_MemAvailable_bytes",
+        "node_memory_MemTotal_bytes"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "filesystem",
+      "signal": "filesystem_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_filesystem_avail_bytes",
+        "node_filesystem_size_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "device",
+        "mountpoint",
+        "fstype"
+      ],
+      "observed_metrics": [
+        "node_filesystem_avail_bytes",
+        "node_filesystem_size_bytes"
+      ],
+      "reason": "ext4 only by default; tmpfs, nfs4, overlay excluded.",
+      "history_days": 28.4
+    },
+    {
+      "family": "filesystem",
+      "signal": "filesystem_inodes_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_filesystem_files",
+        "node_filesystem_files_free"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "device",
+        "mountpoint",
+        "fstype"
+      ],
+      "observed_metrics": [
+        "node_filesystem_files",
+        "node_filesystem_files_free"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "disk_io",
+      "signal": "disk_busy_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_disk_io_time_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "device"
+      ],
+      "observed_metrics": [
+        "node_disk_io_time_seconds_total"
+      ],
+      "reason": "sr0 excluded.",
+      "history_days": 28.4
+    },
+    {
+      "family": "network",
+      "signal": "network_bytes",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_network_receive_bytes_total",
+        "node_network_transmit_bytes_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "device"
+      ],
+      "observed_metrics": [
+        "node_network_receive_bytes_total",
+        "node_network_transmit_bytes_total"
+      ],
+      "reason": "lo excluded.",
+      "history_days": 28.4
+    },
+    {
+      "family": "network",
+      "signal": "network_errors",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_network_receive_errs_total",
+        "node_network_transmit_errs_total",
+        "node_network_receive_drop_total",
+        "node_network_transmit_drop_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "device"
+      ],
+      "observed_metrics": [
+        "node_network_receive_errs_total",
+        "node_network_transmit_errs_total",
+        "node_network_receive_drop_total",
+        "node_network_transmit_drop_total"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "container",
+      "signal": "container_cpu",
+      "status": "partial",
+      "verified": true,
+      "required_metrics": [
+        "container_cpu_usage_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "name",
+        "id"
+      ],
+      "observed_metrics": [
+        "container_cpu_usage_seconds_total"
+      ],
+      "reason": "Named containers on 3 of 4 hosts; paas-production-4 exposes only the root cgroup.",
+      "history_days": 28.4
+    },
+    {
+      "family": "container",
+      "signal": "container_memory_working_set",
+      "status": "partial",
+      "verified": true,
+      "required_metrics": [
+        "container_memory_working_set_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "name",
+        "id"
+      ],
+      "observed_metrics": [
+        "container_memory_working_set_bytes"
+      ],
+      "reason": "Same host coverage as container_cpu.",
+      "history_days": 28.4
+    },
+    {
+      "family": "container",
+      "signal": "container_memory_limit_ratio",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "container_spec_memory_limit_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "name"
+      ],
+      "observed_metrics": [],
+      "reason": "container_spec_memory_limit_bytes is 0 for every container (no limits set).",
+      "history_days": null
+    },
+    {
+      "family": "container",
+      "signal": "container_throttling_ratio",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "container_cpu_cfs_throttled_periods_total",
+        "container_cpu_cfs_periods_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "name"
+      ],
+      "observed_metrics": [],
+      "reason": "No container_cpu_cfs_* metrics exported.",
+      "history_days": null
+    },
+    {
+      "family": "container",
+      "signal": "container_oom",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "container_oom_events_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "name"
+      ],
+      "observed_metrics": [
+        "container_oom_events_total"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "container",
+      "signal": "container_restarts",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "docker_swarm_task_info",
+        "docker_swarm_service_replicas_running",
+        "container_start_time_seconds"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "service_name",
+        "node_hostname"
+      ],
+      "observed_metrics": [
+        "docker_swarm_task_info",
+        "docker_swarm_service_replicas_running",
+        "container_start_time_seconds"
+      ],
+      "reason": "Detect changes; exit-code series include historical tasks.",
+      "history_days": 28.4
+    },
+    {
+      "family": "request_traffic",
+      "signal": "request_rate",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "request_traffic",
+      "signal": "rpc_request_rate",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "rpc_server_call_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "rpc_method",
+        "rpc_response_status_code"
+      ],
+      "observed_metrics": [
+        "rpc_server_call_duration_seconds_count"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "request_failures",
+      "signal": "server_error_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": "5xx extremely rare (2 in 27 days); classify by http_response_status_code only.",
+      "history_days": 28.4
+    },
+    {
+      "family": "request_failures",
+      "signal": "rpc_error_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "rpc_server_call_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "rpc_method",
+        "rpc_response_status_code"
+      ],
+      "observed_metrics": [
+        "rpc_server_call_duration_seconds_count"
+      ],
+      "reason": "Failure = rpc_response_status_code != \"OK\".",
+      "history_days": 28.4
+    },
+    {
+      "family": "client_errors",
+      "signal": "client_error_rate",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": null,
+      "history_days": 28.4
+    },
+    {
+      "family": "latency",
+      "signal": "latency_quantile",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code",
+        "le"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_bucket"
+      ],
+      "reason": "Classic buckets 0.005-10 s; quantiles above 10 s are not resolvable.",
+      "history_days": 28.4
+    },
+    {
+      "family": "latency",
+      "signal": "rpc_latency_quantile",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "rpc_server_call_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "rpc_method",
+        "rpc_response_status_code",
+        "le"
+      ],
+      "observed_metrics": [
+        "rpc_server_call_duration_seconds_bucket"
+      ],
+      "reason": "Classic buckets 0.005-10 s.",
+      "history_days": 28.4
+    }
+  ]
+}

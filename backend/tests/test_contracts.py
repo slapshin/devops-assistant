@@ -79,6 +79,16 @@ def test_fixture_validates_against_exported_json_schema(rel: str) -> None:
     jsonschema.validate(json.loads((FIXTURES / rel).read_text()), schema)
 
 
+def test_observed_manifest_is_verified_and_honest_about_gaps() -> None:
+    items = json.loads(
+        (FIXTURES / "metrics/capabilities_paas_production_observed.json").read_text()
+    )["items"]
+    assert all(c["verified"] for c in items)
+    unsupported = {c["signal"] for c in items if c["status"] == "unsupported"}
+    assert unsupported == {"container_memory_limit_ratio", "container_throttling_ratio"}
+    assert all(not c["observed_metrics"] for c in items if c["status"] == "unsupported")
+
+
 def test_capability_manifest_is_explicitly_unverified() -> None:
     items = json.loads((FIXTURES / "metrics/capabilities_supplied_unverified.json").read_text())
     assert items["items"]

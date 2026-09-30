@@ -56,7 +56,7 @@ The analysis key is `analysis_id|project|env|T|config_hash`. Report validation r
 
 ## States
 
-- **Capability** (`CapabilityStatus`): `supported | partial | unsupported | unverified`. `verified=true` only when the capability was observed in the live source. T003 produces the first verified manifest; until then `fixtures/metrics/capabilities_supplied_unverified.json` applies.
+- **Capability** (`CapabilityStatus`): `supported | partial | unsupported | unverified`. `verified=true` only when the capability was observed in the live source. T003 produced the first verified manifest for paas/production (`fixtures/metrics/capabilities_paas_production_observed.json`). Other scopes are discovered at runtime.
 - **Signal coverage** (`SignalStatus`): `anomalous | no_anomaly | insufficient_data | unsupported | source_error | not_evaluated`. The UI vocabulary is in UI_SPEC §5.
 - **Trend bucket**: `ok | insufficient_baseline | insufficient_data | source_error`.
 - **Job** (`JobState`): `queued | running | completed | partial | failed | cancelled`. **Stages**: `discovery, collection, detection, trends, explanation, saving`, each `pending | running | done | failed | skipped`.
@@ -90,6 +90,7 @@ All fixtures are synthetic and sanitised. They use the supplied label convention
 | `reports/report_partial_source_error.json` | Partial report: network queries timed out (exclusion listed); AI `not_configured` |
 | `jobs/job_running.json`, `job_completed.json`, `job_interrupted.json`, `submitted_duplicate.json` | Lifecycle states, including restart interruption and a duplicate submission |
 | `api/config.json`, `projects.json`, `envs.json`, `problem_queue_full.json`, `problem_report_not_ready.json` | API bodies |
-| `metrics/capabilities_supplied_unverified.json` | Capability manifest from supplied examples only (all `verified=false`) |
+| `metrics/capabilities_supplied_unverified.json` | Capability manifest from supplied examples only (all `verified=false`); fallback for scopes not yet discovered |
+| `metrics/capabilities_paas_production_observed.json` | paas/production capabilities verified live by T003, including `partial` containers and `unsupported` memory limits/throttling |
 
 Fixture values are illustrative. They are not detector output: T005 must derive its own results from series and must not copy them.
