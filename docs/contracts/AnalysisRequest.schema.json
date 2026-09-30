@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "Scope": {
+      "additionalProperties": false,
+      "description": "Exactly one project/env pair. Every query and report stays inside it.",
+      "properties": {
+        "env": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Env",
+          "type": "string"
+        },
+        "project": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Project",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "env"
+      ],
+      "title": "Scope",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Framework-independent input to AnalysisService. end_time is already frozen and aligned.",
+  "properties": {
+    "config_hash": {
+      "pattern": "^[0-9a-f]{12}$",
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "detector_version": {
+      "title": "Detector Version",
+      "type": "string"
+    },
+    "end_time": {
+      "title": "End Time",
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/$defs/Scope"
+    }
+  },
+  "required": [
+    "scope",
+    "end_time",
+    "detector_version",
+    "config_hash"
+  ],
+  "title": "AnalysisRequest",
+  "type": "object"
+}

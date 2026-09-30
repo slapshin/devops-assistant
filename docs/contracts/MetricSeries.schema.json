@@ -1,0 +1,164 @@
+{
+  "$defs": {
+    "Entity": {
+      "additionalProperties": false,
+      "description": "Resource identity built from actual labels only; never inferred across namespaces.",
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "key": {
+          "description": "Stable canonical key, e.g. 'node|job=node|instance=paas-production'.",
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntityKind"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Identity labels only (no project/env).",
+          "title": "Labels",
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "display_name",
+        "labels"
+      ],
+      "title": "Entity",
+      "type": "object"
+    },
+    "EntityKind": {
+      "enum": [
+        "node",
+        "filesystem",
+        "disk",
+        "network_interface",
+        "container",
+        "service",
+        "route"
+      ],
+      "title": "EntityKind",
+      "type": "string"
+    },
+    "SignalFamily": {
+      "enum": [
+        "cpu",
+        "memory",
+        "filesystem",
+        "disk_io",
+        "network",
+        "container",
+        "request_traffic",
+        "request_failures",
+        "client_errors",
+        "latency"
+      ],
+      "title": "SignalFamily",
+      "type": "string"
+    },
+    "Unit": {
+      "enum": [
+        "ratio",
+        "bytes",
+        "bytes_per_second",
+        "requests_per_second",
+        "per_second",
+        "seconds",
+        "count"
+      ],
+      "title": "Unit",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One scoped series on a regular grid: values[i] is at start + i * step_seconds.\n\n`None` is a gap (no sample), never zero.",
+  "properties": {
+    "coverage": {
+      "description": "Share of steps with a sample.",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Coverage",
+      "type": "number"
+    },
+    "entity": {
+      "$ref": "#/$defs/Entity"
+    },
+    "family": {
+      "$ref": "#/$defs/SignalFamily"
+    },
+    "labels": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "All retained labels of the result series.",
+      "title": "Labels",
+      "type": "object"
+    },
+    "query": {
+      "description": "Exact PromQL/MetricsQL sent to the source.",
+      "minLength": 1,
+      "title": "Query",
+      "type": "string"
+    },
+    "series_id": {
+      "pattern": "^ser_[0-9a-f]{16}$",
+      "title": "Series Id",
+      "type": "string"
+    },
+    "signal": {
+      "description": "Derived signal, e.g. 'cpu_utilization'.",
+      "minLength": 1,
+      "title": "Signal",
+      "type": "string"
+    },
+    "start": {
+      "title": "Start",
+      "type": "string"
+    },
+    "step_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Step Seconds",
+      "type": "integer"
+    },
+    "unit": {
+      "$ref": "#/$defs/Unit"
+    },
+    "values": {
+      "items": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Values",
+      "type": "array"
+    }
+  },
+  "required": [
+    "series_id",
+    "family",
+    "signal",
+    "entity",
+    "labels",
+    "unit",
+    "query",
+    "step_seconds",
+    "start",
+    "values",
+    "coverage"
+  ],
+  "title": "MetricSeries",
+  "type": "object"
+}

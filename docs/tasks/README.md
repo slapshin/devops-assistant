@@ -2,14 +2,14 @@
 
 This is the execution index for the first usable DevOps AI assistant release. Read [the product plan](../PRODUCT_PLAN.md) and [architecture](../ARCHITECTURE.md) before starting. Web UI, project/env selection, 24-hour analysis, two-week trends, and OpenAI-first explanations are confirmed. Python/FastAPI, React/TypeScript, SQLite, and Docker are proposed defaults to make concrete in T001.
 
-T001 is DONE (decisions and UI blueprint only); T002 and T003 are ready. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
+T001 and T002 are DONE (decisions, foundations, and shared contracts); T003 and T005 are ready. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
 
 ## Ordered backlog
 
 | ID | Task | Dependencies | Status |
 | --- | --- | --- | --- |
 | T001 | [Technical decisions and UI blueprint](T001-decisions-and-design.md) | — | DONE |
-| T002 | [Application workspace and shared contracts](T002-workspace-and-contracts.md) | T001 | TODO |
+| T002 | [Application workspace and shared contracts](T002-workspace-and-contracts.md) | T001 | DONE |
 | T003 | [Read-only telemetry discovery](T003-telemetry-discovery.md) | T001 | TODO |
 | T004 | [Metrics client and scoped query catalog](T004-metrics-client-and-queries.md) | T002, T003 | TODO |
 | T005 | [Anomaly detection and two-week trends](T005-anomaly-detection-and-trends.md) | T002 | TODO |
@@ -61,4 +61,4 @@ Shared fixtures allow UI design/prototyping while backend work proceeds, but T00
 
 ## Suggested assignment for the next agent
 
-> Read `docs/tasks/README.md`, `docs/PRODUCT_PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/UI_SPEC.md`, and `docs/tasks/T002-workspace-and-contracts.md`. Complete T002: re-check and pin the recorded versions, scaffold backend/frontend foundations, implement and export the shared contracts and fixtures, and record commands/results. T003 (read-only telemetry discovery) is independently ready and may run in parallel only if the assignment authorizes it.
+> Read `docs/tasks/README.md`, `docs/PRODUCT_PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/contracts.md`, and `docs/tasks/T003-telemetry-discovery.md`. Complete T003 with bounded, read-only queries against `METRICS_URL`; record verified/unverified capabilities in `docs/telemetry-inventory.md` and update sanitized fixtures and DECISIONS §5/§6 revisit items as the findings require. T005 (depends only on T002) may run in parallel only if the assignment authorizes it.

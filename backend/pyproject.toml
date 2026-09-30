@@ -1,0 +1,52 @@
+[project]
+name = "devops-ai-assistant"
+version = "0.1.0"
+description = "DevOps AI assistant: scoped metrics anomaly analysis with AI explanations"
+requires-python = "==3.14.*"
+dependencies = [
+    "fastapi==0.142.1",
+    "uvicorn==0.54.0",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "httpx==0.28.1",
+    "numpy==2.5.3",
+    "sqlalchemy==2.1.1",
+    "alembic==1.20.0",
+    "openai==3.22.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.16.9",
+    "mypy==2.3.1",
+    "jsonschema==4.26.0",
+    "types-jsonschema==4.26.0.20260518",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"openai".msg = "Only app/ai/openai_adapter.py may import the OpenAI SDK."
+
+[tool.ruff.lint.per-file-ignores]
+"app/ai/openai_adapter.py" = ["TID251"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app", "tests", "scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

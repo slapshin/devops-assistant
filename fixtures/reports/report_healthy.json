@@ -1,0 +1,573 @@
+{
+  "schema_version": "1.0",
+  "analysis_id": "01999a2b-0000-7000-8000-000000000001",
+  "scope": {
+    "project": "paas",
+    "env": "production"
+  },
+  "windows": {
+    "end_time": "2026-09-30T10:05:00Z",
+    "latest_day": {
+      "start": "2026-09-29T10:05:00Z",
+      "end": "2026-09-30T10:05:00Z"
+    },
+    "trend": {
+      "start": "2026-09-16T10:05:00Z",
+      "end": "2026-09-30T10:05:00Z"
+    },
+    "step_seconds": 300
+  },
+  "generated_at": "2026-09-30T10:07:00Z",
+  "detector_version": "detectors-2026.09.1",
+  "config_hash": "d51f5bfddde4",
+  "source": {
+    "base_url": "http://localhost:8428",
+    "backend": null,
+    "version": null
+  },
+  "state": "completed",
+  "capabilities": [
+    {
+      "family": "cpu",
+      "signal": "cpu_utilization",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "mode"
+      ],
+      "observed_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "reason": "Assumed from owner-supplied examples; not observed in the live source (T003).",
+      "history_days": 28.0
+    },
+    {
+      "family": "memory",
+      "signal": "memory_utilization",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_memory_MemAvailable_bytes",
+        "node_memory_MemTotal_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Standard node exporter metric; not supplied or observed yet (T003).",
+      "history_days": null
+    },
+    {
+      "family": "filesystem",
+      "signal": "filesystem_used_ratio",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_filesystem_avail_bytes",
+        "node_filesystem_size_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Standard node exporter metric; not supplied or observed yet (T003).",
+      "history_days": null
+    },
+    {
+      "family": "disk_io",
+      "signal": "disk_busy_ratio",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_disk_io_time_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Standard node exporter metric; not supplied or observed yet (T003).",
+      "history_days": null
+    },
+    {
+      "family": "network",
+      "signal": "network_bytes",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_network_receive_bytes_total",
+        "node_network_transmit_bytes_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Standard node exporter metric; not supplied or observed yet (T003).",
+      "history_days": null
+    },
+    {
+      "family": "container",
+      "signal": "container_cpu",
+      "status": "unsupported",
+      "verified": false,
+      "required_metrics": [
+        "container_cpu_usage_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env"
+      ],
+      "observed_metrics": [],
+      "reason": "No cAdvisor container metrics in this scope.",
+      "history_days": null
+    },
+    {
+      "family": "request_traffic",
+      "signal": "request_rate",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": "Assumed from owner-supplied examples; not observed in the live source (T003).",
+      "history_days": 28.0
+    },
+    {
+      "family": "request_failures",
+      "signal": "server_error_ratio",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": "Assumed from owner-supplied examples; not observed in the live source (T003).",
+      "history_days": 28.0
+    },
+    {
+      "family": "client_errors",
+      "signal": "client_error_rate",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": "Assumed from owner-supplied examples; not observed in the live source (T003).",
+      "history_days": 28.0
+    },
+    {
+      "family": "latency",
+      "signal": "latency_quantile",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "http_server_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "le"
+      ],
+      "observed_metrics": [],
+      "reason": "Histogram buckets not yet verified (T003).",
+      "history_days": null
+    }
+  ],
+  "coverage": [
+    {
+      "family": "cpu",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "memory",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "filesystem",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "disk_io",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "network",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "container",
+      "status": "unsupported",
+      "capability": "unsupported",
+      "evaluated_series": 0,
+      "total_series": 0,
+      "baseline_days": null,
+      "reasons": [
+        {
+          "code": "metrics_absent",
+          "message": "No cAdvisor container metrics in this scope."
+        }
+      ]
+    },
+    {
+      "family": "request_traffic",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "request_failures",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "client_errors",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "latency",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    }
+  ],
+  "findings": [],
+  "trends": [
+    {
+      "bucket_index": 0,
+      "window": {
+        "start": "2026-09-29T10:05:00Z",
+        "end": "2026-09-30T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 1,
+      "window": {
+        "start": "2026-09-28T10:05:00Z",
+        "end": "2026-09-29T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 2,
+      "window": {
+        "start": "2026-09-27T10:05:00Z",
+        "end": "2026-09-28T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 3,
+      "window": {
+        "start": "2026-09-26T10:05:00Z",
+        "end": "2026-09-27T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 4,
+      "window": {
+        "start": "2026-09-25T10:05:00Z",
+        "end": "2026-09-26T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 5,
+      "window": {
+        "start": "2026-09-24T10:05:00Z",
+        "end": "2026-09-25T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 6,
+      "window": {
+        "start": "2026-09-23T10:05:00Z",
+        "end": "2026-09-24T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 7,
+      "window": {
+        "start": "2026-09-22T10:05:00Z",
+        "end": "2026-09-23T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 8,
+      "window": {
+        "start": "2026-09-21T10:05:00Z",
+        "end": "2026-09-22T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 9,
+      "window": {
+        "start": "2026-09-20T10:05:00Z",
+        "end": "2026-09-21T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 10,
+      "window": {
+        "start": "2026-09-19T10:05:00Z",
+        "end": "2026-09-20T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 11,
+      "window": {
+        "start": "2026-09-18T10:05:00Z",
+        "end": "2026-09-19T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 12,
+      "window": {
+        "start": "2026-09-17T10:05:00Z",
+        "end": "2026-09-18T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 13,
+      "window": {
+        "start": "2026-09-16T10:05:00Z",
+        "end": "2026-09-17T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 2880,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    }
+  ],
+  "evidence": [],
+  "exclusions": [],
+  "explanation": {
+    "status": "skipped_no_findings",
+    "explanation": null,
+    "reason": null,
+    "validation_notes": []
+  }
+}

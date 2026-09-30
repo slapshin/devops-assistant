@@ -1,0 +1,8 @@
+{
+  "type": "about:blank",
+  "title": "Report not ready",
+  "status": 409,
+  "detail": "Analysis is still running (collection).",
+  "code": "report_not_ready",
+  "errors": null
+}

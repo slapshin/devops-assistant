@@ -1,0 +1,1340 @@
+{
+  "$defs": {
+    "AnalysisWindows": {
+      "additionalProperties": false,
+      "properties": {
+        "end_time": {
+          "title": "End Time",
+          "type": "string"
+        },
+        "latest_day": {
+          "$ref": "#/$defs/TimeRange"
+        },
+        "step_seconds": {
+          "title": "Step Seconds",
+          "type": "integer"
+        },
+        "trend": {
+          "$ref": "#/$defs/TimeRange"
+        }
+      },
+      "required": [
+        "end_time",
+        "latest_day",
+        "trend",
+        "step_seconds"
+      ],
+      "title": "AnalysisWindows",
+      "type": "object"
+    },
+    "BaselineMode": {
+      "enum": [
+        "whole_baseline",
+        "time_of_day"
+      ],
+      "title": "BaselineMode",
+      "type": "string"
+    },
+    "CapabilityStatus": {
+      "enum": [
+        "supported",
+        "partial",
+        "unsupported",
+        "unverified"
+      ],
+      "title": "CapabilityStatus",
+      "type": "string"
+    },
+    "ConfidenceLevel": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "ConfidenceLevel",
+      "type": "string"
+    },
+    "DailyTrend": {
+      "additionalProperties": false,
+      "description": "One 24-hour bucket; bucket_index 0 is the latest day [T-24h, T).",
+      "properties": {
+        "affected_entities": {
+          "description": "Entity keys.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Affected Entities",
+          "type": "array"
+        },
+        "anomalous_minutes": {
+          "minimum": 0,
+          "title": "Anomalous Minutes",
+          "type": "integer"
+        },
+        "anomalous_share": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null when nothing was observed.",
+          "title": "Anomalous Share"
+        },
+        "baseline_days_used": {
+          "maximum": 14,
+          "minimum": 0,
+          "title": "Baseline Days Used",
+          "type": "integer"
+        },
+        "bucket_index": {
+          "maximum": 13,
+          "minimum": 0,
+          "title": "Bucket Index",
+          "type": "integer"
+        },
+        "coverage": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Coverage",
+          "type": "number"
+        },
+        "episode_count": {
+          "minimum": 0,
+          "title": "Episode Count",
+          "type": "integer"
+        },
+        "episodes": {
+          "items": {
+            "$ref": "#/$defs/EpisodeSummary"
+          },
+          "title": "Episodes",
+          "type": "array"
+        },
+        "observed_entity_minutes": {
+          "description": "Eligible denominator.",
+          "minimum": 0,
+          "title": "Observed Entity Minutes",
+          "type": "integer"
+        },
+        "peak_severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/TrendBucketStatus"
+        },
+        "window": {
+          "$ref": "#/$defs/TimeRange"
+        }
+      },
+      "required": [
+        "bucket_index",
+        "window",
+        "status",
+        "episode_count",
+        "anomalous_minutes",
+        "peak_severity",
+        "affected_entities",
+        "observed_entity_minutes",
+        "anomalous_share",
+        "baseline_days_used",
+        "coverage",
+        "episodes"
+      ],
+      "title": "DailyTrend",
+      "type": "object"
+    },
+    "DetectionMethod": {
+      "enum": [
+        "relative",
+        "absolute"
+      ],
+      "title": "DetectionMethod",
+      "type": "string"
+    },
+    "Entity": {
+      "additionalProperties": false,
+      "description": "Resource identity built from actual labels only; never inferred across namespaces.",
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "key": {
+          "description": "Stable canonical key, e.g. 'node|job=node|instance=paas-production'.",
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntityKind"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Identity labels only (no project/env).",
+          "title": "Labels",
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "display_name",
+        "labels"
+      ],
+      "title": "Entity",
+      "type": "object"
+    },
+    "EntityKind": {
+      "enum": [
+        "node",
+        "filesystem",
+        "disk",
+        "network_interface",
+        "container",
+        "service",
+        "route"
+      ],
+      "title": "EntityKind",
+      "type": "string"
+    },
+    "EpisodeSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "title": "End",
+          "type": "string"
+        },
+        "entity": {
+          "$ref": "#/$defs/Entity"
+        },
+        "episode_id": {
+          "pattern": "^eps_[0-9a-f]{16}$",
+          "title": "Episode Id",
+          "type": "string"
+        },
+        "expected_median": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected Median"
+        },
+        "family": {
+          "$ref": "#/$defs/SignalFamily"
+        },
+        "finding_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set only for latest-day episodes with evidence.",
+          "title": "Finding Id"
+        },
+        "peak_observed": {
+          "title": "Peak Observed",
+          "type": "number"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "signal": {
+          "title": "Signal",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "string"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit"
+        }
+      },
+      "required": [
+        "episode_id",
+        "finding_id",
+        "entity",
+        "family",
+        "signal",
+        "start",
+        "end",
+        "severity",
+        "peak_observed",
+        "expected_median",
+        "unit"
+      ],
+      "title": "EpisodeSummary",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "Chart data for a finding, persisted so a report reopens without the source.",
+      "properties": {
+        "evidence_id": {
+          "pattern": "^evd_[0-9a-f]{16}$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "lower": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lower"
+        },
+        "series": {
+          "$ref": "#/$defs/MetricSeries"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "threshold_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold Label"
+        },
+        "upper": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Upper"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "finding_id",
+        "series"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Exclusion": {
+      "additionalProperties": false,
+      "description": "Something omitted from the report, always disclosed (codes in docs/contracts.md).",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "family": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SignalFamily"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "finding_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finding Id"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "Exclusion",
+      "type": "object"
+    },
+    "ExpectedValue": {
+      "additionalProperties": false,
+      "properties": {
+        "lower": {
+          "title": "Lower",
+          "type": "number"
+        },
+        "median": {
+          "title": "Median",
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit"
+        },
+        "upper": {
+          "title": "Upper",
+          "type": "number"
+        }
+      },
+      "required": [
+        "median",
+        "lower",
+        "upper",
+        "unit"
+      ],
+      "title": "ExpectedValue",
+      "type": "object"
+    },
+    "Explanation": {
+      "additionalProperties": false,
+      "properties": {
+        "generated_at": {
+          "title": "Generated At",
+          "type": "string"
+        },
+        "hypotheses": {
+          "items": {
+            "$ref": "#/$defs/Hypothesis"
+          },
+          "title": "Hypotheses",
+          "type": "array"
+        },
+        "investigation_steps": {
+          "items": {
+            "$ref": "#/$defs/InvestigationStep"
+          },
+          "title": "Investigation Steps",
+          "type": "array"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "uncertainty": {
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "hypotheses",
+        "investigation_steps",
+        "uncertainty",
+        "provider",
+        "model",
+        "generated_at"
+      ],
+      "title": "Explanation",
+      "type": "object"
+    },
+    "ExplanationResult": {
+      "additionalProperties": false,
+      "properties": {
+        "explanation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Explanation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why failed/not_configured/disabled.",
+          "title": "Reason"
+        },
+        "status": {
+          "$ref": "#/$defs/ExplanationStatus"
+        },
+        "validation_notes": {
+          "description": "E.g. dropped items referencing unknown finding IDs.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Validation Notes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "ExplanationResult",
+      "type": "object"
+    },
+    "ExplanationStatus": {
+      "enum": [
+        "disabled",
+        "not_configured",
+        "pending",
+        "succeeded",
+        "failed",
+        "skipped_no_findings"
+      ],
+      "title": "ExplanationStatus",
+      "type": "string"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Descriptive labels, e.g. error_type; not identity.",
+          "title": "Attributes",
+          "type": "object"
+        },
+        "baseline_days": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Baseline Days"
+        },
+        "baseline_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaselineMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence": {
+          "$ref": "#/$defs/ConfidenceLevel"
+        },
+        "confidence_reasons": {
+          "description": "Every factor that lowered confidence; empty when high.",
+          "items": {
+            "$ref": "#/$defs/Reason"
+          },
+          "title": "Confidence Reasons",
+          "type": "array"
+        },
+        "detector": {
+          "title": "Detector",
+          "type": "string"
+        },
+        "detector_version": {
+          "title": "Detector Version",
+          "type": "string"
+        },
+        "duration_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Duration Seconds",
+          "type": "integer"
+        },
+        "end": {
+          "title": "End",
+          "type": "string"
+        },
+        "entity": {
+          "$ref": "#/$defs/Entity"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExpectedValue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null for absolute-only findings."
+        },
+        "family": {
+          "$ref": "#/$defs/SignalFamily"
+        },
+        "finding_id": {
+          "pattern": "^fnd_[0-9a-f]{16}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/DetectionMethod"
+        },
+        "observed": {
+          "$ref": "#/$defs/ObservedValue",
+          "description": "Peak observed value in the episode."
+        },
+        "peak_at": {
+          "title": "Peak At",
+          "type": "string"
+        },
+        "peak_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Robust z-score; null for absolute checks.",
+          "title": "Peak Score"
+        },
+        "related_finding_ids": {
+          "description": "Findings sharing identity labels only.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Finding Ids",
+          "type": "array"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "severity_points": {
+          "minimum": 0,
+          "title": "Severity Points",
+          "type": "integer"
+        },
+        "signal": {
+          "title": "Signal",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "string"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Heuristic threshold for absolute checks.",
+          "title": "Threshold"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "detector",
+        "detector_version",
+        "method",
+        "family",
+        "signal",
+        "title",
+        "entity",
+        "start",
+        "end",
+        "peak_at",
+        "duration_seconds",
+        "severity",
+        "severity_points",
+        "confidence",
+        "confidence_reasons",
+        "observed",
+        "expected",
+        "peak_score",
+        "threshold",
+        "baseline_days",
+        "baseline_mode",
+        "evidence_ids"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "Hypothesis": {
+      "additionalProperties": false,
+      "description": "Always presented as unverified.",
+      "properties": {
+        "finding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Finding Ids",
+          "type": "array"
+        },
+        "likelihood": {
+          "$ref": "#/$defs/Likelihood"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "finding_ids",
+        "likelihood"
+      ],
+      "title": "Hypothesis",
+      "type": "object"
+    },
+    "InvestigationStep": {
+      "additionalProperties": false,
+      "properties": {
+        "finding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Finding Ids",
+          "type": "array"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "InvestigationStep",
+      "type": "object"
+    },
+    "Likelihood": {
+      "enum": [
+        "plausible",
+        "possible",
+        "speculative"
+      ],
+      "title": "Likelihood",
+      "type": "string"
+    },
+    "MetricCapability": {
+      "additionalProperties": false,
+      "description": "Whether a signal family can be analysed for a scope, and why (not).",
+      "properties": {
+        "family": {
+          "$ref": "#/$defs/SignalFamily"
+        },
+        "history_days": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Observed history for the scope; not proof of retention.",
+          "title": "History Days"
+        },
+        "observed_metrics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Observed Metrics",
+          "type": "array"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "required_labels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Labels",
+          "type": "array"
+        },
+        "required_metrics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Metrics",
+          "type": "array"
+        },
+        "signal": {
+          "title": "Signal",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/CapabilityStatus"
+        },
+        "verified": {
+          "description": "True only when observed in the live source.",
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "family",
+        "signal",
+        "status",
+        "verified",
+        "required_metrics",
+        "required_labels"
+      ],
+      "title": "MetricCapability",
+      "type": "object"
+    },
+    "MetricSeries": {
+      "additionalProperties": false,
+      "description": "One scoped series on a regular grid: values[i] is at start + i * step_seconds.\n\n`None` is a gap (no sample), never zero.",
+      "properties": {
+        "coverage": {
+          "description": "Share of steps with a sample.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Coverage",
+          "type": "number"
+        },
+        "entity": {
+          "$ref": "#/$defs/Entity"
+        },
+        "family": {
+          "$ref": "#/$defs/SignalFamily"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "All retained labels of the result series.",
+          "title": "Labels",
+          "type": "object"
+        },
+        "query": {
+          "description": "Exact PromQL/MetricsQL sent to the source.",
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "series_id": {
+          "pattern": "^ser_[0-9a-f]{16}$",
+          "title": "Series Id",
+          "type": "string"
+        },
+        "signal": {
+          "description": "Derived signal, e.g. 'cpu_utilization'.",
+          "minLength": 1,
+          "title": "Signal",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "string"
+        },
+        "step_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Step Seconds",
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "series_id",
+        "family",
+        "signal",
+        "entity",
+        "labels",
+        "unit",
+        "query",
+        "step_seconds",
+        "start",
+        "values",
+        "coverage"
+      ],
+      "title": "MetricSeries",
+      "type": "object"
+    },
+    "ObservedValue": {
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/Unit"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "ObservedValue",
+      "type": "object"
+    },
+    "Reason": {
+      "additionalProperties": false,
+      "description": "Machine code plus human message, used for confidence, coverage, and exclusions.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "Reason",
+      "type": "object"
+    },
+    "ReportState": {
+      "enum": [
+        "completed",
+        "partial"
+      ],
+      "title": "ReportState",
+      "type": "string"
+    },
+    "Scope": {
+      "additionalProperties": false,
+      "description": "Exactly one project/env pair. Every query and report stays inside it.",
+      "properties": {
+        "env": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Env",
+          "type": "string"
+        },
+        "project": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Project",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "env"
+      ],
+      "title": "Scope",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "SignalCoverage": {
+      "additionalProperties": false,
+      "description": "One row of the report coverage table.",
+      "properties": {
+        "baseline_days": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Days"
+        },
+        "capability": {
+          "$ref": "#/$defs/CapabilityStatus"
+        },
+        "evaluated_series": {
+          "minimum": 0,
+          "title": "Evaluated Series",
+          "type": "integer"
+        },
+        "family": {
+          "$ref": "#/$defs/SignalFamily"
+        },
+        "reasons": {
+          "items": {
+            "$ref": "#/$defs/Reason"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/SignalStatus"
+        },
+        "total_series": {
+          "minimum": 0,
+          "title": "Total Series",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "family",
+        "status",
+        "capability",
+        "evaluated_series",
+        "total_series"
+      ],
+      "title": "SignalCoverage",
+      "type": "object"
+    },
+    "SignalFamily": {
+      "enum": [
+        "cpu",
+        "memory",
+        "filesystem",
+        "disk_io",
+        "network",
+        "container",
+        "request_traffic",
+        "request_failures",
+        "client_errors",
+        "latency"
+      ],
+      "title": "SignalFamily",
+      "type": "string"
+    },
+    "SignalStatus": {
+      "enum": [
+        "anomalous",
+        "no_anomaly",
+        "insufficient_data",
+        "unsupported",
+        "source_error",
+        "not_evaluated"
+      ],
+      "title": "SignalStatus",
+      "type": "string"
+    },
+    "SourceInfo": {
+      "additionalProperties": false,
+      "description": "Identity of the metrics source without credentials.",
+      "properties": {
+        "backend": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "E.g. 'victoriametrics' when detected.",
+          "title": "Backend"
+        },
+        "base_url": {
+          "description": "Scheme, host, port, and path prefix; never userinfo.",
+          "title": "Base Url",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "base_url"
+      ],
+      "title": "SourceInfo",
+      "type": "object"
+    },
+    "TimeRange": {
+      "additionalProperties": false,
+      "description": "Half-open interval [start, end).",
+      "properties": {
+        "end": {
+          "title": "End",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "TimeRange",
+      "type": "object"
+    },
+    "TrendBucketStatus": {
+      "enum": [
+        "ok",
+        "insufficient_baseline",
+        "insufficient_data",
+        "source_error"
+      ],
+      "title": "TrendBucketStatus",
+      "type": "string"
+    },
+    "Unit": {
+      "enum": [
+        "ratio",
+        "bytes",
+        "bytes_per_second",
+        "requests_per_second",
+        "per_second",
+        "seconds",
+        "count"
+      ],
+      "title": "Unit",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "analysis_id": {
+      "title": "Analysis Id",
+      "type": "string"
+    },
+    "capabilities": {
+      "items": {
+        "$ref": "#/$defs/MetricCapability"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "coverage": {
+      "items": {
+        "$ref": "#/$defs/SignalCoverage"
+      },
+      "title": "Coverage",
+      "type": "array"
+    },
+    "detector_version": {
+      "title": "Detector Version",
+      "type": "string"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "exclusions": {
+      "items": {
+        "$ref": "#/$defs/Exclusion"
+      },
+      "title": "Exclusions",
+      "type": "array"
+    },
+    "explanation": {
+      "$ref": "#/$defs/ExplanationResult"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "generated_at": {
+      "title": "Generated At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/$defs/Scope"
+    },
+    "source": {
+      "$ref": "#/$defs/SourceInfo"
+    },
+    "state": {
+      "$ref": "#/$defs/ReportState"
+    },
+    "trends": {
+      "items": {
+        "$ref": "#/$defs/DailyTrend"
+      },
+      "maxItems": 14,
+      "minItems": 14,
+      "title": "Trends",
+      "type": "array"
+    },
+    "windows": {
+      "$ref": "#/$defs/AnalysisWindows"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "scope",
+    "windows",
+    "generated_at",
+    "detector_version",
+    "config_hash",
+    "source",
+    "state",
+    "capabilities",
+    "coverage",
+    "findings",
+    "trends",
+    "evidence",
+    "exclusions",
+    "explanation"
+  ],
+  "title": "AnalysisReport",
+  "type": "object"
+}

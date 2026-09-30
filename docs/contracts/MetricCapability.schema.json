@@ -1,0 +1,106 @@
+{
+  "$defs": {
+    "CapabilityStatus": {
+      "enum": [
+        "supported",
+        "partial",
+        "unsupported",
+        "unverified"
+      ],
+      "title": "CapabilityStatus",
+      "type": "string"
+    },
+    "SignalFamily": {
+      "enum": [
+        "cpu",
+        "memory",
+        "filesystem",
+        "disk_io",
+        "network",
+        "container",
+        "request_traffic",
+        "request_failures",
+        "client_errors",
+        "latency"
+      ],
+      "title": "SignalFamily",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Whether a signal family can be analysed for a scope, and why (not).",
+  "properties": {
+    "family": {
+      "$ref": "#/$defs/SignalFamily"
+    },
+    "history_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Observed history for the scope; not proof of retention.",
+      "title": "History Days"
+    },
+    "observed_metrics": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Observed Metrics",
+      "type": "array"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "required_labels": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Labels",
+      "type": "array"
+    },
+    "required_metrics": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Metrics",
+      "type": "array"
+    },
+    "signal": {
+      "title": "Signal",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/CapabilityStatus"
+    },
+    "verified": {
+      "description": "True only when observed in the live source.",
+      "title": "Verified",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "family",
+    "signal",
+    "status",
+    "verified",
+    "required_metrics",
+    "required_labels"
+  ],
+  "title": "MetricCapability",
+  "type": "object"
+}

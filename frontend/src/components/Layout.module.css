@@ -1,0 +1,27 @@
+.header {
+  display: flex;
+  gap: calc(var(--space) * 2);
+  align-items: baseline;
+  padding: calc(var(--space) * 1.5) calc(var(--space) * 2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brand {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+
+.main {
+  padding: calc(var(--space) * 2);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.notice {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: calc(var(--space) * 2);
+  color: var(--text-muted);
+}

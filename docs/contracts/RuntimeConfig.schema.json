@@ -1,0 +1,133 @@
+{
+  "$defs": {
+    "ExplanationStatus": {
+      "enum": [
+        "disabled",
+        "not_configured",
+        "pending",
+        "succeeded",
+        "failed",
+        "skipped_no_findings"
+      ],
+      "title": "ExplanationStatus",
+      "type": "string"
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_queued_jobs": {
+          "title": "Max Queued Jobs",
+          "type": "integer"
+        },
+        "max_running_jobs": {
+          "title": "Max Running Jobs",
+          "type": "integer"
+        },
+        "max_series_per_job": {
+          "title": "Max Series Per Job",
+          "type": "integer"
+        },
+        "max_series_per_query": {
+          "title": "Max Series Per Query",
+          "type": "integer"
+        },
+        "query_timeout_seconds": {
+          "title": "Query Timeout Seconds",
+          "type": "integer"
+        },
+        "report_max_bytes": {
+          "title": "Report Max Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_running_jobs",
+        "max_queued_jobs",
+        "query_timeout_seconds",
+        "max_series_per_query",
+        "max_series_per_job",
+        "report_max_bytes"
+      ],
+      "title": "Limits",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "GET /api/config — public runtime facts, never secrets.",
+  "properties": {
+    "ai_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Ai Model"
+    },
+    "ai_provider": {
+      "title": "Ai Provider",
+      "type": "string"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "database_bytes": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Database Bytes"
+    },
+    "detector_version": {
+      "title": "Detector Version",
+      "type": "string"
+    },
+    "explanation_status": {
+      "$ref": "#/$defs/ExplanationStatus",
+      "description": "disabled, not_configured, or pending (configured, per-report status varies)."
+    },
+    "limits": {
+      "$ref": "#/$defs/Limits"
+    },
+    "metrics_source": {
+      "title": "Metrics Source",
+      "type": "string"
+    },
+    "report_count": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Report Count"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "ai_provider",
+    "ai_model",
+    "explanation_status",
+    "detector_version",
+    "config_hash",
+    "metrics_source",
+    "limits"
+  ],
+  "title": "RuntimeConfig",
+  "type": "object"
+}

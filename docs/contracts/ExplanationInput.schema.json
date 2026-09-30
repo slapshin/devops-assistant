@@ -1,0 +1,224 @@
+{
+  "$defs": {
+    "ConfidenceLevel": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "ConfidenceLevel",
+      "type": "string"
+    },
+    "Entity": {
+      "additionalProperties": false,
+      "description": "Resource identity built from actual labels only; never inferred across namespaces.",
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "key": {
+          "description": "Stable canonical key, e.g. 'node|job=node|instance=paas-production'.",
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntityKind"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Identity labels only (no project/env).",
+          "title": "Labels",
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "display_name",
+        "labels"
+      ],
+      "title": "Entity",
+      "type": "object"
+    },
+    "EntityKind": {
+      "enum": [
+        "node",
+        "filesystem",
+        "disk",
+        "network_interface",
+        "container",
+        "service",
+        "route"
+      ],
+      "title": "EntityKind",
+      "type": "string"
+    },
+    "FindingDigest": {
+      "additionalProperties": false,
+      "description": "Bounded, credential-free finding summary sent to a provider (no raw series).",
+      "properties": {
+        "confidence": {
+          "$ref": "#/$defs/ConfidenceLevel"
+        },
+        "end": {
+          "title": "End",
+          "type": "string"
+        },
+        "entity": {
+          "$ref": "#/$defs/Entity"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected"
+        },
+        "family": {
+          "$ref": "#/$defs/SignalFamily"
+        },
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "observed": {
+          "description": "Human-readable value with unit.",
+          "title": "Observed",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "start": {
+          "title": "Start",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "title",
+        "family",
+        "entity",
+        "severity",
+        "confidence",
+        "start",
+        "end",
+        "observed",
+        "expected"
+      ],
+      "title": "FindingDigest",
+      "type": "object"
+    },
+    "Scope": {
+      "additionalProperties": false,
+      "description": "Exactly one project/env pair. Every query and report stays inside it.",
+      "properties": {
+        "env": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Env",
+          "type": "string"
+        },
+        "project": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Project",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "env"
+      ],
+      "title": "Scope",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "SignalFamily": {
+      "enum": [
+        "cpu",
+        "memory",
+        "filesystem",
+        "disk_io",
+        "network",
+        "container",
+        "request_traffic",
+        "request_failures",
+        "client_errors",
+        "latency"
+      ],
+      "title": "SignalFamily",
+      "type": "string"
+    },
+    "TimeRange": {
+      "additionalProperties": false,
+      "description": "Half-open interval [start, end).",
+      "properties": {
+        "end": {
+          "title": "End",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "TimeRange",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "coverage_summary": {
+      "title": "Coverage Summary",
+      "type": "string"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/FindingDigest"
+      },
+      "maxItems": 20,
+      "title": "Findings",
+      "type": "array"
+    },
+    "latest_day": {
+      "$ref": "#/$defs/TimeRange"
+    },
+    "scope": {
+      "$ref": "#/$defs/Scope"
+    }
+  },
+  "required": [
+    "scope",
+    "latest_day",
+    "coverage_summary",
+    "findings"
+  ],
+  "title": "ExplanationInput",
+  "type": "object"
+}

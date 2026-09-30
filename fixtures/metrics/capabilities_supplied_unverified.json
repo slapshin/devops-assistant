@@ -1,0 +1,200 @@
+{
+  "items": [
+    {
+      "family": "cpu",
+      "signal": "cpu_utilization",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance",
+        "mode"
+      ],
+      "observed_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "reason": "Assumed from owner-supplied examples; not observed in the live source (T003).",
+      "history_days": null
+    },
+    {
+      "family": "memory",
+      "signal": "memory_utilization",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_memory_MemAvailable_bytes",
+        "node_memory_MemTotal_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Standard node exporter metric; not supplied or observed yet (T003).",
+      "history_days": null
+    },
+    {
+      "family": "filesystem",
+      "signal": "filesystem_used_ratio",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_filesystem_avail_bytes",
+        "node_filesystem_size_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Standard node exporter metric; not supplied or observed yet (T003).",
+      "history_days": null
+    },
+    {
+      "family": "disk_io",
+      "signal": "disk_busy_ratio",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_disk_io_time_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Standard node exporter metric; not supplied or observed yet (T003).",
+      "history_days": null
+    },
+    {
+      "family": "network",
+      "signal": "network_bytes",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "node_network_receive_bytes_total",
+        "node_network_transmit_bytes_total"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Standard node exporter metric; not supplied or observed yet (T003).",
+      "history_days": null
+    },
+    {
+      "family": "container",
+      "signal": "container_cpu",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "container_cpu_usage_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "env"
+      ],
+      "observed_metrics": [],
+      "reason": "cAdvisor metric names and container identity labels need discovery (T003).",
+      "history_days": null
+    },
+    {
+      "family": "request_traffic",
+      "signal": "request_rate",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": "Assumed from owner-supplied examples; not observed in the live source (T003).",
+      "history_days": null
+    },
+    {
+      "family": "request_failures",
+      "signal": "server_error_ratio",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": "Assumed from owner-supplied examples; not observed in the live source (T003).",
+      "history_days": null
+    },
+    {
+      "family": "client_errors",
+      "signal": "client_error_rate",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "http_route",
+        "http_request_method",
+        "http_response_status_code"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": "Assumed from owner-supplied examples; not observed in the live source (T003).",
+      "history_days": null
+    },
+    {
+      "family": "latency",
+      "signal": "latency_quantile",
+      "status": "unverified",
+      "verified": false,
+      "required_metrics": [
+        "http_server_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "env",
+        "job",
+        "le"
+      ],
+      "observed_metrics": [],
+      "reason": "Histogram buckets not yet verified (T003).",
+      "history_days": null
+    }
+  ]
+}

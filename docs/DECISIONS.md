@@ -23,7 +23,7 @@ Lookup date for every version below: **2026-09-30**. Sources: PyPI JSON API (`ht
 | SQLAlchemy (Core only) | 2.1.1 | Explicit SQL for jobs/reports without an ORM layer; required by Alembic. |
 | Alembic | 1.20.0 | Explicit, versioned SQLite migrations run at startup (upgrade only, never drop). |
 | openai | 3.22.1 | Only imported inside `backend/app/ai/openai_adapter.py`. Uses the Responses API with `client.responses.parse(..., text_format=<Pydantic model>)` for structured output (OpenAI Python SDK docs, `helpers.md`). |
-| pytest | 9.1.1 | Tests; plus `pytest-asyncio` pinned by T002. |
+| pytest | 9.1.1 | Tests; plus pytest-asyncio 1.4.0, jsonschema 4.26.0 (fixture validation), and types-jsonschema (pinned by T002). |
 | ruff | 0.16.9 | Lint + format. |
 | mypy | 2.3.1 | Strict type checking of `backend/app`. |
 
@@ -40,14 +40,14 @@ Lookup date for every version below: **2026-09-30**. Sources: PyPI JSON API (`ht
 | TanStack Query | 5.104.0 | Server state, job polling, retry/cancel. |
 | Apache ECharts | 6.1.0 | Time-series with gaps (`null`), expected-range bands (stacked area / `markArea`), `dataZoom`, SVG renderer, and built-in `aria` descriptions. Chosen over uPlot (no a11y layer) and Recharts (weaker large time-series handling). |
 | Styling | Plain CSS with CSS custom properties, CSS Modules via Vite | No framework dependency; tokens defined once in `frontend/src/styles/tokens.css`. |
-| openapi-typescript | 7.13.0 | Generates `frontend/src/api/schema.d.ts` from the backend OpenAPI document; committed and drift-checked in CI. |
+| openapi-typescript | 7.13.0 | Generates `frontend/src/api/schema.d.ts` from the backend OpenAPI document; committed and drift-checked in CI. Compatibility exception (T002): its peer range is `typescript ^5.x` with no release supporting 6.x, so `package.json` `overrides` points it at the pinned TypeScript 6.0.3; generation is verified by `npm run check:api`. |
 | Vitest / Testing Library | 5.0.2 / @testing-library/react 16.3.3 | Unit/component tests. |
 | Playwright | 1.63.0 | Desktop + narrow-viewport workflow and keyboard checks (T008/T010). |
 | ESLint / typescript-eslint | 10.11.0 / 8.71.0 | Lint. |
 
 ### Containers and storage
 
-- Runtime image `python:3.14.7-slim-trixie` (tag exists on Docker Hub); frontend build stage on the official `node:24.21.0` image variant verified by T009. Single runtime container: FastAPI serves the built frontend as static files.
+- Runtime image `python:3.14.7-slim-trixie` (tag exists on Docker Hub). The frontend build stage uses `node:24.21.0-trixie-slim`: T002 verified `npm ci && npm run check` in that image. Local development on Node 26 also passes, but Node 24 is the reference. Single runtime container: FastAPI serves the built frontend as static files.
 - SQLite via the Python standard library driver (local sqlite3 3.54 observed; the image's bundled version is recorded by T009). WAL mode, `foreign_keys=ON`, `busy_timeout=5000`. Database path `DATA_DIR/assistant.sqlite3`; `DATA_DIR` is a persistent volume in Docker.
 
 ### Schema tooling
@@ -245,5 +245,6 @@ docs/contracts/            (generated JSON Schema)
 
 - T003 finds a scrape interval ≠ 30 s, retention < 15 days, container/RPC metric names, or histograms → update §5/§6 and the fixtures.
 - typescript-eslint supports TypeScript 7 → drop the TypeScript 6.0 exception.
+- openapi-typescript declares TypeScript 6+ support → remove the npm `overrides` entry.
 - Node 26 becomes LTS (scheduled October 2026) → consider moving from 24.
 - Access beyond localhost requested → separate access-control decision before binding to `0.0.0.0` outside Docker.

@@ -1,0 +1,19 @@
+{
+  "version": "0.1.0",
+  "ai_provider": "openai",
+  "ai_model": null,
+  "explanation_status": "not_configured",
+  "detector_version": "detectors-2026.09.1",
+  "config_hash": "d51f5bfddde4",
+  "metrics_source": "http://localhost:8428",
+  "limits": {
+    "max_running_jobs": 1,
+    "max_queued_jobs": 4,
+    "query_timeout_seconds": 30,
+    "max_series_per_query": 500,
+    "max_series_per_job": 5000,
+    "report_max_bytes": 20971520
+  },
+  "report_count": null,
+  "database_bytes": null
+}

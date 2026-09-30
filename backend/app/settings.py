@@ -1,0 +1,129 @@
+"""Environment configuration (docs/DECISIONS.md §2) with actionable validation errors."""
+
+from enum import StrEnum
+from pathlib import Path
+from typing import Self
+from urllib.parse import urlsplit, urlunsplit
+
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.domain.explanation import ExplanationStatus
+
+
+class AIProvider(StrEnum):
+    OPENAI = "openai"
+    NONE = "none"
+
+
+class ConfigError(Exception):
+    """Startup configuration error listing each invalid variable."""
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", frozen=True)
+
+    metrics_url: str = "http://localhost:8428"
+    metrics_bearer_token: SecretStr | None = None
+    metrics_basic_auth_user: str | None = None
+    metrics_basic_auth_password: SecretStr | None = None
+    metrics_tls_verify: bool = True
+
+    ai_provider: AIProvider = AIProvider.OPENAI
+    openai_api_key: SecretStr | None = None
+    openai_model: str | None = None
+    openai_base_url: str | None = None
+
+    data_dir: Path = Path("./data")
+    app_host: str = "127.0.0.1"
+    app_port: int = Field(default=8000, ge=1, le=65535)
+    detector_config: Path | None = None
+    log_level: str = "INFO"
+
+    @field_validator("metrics_url")
+    @classmethod
+    def _valid_metrics_url(cls, value: str) -> str:
+        parts = urlsplit(value)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError("expected an http(s) URL such as http://localhost:8428")
+        if parts.username or parts.password:
+            raise ValueError(
+                "must not contain credentials; use METRICS_BEARER_TOKEN or METRICS_BASIC_AUTH_*"
+            )
+        if parts.query or parts.fragment:
+            raise ValueError("must not contain a query string or fragment")
+        return value.rstrip("/")
+
+    @field_validator("log_level")
+    @classmethod
+    def _valid_log_level(cls, value: str) -> str:
+        upper = value.upper()
+        if upper not in ("DEBUG", "INFO", "WARNING", "ERROR"):
+            raise ValueError("expected DEBUG, INFO, WARNING, or ERROR")
+        return upper
+
+    @field_validator("detector_config")
+    @classmethod
+    def _detector_config_exists(cls, value: Path | None) -> Path | None:
+        if value is not None and not value.is_file():
+            raise ValueError(f"file not found: {value}")
+        return value
+
+    @model_validator(mode="after")
+    def _auth_exclusive(self) -> Self:
+        basic = self.metrics_basic_auth_user is not None or self.metrics_basic_auth_password
+        if basic and self.metrics_bearer_token is not None:
+            raise ValueError("METRICS_BEARER_TOKEN and METRICS_BASIC_AUTH_* are mutually exclusive")
+        if (self.metrics_basic_auth_user is None) != (self.metrics_basic_auth_password is None):
+            raise ValueError(
+                "METRICS_BASIC_AUTH_USER and METRICS_BASIC_AUTH_PASSWORD must be set together"
+            )
+        return self
+
+    @property
+    def metrics_source_display(self) -> str:
+        """Scheme, host, port, and path prefix only — safe for logs, UI, and reports."""
+        parts = urlsplit(self.metrics_url)
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+
+    @property
+    def explanation_status(self) -> ExplanationStatus:
+        """Static AI availability; PENDING means configured (per-report status varies)."""
+        if self.ai_provider is AIProvider.NONE:
+            return ExplanationStatus.DISABLED
+        if self.openai_api_key is None or not self.openai_model:
+            return ExplanationStatus.NOT_CONFIGURED
+        return ExplanationStatus.PENDING
+
+    @property
+    def explanation_hint(self) -> str | None:
+        if self.explanation_status is not ExplanationStatus.NOT_CONFIGURED:
+            return None
+        missing = [
+            name
+            for name, value in (
+                ("OPENAI_API_KEY", self.openai_api_key),
+                ("OPENAI_MODEL", self.openai_model),
+            )
+            if not value
+        ]
+        return f"Set {' and '.join(missing)} or AI_PROVIDER=none"
+
+    @property
+    def database_path(self) -> Path:
+        return self.data_dir / "assistant.sqlite3"
+
+
+def load_settings(**overrides: object) -> Settings:
+    """Load settings, converting validation failures into one actionable ConfigError."""
+    try:
+        return Settings(**overrides)  # type: ignore[arg-type]
+    except ValidationError as exc:
+        lines = []
+        for err in exc.errors():
+            loc = "_".join(str(p) for p in err["loc"]).upper() or "SETTINGS"
+            value = err.get("input")
+            shown = "<hidden>" if any(s in loc for s in ("TOKEN", "PASSWORD", "KEY")) else value
+            message = err["msg"].removeprefix("Value error, ")
+            lines.append(f"  {loc}: {message}" + (f" (got {shown!r})" if loc != "SETTINGS" else ""))
+        raise ConfigError("Invalid configuration:\n" + "\n".join(lines)) from None

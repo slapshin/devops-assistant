@@ -9,4 +9,4 @@ Planning documents follow the product/architecture/task structure used by the fa
 
 The task index is the single source of implementation status. Each task contains its outcome, ownership, work, acceptance checklist, verification guidance, and completion record.
 
-T001 (technical decisions and UI blueprint) is DONE: see [DECISIONS.md](docs/DECISIONS.md) and [UI_SPEC.md](docs/UI_SPEC.md). T002 and T003 are ready; no application code exists yet.
+T001 (decisions, UI blueprint) and T002 (workspace foundations, [shared contracts](docs/contracts.md)) are DONE. T003 and T005 are ready. Features beyond the foundations are not implemented yet.

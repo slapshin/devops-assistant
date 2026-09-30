@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "ErrorCode": {
+      "enum": [
+        "validation_error",
+        "project_not_found",
+        "env_not_found",
+        "analysis_not_found",
+        "report_not_ready",
+        "report_unavailable",
+        "schema_unsupported",
+        "analysis_not_active",
+        "queue_full",
+        "metrics_source_unavailable",
+        "end_time_invalid",
+        "interrupted_by_restart",
+        "job_timeout",
+        "internal_error",
+        "not_implemented"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "RFC 9457 problem details (application/problem+json).",
+  "properties": {
+    "code": {
+      "$ref": "#/$defs/ErrorCode"
+    },
+    "detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detail"
+    },
+    "errors": {
+      "anyOf": [
+        {
+          "items": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Errors"
+    },
+    "status": {
+      "title": "Status",
+      "type": "integer"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "type": {
+      "default": "about:blank",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "status",
+    "code"
+  ],
+  "title": "Problem",
+  "type": "object"
+}

@@ -1,0 +1,74 @@
+{
+  "analysis_id": "01999a2b-0000-7000-8000-000000000006",
+  "scope": {
+    "project": "paas",
+    "env": "production"
+  },
+  "end_time": "2026-09-30T10:05:00Z",
+  "detector_version": "detectors-2026.09.1",
+  "config_hash": "d51f5bfddde4",
+  "state": "running",
+  "stages": [
+    {
+      "stage": "discovery",
+      "status": "done",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "collection",
+      "status": "running",
+      "started_at": null,
+      "finished_at": null,
+      "done": 38,
+      "total": 52,
+      "message": null
+    },
+    {
+      "stage": "detection",
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "trends",
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "explanation",
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "saving",
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    }
+  ],
+  "explanation_status": "pending",
+  "error": null,
+  "created_at": "2026-09-30T10:05:00Z",
+  "started_at": "2026-09-30T10:05:01Z",
+  "finished_at": null,
+  "report_available": false,
+  "finding_counts": null
+}

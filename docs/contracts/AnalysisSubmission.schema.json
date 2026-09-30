@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "description": "Body of POST /api/analyses. end_time is floored to the step server-side.",
+  "properties": {
+    "end_time": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "End Time"
+    },
+    "env": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Env",
+      "type": "string"
+    },
+    "project": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Project",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project",
+    "env"
+  ],
+  "title": "AnalysisSubmission",
+  "type": "object"
+}
