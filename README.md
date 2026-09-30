@@ -1,28 +1,41 @@
 # DevOps AI Assistant
 
-A web assistant that analyses the latest 24 hours of Prometheus-compatible metrics for one `project`/`env` scope. It compares them against preceding history, shows a two-week anomaly trend, and adds replaceable AI explanations (OpenAI first).
+A local web assistant for one `project`/`env` scope of a Prometheus-compatible metrics source (verified against VictoriaMetrics). For that scope it:
 
-**Status:** the foundations are in place (T001–T002). Discovery, detection, the API behaviour, and the UI views are not implemented yet: routes return `501 not_implemented` and UI views say "Not implemented yet". See the [plan](PLAN.md) and the [task index](docs/tasks/README.md).
+- finds anomalies in the **latest 24 hours**, comparing them with up to 14 preceding days;
+- shows a **14-day anomaly trend**;
+- adds optional AI explanations (OpenAI first; the provider is replaceable).
 
-## Requirements
+It covers node exporter, cAdvisor, Docker Swarm, and OpenTelemetry HTTP/RPC metrics. Numerical findings never depend on AI, missing telemetry is never reported as healthy, and thresholds are diagnostic heuristics, not SLOs.
 
-- [uv](https://docs.astral.sh/uv/) 0.12+ (installs/uses Python 3.14.7 from `backend/.python-version`)
-- Node.js 24.21 LTS (`frontend/.nvmrc`)
+![Overview](docs/screenshots/overview-desktop.png)
 
-## Commands
+## Run
 
 ```sh
-make install        # uv sync --locked; npm ci
-make check          # lint, types, contract/fixture drift, tests, frontend build
-make dev-backend    # http://127.0.0.1:8000/api/docs
-make dev-frontend   # http://localhost:5173 (proxies /api to the backend)
-make contracts      # regenerate JSON Schema, OpenAPI, and frontend API types
-make fixtures       # regenerate synthetic fixtures
+docker compose up -d --build        # http://127.0.0.1:8000, metrics at http://host.docker.internal:8428
+# or natively
+make install && make serve          # http://127.0.0.1:8000, metrics at http://localhost:8428
+# offline demo, no metrics source or API key
+METRICS_URL=synthetic://incident AI_PROVIDER=fake docker compose up -d --build
 ```
 
-Configuration: copy `.env.example` to `backend/.env`. Neither a metrics connection nor an OpenAI key is needed to build, test, or validate contracts. Invalid settings stop startup with a message naming the variable.
+Configuration, Docker networking, backups, budgets and troubleshooting are in **[docs/OPERATIONS.md](docs/OPERATIONS.md)**. Copy `.env.example` to `backend/.env` for settings such as `OPENAI_API_KEY` and `OPENAI_MODEL`.
 
-## Documentation
+## Use
 
-- [Product plan](docs/PRODUCT_PLAN.md) · [Architecture](docs/ARCHITECTURE.md)
-- [Decisions](docs/DECISIONS.md) · [UI specification](docs/UI_SPEC.md) · [Shared contracts](docs/contracts.md)
+1. Choose a project and environment, then **Analyze**. Progress is shown per stage, and you can cancel.
+2. **Overview**: severity counts, top findings, the AI explanation (hypotheses labelled unverified), and coverage and limitations.
+3. **Findings**: filter, open the evidence (chart with the expected range, gaps and heuristic line; data table; exact query; related findings). Keys `j`/`k` move between findings and `Esc` closes the detail.
+4. **Trends**: 14 daily buckets (anomalous share, episodes, minutes, entities, coverage). Select a day to see its episodes, and see which problems recur.
+5. Saved reports reopen from **Recent reports** or their URL, including after a restart.
+
+## Develop
+
+```sh
+make check          # ruff, mypy strict, pytest; contract and fixture drift; vue-tsc, eslint, vitest, build
+make dev-backend    # :8000 (API docs at /api/docs)
+make dev-frontend   # :5173, proxies /api
+```
+
+Docs: [plan](PLAN.md) · [product](docs/PRODUCT_PLAN.md) · [architecture](docs/ARCHITECTURE.md) · [decisions](docs/DECISIONS.md) · [UI spec](docs/UI_SPEC.md) · [contracts](docs/contracts.md) · [telemetry inventory](docs/telemetry-inventory.md) · [metrics catalog](docs/metrics-catalog.md) · [detection](docs/detection.md) · [tasks](docs/tasks/README.md)

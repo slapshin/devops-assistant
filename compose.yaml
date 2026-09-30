@@ -1,0 +1,26 @@
+# Local operation only: the port is published on 127.0.0.1. See docs/OPERATIONS.md.
+services:
+  assistant:
+    build: .
+    image: devops-ai-assistant:local
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    environment:
+      # Inside the container "localhost" is the container itself. host.docker.internal
+      # reaches a metrics source or SSH tunnel listening on the Docker host.
+      METRICS_URL: ${METRICS_URL:-http://host.docker.internal:8428}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    env_file:
+      - path: backend/.env
+        required: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - assistant-data:/data
+    restart: unless-stopped
+    stop_grace_period: 20s
+
+volumes:
+  assistant-data:

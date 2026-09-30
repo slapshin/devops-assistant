@@ -1,0 +1,13 @@
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+**/data
+.git
+.env
+**/.env
+.playwright-mcp
+docs

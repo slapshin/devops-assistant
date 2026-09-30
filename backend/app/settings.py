@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     app_host: str = "127.0.0.1"
     app_port: int = Field(default=8000, ge=1, le=65535)
     detector_config: Path | None = None
+    static_dir: Path | None = None
+    """Built web UI to serve at /. Defaults to ../frontend/dist when it exists."""
     log_level: str = "INFO"
 
     @field_validator("metrics_url")
@@ -122,6 +124,13 @@ class Settings(BaseSettings):
         """Scenario name when METRICS_URL=synthetic://<scenario> (demo/testing only)."""
         parts = urlsplit(self.metrics_url)
         return parts.netloc if parts.scheme == "synthetic" else None
+
+    @property
+    def ui_dir(self) -> Path | None:
+        if self.static_dir is not None:
+            return self.static_dir if (self.static_dir / "index.html").is_file() else None
+        default = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+        return default if (default / "index.html").is_file() else None
 
     @property
     def database_path(self) -> Path:

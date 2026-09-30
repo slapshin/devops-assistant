@@ -1,5 +1,6 @@
 """ASGI application factory. Run: `uv run uvicorn app.main:create_app --factory`."""
 
+import json
 import logging
 import sys
 from collections.abc import AsyncIterator
@@ -21,6 +22,7 @@ from app.metrics.source import PrometheusMetricsSource
 from app.metrics.synthetic import SCENARIOS, SyntheticMetricsSource
 from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
+from app.static import mount_ui
 from app.storage.repository import SqliteReportRepository
 
 log = logging.getLogger("app")
@@ -39,13 +41,29 @@ def build_source(settings: Settings) -> tuple[MetricsSource, PrometheusClient | 
     return PrometheusMetricsSource(client), client
 
 
+def load_detector_config(settings: Settings) -> DetectorConfig:
+    """Defaults from DECISIONS §5, optionally overridden by a DETECTOR_CONFIG JSON file."""
+    defaults = DetectorConfig()
+    if settings.detector_config is None:
+        return defaults
+    try:
+        override = json.loads(settings.detector_config.read_text())
+        merged = defaults.model_dump()
+        signals = {**merged["signals"], **override.pop("signals", {})}
+        merged.update(override)
+        merged["signals"] = signals
+        return DetectorConfig.model_validate(merged)
+    except (OSError, ValueError) as exc:
+        raise ConfigError(f"Invalid configuration:\n  DETECTOR_CONFIG: {exc}") from None
+
+
 def build_services(
     settings: Settings,
     source: MetricsSource | None = None,
     provider: ExplanationProvider | None = None,
     limits: RunnerLimits | None = None,
 ) -> Services:
-    config = DetectorConfig()  # DETECTOR_CONFIG overrides: see docs/OPERATIONS.md
+    config = load_detector_config(settings)
     client = None
     if source is None:
         source, client = build_source(settings)
@@ -109,4 +127,6 @@ def create_app(
     app.state.services = services
     install_problem_handlers(app)
     app.include_router(router)
+    if settings.ui_dir is not None:
+        mount_ui(app, settings.ui_dir)
     return app

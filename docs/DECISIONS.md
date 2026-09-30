@@ -74,7 +74,8 @@ All settings come from environment (optionally a `.env` file, never committed). 
 | `OPENAI_BASE_URL` | unset | Optional, for compatible gateways. |
 | `DATA_DIR` | `./data` | SQLite and nothing else. |
 | `APP_HOST` / `APP_PORT` | `127.0.0.1` / `8000` | Local-only binding by default (no auth in this release). |
-| `DETECTOR_CONFIG` | unset | Optional path to a YAML/JSON override of §5 defaults; a changed config yields a new `config_hash` in reports. |
+| `DETECTOR_CONFIG` | unset | Optional path to a **JSON** override of §5 defaults (T009: JSON only, to avoid a YAML dependency). A changed config yields a new `config_hash` in reports. |
+| `STATIC_DIR` | `../frontend/dist` if built | Built UI served at `/` with an SPA fallback (T009). |
 | `LOG_LEVEL` | `INFO` | Structured JSON logs; query strings logged, credentials never. |
 
 ## 3. API conventions
@@ -220,7 +221,7 @@ Per bucket: `episode_count`, `anomalous_minutes`, `peak_severity`, `affected_ent
 | AI input | top 20 findings by severity, ≤ 40,000 characters of evidence summaries; no raw series, no credentials, no URLs with secrets |
 | AI call | timeout 60 s, 1 retry on transient errors |
 
-Retention: saved reports are **not deleted automatically** in this release. `GET /api/config` exposes report count and database size. T009 documents a manual, explicit prune command (e.g. older than N days) that prints what it will delete before deleting.
+Retention: saved reports are **not deleted automatically** in this release. `GET /api/config` exposes report count and database size. T009 added `python -m app.maintenance prune --older-than N` (a dry run unless `--yes`) and `backup <file>` (SQLite online backup); see [OPERATIONS.md](OPERATIONS.md).
 
 All queries are read-only (`/api/v1/query`, `/query_range`, `/series`, `/labels`, `/label/<name>/values`, `/metadata`, `/status/buildinfo`). Every selector includes `project="<p>", env="<e>"`; the query builder rejects a selector without both (enforced by tests in T004).
 

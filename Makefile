@@ -1,5 +1,5 @@
 # Repository checks. Requires uv and Node.js 24.21 LTS (see docs/DECISIONS.md).
-.PHONY: install check check-backend check-frontend contracts fixtures dev-backend dev-frontend
+.PHONY: install check check-backend check-frontend contracts fixtures dev-backend dev-frontend build serve docker-up docker-down backup
 
 install:
 	cd backend && uv sync --locked
@@ -30,3 +30,18 @@ dev-backend:
 
 dev-frontend:
 	cd frontend && npm run dev
+
+build:
+	cd frontend && npm run build
+
+serve: build
+	cd backend && uv run python -m app
+
+docker-up:
+	docker compose up -d --build
+
+docker-down:
+	docker compose down
+
+backup:
+	cd backend && uv run python -m app.maintenance backup ../backups/assistant-$$(date +%Y%m%d-%H%M%S).sqlite3

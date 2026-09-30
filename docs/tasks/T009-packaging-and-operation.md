@@ -22,11 +22,11 @@ Docker/build configuration, `.env.example`, root README, and `docs/OPERATIONS.md
 
 ## Acceptance
 
-- [ ] Documented native and Docker startup work from a fresh checkout with reproducible dependencies/images.
-- [ ] Packaged UI/backend operate together with the configured metrics URL and optional AI settings.
-- [ ] Saved reports survive container recreation without deleting the volume.
-- [ ] Connectivity and invalid-configuration failures are understandable and documented.
-- [ ] Runtime, persistence, migrations, storage limits, and local exposure match the documentation.
+- [x] Documented native and Docker startup work from a fresh checkout with reproducible dependencies/images.
+- [x] Packaged UI/backend operate together with the configured metrics URL and optional AI settings.
+- [x] Saved reports survive container recreation without deleting the volume.
+- [x] Connectivity and invalid-configuration failures are understandable and documented.
+- [x] Runtime, persistence, migrations, storage limits, and local exposure match the documentation.
 
 ## Verification
 
@@ -34,11 +34,28 @@ Start the packaged app in an isolated local setup, produce a synthetic report, r
 
 ## Completion record
 
-Not started. Fill in after execution:
-
-- Completed date:
+- Completed date: 2026-09-30
 - Actual changed files and artifacts:
+  - `Dockerfile` (Node 24.21 build stage → Python 3.14.7-slim runtime, uv 0.12.19, non-root uid 10001, `/data` volume, healthcheck), `.dockerignore`, `compose.yaml` (127.0.0.1 only, `host.docker.internal:host-gateway`, named volume)
+  - `backend/app/{__main__,static,maintenance}.py`
+  - `backend/app/main.py` (UI mount; `DETECTOR_CONFIG` JSON overrides), `backend/app/settings.py` (`STATIC_DIR`)
+  - `backend/tests/test_operations.py`
+  - `docs/OPERATIONS.md` (new), `README.md` (replaced), `.env.example`, `Makefile` (build/serve/docker/backup targets), `.gitignore`, `docs/DECISIONS.md` §2/§6
 - Commands/checks and results:
+  - `make check` passes (269 backend tests passed, 2 skipped; 16 frontend tests; build).
+  - `docker build -t devops-ai-assistant:local .` succeeds (425 MB; Python 3.14.7; SQLite 3.46.1; uid 10001; healthy).
+  - Compose run with `METRICS_URL=synthetic://incident`: report produced; after `down` and `up --force-recreate` it was byte-identical (MD5); SPA deep link served.
+  - Compose run with `METRICS_URL=http://host.docker.internal:8428` through the SSH tunnel: 31 projects; live paas/production analysis completed in 40 s with 10 findings.
+  - An invalid `METRICS_URL` exits 2 with an actionable message. An unreachable source gives health `reachable:false` and a 503 `metrics_source_unavailable`.
+  - Native `uv run python -m app` serves `/`, deep links, assets and the API.
+  - The verification volume was removed afterwards.
 - Decisions or dependency changes:
+  - `DETECTOR_CONFIG` is JSON only.
+  - The backend serves the UI (a single container).
+  - Maintenance is explicit only: backup never overwrites, and prune is a dry run unless `--yes`.
+  - No new runtime dependencies.
 - Remaining limitations or blockers:
-- Next ready task:
+  - The image is not published to a registry, and there is no CI pipeline file.
+  - No authentication, so exposure is local only.
+  - Docker was verified on Docker Desktop for macOS; `host-gateway` on Linux is documented but was not exercised here.
+- Next ready task: T010.
