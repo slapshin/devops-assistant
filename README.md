@@ -22,7 +22,7 @@ METRICS_URL=synthetic://incident AI_PROVIDER=fake make up
 
 Configuration, Docker networking, backups, budgets and troubleshooting are in **[docs/OPERATIONS.md](docs/OPERATIONS.md)**. Copy `config.env.template` to `config.env` for settings such as `OPENAI_API_KEY` and `OPENAI_MODEL`.
 
-Layout: `devops/docker/Dockerfile` builds the image, `tools/compose/compose.yml` runs it locally (through `make up`/`make down`/`make stop`/`make logs`).
+Layout: `devops/docker/Dockerfile` builds the image, `tools/compose/compose.yml` runs it locally (through `make up`/`make down`/`make stop`/`make logs`). Run `make help` for all targets.
 
 ## Use
 
