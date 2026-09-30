@@ -40,6 +40,7 @@ Interfaces (`domain/interfaces.py`). T004 added `DiscoveredValues` (values plus 
   - `EpisodeSummary.finding_id` is null for earlier-day episodes.
   - `ExplanationResult.explanation` is null unless `status=succeeded`.
 - **Severity** is `low | medium | high | critical`. **Confidence** is `low | medium | high`, with `confidence_reasons[{code, message}]` listing every lowering factor. The two are never combined.
+- **Finding lifecycle** (T005, additive): `state` (`ongoing | resolved`), `recurrence` (`new | repeated | recurring`) and `prior_episode_days`. `AnalysisReport.trend_summary` (`worsening | improving | stable | inconclusive`, with confidence and measures) is nullable.
 - **Detection method**: `relative` needs `expected` and `peak_score`. `absolute` needs `threshold`, which is a diagnostic heuristic, never an SLO.
 
 ## Identifiers and ownership
@@ -52,7 +53,7 @@ Interfaces (`domain/interfaces.py`). T004 added `DiscoveredValues` (values plus 
 | `episode_id` | `eps_` + 16 hex | T005 | same inputs as findings |
 | `evidence_id` | `evd_` + 16 hex | T005 | hash of finding ID + series ID |
 
-The analysis key is `analysis_id|project|env|T|config_hash`. Report validation rejects any finding, evidence, related-finding, or explanation reference that does not resolve inside the same report.
+The analysis key is `project|env|T|config_hash` (T005). It deliberately excludes `analysis_id`, so identical inputs yield identical IDs. Report validation rejects any finding, evidence, related-finding, or explanation reference that does not resolve inside the same report.
 
 ## States
 

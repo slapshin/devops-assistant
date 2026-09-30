@@ -42,6 +42,21 @@ class SignalStatus(StrEnum):
     NOT_EVALUATED = "not_evaluated"
 
 
+class FindingState(StrEnum):
+    ONGOING = "ongoing"
+    """Episode still anomalous at the end of the analysed window."""
+    RESOLVED = "resolved"
+
+
+class Recurrence(StrEnum):
+    NEW = "new"
+    """No episode for this entity and signal on the preceding 13 days."""
+    REPEATED = "repeated"
+    """Episodes on 1-2 preceding days."""
+    RECURRING = "recurring"
+    """Episodes on at least 3 preceding days."""
+
+
 class ObservedValue(Contract):
     value: float
     unit: Unit
@@ -86,6 +101,9 @@ class Finding(Contract):
     attributes: Labels = Field(
         default_factory=dict, description="Descriptive labels, e.g. error_type; not identity."
     )
+    state: FindingState = FindingState.RESOLVED
+    recurrence: Recurrence = Recurrence.NEW
+    prior_episode_days: int = Field(default=0, ge=0, le=13)
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -146,6 +164,25 @@ class EpisodeSummary(Contract):
     peak_observed: float
     expected_median: float | None
     unit: Unit
+
+
+class TrendDirection(StrEnum):
+    WORSENING = "worsening"
+    IMPROVING = "improving"
+    STABLE = "stable"
+    INCONCLUSIVE = "inconclusive"
+
+
+class TrendSummary(Contract):
+    """Direction of the 14-day trend: last 7 buckets vs the 7 before, by anomalous share."""
+
+    direction: TrendDirection
+    confidence: ConfidenceLevel
+    recent_share: Ratio | None
+    previous_share: Ratio | None
+    recent_episodes: int = Field(ge=0)
+    previous_episodes: int = Field(ge=0)
+    reason: str
 
 
 class TrendBucketStatus(StrEnum):

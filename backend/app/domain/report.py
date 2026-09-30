@@ -17,7 +17,7 @@ from app.domain.common import (
     UtcDatetime,
 )
 from app.domain.explanation import ExplanationResult
-from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage
+from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
 from app.domain.metrics import MetricCapability
 
 TREND_DAYS = 14
@@ -89,6 +89,7 @@ class AnalysisReport(Contract):
     coverage: list[SignalCoverage]
     findings: list[Finding]
     trends: list[DailyTrend] = Field(min_length=TREND_DAYS, max_length=TREND_DAYS)
+    trend_summary: TrendSummary | None = None
     evidence: list[Evidence]
     exclusions: list[Exclusion]
     explanation: ExplanationResult

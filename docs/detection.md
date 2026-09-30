@@ -1,0 +1,66 @@
+# Detection engine (T005)
+
+`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.09.1`, identified by `config_hash`). Every threshold is a provisional diagnostic heuristic, not an SLO.
+
+## Pipeline
+
+1. **Derive** (`derive.py`): turns collected series into analysable series.
+   - Direct resource signals pass through unchanged.
+   - HTTP 5xx ratio = `http_5xx / http_requests`, and RPC failure ratio = `rpc_errors / rpc_requests`. A missing numerator counts as 0 only where the denominator was observed. A step is unobserved when requests per step are below 30.
+   - `404 rate` and `other 4xx rate` (= 4xx − 404) are derived separately, so 404s are never counted twice.
+   - Latency uses p95 (with p99 kept as evidence), or mean when histograms are absent. It carries the same volume guard.
+   - Swarm failed-task counts become **positive deltas**: new failures.
+2. **Baseline** (`baseline.py`): computed for each trend bucket *b* from `[start_b − 14 d, start_b)` only.
+   - Days with ≥ 70 % coverage are adequate.
+   - With fewer than 3 adequate days, relative detection is unavailable and only absolute checks run.
+   - With ≥ 7 adequate days, the median/MAD is pooled from the same time of day ± 1 h. Otherwise it is pooled over the whole baseline.
+   - Scale = `max(1.4826·MAD, abs_floor, 5 % · |median|)`, so a zero MAD is handled explicitly.
+3. **Flags** (`detect.py`): a step is anomalous when any of these holds:
+   - `|z| ≥ 4` in the rule direction plus the minimum effect (absolute difference and/or relative factor);
+   - the value is at or above the absolute heuristic;
+   - an event count is > 0 (OOM, new task failures);
+   - a replica shortfall of ≥ 1 persists for ≥ 15 min.
+4. **Episodes**: flagged steps separated by ≤ 2 steps are merged. A level episode needs ≥ 3 relative steps, or an absolute run of at least the signal's minimum minutes. Episodes are built over the continuous 14-day range, so they can cross bucket boundaries. Trends clip them per bucket, while findings keep the whole episode.
+5. **Findings**: one per episode that reaches the latest day.
+   - **Severity** is based on magnitude and duration only:
+     - peak z 4–6 / 6–10 / ≥ 10 gives 1 / 2 / 3 points; the high / critical heuristic gives 3 / 4;
+     - 30–120 min adds 1 point and ≥ 120 min adds 2;
+     - events have fixed points.
+     - Points map to severity as ≤ 1 low, 2 medium, 3–4 high, ≥ 5 critical.
+     - Caps: 4xx/404 medium, network throughput medium, disk throughput low. Throughput alone is informational; saturation is covered by busy time and PSI.
+   - **Confidence** is based on data quality only. It is the minimum over: baseline days (≥ 7 / 3–6 / none), coverage in episode ± 1 h (≥ 90 % / ≥ 70 % / lower), requests per step (≥ 300), and episode length (≥ 6 steps). Every lowering factor is listed in `confidence_reasons`.
+   - **State:** `ongoing` if still anomalous within 2 steps of T, otherwise `resolved`.
+   - **Recurrence:** from the other episodes of the same entity and signal on buckets 1–13: `new` (0 days), `repeated` (1–2 days) or `recurring` (≥ 3 days).
+   - **Evidence:** the series over episode ± 6 h, with expected median and band `median ± 4·scale`, the heuristic threshold line, and operands (request rate, p99).
+6. **Relations**: findings are related only when their time windows overlap (± 30 min) **and** one of the following holds:
+   - they concern the same entity;
+   - they concern routes of the same service;
+   - they share a host through identity labels (node/filesystem/disk/interface/container `instance`) or a verified mapping (OTel `target_info` → container → host, or Swarm task → host).
+
+   Overlap in time alone never relates findings.
+7. **Trends**: for each bucket:
+   - episodes (≤ 200 listed), anomalous entity-minutes, peak severity and affected entities;
+   - observed entity-minutes, the union of observed steps per entity, which is the denominator;
+   - `anomalous_share`, the median baseline days, and coverage relative to all entities seen in the 28 days.
+
+   The status is `insufficient_data` when coverage < 50 %, and `insufficient_baseline` when the median baseline days are < 3. The **trend summary** compares the anomalous share of buckets 0–6 with 7–13 (worsening/improving needs ≥ 1.5× and ≥ 0.5 pp). With fewer than 4 OK buckets on either side it is `inconclusive`.
+8. **Coverage rows** per family: `unsupported` (capabilities), `anomalous`, `source_error` (collection exclusions), `insufficient_data` (latest-day coverage < 50 % or no baseline), or `no_anomaly`.
+
+IDs are derived from `project|env|T|config_hash` plus entity, signal and start time, so identical inputs give identical findings, episodes and evidence IDs.
+
+## Verification
+
+`backend/tests/test_analysis.py` uses the deterministic `SyntheticMetricsSource` (`backend/app/metrics/synthetic.py`) and covers:
+
+- healthy data; sustained CPU; memory growth (ongoing); disk depletion (critical);
+- independent 404 and 5xx bursts; latency shift; mean-only latency; traffic drop;
+- the low-volume ratio guard; gaps lowering confidence; zero-variance baselines;
+- short retention (5 days) and no baseline (2 days);
+- no use of the evaluated day or future data in baselines (tampering tests);
+- determinism; ordering; recurrence across days;
+- a changing host population, which does not raise the anomalous share;
+- relations only through verified mappings; episode merging across the day boundary;
+- severity mapping; the inconclusive trend summary;
+- composing a valid `AnalysisReport`.
+
+Live check (2026-09-30, paas/production, 360 series): detection took 4.3 s and produced 9 latest-day findings. One was medium (an other-4xx spike on `POST /api/v3/tasks`) and eight were low (disk-throughput bursts, recurring). The 14-day trend was stable (0.25 % vs 0.31 % anomalous share), all 14 buckets OK with 14 baseline days.

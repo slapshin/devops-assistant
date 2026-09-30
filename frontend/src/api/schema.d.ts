@@ -198,6 +198,7 @@ export interface components {
             scope: components["schemas"]["Scope"];
             source: components["schemas"]["SourceInfo"];
             state: components["schemas"]["ReportState"];
+            trend_summary?: components["schemas"]["TrendSummary"] | null;
             /** Trends */
             trends: components["schemas"]["DailyTrend"][];
             windows: components["schemas"]["AnalysisWindows"];
@@ -486,6 +487,13 @@ export interface components {
              */
             peak_score: number | null;
             /**
+             * Prior Episode Days
+             * @default 0
+             */
+            prior_episode_days: number;
+            /** @default new */
+            recurrence: components["schemas"]["Recurrence"];
+            /**
              * Related Finding Ids
              * @description Findings sharing identity labels only.
              */
@@ -497,6 +505,8 @@ export interface components {
             signal: string;
             /** Start */
             start: string;
+            /** @default resolved */
+            state: components["schemas"]["FindingState"];
             /**
              * Threshold
              * @description Heuristic threshold for absolute checks.
@@ -505,6 +515,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * FindingState
+         * @enum {string}
+         */
+        FindingState: "ongoing" | "resolved";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -696,6 +711,11 @@ export interface components {
             message: string;
         };
         /**
+         * Recurrence
+         * @enum {string}
+         */
+        Recurrence: "new" | "repeated" | "recurring";
+        /**
          * ReportState
          * @enum {string}
          */
@@ -837,6 +857,29 @@ export interface components {
          * @enum {string}
          */
         TrendBucketStatus: "ok" | "insufficient_baseline" | "insufficient_data" | "source_error";
+        /**
+         * TrendDirection
+         * @enum {string}
+         */
+        TrendDirection: "worsening" | "improving" | "stable" | "inconclusive";
+        /**
+         * TrendSummary
+         * @description Direction of the 14-day trend: last 7 buckets vs the 7 before, by anomalous share.
+         */
+        TrendSummary: {
+            confidence: components["schemas"]["ConfidenceLevel"];
+            direction: components["schemas"]["TrendDirection"];
+            /** Previous Episodes */
+            previous_episodes: number;
+            /** Previous Share */
+            previous_share: number | null;
+            /** Reason */
+            reason: string;
+            /** Recent Episodes */
+            recent_episodes: number;
+            /** Recent Share */
+            recent_share: number | null;
+        };
         /**
          * Unit
          * @enum {string}

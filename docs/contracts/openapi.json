@@ -210,6 +210,16 @@
           "state": {
             "$ref": "#/components/schemas/ReportState"
           },
+          "trend_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrendSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "trends": {
             "items": {
               "$ref": "#/components/schemas/DailyTrend"
@@ -1045,6 +1055,17 @@
             "description": "Robust z-score; null for absolute checks.",
             "title": "Peak Score"
           },
+          "prior_episode_days": {
+            "default": 0,
+            "maximum": 13.0,
+            "minimum": 0.0,
+            "title": "Prior Episode Days",
+            "type": "integer"
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/Recurrence",
+            "default": "new"
+          },
           "related_finding_ids": {
             "description": "Findings sharing identity labels only.",
             "items": {
@@ -1068,6 +1089,10 @@
           "start": {
             "title": "Start",
             "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/FindingState",
+            "default": "resolved"
           },
           "threshold": {
             "anyOf": [
@@ -1113,6 +1138,14 @@
         ],
         "title": "Finding",
         "type": "object"
+      },
+      "FindingState": {
+        "enum": [
+          "ongoing",
+          "resolved"
+        ],
+        "title": "FindingState",
+        "type": "string"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1581,6 +1614,15 @@
         "title": "Reason",
         "type": "object"
       },
+      "Recurrence": {
+        "enum": [
+          "new",
+          "repeated",
+          "recurring"
+        ],
+        "title": "Recurrence",
+        "type": "string"
+      },
       "ReportState": {
         "enum": [
           "completed",
@@ -1991,6 +2033,79 @@
         ],
         "title": "TrendBucketStatus",
         "type": "string"
+      },
+      "TrendDirection": {
+        "enum": [
+          "worsening",
+          "improving",
+          "stable",
+          "inconclusive"
+        ],
+        "title": "TrendDirection",
+        "type": "string"
+      },
+      "TrendSummary": {
+        "additionalProperties": false,
+        "description": "Direction of the 14-day trend: last 7 buckets vs the 7 before, by anomalous share.",
+        "properties": {
+          "confidence": {
+            "$ref": "#/components/schemas/ConfidenceLevel"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/TrendDirection"
+          },
+          "previous_episodes": {
+            "minimum": 0.0,
+            "title": "Previous Episodes",
+            "type": "integer"
+          },
+          "previous_share": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Share"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "recent_episodes": {
+            "minimum": 0.0,
+            "title": "Recent Episodes",
+            "type": "integer"
+          },
+          "recent_share": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recent Share"
+          }
+        },
+        "required": [
+          "direction",
+          "confidence",
+          "recent_share",
+          "previous_share",
+          "recent_episodes",
+          "previous_episodes",
+          "reason"
+        ],
+        "title": "TrendSummary",
+        "type": "object"
       },
       "Unit": {
         "enum": [

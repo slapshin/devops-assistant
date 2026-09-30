@@ -19,7 +19,7 @@
   },
   "generated_at": "2026-09-30T10:07:00Z",
   "detector_version": "detectors-2026.09.1",
-  "config_hash": "d51f5bfddde4",
+  "config_hash": "b177dc4ac897",
   "source": {
     "base_url": "http://localhost:8428",
     "backend": null,
@@ -328,7 +328,7 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_6ce2af20a57172e1",
+      "finding_id": "fnd_285ccac7fe178164",
       "detector": "robust_baseline",
       "detector_version": "detectors-2026.09.1",
       "method": "relative",
@@ -372,10 +372,13 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_fd476f79a1192a8e"
+        "evd_fc31c4c25c94d353"
       ],
       "related_finding_ids": [],
-      "attributes": {}
+      "attributes": {},
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
     }
   ],
   "trends": [
@@ -398,8 +401,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_6ce2af20a57172e1",
-          "finding_id": "fnd_6ce2af20a57172e1",
+          "episode_id": "eps_285ccac7fe178164",
+          "finding_id": "fnd_285ccac7fe178164",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=paas-production",
@@ -642,10 +645,19 @@
       "episodes": []
     }
   ],
+  "trend_summary": {
+    "direction": "inconclusive",
+    "confidence": "low",
+    "recent_share": 0.03125,
+    "previous_share": null,
+    "recent_episodes": 1,
+    "previous_episodes": 0,
+    "reason": "Only 2 recent and 0 earlier days have a full baseline and coverage (need ≥ 4 each)."
+  },
   "evidence": [
     {
-      "evidence_id": "evd_fd476f79a1192a8e",
-      "finding_id": "fnd_6ce2af20a57172e1",
+      "evidence_id": "evd_fc31c4c25c94d353",
+      "finding_id": "fnd_285ccac7fe178164",
       "series": {
         "series_id": "ser_063ed23f9b327c5f",
         "family": "cpu",

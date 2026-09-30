@@ -11,7 +11,7 @@ from pydantic import Field
 from app.domain.common import Contract, Scope, UtcDatetime
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import Explanation, ExplanationInput
-from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage
+from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
 from app.domain.jobs import AnalysisJob, JobError, JobState, StageProgress
 from app.domain.metrics import MetricCapability, MetricSeries
 from app.domain.report import (
@@ -103,6 +103,7 @@ class DetectionResult(Contract):
     findings: list[Finding]
     evidence: list[Evidence]
     trends: list[DailyTrend]
+    trend_summary: TrendSummary | None = None
     coverage: list[SignalCoverage]
     exclusions: list[Exclusion]
 

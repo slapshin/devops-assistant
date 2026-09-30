@@ -22,6 +22,51 @@ class SignalThresholds(Contract):
     absolute_min_minutes: int = 15
 
 
+_T = SignalThresholds
+_MIB = 1024.0 * 1024.0
+_DEFAULT_SIGNALS: dict[str, SignalThresholds] = {
+    "cpu_utilization": _T(min_abs_effect=0.10, abs_floor=0.01, absolute_high=0.90),
+    "cpu_iowait": _T(min_abs_effect=0.05, abs_floor=0.005, absolute_high=0.20),
+    "memory_utilization": _T(min_abs_effect=0.10, abs_floor=0.01, absolute_high=0.90),
+    "memory_pressure": _T(min_abs_effect=0.05, abs_floor=0.005, absolute_high=0.20),
+    "io_pressure": _T(min_abs_effect=0.05, abs_floor=0.005, absolute_high=0.30),
+    "filesystem_used_ratio": _T(
+        min_abs_effect=0.05,
+        abs_floor=0.005,
+        absolute_high=0.90,
+        absolute_critical=0.95,
+        absolute_min_minutes=5,
+    ),
+    "filesystem_inodes_used_ratio": _T(
+        min_abs_effect=0.05,
+        abs_floor=0.005,
+        absolute_high=0.90,
+        absolute_critical=0.95,
+        absolute_min_minutes=5,
+    ),
+    "disk_busy_ratio": _T(min_abs_effect=0.20, abs_floor=0.01, absolute_high=0.90),
+    "disk_io_bytes": _T(min_rel_factor=2.0, min_abs_effect=_MIB, abs_floor=100 * 1024.0),
+    "network_bytes": _T(min_rel_factor=2.0, min_abs_effect=100 * 1024.0, abs_floor=1024.0),
+    "network_errors": _T(min_abs_effect=1.0, abs_floor=0.01),
+    "container_cpu": _T(min_rel_factor=1.25, min_abs_effect=0.1, abs_floor=0.01),
+    "container_memory_working_set": _T(
+        min_rel_factor=1.25, min_abs_effect=50 * _MIB, abs_floor=_MIB
+    ),
+    "container_memory_limit_ratio": _T(min_rel_factor=1.25, abs_floor=0.01, absolute_high=0.90),
+    "container_throttling_ratio": _T(min_rel_factor=1.25, abs_floor=0.01, absolute_high=0.25),
+    "request_rate": _T(min_rel_factor=2.0, min_abs_effect=0.2, abs_floor=0.05),
+    "server_error_ratio": _T(
+        min_abs_effect=0.02, abs_floor=0.002, absolute_high=0.05, absolute_min_minutes=5
+    ),
+    "rpc_error_ratio": _T(
+        min_abs_effect=0.02, abs_floor=0.002, absolute_high=0.05, absolute_min_minutes=5
+    ),
+    "not_found_rate": _T(min_rel_factor=2.0, min_abs_effect=0.1, abs_floor=0.05),
+    "client_error_rate": _T(min_rel_factor=2.0, min_abs_effect=0.1, abs_floor=0.05),
+    "latency_quantile": _T(min_rel_factor=1.5, min_abs_effect=0.05, abs_floor=0.005),
+}
+
+
 class DetectorConfig(Contract):
     version: str = DETECTOR_VERSION
     step_seconds: int = STEP_SECONDS
@@ -40,52 +85,9 @@ class DetectorConfig(Contract):
     min_ratio_requests_per_step: int = 30
     top_routes_per_service: int = 20
     client_error_max_severity: str = "medium"
-    signals: dict[str, SignalThresholds] = Field(
-        default_factory=lambda: {
-            "cpu_utilization": SignalThresholds(
-                min_abs_effect=0.10, abs_floor=0.01, absolute_high=0.90
-            ),
-            "cpu_iowait": SignalThresholds(
-                min_abs_effect=0.05, abs_floor=0.005, absolute_high=0.20
-            ),
-            "memory_utilization": SignalThresholds(
-                min_abs_effect=0.10, abs_floor=0.01, absolute_high=0.90
-            ),
-            "filesystem_used_ratio": SignalThresholds(
-                min_abs_effect=0.05,
-                abs_floor=0.005,
-                absolute_high=0.90,
-                absolute_critical=0.95,
-                absolute_min_minutes=5,
-            ),
-            "filesystem_inodes_used_ratio": SignalThresholds(
-                min_abs_effect=0.05, abs_floor=0.005, absolute_high=0.90, absolute_min_minutes=5
-            ),
-            "disk_busy_ratio": SignalThresholds(
-                min_abs_effect=0.20, abs_floor=0.01, absolute_high=0.90
-            ),
-            "network_bytes": SignalThresholds(min_rel_factor=2.0, abs_floor=1024.0),
-            "network_errors": SignalThresholds(min_abs_effect=0.0, abs_floor=0.01),
-            "container_cpu": SignalThresholds(min_rel_factor=1.25, abs_floor=0.01),
-            "container_memory_limit_ratio": SignalThresholds(
-                min_rel_factor=1.25, abs_floor=0.01, absolute_high=0.90
-            ),
-            "container_throttling_ratio": SignalThresholds(
-                min_rel_factor=1.25, abs_floor=0.01, absolute_high=0.25
-            ),
-            "request_rate": SignalThresholds(
-                min_rel_factor=2.0, min_abs_effect=0.2, abs_floor=0.05
-            ),
-            "server_error_ratio": SignalThresholds(
-                min_abs_effect=0.02, abs_floor=0.002, absolute_high=0.05, absolute_min_minutes=5
-            ),
-            "client_error_rate": SignalThresholds(min_rel_factor=2.0, abs_floor=0.05),
-            "client_error_ratio": SignalThresholds(min_abs_effect=0.01, abs_floor=0.002),
-            "latency_quantile": SignalThresholds(
-                min_rel_factor=1.5, min_abs_effect=0.05, abs_floor=0.005
-            ),
-        }
-    )
+    shortfall_min_minutes: int = 15
+    relation_slack_minutes: int = 30
+    signals: dict[str, SignalThresholds] = Field(default_factory=lambda: dict(_DEFAULT_SIGNALS))
 
     @property
     def config_hash(self) -> str:

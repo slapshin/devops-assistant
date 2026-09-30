@@ -56,4 +56,5 @@ Use bounded metadata and time-range queries against `METRICS_URL`. Record query 
   - The retention flag (4w) and the observed oldest data (≈ 28.4 d) are point-in-time.
   - Traefik metrics are present but excluded from the first-release catalog pending review of their `code` label.
   - T010 must repeat live validation, including a large scope.
+- Correction (2026-09-30, T005): the "paas-production-2 / 91 % used" note was a misread free ratio (91 % free); the inventory now says so.
 - Next ready task: T004 (dependencies T002 and T003 are done). T005 is also ready.

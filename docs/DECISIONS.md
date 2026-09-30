@@ -160,7 +160,7 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | Container | CPU usage, memory working set per swarm task/container (`name`), restarts (swarm task changes, `container_start_time_seconds` changes), OOM (`container_oom_events_total`) | up | +25 % | any restart/OOM increase. Memory ≥ 90 % of limit and throttling ≥ 25 % apply only when limits/CFS metrics exist. T003 found neither for paas/production, so those are `unsupported` there. |
 | HTTP/RPC traffic | request rate (service, route, method) | both | ×2 or ÷2 and ≥ 0.2 req/s change | — |
 | HTTP/RPC failure | 5xx ratio (`http_response_status_code=~"5.."` / all); RPC failure ratio (`rpc_response_status_code!="OK"` / all). Baselines are ≈ 0 in practice (T003), so the absolute check is the main detector. | up | +2 pp | ≥ 5 % over a step window with ≥ 30 requests |
-| HTTP client errors | 4xx rate and 4xx ratio, 404 shown separately | up | ×2 and +1 pp | — (never a failure) |
+| HTTP client errors | 404 rate and other-4xx rate (4xx − 404), each ×2 and ≥ +0.1 req/s (T005: rates replace the 4xx ratio to avoid double counting) | up | ×2 | — (never a failure) |
 | Latency | p95/p99 from verified classic histograms (HTTP and RPC buckets 0.005–10 s; values at the top bucket are reported as "≥ 10 s"); mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
 
 - Rates are computed before aggregation; ratio numerator and denominator use the same selector scope (project, env, and entity labels).
@@ -181,7 +181,7 @@ Points = magnitude points + duration points; severity from points.
 | absolute check "high" | 3 | | |
 | absolute check "critical" | 4 | | |
 
-`≤ 1` low · `2` medium · `3–4` high · `≥ 5` critical. HTTP 4xx-only findings are capped at **medium**.
+`≤ 1` low · `2` medium · `3–4` high · `≥ 5` critical. HTTP 4xx-only findings are capped at **medium**. T005 adds two more caps: network throughput at medium, and disk throughput at low. Throughput alone is informational; saturation is judged by busy time and PSI. Events have fixed points: OOM kills 3, new failed Swarm tasks 2, replica shortfall ≥ 15 min 3. The implemented policy is in [detection.md](detection.md).
 
 ### Confidence (data quality only)
 

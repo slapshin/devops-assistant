@@ -19,7 +19,7 @@
   },
   "generated_at": "2026-09-30T10:07:00Z",
   "detector_version": "detectors-2026.09.1",
-  "config_hash": "d51f5bfddde4",
+  "config_hash": "b177dc4ac897",
   "source": {
     "base_url": "http://localhost:8428",
     "backend": null,
@@ -567,6 +567,15 @@
       "episodes": []
     }
   ],
+  "trend_summary": {
+    "direction": "stable",
+    "confidence": "high",
+    "recent_share": 0.0,
+    "previous_share": 0.0,
+    "recent_episodes": 0,
+    "previous_episodes": 0,
+    "reason": "Anomalous share 0.00% over the last 7 days vs 0.00% over the previous 7 (similar); 0 vs 0 episodes."
+  },
   "evidence": [],
   "exclusions": [
     {

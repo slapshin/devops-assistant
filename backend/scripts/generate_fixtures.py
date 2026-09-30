@@ -16,6 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from app.analysis.engine import trend_summary
 from app.domain.common import (
     STEP_SECONDS,
     ConfidenceLevel,
@@ -46,6 +47,7 @@ from app.domain.findings import (
     ExpectedValue,
     Finding,
     ObservedValue,
+    Recurrence,
     SignalCoverage,
     SignalStatus,
     TrendBucketStatus,
@@ -597,6 +599,8 @@ def not_found_finding(aid: str) -> tuple[Finding, Evidence]:
         baseline_mode=BaselineMode.TIME_OF_DAY,
         evidence_ids=[eid],
         attributes={"http_response_status_code": "404", "error_type": "404"},
+        recurrence=Recurrence.RECURRING,
+        prior_episode_days=3,
     )
     evidence = Evidence(
         evidence_id=eid,
@@ -810,6 +814,9 @@ def report(
         capabilities=capabilities(float(history_days), histogram, containers=False),
         coverage=coverage(findings, baseline_days, histogram, source_error),
         findings=findings,
+        trend_summary=trend_summary(
+            trends(aid, history_days=history_days, findings=findings, recurring_404_days=recurring)
+        ),
         trends=trends(
             aid, history_days=history_days, findings=findings, recurring_404_days=recurring
         ),
