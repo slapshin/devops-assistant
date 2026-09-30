@@ -25,7 +25,7 @@ Source of truth: `backend/app/domain/`. Generated artifacts, drift-checked by `m
 | Job lifecycle / API bodies | `AnalysisJob`, `StageProgress`, `Problem`, `ProjectList`, `EnvList`, `RuntimeConfig`, `HealthResponse` | `domain/jobs.py` |
 | Detector configuration | `DetectorConfig` (defaults = DECISIONS §5, `config_hash`) | `domain/detector_config.py` |
 
-Interfaces (`domain/interfaces.py`): `MetricsSource` (T004), `Detector` (T005), `ExplanationProvider` (T006), `AnalysisService` (the framework-independent entry point, T007), `ReportRepository` (T007), and `ProgressReporter`/`CancellationToken`. The domain package imports no web framework, HTTP client, ORM, or LLM SDK. This is enforced by `tests/test_contracts.py` and a ruff banned-import rule for `openai`.
+Interfaces (`domain/interfaces.py`). T004 added `DiscoveredValues` (values plus a `truncated` flag), `EntityMapping`/`MappingKind`, and `CollectionResult.mappings`, all additive: `MetricsSource` (T004), `Detector` (T005), `ExplanationProvider` (T006), `AnalysisService` (the framework-independent entry point, T007), `ReportRepository` (T007), and `ProgressReporter`/`CancellationToken`. The domain package imports no web framework, HTTP client, ORM, or LLM SDK. This is enforced by `tests/test_contracts.py` and a ruff banned-import rule for `openai`.
 
 ## Conventions
 

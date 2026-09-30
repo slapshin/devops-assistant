@@ -3,9 +3,12 @@ storage and orchestration). Kept free of web framework and LLM SDK types."""
 
 import asyncio
 from collections.abc import Sequence
+from enum import StrEnum
 from typing import Protocol
 
-from app.domain.common import Contract, Scope
+from pydantic import Field
+
+from app.domain.common import Contract, Scope, UtcDatetime
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import Explanation, ExplanationInput
 from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage
@@ -46,9 +49,31 @@ class ProgressReporter(Protocol):
     async def update(self, progress: StageProgress) -> None: ...
 
 
+class DiscoveredValues(Contract):
+    values: list[str]
+    truncated: bool = False
+
+
+class MappingKind(StrEnum):
+    OTEL_SERVICE = "otel_service"
+    """target_info.service_instance_id -> cAdvisor container id -> cAdvisor instance (host)."""
+    SWARM_SERVICE = "swarm_service"
+    """docker_swarm_task_info{state="running"}.node_hostname."""
+
+
+class EntityMapping(Contract):
+    """A service-to-host relationship established by shared label values at one instant."""
+
+    kind: MappingKind
+    service: str = Field(description="OTel job label or Swarm service_name.")
+    host: str = Field(description="Host alias, equal to node/cAdvisor instance.")
+    observed_at: UtcDatetime
+
+
 class CollectionResult(Contract):
     series: list[MetricSeries]
     exclusions: list[Exclusion]
+    mappings: list[EntityMapping] = Field(default_factory=list)
 
 
 class MetricsSource(Protocol):
@@ -56,9 +81,9 @@ class MetricsSource(Protocol):
 
     async def source_info(self) -> SourceInfo: ...
 
-    async def list_projects(self) -> list[str]: ...
+    async def list_projects(self) -> DiscoveredValues: ...
 
-    async def list_envs(self, project: str) -> list[str]: ...
+    async def list_envs(self, project: str) -> DiscoveredValues: ...
 
     async def capabilities(
         self, scope: Scope, windows: AnalysisWindows

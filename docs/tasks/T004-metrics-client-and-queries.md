@@ -22,11 +22,11 @@ The analysis engine receives normalized metric series and explicit capability/co
 
 ## Acceptance
 
-- [ ] Every selector is correctly scoped and escaped, including ratio operands and selected-scope discovery.
-- [ ] Counter rates, aggregation, reset behavior, invalid denominators, histogram units, and missing series are handled correctly.
-- [ ] Metric capabilities explicitly gate latency, restart, and limit-dependent calculations.
-- [ ] Timeouts, retries, concurrency, cancellation, query/response limits, and scoped caching have defined behavior.
-- [ ] Truncation, missing data, and unsupported metrics remain visible to consumers.
+- [x] Every selector is correctly scoped and escaped, including ratio operands and selected-scope discovery.
+- [x] Counter rates, aggregation, reset behavior, invalid denominators, histogram units, and missing series are handled correctly.
+- [x] Metric capabilities explicitly gate latency, restart, and limit-dependent calculations.
+- [x] Timeouts, retries, concurrency, cancellation, query/response limits, and scoped caching have defined behavior.
+- [x] Truncation, missing data, and unsupported metrics remain visible to consumers.
 
 ## Verification
 
@@ -34,11 +34,32 @@ Use meaningful HTTP/API fixtures for exact label escaping, cross-project isolati
 
 ## Completion record
 
-Not started. Fill in after execution:
-
-- Completed date:
+- Completed date: 2026-09-30
 - Actual changed files and artifacts:
+  - `backend/app/metrics/{promql,client,catalog,source}.py`
+  - `backend/app/domain/interfaces.py` (`DiscoveredValues`, `EntityMapping`, `CollectionResult.mappings`)
+  - `backend/tests/test_metrics.py`
+  - `docs/metrics-catalog.md` (new) and `docs/contracts.md`
 - Commands/checks and results:
+  - `uv run pytest` passes (174 passed, 2 skipped); ruff and mypy strict are clean.
+  - The metrics tests use `httpx.MockTransport` fixtures and cover:
+    - label escaping and scope checks for every catalog query and gate, under plain and hostile scopes
+    - rejection of an unscoped ratio operand, bare metrics, fake scopes inside strings, and another project's matcher
+    - structural rate-before-aggregation and histogram `le` checks
+    - chunk contiguity and merging, NaN → gap, retry/no-retry classification, auth/unreachable/too-large errors
+    - cache keying, bearer token only in headers, grid placement
+    - capability gating (missing metrics, zero limits, missing buckets, partial containers, mean fallback)
+    - route top-N with `(other routes)`, per-query truncation, exclusions on failure, out-of-scope result filtering, cancellation, the service→host mapping join, and discovery truncation and escaping
+  - Live read-only smoke on paas/production passed: all 31 catalog queries evaluated as instant queries; full capabilities took 1.2 s and collection 42.6 s (126 requests, 360 series, no exclusions). See `docs/metrics-catalog.md`.
 - Decisions or dependency changes:
+  - HTTP/RPC failure ratios are derived in the analysis from separately collected operands.
+  - Restart evidence comes from Swarm task/replica proxies, not cAdvisor.
+  - Container identity strips the Swarm task ID.
+  - There is no swap signal where SwapTotal is 0.
+  - PSI memory/IO pressure and host OOM kills were added.
+  - No new dependencies.
 - Remaining limitations or blockers:
-- Next ready task:
+  - Mappings are an instant snapshot at T rather than per-step joins; they are used only for latest-day grouping, and T005 labels any time-only overlap as a hypothesis.
+  - Traefik is excluded.
+  - Collection for large scopes (paas-gpu) was not re-measured end to end; this is a T010 obligation.
+- Next ready task: T005.
