@@ -58,3 +58,58 @@ body {
     transition: none !important;
   }
 }
+
+a { color: var(--focus); }
+
+h1 { font-size: 1.4rem; margin: 0 0 var(--space); }
+h2 { font-size: 1.1rem; margin: calc(var(--space) * 2) 0 var(--space); }
+
+button {
+  font: inherit;
+  padding: calc(var(--space) * 0.5) calc(var(--space) * 1.5);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+button.primary { background: var(--focus); color: #fff; border-color: var(--focus); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.link { border: none; background: none; color: var(--focus); padding: 0; text-decoration: underline; }
+
+select, input {
+  font: inherit;
+  padding: calc(var(--space) * 0.5);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.muted { color: var(--text-muted); }
+.banner {
+  border: 1px solid var(--status-warn); border-left-width: 4px; border-radius: var(--radius);
+  padding: var(--space) calc(var(--space) * 1.5); margin: var(--space) 0;
+}
+.banner.error { border-color: var(--sev-critical); }
+.card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: calc(var(--space) * 1.5); background: var(--bg);
+}
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.table th { font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+code, pre { font-family: var(--font-mono); font-size: 0.85rem; }
+pre { white-space: pre-wrap; word-break: break-all; background: var(--surface); padding: var(--space); border-radius: var(--radius); }
+.row { display: flex; gap: var(--space); align-items: center; flex-wrap: wrap; }
+.stack > * + * { margin-top: var(--space); }
+.skeleton { background: var(--surface); border-radius: var(--radius); height: 1.2em; margin: 6px 0; }
+
+/* Data tables scroll in their own container; the page never scrolls horizontally. */
+.table-wrap { overflow-x: auto; max-width: 100%; }
+main { overflow-wrap: anywhere; }
