@@ -1,6 +1,6 @@
 # Implementation tasks and agent handoff
 
-This is the execution index for the first usable DevOps AI assistant release. Read [the product plan](../PRODUCT_PLAN.md) and [architecture](../ARCHITECTURE.md) before starting. Web UI, project/env selection, 24-hour analysis, two-week trends, and OpenAI-first explanations are confirmed. Python/FastAPI, React/TypeScript, SQLite, and Docker are proposed defaults to make concrete in T001.
+This is the execution index for the first usable DevOps AI assistant release. Read [the product plan](../PRODUCT_PLAN.md) and [architecture](../ARCHITECTURE.md) before starting. Web UI, project/env selection, 24-hour analysis, two-week trends, and OpenAI-first explanations are confirmed. The Vue.js frontend is an owner decision (2026-09-30); Python/FastAPI, TypeScript, SQLite, and Docker are proposed defaults made concrete in T001.
 
 T001–T003 are DONE (decisions, foundations, shared contracts, telemetry inventory); T004 and T005 are ready. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
 

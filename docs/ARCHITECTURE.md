@@ -4,7 +4,7 @@ Status: planning, 2026-09-30. No application is implemented. T001 defaults are r
 
 ## Proposed stack and runtime
 
-Use a Python backend with FastAPI and a React/TypeScript web UI, packaged for local/self-hosted Docker operation. These are planning defaults, not requirements supplied by the user. Keep the analysis engine independent of HTTP, UI, scheduling, and AI providers so future entry points reuse it.
+Use a Python backend with FastAPI and a Vue.js/TypeScript web UI, packaged for local/self-hosted Docker operation. Vue.js is an owner decision (2026-09-30); the remaining stack choices are planning defaults, not requirements supplied by the user. Keep the analysis engine independent of HTTP, UI, scheduling, and AI providers so future entry points reuse it.
 
 Use SQLite for analysis job status and report snapshots. Start with one application process and a bounded background job runner; Redis, distributed workers, and a separate time-series database are unnecessary for the first version. Metrics remain in the existing metrics backend.
 

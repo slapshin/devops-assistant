@@ -1,3 +1,13 @@
+<template>
+  <header class="header">
+    <RouterLink to="/" class="brand">DevOps AI Assistant</RouterLink>
+  </header>
+  <main class="main">
+    <RouterView />
+  </main>
+</template>
+
+<style scoped>
 .header {
   display: flex;
   gap: calc(var(--space) * 2);
@@ -18,10 +28,4 @@
   max-width: 1400px;
   margin: 0 auto;
 }
-
-.notice {
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  padding: calc(var(--space) * 2);
-  color: var(--text-muted);
-}
+</style>

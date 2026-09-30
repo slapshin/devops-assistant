@@ -1,10 +1,10 @@
-import react from "@vitejs/plugin-react";
+import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vitest/config";
 
 const backend = process.env.VITE_BACKEND_URL ?? "http://127.0.0.1:8000";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [vue()],
   server: {
     proxy: { "/api": backend },
   },

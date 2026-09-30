@@ -6,7 +6,7 @@ Implementation handoff: [ordered task backlog](tasks/README.md). Technical bound
 
 ## Confirmed requirements
 
-- Web UI first; CLI and scheduled daily reports later.
+- Web UI first, built with Vue.js (owner decision, 2026-09-30); CLI and scheduled daily reports later.
 - Read metrics through a Prometheus-compatible HTTP API configured by environment: `METRICS_URL=http://localhost:8428`.
 - Select exactly one `project` and `env` per analysis, with discovery-backed selectors.
 - Analyze anomalies in the latest 24 hours and show both historical comparison and a two-week anomaly trend.
@@ -93,4 +93,4 @@ The [task index](tasks/README.md) supplies exact dependencies and agent assignme
 
 CLI entry points, scheduled daily reports/delivery channels, additional AI adapters, user SLOs, suppression/maintenance windows, longer seasonal baselines, and multi-user authentication follow this release.
 
-Retention, scrape cadence, actual cAdvisor/RPC metric names, histograms, and service-to-host mapping are discovery work. The hosting target and OpenAI model remain configurable. Python/FastAPI, React/TypeScript, SQLite, and Docker are proposed defaults, not a copied family-tree stack or confirmed owner choices.
+Retention, scrape cadence, actual cAdvisor/RPC metric names, histograms, and service-to-host mapping are discovery work. The hosting target and OpenAI model remain configurable. Python/FastAPI, TypeScript, SQLite, and Docker are proposed defaults, not a copied family-tree stack or confirmed owner choices; the Vue.js frontend is confirmed.

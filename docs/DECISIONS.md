@@ -1,6 +1,6 @@
 # Technical decisions (T001)
 
-Status: recorded 2026-09-30 by T001. Everything here is an **implementation default** chosen by the implementing agent under the [architecture](ARCHITECTURE.md) version policy — not an owner-confirmed requirement. Confirmed requirements remain those in the [product plan](PRODUCT_PLAN.md#confirmed-requirements). Later tasks may revise a default by editing this file with a reason; T002 pins what is recorded here.
+Status: recorded 2026-09-30 by T001; frontend framework changed to Vue.js by owner decision the same day. Everything here, except items marked **owner decision**, is an **implementation default** chosen by the implementing agent under the [architecture](ARCHITECTURE.md) version policy — not an owner-confirmed requirement. Confirmed requirements remain those in the [product plan](PRODUCT_PLAN.md#confirmed-requirements). Later tasks may revise a default by editing this file with a reason; T002 pins what is recorded here.
 
 Companion document: [UI specification](UI_SPEC.md).
 
@@ -31,19 +31,19 @@ Lookup date for every version below: **2026-09-30**. Sources: PyPI JSON API (`ht
 
 | Component | Version | Rationale |
 | --- | --- | --- |
-| Node.js | 24.21.0 LTS ("Krypton") | Newest LTS line. Node 26.x is the Current line and not LTS until its scheduled promotion, so it is not chosen for a self-hosted build. Meets engines of Vite 8, Vitest 5, React Router 8 (`>=22.22`), ESLint 10. |
+| Node.js | 24.21.0 LTS ("Krypton") | Newest LTS line. Node 26.x is the Current line and not LTS until its scheduled promotion, so it is not chosen for a self-hosted build. Meets engines of Vite 8, Vitest 5, @vitejs/plugin-vue 6, ESLint 10. |
 | npm | bundled with Node 24 | `package-lock.json` committed; `npm ci`. pnpm is not installed locally and adds nothing needed here. |
-| React / react-dom | 19.3.0 | Proposed default stack. |
-| TypeScript | **6.0.3** | Compatibility exception: TypeScript 7.0.2 is `latest`, but `typescript-eslint` 8.71.0 declares `typescript >=4.8.4 <6.1.0`. Use 6.0.x until typescript-eslint supports 7. |
-| Vite / @vitejs/plugin-react | 8.3.1 / 6.1.1 | Dev server with `/api` proxy to the backend; static production build. |
-| React Router | 8.4.0 | URL-addressable reports, views, and findings (declarative/data router mode, no framework mode/SSR). |
-| TanStack Query | 5.104.0 | Server state, job polling, retry/cancel. |
-| Apache ECharts | 6.1.0 | Time-series with gaps (`null`), expected-range bands (stacked area / `markArea`), `dataZoom`, SVG renderer, and built-in `aria` descriptions. Chosen over uPlot (no a11y layer) and Recharts (weaker large time-series handling). |
-| Styling | Plain CSS with CSS custom properties, CSS Modules via Vite | No framework dependency; tokens defined once in `frontend/src/styles/tokens.css`. |
+| Vue | 3.5.43 | **Owner decision (2026-09-30): Vue.js instead of React.** Latest stable line; 3.6 is still in pre-release (`rc`), so it is not used. Composition API with `<script setup lang="ts">` single-file components. |
+| TypeScript / vue-tsc | **6.0.3** / 3.3.11 | Compatibility exception: TypeScript 7.0.2 is `latest`, but `typescript-eslint` 8.71.0 (used by `@vue/eslint-config-typescript` 14.9.0) declares `typescript >=4.8.4 <6.1.0`. Use 6.0.x until typescript-eslint supports 7. `vue-tsc` (peer `typescript >=5.0.0`) type-checks `.vue` files. `@vue/tsconfig` 0.9.1 is the base config. |
+| Vite / @vitejs/plugin-vue | 8.3.1 / 6.0.9 | Dev server with `/api` proxy to the backend; static production build. |
+| Vue Router | 5.3.1 | URL-addressable reports, views, and findings (HTML5 history mode, no SSR). The optional Pinia/Colada peers are not used. |
+| TanStack Query (`@tanstack/vue-query`) | 5.104.0 | Server state, job polling, retry/cancel. No Pinia store: there is no client state beyond URL and query cache. It pulls `vue-demi` 0.14.10, whose npm postinstall is blocked by npm 11's install-script policy; the published default build already targets Vue 3 (`isVue3 = true`, checked 2026-09-30), so no script approval is needed. |
+| Apache ECharts / vue-echarts | 6.1.0 / 8.3.1 | Time-series with gaps (`null`), expected-range bands (stacked area / `markArea`), `dataZoom`, SVG renderer, and built-in `aria` descriptions. Chosen over uPlot (no a11y layer) and Recharts (weaker large time-series handling). |
+| Styling | Plain CSS with custom properties; component styles in SFC `<style scoped>` | No CSS framework; tokens defined once in `frontend/src/styles/tokens.css`. |
 | openapi-typescript | 7.13.0 | Generates `frontend/src/api/schema.d.ts` from the backend OpenAPI document; committed and drift-checked in CI. Compatibility exception (T002): its peer range is `typescript ^5.x` with no release supporting 6.x, so `package.json` `overrides` points it at the pinned TypeScript 6.0.3; generation is verified by `npm run check:api`. |
-| Vitest / Testing Library | 5.0.2 / @testing-library/react 16.3.3 | Unit/component tests. |
+| Vitest / Testing Library | 5.0.2 / @testing-library/vue 8.1.0 (+ @vue/test-utils, jest-dom 7.0.1) | Unit/component tests using accessible role/text queries. |
 | Playwright | 1.63.0 | Desktop + narrow-viewport workflow and keyboard checks (T008/T010). |
-| ESLint / typescript-eslint | 10.11.0 / 8.71.0 | Lint. |
+| ESLint / eslint-plugin-vue / @vue/eslint-config-typescript | 10.11.0 / 10.11.1 / 14.9.0 | Lint with `flat/recommended` and zero warnings allowed. Two layout-only rules (`max-attributes-per-line`, `singleline-html-element-content-newline`) are off. |
 
 ### Containers and storage
 

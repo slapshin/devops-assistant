@@ -1,18 +1,19 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
+import { render, screen } from "@testing-library/vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createMemoryHistory } from "vue-router";
 import config from "../../fixtures/api/config.json";
-import { routes } from "./App";
+import App from "./App.vue";
+import { makeRouter } from "./router";
 
-function renderAt(path: string) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const router = createMemoryRouter(routes, { initialEntries: [path] });
-  return render(
-    <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
+async function renderAt(path: string) {
+  const router = makeRouter(createMemoryHistory());
+  await router.push(path);
+  await router.isReady();
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(App, {
+    global: { plugins: [router, [VueQueryPlugin, { queryClient }]] },
+  });
 }
 
 function mockFetch(response: Response | Error) {
@@ -27,14 +28,14 @@ afterEach(() => vi.unstubAllGlobals());
 describe("foundation routes", () => {
   it("shows backend configuration on the start page", async () => {
     mockFetch(new Response(JSON.stringify(config), { headers: { "content-type": "application/json" } }));
-    renderAt("/");
+    await renderAt("/");
     expect(await screen.findByText("http://localhost:8428")).toBeInTheDocument();
     expect(screen.getByText(/openai · not_configured/)).toBeInTheDocument();
   });
 
   it("reports an unreachable backend with a retry action", async () => {
     mockFetch(new TypeError("network down"));
-    renderAt("/");
+    await renderAt("/");
     expect(await screen.findByRole("alert")).toHaveTextContent("Lost connection to the assistant");
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
@@ -45,8 +46,8 @@ describe("foundation routes", () => {
     ["/reports/abc/findings/fnd_1", "Evidence"],
     ["/reports/abc/trends", "Trends"],
     ["/analyses/abc", "Job progress"],
-  ])("marks %s as not implemented", (path, view) => {
-    renderAt(path);
+  ])("marks %s as not implemented", async (path, view) => {
+    await renderAt(path);
     expect(screen.getByRole("heading", { name: view })).toBeInTheDocument();
     expect(screen.getByText(/Not implemented yet — delivered by T008/)).toBeInTheDocument();
   });

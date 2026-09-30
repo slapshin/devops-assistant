@@ -59,4 +59,5 @@ Run the foundation build/checks and validate representative JSON examples agains
   - `/api/health` reports `database: not_initialized` and does not check metrics until T004/T007.
   - Fixture values are illustrative, not detector output.
   - Detector config file overrides (`DETECTOR_CONFIG`) are validated for existence but loaded by T005.
+- Later change (2026-09-30, owner decision): the frontend foundation was rebuilt on Vue 3.5 + Vue Router 5 + `@tanstack/vue-query`, replacing React. The same routes, API client, generated types, and seven tests were kept. `npm ci && npm run check` passes on Node 24.21.0 and locally. See DECISIONS §1.
 - Next ready task: T003 (read-only telemetry discovery); T005 is also ready (depends only on T002).
