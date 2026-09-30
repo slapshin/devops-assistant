@@ -1,6 +1,6 @@
 # Architecture and implementation boundaries
 
-Status: planning only, 2026-09-30. No application is implemented. The [product plan](PRODUCT_PLAN.md) records confirmed requirements; [T001](tasks/T001-decisions-and-design.md) makes the remaining defaults concrete.
+Status: planning, 2026-09-30. No application is implemented. T001 defaults are recorded in [DECISIONS.md](DECISIONS.md) and [UI_SPEC.md](UI_SPEC.md). The [product plan](PRODUCT_PLAN.md) records confirmed requirements; [T001](tasks/T001-decisions-and-design.md) makes the remaining defaults concrete.
 
 ## Proposed stack and runtime
 
@@ -88,7 +88,7 @@ Use explicit migrations and persistent container storage. Startup must not erase
 
 ## Decisions delegated to T001
 
-Record package managers/runtime versions, frontend routing/charting/styling, API/error conventions, report schema tooling, SQLite access/migrations, job scheduling/cancellation/recovery, query/resource budgets, default detector configuration, and UI behavior in `docs/DECISIONS.md` and `docs/UI_SPEC.md`.
+Resolved 2026-09-30 in [DECISIONS.md](DECISIONS.md) and [UI_SPEC.md](UI_SPEC.md) as implementation defaults. Originally delegated: record package managers/runtime versions, frontend routing/charting/styling, API/error conventions, report schema tooling, SQLite access/migrations, job scheduling/cancellation/recovery, query/resource budgets, default detector configuration, and UI behavior in `docs/DECISIONS.md` and `docs/UI_SPEC.md`.
 
 Ordinary implementation choices can be resolved using these defaults and current official documentation. Do not turn proposed choices into owner-confirmed requirements. Shared contracts are frozen in T002 before dependent tasks proceed.
 
