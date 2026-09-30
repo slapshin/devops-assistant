@@ -2,6 +2,7 @@
 
 import json
 import re
+import unicodedata
 from collections.abc import Sequence
 
 from app.analysis.rules import format_value
@@ -12,8 +13,23 @@ from app.domain.findings import Finding, SignalCoverage, SignalStatus
 MAX_FINDINGS = 20
 MAX_INPUT_CHARS = 40_000
 MAX_LABEL_CHARS = 200
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
-_URL_SECRET = re.compile(r"(?i)(https?://)[^/\s:@]+:[^/\s@]+@")
+# Control and format characters (incl. zero-width and bidi overrides) are removed *after*
+# redaction, so they can neither split a secret away from its pattern nor survive into output.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
+# Any userinfo up to the *last* "@" of a whitespace-free token, for any scheme. This is at
+# least as broad as URL parsers, which also split userinfo at the last "@".
+_URL_USERINFO = re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)\S*@")
+_QUERY_SECRET = re.compile(
+    r"(?i)([?&;#](?:access_token|refresh_token|id_token|token|api[_-]?key|apikey|key|secret|"
+    r"client_secret|password|passwd|pwd|pass|auth|authorization|sig|signature|"
+    r"x-amz-signature|x-amz-credential|session|sessionid|jwt)=)[^&\s#;]*"
+)
+_BEARER = re.compile(r"(?i)\b(bearer|basic|token)(\s+|=|:)[A-Za-z0-9._~+/\-]+=*")
+_KNOWN_KEYS = re.compile(
+    r"\b(?:sk-[A-Za-z0-9_\-]{16,}|sk_(?:live|test)_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|"
+    r"ASIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_\-]{20,}|"
+    r"xox[abprs]-[A-Za-z0-9\-]{10,}|eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]+)"
+)
 
 INSTRUCTIONS = """\
 You explain numerical anomaly findings from a DevOps monitoring assistant.
@@ -35,9 +51,19 @@ Rules:
 """
 
 
+def redact(text: str) -> str:
+    """Remove credentials; NFKC first so full-width at-sign/colon look-alikes match."""
+    text = unicodedata.normalize("NFKC", text)
+    text = _URL_USERINFO.sub(r"\1<redacted>@", text)
+    text = _QUERY_SECRET.sub(r"\1<redacted>", text)
+    text = _BEARER.sub(r"\1\2<redacted>", text)
+    text = _KNOWN_KEYS.sub("<redacted>", text)
+    return _CONTROL.sub("", text)
+
+
 def clean(text: str, limit: int = MAX_LABEL_CHARS) -> str:
-    """Neutralise control characters, credentials in URLs, and excessive length."""
-    text = _URL_SECRET.sub(r"\1<redacted>@", _CONTROL.sub(" ", text))
+    """Redact credentials, drop control characters, then bound the length (in that order)."""
+    text = redact(text)
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
@@ -108,7 +134,10 @@ def build_input(
     summary = coverage_summary(coverage)
     while True:
         payload = ExplanationInput(
-            scope=scope, latest_day=latest_day, coverage_summary=summary, findings=digests
+            scope=Scope(project=clean(scope.project), env=clean(scope.env)),
+            latest_day=latest_day,
+            coverage_summary=summary,
+            findings=digests,
         )
         if len(render(payload)) <= max_chars or not digests:
             break

@@ -268,3 +268,62 @@ def test_openai_sdk_is_confined_to_the_adapter() -> None:
                 else ([node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
             )
             assert not any(n.split(".")[0] == "openai" for n in names), path
+
+
+@pytest.mark.parametrize(
+    ("raw", "leak"),
+    [
+        ("https://user:pa\x00ss@host/x", "pa"),  # control char must not split the secret
+        ("https://user:pa\u200bss@host/x", "pa"),  # zero-width char
+        ("https://u:p/ss@h@host/p", "ss@h"),  # last '@' wins, as in URL parsers
+        ("https\uff1a//u:s3cret\uff20host", "s3cret"),  # full-width look-alikes
+        ("ftp://admin:hunter2@files", "hunter2"),
+        ("/cb?code=1&access_token=tok123&x=1", "tok123"),
+        ("/x?api_key=k-999", "k-999"),
+        ("Authorization: Bearer abc.def-ghi", "abc.def"),
+        ("key sk-abcdefghijklmnopqrstuvwx", "sk-abcdef"),
+        ("AKIAABCDEFGHIJKLMNOP", "AKIAABCD"),
+        ("ghp_" + "a" * 36, "ghp_aaaa"),
+        ("glpat-abcdefghijklmnopqrstu", "glpat-"),
+        ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkw.sig", "eyJhbGci"),
+    ],
+)
+def test_credentials_are_redacted_before_normalisation_tricks(raw: str, leak: str) -> None:
+    cleaned = clean(raw)
+    assert leak not in cleaned and "<redacted>" in cleaned
+
+
+def test_redaction_happens_before_truncation() -> None:
+    raw = "x" * 190 + " https://user:longsecretvalue@host"
+    assert "longsecret" not in clean(raw)
+
+
+def test_ordinary_labels_are_unchanged() -> None:
+    for label in ("/api/v3/tasks/:task", "paas-production-2", "GET", "10.0.4.251:5555"):
+        assert clean(label) == label
+
+
+async def test_hostile_labels_never_reach_the_provider_payload() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return responses_api(good_output())
+
+    leaky = FINDINGS[1].model_copy(
+        update={
+            "entity": FINDINGS[1].entity.model_copy(
+                update={
+                    "labels": {
+                        **FINDINGS[1].entity.labels,
+                        "http_route": "/cb?token=tok-SECRET-1",
+                        "target": "https://svc:pw-SECRET-2\x00x@h",
+                    },
+                    "display_name": "Bearer SECRET-3-abcdef",
+                }
+            )
+        }
+    )
+    await run(provider(handler), findings=[FINDINGS[0], leaky])
+    body = seen[0].content.decode()
+    assert "SECRET" not in body
