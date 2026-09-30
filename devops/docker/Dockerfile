@@ -59,4 +59,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS --max-time 4 -o /dev/null "http://127.0.0.1:${APP_PORT}/api/health" || exit 1
 
-CMD ["/app/backend/.venv/bin/python", "-m", "app"]
+# --no-sync: the venv is baked at build time; never re-resolve or write to it at runtime.
+CMD ["uv", "run", "--no-sync", "python", "-m", "app"]
