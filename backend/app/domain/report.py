@@ -34,7 +34,9 @@ class AnalysisRequest(Contract):
     @model_validator(mode="after")
     def _aligned(self) -> Self:
         if int(self.end_time.timestamp()) % STEP_SECONDS or self.end_time.microsecond:
-            raise ValueError(f"end_time must be aligned to {STEP_SECONDS}s steps")
+            raise ValueError(
+                f"end_time {self.end_time.isoformat()} must be aligned to {STEP_SECONDS}s steps"
+            )
         return self
 
 
@@ -106,8 +108,11 @@ class AnalysisReport(Contract):
         for e in self.evidence:
             if e.finding_id not in finding_ids:
                 raise ValueError(f"{e.evidence_id} references unknown finding {e.finding_id}")
-        if [t.bucket_index for t in self.trends] != list(range(TREND_DAYS)):
-            raise ValueError("trends must be ordered by bucket_index 0..13")
+        bucket_indexes = [t.bucket_index for t in self.trends]
+        if bucket_indexes != list(range(TREND_DAYS)):
+            raise ValueError(
+                f"trends must be ordered by bucket_index 0..{TREND_DAYS - 1}, got {bucket_indexes}"
+            )
         if self.explanation.explanation is not None:
             ex = self.explanation.explanation
             referenced = [h.finding_ids for h in ex.hypotheses] + [

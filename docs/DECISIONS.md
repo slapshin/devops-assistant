@@ -74,8 +74,8 @@ All settings come from environment (optionally the repository-root `config.env`,
 | `OPENAI_BASE_URL` | unset | Optional, for compatible gateways. |
 | `DATA_DIR` | `./data` | SQLite and nothing else. |
 | `APP_HOST` / `APP_PORT` | `127.0.0.1` / `8000` | Local-only binding by default (no auth in this release). |
-| `DETECTOR_CONFIG` | unset | Optional path to a **JSON** override of §5 defaults (T009: JSON only, to avoid a YAML dependency). A changed config yields a new `config_hash` in reports. |
-| `STATIC_DIR` | `../frontend/dist` if built | Built UI served at `/` with an SPA fallback (T009). |
+| `DETECTOR_CONFIG_FILE` | unset | Optional path to a **JSON** override of §5 defaults (T009: JSON only, to avoid a YAML dependency). A changed config yields a new `config_hash` in reports. |
+| `UI_STATIC_DIR` | `../frontend/dist` if built | Built UI served at `/` with an SPA fallback (T009). |
 | `LOG_LEVEL` | `INFO` | Structured JSON logs; query strings logged, credentials never. |
 
 ## 3. API conventions
@@ -125,7 +125,7 @@ Error codes: `validation_error` (422), `project_not_found` / `env_not_found` (40
 
 ## 5. Numerical policy (detector config `detectors-2026.09.1`)
 
-All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
+All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
 ### Windows and resolution
 

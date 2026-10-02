@@ -27,7 +27,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
   APP_HOST=0.0.0.0 \
   APP_PORT=8000 \
   DATA_DIR=/data \
-  STATIC_DIR=/app/static
+  UI_STATIC_DIR=/app/static
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl \

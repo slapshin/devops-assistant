@@ -15,6 +15,8 @@ from app.domain.report import AnalysisReport, AnalysisRequest
 from app.storage.db import analysis_jobs, make_engine, migrate, reports
 
 ACTIVE = (JobState.QUEUED.value, JobState.RUNNING.value)
+MAX_REPORT_BYTES = 20 * 1024 * 1024
+REPORT_COMPRESSION_LEVEL = 6
 
 
 class SchemaUnsupported(Exception):
@@ -28,7 +30,7 @@ class ReportTooLarge(Exception):
 
 
 class SqliteReportRepository:
-    def __init__(self, path: Path, max_report_bytes: int = 20 * 1024 * 1024) -> None:
+    def __init__(self, path: Path, max_report_bytes: int = MAX_REPORT_BYTES) -> None:
         self.path = path
         self.max_report_bytes = max_report_bytes
         self.engine = make_engine(path)
@@ -115,10 +117,13 @@ class SqliteReportRepository:
                 )
             if cursor:
                 stmt = stmt.where(analysis_jobs.c.analysis_id < cursor)
+
             rows = conn.execute(stmt.limit(limit + 1)).all()
             jobs = [AnalysisJob.model_validate_json(r[0]) for r in rows[:limit]]
-            nxt = jobs[-1].analysis_id if len(rows) > limit and jobs else None
-            return jobs, nxt
+            # One extra row was fetched only to learn whether another page exists.
+            has_more = len(rows) > limit
+            next_cursor = jobs[-1].analysis_id if has_more and jobs else None
+            return jobs, next_cursor
 
         return await self._run(q)
 
@@ -127,6 +132,7 @@ class SqliteReportRepository:
             job = self._get(conn, analysis_id)
             if job is None or not job.state.active:
                 return
+
             stages = [_merge(s, progress) if s.stage is progress.stage else s for s in job.stages]
             self._put(conn, job.model_copy(update={"stages": stages}))
 
@@ -137,6 +143,7 @@ class SqliteReportRepository:
             job = self._get(conn, analysis_id)
             if job is None or job.state is not JobState.QUEUED:
                 return None
+
             job = job.model_copy(update={"state": JobState.RUNNING, "started_at": at})
             self._put(conn, job)
             return job
@@ -159,6 +166,8 @@ class SqliteReportRepository:
             job = self._get(conn, analysis_id)
             if job is None:
                 raise KeyError(analysis_id)
+
+            # A running stage cannot finish once the job has ended without completing.
             stages = [
                 s.model_copy(update={"status": StageStatus.FAILED, "finished_at": now})
                 if s.status is StageStatus.RUNNING and state is not JobState.COMPLETED
@@ -184,8 +193,11 @@ class SqliteReportRepository:
     async def save_report(self, report: AnalysisReport) -> None:
         raw = report.model_dump_json().encode()
         if len(raw) > self.max_report_bytes:
-            raise ReportTooLarge(f"{len(raw)} bytes > {self.max_report_bytes}")
-        body = zlib.compress(raw, 6)
+            raise ReportTooLarge(
+                f"report {report.analysis_id} is {len(raw)} bytes > {self.max_report_bytes}"
+            )
+
+        body = zlib.compress(raw, REPORT_COMPRESSION_LEVEL)
         await self._run(
             lambda c: c.execute(
                 reports.insert().values(
@@ -210,7 +222,9 @@ class SqliteReportRepository:
         row = await self._run(q)
         if row is None:
             return None
+
         version, body = row
+        # Only a major schema change breaks reading; minor versions stay compatible.
         if version.split(".")[0] != REPORT_SCHEMA_VERSION.split(".")[0]:
             raise SchemaUnsupported(version)
         return AnalysisReport.model_validate_json(zlib.decompress(body))

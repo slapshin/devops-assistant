@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     app_host: str = "127.0.0.1"
     app_port: int = Field(default=8000, ge=1, le=65535)
-    detector_config: Path | None = None
-    static_dir: Path | None = None
+    detector_config_file: Path | None = None
+    ui_static_dir: Path | None = None
     """Built web UI to serve at /. Defaults to ../frontend/dist when it exists."""
     log_level: str = "INFO"
 
@@ -74,7 +74,7 @@ class Settings(BaseSettings):
             raise ValueError("expected DEBUG, INFO, WARNING, or ERROR")
         return upper
 
-    @field_validator("detector_config")
+    @field_validator("detector_config_file")
     @classmethod
     def _detector_config_exists(cls, value: Path | None) -> Path | None:
         if value is not None and not value.is_file():
@@ -131,8 +131,8 @@ class Settings(BaseSettings):
 
     @property
     def ui_dir(self) -> Path | None:
-        if self.static_dir is not None:
-            return self.static_dir if (self.static_dir / "index.html").is_file() else None
+        if self.ui_static_dir is not None:
+            return self.ui_static_dir if (self.ui_static_dir / "index.html").is_file() else None
         default = Path(__file__).resolve().parents[2] / "frontend" / "dist"
         return default if (default / "index.html").is_file() else None
 

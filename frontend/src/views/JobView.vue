@@ -5,14 +5,6 @@ import { ApiError } from "../api/client";
 import { isActive, useAnalysis, useCancel, useSubmit } from "../api/queries";
 import { JOB_STATES, formatTime, utcTooltip } from "../lib/format";
 
-const props = defineProps<{ id: string }>();
-const route = useRoute();
-const router = useRouter();
-const job = useAnalysis(() => props.id);
-const cancel = useCancel();
-const submit = useSubmit();
-const confirming = ref(false);
-
 const STAGE_LABELS: Record<string, string> = {
   discovery: "Discover capabilities",
   collection: "Collect metrics",
@@ -21,37 +13,46 @@ const STAGE_LABELS: Record<string, string> = {
   explanation: "AI explanation",
   saving: "Save report",
 };
-const ICONS: Record<string, string> = { pending: "○", running: "◔", done: "●", failed: "✕", skipped: "–" };
+const STAGE_STATUS_ICONS: Record<string, string> = { pending: "○", running: "◔", done: "●", failed: "✕", skipped: "–" };
+
+const props = defineProps<{ id: string }>();
+
+const route = useRoute();
+const router = useRouter();
+const job = useAnalysis(() => props.id);
+const cancel = useCancel();
+const submit = useSubmit();
+const confirming = ref(false);
 
 const current = computed(() => job.data.value);
 const active = computed(() => !!current.value && isActive(current.value.state));
 const runningStage = computed(() => current.value?.stages.find((s) => s.status === "running")?.stage ?? null);
 const lostConnection = computed(() => job.failureCount.value >= 1 && job.isError.value === false && job.isFetching.value);
+const notFound = computed(() => job.error.value instanceof ApiError && job.error.value.problem.status === 404);
 
-watch(
-  () => current.value,
-  (j) => {
-    if (j?.report_available) void router.replace(`/reports/${j.analysis_id}`);
-  },
-  { immediate: true },
-);
-
-async function doCancel() {
+async function confirmCancel() {
   confirming.value = false;
   await cancel.mutateAsync(props.id);
 }
 
 async function runAgain() {
   if (!current.value) return;
+
   try {
-    const res = await submit.mutateAsync({ project: current.value.scope.project, env: current.value.scope.env });
-    await router.push(`/analyses/${res.analysis.analysis_id}`);
+    const submitted = await submit.mutateAsync({ project: current.value.scope.project, env: current.value.scope.env });
+    await router.push(`/analyses/${submitted.analysis.analysis_id}`);
   } catch {
     /* shown from submit.error */
   }
 }
 
-const notFound = computed(() => job.error.value instanceof ApiError && job.error.value.problem.status === 404);
+watch(
+  () => current.value,
+  (currentJob) => {
+    if (currentJob?.report_available) void router.replace(`/reports/${currentJob.analysis_id}`);
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -75,7 +76,7 @@ const notFound = computed(() => job.error.value instanceof ApiError && job.error
 
       <ol class="stages" aria-live="polite" :aria-busy="active">
         <li v-for="s in current.stages" :key="s.stage" :class="`s-${s.status}`">
-          <span aria-hidden="true">{{ ICONS[s.status] }}</span>
+          <span aria-hidden="true">{{ STAGE_STATUS_ICONS[s.status] }}</span>
           {{ STAGE_LABELS[s.stage] ?? s.stage }} — <span class="st">{{ s.status }}</span>
           <span v-if="s.total" class="muted"> ({{ s.done ?? 0 }}/{{ s.total }})</span>
           <span v-if="s.message" class="muted"> · {{ s.message }}</span>
@@ -87,7 +88,7 @@ const notFound = computed(() => job.error.value instanceof ApiError && job.error
         <button v-if="!confirming" type="button" @click="confirming = true">Cancel analysis</button>
         <template v-else>
           <span>Cancel this analysis? No report will be saved.</span>
-          <button type="button" class="primary" @click="doCancel">Yes, cancel</button>
+          <button type="button" class="primary" @click="confirmCancel">Yes, cancel</button>
           <button type="button" @click="confirming = false">Keep running</button>
         </template>
       </div>

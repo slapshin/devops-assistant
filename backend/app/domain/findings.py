@@ -108,13 +108,13 @@ class Finding(Contract):
     @model_validator(mode="after")
     def _consistent(self) -> Self:
         if not self.start <= self.peak_at < self.end:
-            raise ValueError("peak_at must lie in [start, end)")
+            raise ValueError(f"{self.finding_id}: peak_at must lie in [start, end)")
         if self.method is DetectionMethod.RELATIVE and (
             self.expected is None or self.peak_score is None
         ):
-            raise ValueError("relative findings need expected and peak_score")
+            raise ValueError(f"{self.finding_id}: relative findings need expected and peak_score")
         if self.method is DetectionMethod.ABSOLUTE and self.threshold is None:
-            raise ValueError("absolute findings need threshold")
+            raise ValueError(f"{self.finding_id}: absolute findings need threshold")
         return self
 
 
@@ -136,7 +136,9 @@ class Evidence(Contract):
         for name in ("expected", "lower", "upper"):
             band = getattr(self, name)
             if band is not None and len(band) != n:
-                raise ValueError(f"{name} length {len(band)} != series length {n}")
+                raise ValueError(
+                    f"{self.evidence_id}: {name} length {len(band)} != series length {n}"
+                )
         return self
 
 

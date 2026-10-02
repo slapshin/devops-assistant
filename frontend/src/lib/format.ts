@@ -1,18 +1,27 @@
 import { ref, watch } from "vue";
 
-export type Unit = "ratio" | "bytes" | "bytes_per_second" | "requests_per_second" | "per_second" | "seconds" | "count";
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const BYTES_PER_KIBIBYTE = 1024;
+const BYTE_UNITS = ["B", "KiB", "MiB", "GiB", "TiB"];
+/** Ratios below this (but above zero) get an extra decimal so they do not round to 0.0 %. */
+const SMALL_RATIO = 0.01;
+const TIMEZONE_STORAGE_KEY = "assistant.timezone";
+const NO_VALUE = "—";
 
 export function formatValue(value: number | null | undefined, unit: string): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  if (value === null || value === undefined || Number.isNaN(value)) return NO_VALUE;
+
   switch (unit) {
     case "ratio":
-      return `${(value * 100).toFixed(value < 0.01 && value > 0 ? 2 : 1)} %`;
+      return `${(value * 100).toFixed(value < SMALL_RATIO && value > 0 ? 2 : 1)} %`;
     case "seconds":
-      return value < 1 ? `${(value * 1000).toFixed(0)} ms` : `${value.toFixed(2)} s`;
+      return value < 1 ? `${(value * MS_PER_SECOND).toFixed(0)} ms` : `${value.toFixed(2)} s`;
     case "bytes":
-      return bytes(value);
+      return formatBytes(value);
     case "bytes_per_second":
-      return `${bytes(value)}/s`;
+      return `${formatBytes(value)}/s`;
     case "requests_per_second":
       return `${value.toFixed(2)} req/s`;
     case "per_second":
@@ -22,58 +31,68 @@ export function formatValue(value: number | null | undefined, unit: string): str
   }
 }
 
-function bytes(value: number): string {
-  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-  let v = value;
-  let i = 0;
-  while (Math.abs(v) >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i++;
+function formatBytes(value: number): string {
+  let scaled = value;
+  let unitIndex = 0;
+  while (Math.abs(scaled) >= BYTES_PER_KIBIBYTE && unitIndex < BYTE_UNITS.length - 1) {
+    scaled /= BYTES_PER_KIBIBYTE;
+    unitIndex++;
   }
-  return `${v.toFixed(1)} ${units[i]}`;
+
+  return `${scaled.toFixed(1)} ${BYTE_UNITS[unitIndex]}`;
 }
 
-const TZ_KEY = "assistant.timezone";
-function readTz(): "utc" | "local" {
+type TimezoneChoice = "utc" | "local";
+
+function readTimezone(): TimezoneChoice {
   try {
-    return localStorage.getItem(TZ_KEY) === "local" ? "local" : "utc";
+    return localStorage.getItem(TIMEZONE_STORAGE_KEY) === "local" ? "local" : "utc";
   } catch {
     return "utc";
   }
 }
+
 /** UTC by default (UI_SPEC §2); the choice is a per-viewer convenience. */
-export const timezone = ref<"utc" | "local">(readTz());
-watch(timezone, (tz) => {
+export const timezone = ref<TimezoneChoice>(readTimezone());
+
+watch(timezone, (choice) => {
   try {
-    localStorage.setItem(TZ_KEY, tz);
+    localStorage.setItem(TIMEZONE_STORAGE_KEY, choice);
   } catch {
     /* storage unavailable: keep in memory */
   }
 });
 
 export function formatTime(iso: string, withDate = true): string {
-  const d = new Date(iso);
-  const opts: Intl.DateTimeFormatOptions = {
+  const isUtc = timezone.value === "utc";
+  const options: Intl.DateTimeFormatOptions = {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
     ...(withDate ? { day: "2-digit", month: "short" } : {}),
-    ...(timezone.value === "utc" ? { timeZone: "UTC" } : {}),
+    ...(isUtc ? { timeZone: "UTC" } : {}),
   };
-  return `${new Intl.DateTimeFormat("en-GB", opts).format(d)}${timezone.value === "utc" ? " UTC" : ""}`;
+
+  return `${new Intl.DateTimeFormat("en-GB", options).format(new Date(iso))}${isUtc ? " UTC" : ""}`;
 }
 
-export const utcTooltip = (iso: string) => new Date(iso).toISOString().replace(".000Z", "Z");
+/** Same RFC 3339 form as the API ("…:00Z"), without milliseconds. */
+export const toRfc3339 = (date: Date) => date.toISOString().replace(".000Z", "Z");
+
+export const utcTooltip = (iso: string) => toRfc3339(new Date(iso));
 
 export function formatDuration(seconds: number): string {
-  const m = Math.round(seconds / 60);
-  if (m < 60) return `${m} min`;
-  const h = Math.floor(m / 60);
-  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+  const totalMinutes = Math.round(seconds / SECONDS_PER_MINUTE);
+  if (totalMinutes < MINUTES_PER_HOUR) return `${totalMinutes} min`;
+
+  const hours = Math.floor(totalMinutes / MINUTES_PER_HOUR);
+  const minutes = totalMinutes % MINUTES_PER_HOUR;
+  return minutes ? `${hours} h ${minutes} min` : `${hours} h`;
 }
 
+export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 export const SEVERITIES = ["critical", "high", "medium", "low"] as const;
-export const severityRank = (s: string) => SEVERITIES.indexOf(s as (typeof SEVERITIES)[number]);
 
 export const FAMILY_LABELS: Record<string, string> = {
   cpu: "CPU",
@@ -106,6 +125,7 @@ export const JOB_STATES: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+/** Mean latency comes from _sum/_count because no histogram buckets exist, so no percentiles. */
 export function isLatencyMean(signal: string): boolean {
   return signal === "latency_mean";
 }

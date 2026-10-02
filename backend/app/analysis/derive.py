@@ -35,6 +35,51 @@ DIRECT = {
     "swarm_replica_shortfall",
 }
 
+SWARM_FAILED_TASKS = "swarm_failed_tasks"
+HTTP_404 = "http_404"
+HTTP_4XX = "http_4xx"
+MEAN_LATENCY_RULE = "latency_mean"
+STATUS_CODE_ATTRIBUTE = "http_response_status_code"
+
+
+@dataclass(frozen=True)
+class _TrafficSpec:
+    """How one request-count signal fans out into analysable rate, ratio and latency series."""
+
+    traffic_signal: str
+    rate_rule: str
+    error_ratios: tuple[tuple[str, str], ...]
+    """(numerator signal, ratio rule) pairs divided by the request rate."""
+    quantile_signal: str
+    quantile_rule: str
+    mean_signal: str | None = None
+    """Latency fallback when no histogram quantile is collected."""
+    tail_signal: str | None = None
+    """Higher quantile attached as extra evidence."""
+    client_errors: bool = False
+    """Whether 404 and other 4xx rates are derived (HTTP only)."""
+
+
+_TRAFFIC_SPECS = (
+    _TrafficSpec(
+        traffic_signal="http_requests",
+        rate_rule="request_rate",
+        error_ratios=(("http_5xx", "server_error_ratio"),),
+        quantile_signal="http_latency_p95",
+        quantile_rule="latency_p95",
+        mean_signal="http_latency_mean",
+        tail_signal="http_latency_p99",
+        client_errors=True,
+    ),
+    _TrafficSpec(
+        traffic_signal="rpc_requests",
+        rate_rule="rpc_request_rate",
+        error_ratios=(("rpc_errors", "rpc_error_ratio"),),
+        quantile_signal="rpc_latency_p95",
+        quantile_rule="rpc_latency_p95",
+    ),
+)
+
 
 @dataclass
 class AnalysisSeries:
@@ -70,20 +115,33 @@ def _zero_where_observed(numerator: Array | None, denominator: Array) -> Array:
 def derive(
     series: list[MetricSeries], step_seconds: int, min_requests: int
 ) -> list[AnalysisSeries]:
-    by: dict[str, dict[str, MetricSeries]] = defaultdict(dict)
+    by_signal: dict[str, dict[str, MetricSeries]] = defaultdict(dict)
     for s in series:
-        by[s.signal][s.entity.key] = s
+        by_signal[s.signal][s.entity.key] = s
+
+    out = _direct_series(by_signal)
+    out += _task_failure_series(by_signal)
+    for spec in _TRAFFIC_SPECS:
+        out += _traffic_series(by_signal, spec, step_seconds, min_requests)
+    return out
+
+
+def _direct_series(by_signal: dict[str, dict[str, MetricSeries]]) -> list[AnalysisSeries]:
     out: list[AnalysisSeries] = []
-
-    for name in sorted(DIRECT & set(by)):
-        for key in sorted(by[name]):
-            s = by[name][key]
+    for name in sorted(DIRECT & set(by_signal)):
+        for key in sorted(by_signal[name]):
+            s = by_signal[name][key]
             out.append(AnalysisSeries(RULES[name], s.entity, s.unit, to_array(s), s.query, s))
+    return out
 
-    for key in sorted(by.get("swarm_failed_tasks", {})):
-        s = by["swarm_failed_tasks"][key]
-        values = to_array(s)
-        delta = np.diff(values, prepend=np.nan)
+
+def _task_failure_series(by_signal: dict[str, dict[str, MetricSeries]]) -> list[AnalysisSeries]:
+    """Failed-task counts are cumulative gauges; analyse the per-step increase instead."""
+    failed_tasks = by_signal.get(SWARM_FAILED_TASKS, {})
+    out: list[AnalysisSeries] = []
+    for key in sorted(failed_tasks):
+        s = failed_tasks[key]
+        delta = np.diff(to_array(s), prepend=np.nan)
         delta[delta < 0] = 0.0  # pruned task history: decreases carry no information
         out.append(
             AnalysisSeries(
@@ -95,103 +153,151 @@ def derive(
                 s,
             )
         )
-
-    for traffic, rule_rate, pairs, latency in (
-        (
-            "http_requests",
-            "request_rate",
-            (("http_5xx", "server_error_ratio"),),
-            ("http_latency_p95", "http_latency_mean"),
-        ),
-        (
-            "rpc_requests",
-            "rpc_request_rate",
-            (("rpc_errors", "rpc_error_ratio"),),
-            ("rpc_latency_p95", None),
-        ),
-    ):
-        for key in sorted(by.get(traffic, {})):
-            req = by[traffic][key]
-            rate = to_array(req)
-            volume = rate * step_seconds
-            out.append(AnalysisSeries(RULES[rule_rate], req.entity, req.unit, rate, req.query, req))
-            guarded = rate.copy()
-            guarded[volume < min_requests] = np.nan
-            for num_signal, rule_name in pairs:
-                num_series = by.get(num_signal, {}).get(key)
-                num = _zero_where_observed(to_array(num_series) if num_series else None, rate)
-                ratio = np.full_like(rate, np.nan)
-                ok = ~np.isnan(guarded)
-                ratio[ok] = num[ok] / guarded[ok]
-                query = f"({(num_series or req).query})\n/\n({req.query})"
-                out.append(
-                    AnalysisSeries(
-                        RULES[rule_name],
-                        req.entity,
-                        Unit.RATIO,
-                        ratio,
-                        query,
-                        num_series or req,
-                        volume=volume,
-                        extra_evidence=[req],
-                    )
-                )
-            if traffic == "http_requests":
-                n404 = _zero_where_observed(
-                    to_array(by["http_404"][key]) if key in by.get("http_404", {}) else None, rate
-                )
-                n4xx = _zero_where_observed(
-                    to_array(by["http_4xx"][key]) if key in by.get("http_4xx", {}) else None, rate
-                )
-                src404 = by.get("http_404", {}).get(key, req)
-                src4xx = by.get("http_4xx", {}).get(key, req)
-                out.append(
-                    AnalysisSeries(
-                        RULES["not_found_rate"],
-                        req.entity,
-                        Unit.REQUESTS_PER_SECOND,
-                        n404,
-                        src404.query,
-                        src404,
-                        extra_evidence=[req],
-                        attributes={"http_response_status_code": "404"},
-                    )
-                )
-                out.append(
-                    AnalysisSeries(
-                        RULES["client_error_rate"],
-                        req.entity,
-                        Unit.REQUESTS_PER_SECOND,
-                        np.clip(n4xx - n404, 0.0, None),
-                        f"({src4xx.query})\n-\n({src404.query})",
-                        src4xx,
-                        extra_evidence=[req],
-                        attributes={"http_response_status_code": "4xx excl. 404"},
-                    )
-                )
-            quantile, mean = latency
-            lat = by.get(quantile, {}).get(key) or (by.get(mean, {}).get(key) if mean else None)
-            if lat is not None:
-                values = to_array(lat)
-                values[volume < min_requests] = np.nan
-                rule = (
-                    "latency_mean"
-                    if lat.signal == "http_latency_mean"
-                    else ("latency_p95" if traffic == "http_requests" else "rpc_latency_p95")
-                )
-                extra = [req]
-                if (p99 := by.get("http_latency_p99", {}).get(key)) is not None:
-                    extra.insert(0, p99)
-                out.append(
-                    AnalysisSeries(
-                        RULES[rule],
-                        req.entity,
-                        Unit.SECONDS,
-                        values,
-                        lat.query,
-                        lat,
-                        volume=volume,
-                        extra_evidence=extra,
-                    )
-                )
     return out
+
+
+def _traffic_series(
+    by_signal: dict[str, dict[str, MetricSeries]],
+    spec: _TrafficSpec,
+    step_seconds: int,
+    min_requests: int,
+) -> list[AnalysisSeries]:
+    """Request rate plus the volume-guarded ratios, 4xx rates and latency of each route."""
+    out: list[AnalysisSeries] = []
+    for key in sorted(by_signal.get(spec.traffic_signal, {})):
+        requests = by_signal[spec.traffic_signal][key]
+        rate = to_array(requests)
+        volume = rate * step_seconds
+        out.append(
+            AnalysisSeries(
+                RULES[spec.rate_rule],
+                requests.entity,
+                requests.unit,
+                rate,
+                requests.query,
+                requests,
+            )
+        )
+
+        guarded_rate = rate.copy()
+        guarded_rate[volume < min_requests] = np.nan
+        for numerator_signal, rule_name in spec.error_ratios:
+            numerator_series = by_signal.get(numerator_signal, {}).get(key)
+            out.append(
+                _error_ratio(
+                    numerator_series, requests, rate, guarded_rate, volume, RULES[rule_name]
+                )
+            )
+
+        if spec.client_errors:
+            out += _client_error_series(by_signal, key, requests, rate)
+
+        latency = _latency_series(by_signal, spec, key, requests, volume, min_requests)
+        if latency is not None:
+            out.append(latency)
+    return out
+
+
+def _error_ratio(
+    numerator_series: MetricSeries | None,
+    requests: MetricSeries,
+    rate: Array,
+    guarded_rate: Array,
+    volume: Array,
+    rule: Rule,
+) -> AnalysisSeries:
+    numerator = _zero_where_observed(to_array(numerator_series) if numerator_series else None, rate)
+    ratio = np.full_like(rate, np.nan)
+    has_volume = ~np.isnan(guarded_rate)
+    ratio[has_volume] = numerator[has_volume] / guarded_rate[has_volume]
+
+    source = numerator_series or requests
+    return AnalysisSeries(
+        rule,
+        requests.entity,
+        Unit.RATIO,
+        ratio,
+        f"({source.query})\n/\n({requests.query})",
+        source,
+        volume=volume,
+        extra_evidence=[requests],
+    )
+
+
+def _client_error_series(
+    by_signal: dict[str, dict[str, MetricSeries]],
+    key: str,
+    requests: MetricSeries,
+    rate: Array,
+) -> list[AnalysisSeries]:
+    """404s on their own, and other 4xx with the 404s subtracted so neither is counted twice."""
+    not_found_series = by_signal.get(HTTP_404, {}).get(key)
+    client_error_series = by_signal.get(HTTP_4XX, {}).get(key)
+    not_found = _zero_where_observed(
+        to_array(not_found_series) if not_found_series is not None else None, rate
+    )
+    client_errors = _zero_where_observed(
+        to_array(client_error_series) if client_error_series is not None else None, rate
+    )
+
+    not_found_source = not_found_series or requests
+    client_error_source = client_error_series or requests
+    return [
+        AnalysisSeries(
+            RULES["not_found_rate"],
+            requests.entity,
+            Unit.REQUESTS_PER_SECOND,
+            not_found,
+            not_found_source.query,
+            not_found_source,
+            extra_evidence=[requests],
+            attributes={STATUS_CODE_ATTRIBUTE: "404"},
+        ),
+        AnalysisSeries(
+            RULES["client_error_rate"],
+            requests.entity,
+            Unit.REQUESTS_PER_SECOND,
+            np.clip(client_errors - not_found, 0.0, None),
+            f"({client_error_source.query})\n-\n({not_found_source.query})",
+            client_error_source,
+            extra_evidence=[requests],
+            attributes={STATUS_CODE_ATTRIBUTE: "4xx excl. 404"},
+        ),
+    ]
+
+
+def _latency_series(
+    by_signal: dict[str, dict[str, MetricSeries]],
+    spec: _TrafficSpec,
+    key: str,
+    requests: MetricSeries,
+    volume: Array,
+    min_requests: int,
+) -> AnalysisSeries | None:
+    """Prefer the histogram quantile; fall back to the mean where no histogram exists."""
+    latency = by_signal.get(spec.quantile_signal, {}).get(key)
+    rule_name = spec.quantile_rule
+    if latency is None and spec.mean_signal is not None:
+        latency = by_signal.get(spec.mean_signal, {}).get(key)
+        rule_name = MEAN_LATENCY_RULE
+    if latency is None:
+        return None
+
+    values = to_array(latency)
+    values[volume < min_requests] = np.nan
+    extra_evidence = [requests]
+    if spec.tail_signal is not None:
+        tail = by_signal.get(spec.tail_signal, {}).get(key)
+        if tail is not None:
+            extra_evidence.insert(0, tail)
+
+    return AnalysisSeries(
+        RULES[rule_name],
+        requests.entity,
+        Unit.SECONDS,
+        values,
+        latency.query,
+        latency,
+        volume=volume,
+        extra_evidence=extra_evidence,
+    )

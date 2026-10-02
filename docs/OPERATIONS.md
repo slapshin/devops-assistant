@@ -49,8 +49,8 @@ All settings are environment variables, optionally read from `config.env` in the
 | `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | unset | The model must support Structured Outputs on the Responses API. Check it with `cd backend && uv run python -m scripts.check_openai [--structured]` (`--structured` makes one small paid call). |
 | `DATA_DIR` | `./data` (native), `/data` (image) | SQLite database `assistant.sqlite3`. |
 | `APP_HOST` / `APP_PORT` | `127.0.0.1` / `8000` (image: `0.0.0.0` inside the container, published on 127.0.0.1) | Listen address. |
-| `STATIC_DIR` | `../frontend/dist` if built (image: `/app/static`) | Built UI served at `/`. |
-| `DETECTOR_CONFIG` | unset | JSON file overriding detector defaults (see below). |
+| `UI_STATIC_DIR` | `../frontend/dist` if built (image: `/app/static`) | Built UI served at `/`. |
+| `DETECTOR_CONFIG_FILE` | unset | JSON file overriding detector defaults (see below). |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
 
 Without AI, numerical reports are complete. The explanation status is `disabled` (with `AI_PROVIDER=none`) or `not_configured` (when the key or model is missing).

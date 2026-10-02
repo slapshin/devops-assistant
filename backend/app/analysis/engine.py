@@ -2,13 +2,23 @@
 
 from collections import defaultdict
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import numpy as np
 
 from app.analysis.baseline import STEPS_PER_DAY
-from app.analysis.derive import AnalysisSeries, derive
-from app.analysis.detect import TREND_STEPS, Episode, SeriesEvaluation, evaluate
+from app.analysis.derive import AnalysisSeries, derive, to_array
+from app.analysis.detect import (
+    ABS_LEVEL_CRITICAL,
+    EVENT_MIN_VALUE,
+    MINUTES_PER_STEP,
+    SHORTFALL_MIN_VALUE,
+    TREND_STEPS,
+    Episode,
+    SeriesEvaluation,
+    evaluate,
+)
 from app.analysis.rules import SEVERITY_ORDER, Dir, RuleKind, format_value
 from app.domain.common import (
     ConfidenceLevel,
@@ -20,7 +30,7 @@ from app.domain.common import (
     TimeRange,
     Unit,
 )
-from app.domain.detector_config import DetectorConfig
+from app.domain.detector_config import DetectorConfig, SignalThresholds
 from app.domain.findings import (
     DailyTrend,
     DetectionMethod,
@@ -45,7 +55,40 @@ from app.domain.report import TREND_DAYS, AnalysisRequest, AnalysisWindows, Excl
 EVIDENCE_PAD_STEPS = 72  # ± 6 h
 COVERAGE_PAD_STEPS = 12  # ± 1 h
 MAX_EPISODES_PER_BUCKET = 200
+MAX_EXTRA_EVIDENCE = 2
 LATEST_START = TREND_STEPS - STEPS_PER_DAY
+MINUTES_PER_DAY = 24 * 60
+MAX_REPORTED_BASELINE_DAYS = 14
+"""Upper bound of DailyTrend.baseline_days_used in the report contract."""
+
+OTEL_MAPPING_PREFIX = "otel"
+SWARM_MAPPING_PREFIX = "swarm"
+JOB_LABEL = "job"
+HOST_ATTRIBUTE = "host"
+
+# Upper bound of severity points per severity; anything above is critical.
+SEVERITY_MAX_POINTS = ((1, Severity.LOW), (2, Severity.MEDIUM), (4, Severity.HIGH))
+
+# Confidence reasons.
+SHORT_BASELINE_DAYS = 7
+LOW_COVERAGE = 0.7
+REDUCED_COVERAGE = 0.9
+LOW_VOLUME_REQUESTS_PER_STEP = 300
+SHORT_EPISODE_STEPS = 6
+LOW_CONFIDENCE_SUFFIX = "_low"
+
+RECURRING_MIN_PRIOR_DAYS = 3
+LATENCY_HISTOGRAM_TOP_SECONDS = 10.0
+"""Top finite histogram bucket: p95 at or above it is only a lower bound."""
+
+# Trend summary: last 7 buckets vs the 7 before.
+RECENT_BUCKETS = range(7)
+PREVIOUS_BUCKETS = range(7, 14)
+MIN_OK_BUCKETS_PER_HALF = 4
+HIGH_CONFIDENCE_OK_BUCKETS = 14
+MEDIUM_CONFIDENCE_OK_BUCKETS = 10
+TREND_CHANGE_FACTOR = 1.5
+TREND_MIN_SHARE_CHANGE = 0.005
 
 _CAPABILITY_RANK = {
     CapabilityStatus.SUPPORTED: 3,
@@ -63,14 +106,9 @@ def analysis_key(request: AnalysisRequest) -> str:
 
 
 def severity_from_points(points: int, cap: Severity | None) -> Severity:
-    severity = (
-        Severity.LOW
-        if points <= 1
-        else Severity.MEDIUM
-        if points == 2
-        else Severity.HIGH
-        if points <= 4
-        else Severity.CRITICAL
+    severity = next(
+        (severity for max_points, severity in SEVERITY_MAX_POINTS if points <= max_points),
+        Severity.CRITICAL,
     )
     if cap is not None and SEVERITY_ORDER.index(severity) > SEVERITY_ORDER.index(cap):
         return cap
@@ -79,6 +117,10 @@ def severity_from_points(points: int, cap: Severity | None) -> Severity:
 
 def _opt(value: float) -> float | None:
     return None if np.isnan(value) else float(value)
+
+
+def _mapping_key(prefix: str, service: str) -> str:
+    return f"{prefix}:{service}"
 
 
 def hosts_for(entity: Entity, mappings: dict[str, set[str]]) -> set[str]:
@@ -94,10 +136,39 @@ def hosts_for(entity: Entity, mappings: dict[str, set[str]]) -> set[str]:
         ):
             return {labels["instance"]} if labels.get("instance") else set()
         case EntityKind.SERVICE:
-            return mappings.get(f"swarm:{labels.get('service_name', '')}", set())
+            key = _mapping_key(SWARM_MAPPING_PREFIX, labels.get("service_name", ""))
+            return mappings.get(key, set())
         case EntityKind.ROUTE:
-            return mappings.get(f"otel:{labels.get('job', '')}", set())
+            return mappings.get(_mapping_key(OTEL_MAPPING_PREFIX, labels.get(JOB_LABEL, "")), set())
     return set()
+
+
+@dataclass(frozen=True)
+class _TrendContext:
+    """Inputs shared by every trend bucket of one detection run."""
+
+    key: str
+    at: Callable[[int], datetime]
+    finding_for_episode: dict[tuple[int, int], str]
+    entities: dict[str, list[tuple[int, SeriesEvaluation]]]
+    """Entity key -> (evaluation index, evaluation)."""
+    present: set[str]
+    """Entities with at least one sample anywhere in the grid."""
+
+
+@dataclass
+class _BucketActivity:
+    observed_minutes: int = 0
+    anomalous_minutes: int = 0
+    affected: set[str] = field(default_factory=set)
+    summaries: list[EpisodeSummary] = field(default_factory=list)
+    peak: Severity | None = None
+
+
+def _bucket_bounds(bucket_index: int) -> tuple[int, int]:
+    """Trend-step range [lo, hi) of a bucket (0 = latest day)."""
+    lo = (TREND_DAYS - 1 - bucket_index) * STEPS_PER_DAY
+    return lo, lo + STEPS_PER_DAY
 
 
 class RobustDetector:
@@ -113,15 +184,19 @@ class RobustDetector:
         step = windows.step_seconds
         analysed = derive(collection.series, step, config.min_ratio_requests_per_step)
         evaluations = [evaluate(s, config) for s in analysed]
-        trend_start = windows.trend.start
+
         mappings: dict[str, set[str]] = defaultdict(set)
         for m in collection.mappings:
-            prefix = "otel" if m.kind is MappingKind.OTEL_SERVICE else "swarm"
-            mappings[f"{prefix}:{m.service}"].add(m.host)
+            is_otel = m.kind is MappingKind.OTEL_SERVICE
+            prefix = OTEL_MAPPING_PREFIX if is_otel else SWARM_MAPPING_PREFIX
+            mappings[_mapping_key(prefix, m.service)].add(m.host)
+
+        trend_start = windows.trend.start
 
         def at(t: int) -> datetime:
             return trend_start + timedelta(seconds=t * step)
 
+        # Findings are reported for latest-day episodes only; earlier ones feed the trends.
         findings: list[Finding] = []
         evidence: list[Evidence] = []
         finding_for_episode: dict[tuple[int, int], str] = {}
@@ -134,14 +209,10 @@ class RobustDetector:
                 evidence.extend(evs)
                 finding_for_episode[(ei, id(ep))] = f.finding_id
         findings = self._relate(findings, mappings, config)
-        findings.sort(
-            key=lambda f: (
-                -SEVERITY_ORDER.index(f.severity),
-                f.start,
-                f.finding_id,
-            )
-        )
-        trends = self._trends(key, evaluations, finding_for_episode, at, windows)
+        findings.sort(key=lambda f: (-SEVERITY_ORDER.index(f.severity), f.start, f.finding_id))
+
+        trends = self._trends(key, evaluations, finding_for_episode, at, config)
+
         return DetectionResult(
             findings=findings,
             evidence=evidence,
@@ -170,44 +241,20 @@ class RobustDetector:
         base = ev.baseline_for_step(ep.peak)
         start, end = at(ep.start), at(ep.end)
         fid = finding_id(key, s.entity.key, rule.name, start.isoformat())
-        points = ep.severity_points
-        severity = severity_from_points(points, rule.severity_cap)
+
         is_abs = ep.abs_level > 0 or rule.kind is not RuleKind.LEVEL
-        threshold: float | None = None
-        if rule.kind is not RuleKind.LEVEL:
-            threshold = 1.0 if rule.kind is RuleKind.SHORTFALL else 0.5
-        elif ep.abs_level and th is not None:
-            threshold = (
-                th.absolute_critical
-                if ep.abs_level == 2 and th.absolute_critical is not None
-                else th.absolute_high
-            )
-        peak_value = float(ev.values[ep.peak])
-        expected = None
-        if base.available and not np.isnan(ev.median[ep.peak]):
-            med = float(ev.median[ep.peak])
-            spread = config.z_threshold * float(ev.scale[ep.peak])
-            expected = ExpectedValue(
-                median=med, lower=max(0.0, med - spread), upper=med + spread, unit=s.unit
-            )
-        reasons = self._confidence_reasons(ev, ep, base.available, is_abs)
-        confidence = (
-            ConfidenceLevel.LOW
-            if any(r.code.endswith("_low") for r in reasons)
-            else ConfidenceLevel.MEDIUM
-            if reasons
-            else ConfidenceLevel.HIGH
-        )
-        prior = sorted(
-            {b for other in ev.episodes if other is not ep for b in other.buckets()}
-            - {0}
-            - ep.buckets()
-        )
-        attributes = dict(s.attributes)
-        if rule.name.endswith("latency_p95") and peak_value >= 10.0:
-            attributes["latency_bound"] = ">= 10 s (top histogram bucket)"
-        evs = self._evidence(fid, ev, ep, windows, threshold, rule.label, config.z_threshold)
         method = DetectionMethod.ABSOLUTE if is_abs else DetectionMethod.RELATIVE
+        threshold = _finding_threshold(ev, ep, th)
+        peak_value = float(ev.values[ep.peak])
+        expected = _expected_value(ev, ep, base.available, config)
+        reasons = self._confidence_reasons(ev, ep, base.available, is_abs, config)
+        prior = _prior_episode_days(ev, ep)
+
+        attributes = dict(s.attributes)
+        if rule.name.endswith("latency_p95") and peak_value >= LATENCY_HISTOGRAM_TOP_SECONDS:
+            attributes["latency_bound"] = ">= 10 s (top histogram bucket)"
+
+        evs = self._evidence(fid, ev, ep, windows, threshold, rule.label, config.z_threshold)
         finding = Finding(
             finding_id=fid,
             detector=f"{rule.kind.value}:{rule.name}",
@@ -221,9 +268,9 @@ class RobustDetector:
             end=end,
             peak_at=at(ep.peak),
             duration_seconds=(ep.end - ep.start) * windows.step_seconds,
-            severity=severity,
-            severity_points=points,
-            confidence=confidence,
+            severity=severity_from_points(ep.severity_points, rule.severity_cap),
+            severity_points=ep.severity_points,
+            confidence=_confidence(reasons),
             confidence_reasons=reasons,
             observed=ObservedValue(value=peak_value, unit=s.unit),
             expected=expected,
@@ -233,71 +280,72 @@ class RobustDetector:
             baseline_mode=base.mode,
             evidence_ids=[e.evidence_id for e in evs],
             attributes=attributes,
-            state=(
-                FindingState.ONGOING
-                if ep.end >= TREND_STEPS - config.max_merge_gap_steps
-                else FindingState.RESOLVED
-            ),
-            recurrence=(
-                Recurrence.NEW
-                if not prior
-                else Recurrence.RECURRING
-                if len(prior) >= 3
-                else Recurrence.REPEATED
-            ),
+            state=_finding_state(ep, config),
+            recurrence=_recurrence(len(prior)),
             prior_episode_days=len(prior),
         )
         if method is DetectionMethod.RELATIVE and (expected is None or finding.peak_score is None):
-            raise AssertionError("relative finding without baseline")  # pragma: no cover
+            raise AssertionError(  # pragma: no cover
+                f"relative finding {fid} ({rule.name}) without baseline"
+            )
         return finding, evs
 
     @staticmethod
     def _confidence_reasons(
-        ev: SeriesEvaluation, ep: Episode, baseline_ok: bool, is_abs: bool
+        ev: SeriesEvaluation,
+        ep: Episode,
+        baseline_ok: bool,
+        is_abs: bool,
+        config: DetectorConfig,
     ) -> list[Reason]:
         reasons: list[Reason] = []
         base = ev.baseline_for_step(ep.peak)
-        if ev.series.rule.kind is RuleKind.LEVEL:
-            if not baseline_ok:
-                reasons.append(
-                    Reason(
-                        code="baseline_low",
-                        message=f"{base.days} adequate baseline days (< 3); absolute check only.",
-                    )
+        is_level = ev.series.rule.kind is RuleKind.LEVEL
+
+        if is_level and not baseline_ok:
+            min_days = config.baseline_min_adequate_days
+            reasons.append(
+                Reason(
+                    code="baseline_low",
+                    message=f"{base.days} adequate baseline days (< {min_days}); "
+                    "absolute check only.",
                 )
-            elif base.days < 7:
-                reasons.append(
-                    Reason(
-                        code="baseline_short",
-                        message=f"{base.days} adequate baseline days (< 7).",
-                    )
+            )
+        elif is_level and base.days < SHORT_BASELINE_DAYS:
+            reasons.append(
+                Reason(
+                    code="baseline_short",
+                    message=f"{base.days} adequate baseline days (< {SHORT_BASELINE_DAYS}).",
                 )
+            )
+
         lo = max(0, ep.start - COVERAGE_PAD_STEPS)
         hi = min(TREND_STEPS, ep.end + COVERAGE_PAD_STEPS)
         coverage = float(np.mean(~np.isnan(ev.values[lo:hi])))
-        if coverage < 0.7:
-            reasons.append(
-                Reason(code="coverage_low", message=f"Coverage {coverage:.0%} in episode ± 1 h.")
-            )
-        elif coverage < 0.9:
-            reasons.append(
-                Reason(
-                    code="coverage_reduced", message=f"Coverage {coverage:.0%} in episode ± 1 h."
-                )
-            )
+        coverage_message = f"Coverage {coverage:.0%} in episode ± 1 h."
+        if coverage < LOW_COVERAGE:
+            reasons.append(Reason(code="coverage_low", message=coverage_message))
+        elif coverage < REDUCED_COVERAGE:
+            reasons.append(Reason(code="coverage_reduced", message=coverage_message))
+
         if ev.series.volume is not None:
-            vol = ev.series.volume[ev.offset + ep.start : ev.offset + ep.end]
-            flagged = vol[~np.isnan(vol)]
-            if flagged.size and float(flagged.min()) < 300:
+            volume = ev.series.volume[ev.offset + ep.start : ev.offset + ep.end]
+            observed_volume = volume[~np.isnan(volume)]
+            if observed_volume.size and float(observed_volume.min()) < LOW_VOLUME_REQUESTS_PER_STEP:
                 reasons.append(
                     Reason(
                         code="request_volume",
-                        message=f"As few as {flagged.min():.0f} requests per 5-min step (< 300).",
+                        message=f"As few as {observed_volume.min():.0f} requests per 5-min step "
+                        f"(< {LOW_VOLUME_REQUESTS_PER_STEP}).",
                     )
                 )
-        if ev.series.rule.kind is RuleKind.LEVEL and ep.anomalous_steps < 6 and not is_abs:
+
+        if is_level and ep.anomalous_steps < SHORT_EPISODE_STEPS and not is_abs:
             reasons.append(
-                Reason(code="episode_short", message=f"{ep.anomalous_steps} anomalous steps (< 6).")
+                Reason(
+                    code="episode_short",
+                    message=f"{ep.anomalous_steps} anomalous steps (< {SHORT_EPISODE_STEPS}).",
+                )
             )
         return reasons
 
@@ -335,11 +383,16 @@ class RobustDetector:
                 ),
             )
         ]
-        for extra in s.extra_evidence[:2]:
-            values = np.array([np.nan if v is None else v for v in extra.values])
-            ms = _slice_series_raw(extra, values[ev.offset + lo : ev.offset + hi], start)
+
+        for extra in s.extra_evidence[:MAX_EXTRA_EVIDENCE]:
+            values = to_array(extra)[ev.offset + lo : ev.offset + hi]
+            extra_series = _slice_series_raw(extra, values, start)
             out.append(
-                Evidence(evidence_id=evidence_id(fid, ms.series_id), finding_id=fid, series=ms)
+                Evidence(
+                    evidence_id=evidence_id(fid, extra_series.series_id),
+                    finding_id=fid,
+                    series=extra_series,
+                )
             )
         return out
 
@@ -349,28 +402,14 @@ class RobustDetector:
     def _relate(
         findings: list[Finding], mappings: dict[str, set[str]], config: DetectorConfig
     ) -> list[Finding]:
-        slack = timedelta(minutes=config.relation_slack_minutes)
         hosts = {f.finding_id: hosts_for(f.entity, mappings) for f in findings}
-        related: dict[str, set[str]] = defaultdict(set)
-        for i, a in enumerate(findings):
-            for b in findings[i + 1 :]:
-                overlap = a.start - slack < b.end and b.start - slack < a.end
-                if not overlap:
-                    continue
-                same_entity = a.entity.key == b.entity.key
-                same_service = (
-                    a.entity.kind is b.entity.kind is EntityKind.ROUTE
-                    and a.entity.labels.get("job") == b.entity.labels.get("job")
-                )
-                shared_host = bool(hosts[a.finding_id] & hosts[b.finding_id])
-                if same_entity or same_service or shared_host:
-                    related[a.finding_id].add(b.finding_id)
-                    related[b.finding_id].add(a.finding_id)
+        related = _related_finding_ids(findings, hosts, config)
+
         out = []
         for f in findings:
             attrs = dict(f.attributes)
             if f.entity.kind in (EntityKind.ROUTE, EntityKind.SERVICE) and hosts[f.finding_id]:
-                attrs["host"] = ",".join(sorted(hosts[f.finding_id]))
+                attrs[HOST_ATTRIBUTE] = ",".join(sorted(hosts[f.finding_id]))
             out.append(
                 f.model_copy(
                     update={
@@ -389,7 +428,7 @@ class RobustDetector:
         evaluations: list[SeriesEvaluation],
         finding_for_episode: dict[tuple[int, int], str],
         at: Callable[[int], datetime],
-        windows: AnalysisWindows,
+        config: DetectorConfig,
     ) -> list[DailyTrend]:
         entities: dict[str, list[tuple[int, SeriesEvaluation]]] = defaultdict(list)
         for i, ev in enumerate(evaluations):
@@ -399,86 +438,37 @@ class RobustDetector:
             for k, evs in entities.items()
             if any(np.any(~np.isnan(e.series.values)) for _, e in evs)
         }
+        context = _TrendContext(key, at, finding_for_episode, entities, present)
+
         trends: list[DailyTrend] = []
         for b in range(TREND_DAYS):
-            lo = (TREND_DAYS - 1 - b) * STEPS_PER_DAY
-            hi = lo + STEPS_PER_DAY
-            observed_minutes = 0
-            anomalous_minutes = 0
-            affected: set[str] = set()
-            summaries: list[EpisodeSummary] = []
-            peak: Severity | None = None
-            for ekey in sorted(present):
-                evs = entities[ekey]
-                observed = np.zeros(STEPS_PER_DAY, dtype=bool)
-                anomalous = np.zeros(STEPS_PER_DAY, dtype=bool)
-                for ei, ev in evs:
-                    observed |= ~np.isnan(ev.values[lo:hi])
-                    for ep in ev.episodes:
-                        s, e = max(ep.start, lo), min(ep.end, hi)
-                        if s >= e:
-                            continue
-                        anomalous[s - lo : e - lo] = True
-                        affected.add(ekey)
-                        sev = severity_from_points(ep.severity_points, ev.series.rule.severity_cap)
-                        if peak is None or SEVERITY_ORDER.index(sev) > SEVERITY_ORDER.index(peak):
-                            peak = sev
-                        summaries.append(
-                            EpisodeSummary(
-                                episode_id=episode_id(
-                                    key, ekey, ev.series.rule.name, at(ep.start).isoformat()
-                                ),
-                                finding_id=finding_for_episode.get((ei, id(ep)))
-                                if b == 0
-                                else None,
-                                entity=ev.series.entity,
-                                family=ev.series.rule.family,
-                                signal=ev.series.rule.name,
-                                start=at(s),
-                                end=at(e),
-                                severity=sev,
-                                peak_observed=float(np.nanmax(ev.values[s:e]))
-                                if ep.up
-                                else float(np.nanmin(ev.values[s:e])),
-                                expected_median=_opt(float(ev.median[ep.peak]))
-                                if lo <= ep.peak < hi
-                                else None,
-                                unit=ev.series.unit,
-                            )
-                        )
-                observed_minutes += int(observed.sum()) * 5
-                anomalous_minutes += int((anomalous & observed).sum()) * 5
-            baseline_days = [
-                ev.baselines[b].days
-                for ev in evaluations
-                if ev.series.rule.kind is RuleKind.LEVEL and np.any(~np.isnan(ev.values[lo:hi]))
-            ]
-            used = int(np.median(baseline_days)) if baseline_days else 0
-            coverage = observed_minutes / (len(present) * 1440) if present else 0.0
-            status = (
-                TrendBucketStatus.INSUFFICIENT_DATA
-                if coverage < 0.5
-                else TrendBucketStatus.INSUFFICIENT_BASELINE
-                if used < 3
-                else TrendBucketStatus.OK
+            lo, hi = _bucket_bounds(b)
+            activity = _bucket_activity(context, b)
+            used = _median_baseline_days(evaluations, b)
+            coverage = (
+                activity.observed_minutes / (len(present) * MINUTES_PER_DAY) if present else 0.0
             )
-            summaries.sort(key=lambda e: (-SEVERITY_ORDER.index(e.severity), e.start, e.episode_id))
+            activity.summaries.sort(
+                key=lambda e: (-SEVERITY_ORDER.index(e.severity), e.start, e.episode_id)
+            )
             trends.append(
                 DailyTrend(
                     bucket_index=b,
                     window=TimeRange(start=at(lo), end=at(hi)),
-                    status=status,
-                    episode_count=len(summaries),
-                    anomalous_minutes=anomalous_minutes,
-                    peak_severity=peak,
-                    affected_entities=sorted(affected),
-                    observed_entity_minutes=observed_minutes,
-                    anomalous_share=round(anomalous_minutes / observed_minutes, 6)
-                    if observed_minutes
-                    else None,
-                    baseline_days_used=min(used, 14),
+                    status=_bucket_status(coverage, used, config),
+                    episode_count=len(activity.summaries),
+                    anomalous_minutes=activity.anomalous_minutes,
+                    peak_severity=activity.peak,
+                    affected_entities=sorted(activity.affected),
+                    observed_entity_minutes=activity.observed_minutes,
+                    anomalous_share=(
+                        round(activity.anomalous_minutes / activity.observed_minutes, 6)
+                        if activity.observed_minutes
+                        else None
+                    ),
+                    baseline_days_used=min(used, MAX_REPORTED_BASELINE_DAYS),
                     coverage=round(min(1.0, coverage), 6),
-                    episodes=summaries[:MAX_EPISODES_PER_BUCKET],
+                    episodes=activity.summaries[:MAX_EPISODES_PER_BUCKET],
                 )
             )
         return trends
@@ -499,18 +489,19 @@ class RobustDetector:
             best = (
                 max(caps, key=lambda c: _CAPABILITY_RANK[c.status]).status
                 if caps
-                else (CapabilityStatus.UNSUPPORTED)
+                else CapabilityStatus.UNSUPPORTED
             )
+
             fam_evs = [ev for ev in evaluations if ev.series.rule.family is family]
-            latest = [ev.values[LATEST_START:] for ev in fam_evs]
             evaluated = [
                 ev
-                for ev, v in zip(fam_evs, latest, strict=True)
-                if np.mean(~np.isnan(v)) >= config.bucket_min_coverage
+                for ev in fam_evs
+                if np.mean(~np.isnan(ev.values[LATEST_START:])) >= config.bucket_min_coverage
             ]
             level_evaluated = [ev for ev in evaluated if ev.series.rule.kind is RuleKind.LEVEL]
             days = [ev.baselines[0].days for ev in level_evaluated]
             baseline_days = int(np.median(days)) if days else None
+
             reasons = [
                 Reason(code="capability", message=f"{c.signal}: {c.reason}")
                 for c in caps
@@ -518,6 +509,7 @@ class RobustDetector:
             ]
             errors = [e for e in exclusions if e.family is family]
             reasons += [Reason(code=e.code, message=e.message) for e in errors]
+
             if best is CapabilityStatus.UNSUPPORTED:
                 status = SignalStatus.UNSUPPORTED
             elif any(f.family is family for f in findings):
@@ -537,7 +529,8 @@ class RobustDetector:
                 reasons.append(
                     Reason(
                         code="insufficient_baseline",
-                        message=f"{baseline_days} adequate baseline days (< 3); relative detection "
+                        message=f"{baseline_days} adequate baseline days "
+                        f"(< {config.baseline_min_adequate_days}); relative detection "
                         "unavailable, absolute checks ran.",
                     )
                 )
@@ -545,6 +538,7 @@ class RobustDetector:
                 status = SignalStatus.SOURCE_ERROR
             else:
                 status = SignalStatus.NO_ANOMALY
+
             rows.append(
                 SignalCoverage(
                     family=family,
@@ -559,10 +553,187 @@ class RobustDetector:
         return rows
 
 
+# --- finding helpers ----------------------------------------------------------------------
+
+
+def _finding_threshold(
+    ev: SeriesEvaluation, ep: Episode, th: SignalThresholds | None
+) -> float | None:
+    """The heuristic threshold the episode crossed, or None for relative-only findings."""
+    kind = ev.series.rule.kind
+    if kind is RuleKind.SHORTFALL:
+        return SHORTFALL_MIN_VALUE
+    if kind is not RuleKind.LEVEL:
+        return EVENT_MIN_VALUE
+    if not ep.abs_level or th is None:
+        return None
+    if ep.abs_level == ABS_LEVEL_CRITICAL and th.absolute_critical is not None:
+        return th.absolute_critical
+    return th.absolute_high
+
+
+def _expected_value(
+    ev: SeriesEvaluation, ep: Episode, baseline_ok: bool, config: DetectorConfig
+) -> ExpectedValue | None:
+    if not baseline_ok or np.isnan(ev.median[ep.peak]):
+        return None
+    median = float(ev.median[ep.peak])
+    spread = config.z_threshold * float(ev.scale[ep.peak])
+    return ExpectedValue(
+        median=median, lower=max(0.0, median - spread), upper=median + spread, unit=ev.series.unit
+    )
+
+
+def _confidence(reasons: list[Reason]) -> ConfidenceLevel:
+    if any(r.code.endswith(LOW_CONFIDENCE_SUFFIX) for r in reasons):
+        return ConfidenceLevel.LOW
+    if reasons:
+        return ConfidenceLevel.MEDIUM
+    return ConfidenceLevel.HIGH
+
+
+def _prior_episode_days(ev: SeriesEvaluation, ep: Episode) -> list[int]:
+    """Earlier trend buckets (never the latest day) with another episode of this series."""
+    other_buckets = {b for other in ev.episodes if other is not ep for b in other.buckets()}
+    return sorted(other_buckets - {0} - ep.buckets())
+
+
+def _recurrence(prior_days: int) -> Recurrence:
+    if not prior_days:
+        return Recurrence.NEW
+    if prior_days >= RECURRING_MIN_PRIOR_DAYS:
+        return Recurrence.RECURRING
+    return Recurrence.REPEATED
+
+
+def _finding_state(ep: Episode, config: DetectorConfig) -> FindingState:
+    # Within one merge gap of the window end the episode may still be continuing.
+    if ep.end >= TREND_STEPS - config.max_merge_gap_steps:
+        return FindingState.ONGOING
+    return FindingState.RESOLVED
+
+
+def _related_finding_ids(
+    findings: list[Finding], hosts: dict[str, set[str]], config: DetectorConfig
+) -> dict[str, set[str]]:
+    """Overlapping findings on the same entity, the same service, or a shared host."""
+    slack = timedelta(minutes=config.relation_slack_minutes)
+    related: dict[str, set[str]] = defaultdict(set)
+    for i, a in enumerate(findings):
+        for b in findings[i + 1 :]:
+            overlap = a.start - slack < b.end and b.start - slack < a.end
+            if not overlap:
+                continue
+
+            same_entity = a.entity.key == b.entity.key
+            same_service = (
+                a.entity.kind is b.entity.kind is EntityKind.ROUTE
+                and a.entity.labels.get(JOB_LABEL) == b.entity.labels.get(JOB_LABEL)
+            )
+            shared_host = bool(hosts[a.finding_id] & hosts[b.finding_id])
+            if same_entity or same_service or shared_host:
+                related[a.finding_id].add(b.finding_id)
+                related[b.finding_id].add(a.finding_id)
+    return related
+
+
+# --- trend helpers ------------------------------------------------------------------------
+
+
+def _bucket_activity(context: _TrendContext, bucket_index: int) -> _BucketActivity:
+    """Observed/anomalous entity-minutes and episode summaries of one trend bucket."""
+    lo, hi = _bucket_bounds(bucket_index)
+    activity = _BucketActivity()
+    for entity_key in sorted(context.present):
+        observed = np.zeros(STEPS_PER_DAY, dtype=bool)
+        anomalous = np.zeros(STEPS_PER_DAY, dtype=bool)
+        for ei, ev in context.entities[entity_key]:
+            observed |= ~np.isnan(ev.values[lo:hi])
+            for ep in ev.episodes:
+                start, end = max(ep.start, lo), min(ep.end, hi)
+                if start >= end:
+                    continue
+
+                anomalous[start - lo : end - lo] = True
+                activity.affected.add(entity_key)
+                severity = severity_from_points(ep.severity_points, ev.series.rule.severity_cap)
+                activity.peak = _more_severe(activity.peak, severity)
+                activity.summaries.append(
+                    _episode_summary(context, bucket_index, ei, ev, ep, severity)
+                )
+        activity.observed_minutes += int(observed.sum()) * MINUTES_PER_STEP
+        activity.anomalous_minutes += int((anomalous & observed).sum()) * MINUTES_PER_STEP
+    return activity
+
+
+def _more_severe(current: Severity | None, candidate: Severity) -> Severity:
+    if current is None or SEVERITY_ORDER.index(candidate) > SEVERITY_ORDER.index(current):
+        return candidate
+    return current
+
+
+def _episode_summary(
+    context: _TrendContext,
+    bucket_index: int,
+    evaluation_index: int,
+    ev: SeriesEvaluation,
+    ep: Episode,
+    severity: Severity,
+) -> EpisodeSummary:
+    """Summary of the part of an episode that falls inside one bucket."""
+    lo, hi = _bucket_bounds(bucket_index)
+    start, end = max(ep.start, lo), min(ep.end, hi)
+    rule = ev.series.rule
+    in_bucket = ev.values[start:end]
+
+    # Only latest-day episodes have a finding (and evidence) to link to.
+    finding = (
+        context.finding_for_episode.get((evaluation_index, id(ep))) if bucket_index == 0 else None
+    )
+    peak_observed = float(np.nanmax(in_bucket)) if ep.up else float(np.nanmin(in_bucket))
+    expected_median = _opt(float(ev.median[ep.peak])) if lo <= ep.peak < hi else None
+
+    return EpisodeSummary(
+        episode_id=episode_id(
+            context.key, ev.series.entity.key, rule.name, context.at(ep.start).isoformat()
+        ),
+        finding_id=finding,
+        entity=ev.series.entity,
+        family=rule.family,
+        signal=rule.name,
+        start=context.at(start),
+        end=context.at(end),
+        severity=severity,
+        peak_observed=peak_observed,
+        expected_median=expected_median,
+        unit=ev.series.unit,
+    )
+
+
+def _median_baseline_days(evaluations: list[SeriesEvaluation], bucket_index: int) -> int:
+    lo, hi = _bucket_bounds(bucket_index)
+    baseline_days = [
+        ev.baselines[bucket_index].days
+        for ev in evaluations
+        if ev.series.rule.kind is RuleKind.LEVEL and np.any(~np.isnan(ev.values[lo:hi]))
+    ]
+    return int(np.median(baseline_days)) if baseline_days else 0
+
+
+def _bucket_status(
+    coverage: float, baseline_days: int, config: DetectorConfig
+) -> TrendBucketStatus:
+    if coverage < config.bucket_min_coverage:
+        return TrendBucketStatus.INSUFFICIENT_DATA
+    if baseline_days < config.baseline_min_adequate_days:
+        return TrendBucketStatus.INSUFFICIENT_BASELINE
+    return TrendBucketStatus.OK
+
+
 def trend_summary(trends: list[DailyTrend]) -> TrendSummary:
     ok = {t.bucket_index: t for t in trends if t.status is TrendBucketStatus.OK}
-    recent = [ok[b] for b in range(7) if b in ok]
-    previous = [ok[b] for b in range(7, 14) if b in ok]
+    recent = [ok[b] for b in RECENT_BUCKETS if b in ok]
+    previous = [ok[b] for b in PREVIOUS_BUCKETS if b in ok]
 
     def share(ts: list[DailyTrend]) -> float | None:
         observed = sum(t.observed_entity_minutes for t in ts)
@@ -571,14 +742,12 @@ def trend_summary(trends: list[DailyTrend]) -> TrendSummary:
     r, p = share(recent), share(previous)
     rec_eps = sum(t.episode_count for t in recent)
     prev_eps = sum(t.episode_count for t in previous)
-    confidence = (
-        ConfidenceLevel.HIGH
-        if len(ok) == 14
-        else ConfidenceLevel.MEDIUM
-        if len(ok) >= 10
-        else ConfidenceLevel.LOW
-    )
-    if len(recent) < 4 or len(previous) < 4 or r is None or p is None:
+    if (
+        len(recent) < MIN_OK_BUCKETS_PER_HALF
+        or len(previous) < MIN_OK_BUCKETS_PER_HALF
+        or r is None
+        or p is None
+    ):
         return TrendSummary(
             direction=TrendDirection.INCONCLUSIVE,
             confidence=ConfidenceLevel.LOW,
@@ -587,18 +756,20 @@ def trend_summary(trends: list[DailyTrend]) -> TrendSummary:
             recent_episodes=rec_eps,
             previous_episodes=prev_eps,
             reason=f"Only {len(recent)} recent and {len(previous)} earlier days have a full "
-            "baseline and coverage (need ≥ 4 each).",
+            f"baseline and coverage (need ≥ {MIN_OK_BUCKETS_PER_HALF} each).",
         )
+
     diff = r - p
-    if r >= 1.5 * p and diff >= 0.005:
+    if r >= TREND_CHANGE_FACTOR * p and diff >= TREND_MIN_SHARE_CHANGE:
         direction, text = TrendDirection.WORSENING, "higher"
-    elif p >= 1.5 * r and -diff >= 0.005:
+    elif p >= TREND_CHANGE_FACTOR * r and -diff >= TREND_MIN_SHARE_CHANGE:
         direction, text = TrendDirection.IMPROVING, "lower"
     else:
         direction, text = TrendDirection.STABLE, "similar"
+
     return TrendSummary(
         direction=direction,
-        confidence=confidence,
+        confidence=_trend_confidence(len(ok)),
         recent_share=round(r, 6),
         previous_share=round(p, 6),
         recent_episodes=rec_eps,
@@ -606,6 +777,18 @@ def trend_summary(trends: list[DailyTrend]) -> TrendSummary:
         reason=f"Anomalous share {r:.2%} over the last 7 days vs {p:.2%} over the previous 7 "
         f"({text}); {rec_eps} vs {prev_eps} episodes.",
     )
+
+
+def _trend_confidence(ok_buckets: int) -> ConfidenceLevel:
+    if ok_buckets == HIGH_CONFIDENCE_OK_BUCKETS:
+        return ConfidenceLevel.HIGH
+    if ok_buckets >= MEDIUM_CONFIDENCE_OK_BUCKETS:
+        return ConfidenceLevel.MEDIUM
+    return ConfidenceLevel.LOW
+
+
+def _sample_coverage(values: list[float | None]) -> float:
+    return sum(v is not None for v in values) / len(values) if values else 0.0
 
 
 def _slice_series(
@@ -623,18 +806,14 @@ def _slice_series(
         step_seconds=windows.step_seconds,
         start=start,
         values=vals,
-        coverage=sum(v is not None for v in vals) / len(vals) if vals else 0.0,
+        coverage=_sample_coverage(vals),
     )
 
 
 def _slice_series_raw(src: MetricSeries, values: np.ndarray, start: datetime) -> MetricSeries:
     vals = [_opt(v) for v in values]
     return src.model_copy(
-        update={
-            "start": start,
-            "values": vals,
-            "coverage": sum(v is not None for v in vals) / len(vals) if vals else 0.0,
-        }
+        update={"start": start, "values": vals, "coverage": _sample_coverage(vals)}
     )
 
 

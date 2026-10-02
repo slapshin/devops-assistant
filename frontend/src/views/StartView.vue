@@ -5,17 +5,14 @@ import { ApiError } from "../api/client";
 import { useAnalyses, useEnvs, useProjects, useSubmit } from "../api/queries";
 import { JOB_STATES, SEVERITIES, formatTime, utcTooltip } from "../lib/format";
 
-const LAST_KEY = "assistant.lastScope";
+const LAST_SCOPE_STORAGE_KEY = "assistant.lastScope";
+/** Shown when a queue_full response carries no Retry-After header. */
+const DEFAULT_RETRY_AFTER_SECONDS = 30;
+
+type RememberedScope = { project?: string; env?: string };
+
 const route = useRoute();
 const router = useRouter();
-
-function remembered(): { project?: string; env?: string } {
-  try {
-    return JSON.parse(localStorage.getItem(LAST_KEY) ?? "{}") as { project?: string; env?: string };
-  } catch {
-    return {};
-  }
-}
 
 const project = ref<string | null>((route.query.project as string) || null);
 const env = ref<string | null>((route.query.env as string) || null);
@@ -24,19 +21,33 @@ const envs = useEnvs(project);
 const analyses = useAnalyses(project, env);
 const submit = useSubmit();
 
-// Reapply the last pair only if it is still discovered.
-watch(
-  () => projects.data.value,
-  (data) => {
-    if (!data || project.value) return;
-    const last = remembered();
-    if (last.project && data.items.some((p) => p.project === last.project)) {
-      project.value = last.project;
-      env.value = last.env ?? null;
-    }
-  },
-  { immediate: true },
+const envOptions = computed(() =>
+  envs.data.value && envs.data.value.project === project.value ? envs.data.value.items : [],
 );
+const envPlaceholder = computed(() => {
+  if (!project.value) return "Select a project first";
+  return envs.isPending.value ? "Loading…" : "Select an environment";
+});
+const canAnalyze = computed(() => !!project.value && !!env.value && !submit.isPending.value);
+const submitError = computed(() => (submit.error.value instanceof ApiError ? submit.error.value : null));
+
+function readLastScope(): RememberedScope {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_SCOPE_STORAGE_KEY) ?? "{}") as RememberedScope;
+  } catch {
+    return {};
+  }
+}
+
+function rememberScope(scope: RememberedScope) {
+  try {
+    localStorage.setItem(LAST_SCOPE_STORAGE_KEY, JSON.stringify(scope));
+  } catch {
+    /* storage unavailable: the scope is just not remembered */
+  }
+}
+
+const reportLink = (id: string, available: boolean) => (available ? `/reports/${id}` : `/analyses/${id}`);
 
 // Changing the project always clears the environment and stale results.
 function selectProject(value: string) {
@@ -44,6 +55,39 @@ function selectProject(value: string) {
   env.value = null;
   submit.reset();
 }
+
+async function analyze() {
+  if (!project.value || !env.value) return;
+
+  rememberScope({ project: project.value, env: env.value });
+
+  let result;
+  try {
+    result = await submit.mutateAsync({ project: project.value, env: env.value });
+  } catch {
+    return; // shown from submit.error
+  }
+
+  await router.push({
+    path: `/analyses/${result.analysis.analysis_id}`,
+    query: result.duplicate_of_active ? { duplicate: "1" } : {},
+  });
+}
+
+// Reapply the last pair only if it is still discovered.
+watch(
+  () => projects.data.value,
+  (data) => {
+    if (!data || project.value) return;
+
+    const last = readLastScope();
+    if (last.project && data.items.some((p) => p.project === last.project)) {
+      project.value = last.project;
+      env.value = last.env ?? null;
+    }
+  },
+  { immediate: true },
+);
 
 watch(
   () => envs.data.value,
@@ -53,33 +97,6 @@ watch(
     if (!env.value && data.items.length === 1) env.value = data.items[0]?.env ?? null;
   },
 );
-
-const envOptions = computed(() =>
-  envs.data.value && envs.data.value.project === project.value ? envs.data.value.items : [],
-);
-const canAnalyze = computed(() => !!project.value && !!env.value && !submit.isPending.value);
-
-async function analyze() {
-  if (!project.value || !env.value) return;
-  try {
-    localStorage.setItem(LAST_KEY, JSON.stringify({ project: project.value, env: env.value }));
-  } catch {
-    /* ignore */
-  }
-  let result;
-  try {
-    result = await submit.mutateAsync({ project: project.value, env: env.value });
-  } catch {
-    return; // shown from submit.error
-  }
-  await router.push({
-    path: `/analyses/${result.analysis.analysis_id}`,
-    query: result.duplicate_of_active ? { duplicate: "1" } : {},
-  });
-}
-
-const submitError = computed(() => (submit.error.value instanceof ApiError ? submit.error.value : null));
-const reportLink = (id: string, available: boolean) => (available ? `/reports/${id}` : `/analyses/${id}`);
 </script>
 
 <template>
@@ -109,7 +126,7 @@ const reportLink = (id: string, available: boolean) => (available ? `/reports/${
       <label>
         Environment
         <select v-model="env" :disabled="!project || envs.isPending.value" :aria-busy="envs.isFetching.value">
-          <option :value="null" disabled>{{ project ? (envs.isPending.value ? "Loading…" : "Select an environment") : "Select a project first" }}</option>
+          <option :value="null" disabled>{{ envPlaceholder }}</option>
           <option v-for="e in envOptions" :key="e.env" :value="e.env">{{ e.env }}</option>
         </select>
       </label>
@@ -121,7 +138,7 @@ const reportLink = (id: string, available: boolean) => (available ? `/reports/${
     <p v-if="envs.isError.value" role="alert" class="banner error">Environments could not be loaded: {{ envs.error.value?.message }}</p>
     <p v-if="submitError" role="alert" class="banner error">
       <template v-if="submitError.problem.code === 'queue_full'">
-        The analysis queue is full. Try again in {{ submitError.retryAfter ?? 30 }} seconds.
+        The analysis queue is full. Try again in {{ submitError.retryAfter ?? DEFAULT_RETRY_AFTER_SECONDS }} seconds.
       </template>
       <template v-else>{{ submitError.problem.title }}<span v-if="submitError.problem.detail">: {{ submitError.problem.detail }}</span></template>
     </p>
@@ -144,9 +161,9 @@ const reportLink = (id: string, available: boolean) => (available ? `/reports/${
               </td>
               <td>{{ JOB_STATES[job.state] ?? job.state }}<span v-if="job.error" class="muted"> · {{ job.error.code }}</span></td>
               <td>
-                <span v-if="job.finding_counts">
+                <span v-if="job.finding_counts" class="sev-counts">
                   <template v-for="s in SEVERITIES" :key="s">
-                    <span v-if="job.finding_counts[s]" :class="`sev-text-${s}`">{{ job.finding_counts[s] }} {{ s }} </span>
+                    <span v-if="job.finding_counts[s]" :class="`sev-text-${s}`">{{ job.finding_counts[s] }} {{ s }}</span>
                   </template>
                   <span v-if="!Object.values(job.finding_counts).some(Boolean)" class="muted">none</span>
                 </span>
@@ -164,6 +181,7 @@ const reportLink = (id: string, available: boolean) => (available ? `/reports/${
 <style scoped>
 .selectors label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
 .selectors { align-items: flex-end; }
+.sev-counts { display: inline-flex; flex-wrap: wrap; gap: 0 0.75em; }
 .sev-text-critical { color: var(--sev-critical); }
 .sev-text-high { color: var(--sev-high); }
 .sev-text-medium { color: var(--sev-medium); }

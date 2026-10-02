@@ -8,6 +8,9 @@ COMPOSE=docker compose ${COMPOSE_ARGS}
 SERVICE=assistant
 APP_URL=http://127.0.0.1:$${APP_PORT:-8000}
 
+MONITORING_FORWARD := 8428:localhost:8428
+MONITORING_HOST := art-monitoring
+
 .DEFAULT_GOAL := help
 
 .PHONY: help config install check check-backend check-frontend contracts fixtures \
@@ -102,3 +105,9 @@ docker-backup: ## Back up the container database to ./backups
 	${COMPOSE} exec ${SERVICE} /app/backend/.venv/bin/python -m app.maintenance backup /data/backup.sqlite3
 	${COMPOSE} cp ${SERVICE}:/data/backup.sqlite3 ./backups/assistant-docker-$$(date +%Y%m%d-%H%M%S).sqlite3
 	${COMPOSE} exec ${SERVICE} rm -f /data/backup.sqlite3
+
+tunnels:
+	@ssh -N -L $(MONITORING_FORWARD) $(MONITORING_HOST) & mon=$$!;
+	trap 'kill $$mon $$ch 2>/dev/null' EXIT INT TERM; \
+	echo "forwarding $(MONITORING_FORWARD) via $(MONITORING_HOST); Ctrl-C to close"; \
+	wait

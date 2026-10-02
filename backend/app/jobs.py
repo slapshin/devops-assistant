@@ -20,7 +20,8 @@ from app.domain.jobs import (
     StageProgress,
     StageStatus,
 )
-from app.domain.report import AnalysisRequest
+from app.domain.report import AnalysisReport, AnalysisRequest, ReportState
+from app.metrics.client import SourceError
 
 log = logging.getLogger("app.jobs")
 
@@ -102,7 +103,8 @@ class JobRunner:
                 return existing, True
             active = await self.repo.count_active()
             if active.get(JobState.QUEUED, 0) >= self.limits.max_queued:
-                raise QueueFull
+                raise QueueFull(f"{self.limits.max_queued} analyses already queued")
+
             job = AnalysisJob(
                 analysis_id=new_analysis_id(),
                 scope=request.scope,
@@ -126,7 +128,8 @@ class JobRunner:
         if job is None:
             raise KeyError(analysis_id)
         if not job.state.active:
-            raise NotActive
+            raise NotActive(f"analysis {analysis_id} is {job.state.value}")
+
         self._user_cancelled.add(analysis_id)
         if (token := self._tokens.get(analysis_id)) is not None:
             token.cancel()
@@ -135,8 +138,9 @@ class JobRunner:
             await asyncio.gather(task, return_exceptions=True)
         elif job.state is JobState.QUEUED:
             await self._finish_cancelled(analysis_id)
+
         refreshed = await self.repo.get_job(analysis_id)
-        assert refreshed is not None
+        assert refreshed is not None, f"analysis {analysis_id} vanished while cancelling"
         return refreshed
 
     async def _finish_cancelled(self, analysis_id: str) -> None:
@@ -162,37 +166,14 @@ class JobRunner:
         token = self._tokens[analysis_id]
         if await self.repo.mark_running(analysis_id, datetime.now(UTC)) is None:
             return
+
         try:
             report = await asyncio.wait_for(
                 self.service.run(analysis_id, request, _Progress(self.repo, analysis_id), token),
                 self.limits.job_timeout_seconds,
             )
-            await self.repo.update_stage(
-                analysis_id,
-                StageProgress(
-                    stage=StageName.SAVING,
-                    status=StageStatus.RUNNING,
-                    started_at=datetime.now(UTC),
-                ),
-            )
-            await self.repo.save_report(report)
-            await self.repo.update_stage(
-                analysis_id,
-                StageProgress(
-                    stage=StageName.SAVING,
-                    status=StageStatus.DONE,
-                    finished_at=datetime.now(UTC),
-                ),
-            )
-            counts = Counter(f.severity for f in report.findings)
-            await self.repo.finish_job(
-                analysis_id,
-                JobState.PARTIAL if report.state.value == "partial" else JobState.COMPLETED,
-                None,
-                explanation_status=report.explanation.status,
-                finding_counts={s: counts.get(s, 0) for s in Severity},
-                report_available=True,
-            )
+            await self._save(analysis_id, report)
+            await self._finish_with_report(analysis_id, report)
         except Cancelled, asyncio.CancelledError:
             if analysis_id in self._user_cancelled:
                 await self._finish_cancelled(analysis_id)
@@ -209,16 +190,44 @@ class JobRunner:
             )
         except Exception as exc:
             log.exception("analysis %s failed", analysis_id)
-            from app.metrics.client import SourceError
-
-            code = (
-                ErrorCode.METRICS_SOURCE_UNAVAILABLE
-                if isinstance(exc, SourceError)
-                else ErrorCode.INTERNAL_ERROR
-            )
-            message = exc.message if isinstance(exc, SourceError) else type(exc).__name__
-            await self.repo.finish_job(
-                analysis_id, JobState.FAILED, JobError(code=code, message=message)
-            )
+            await self.repo.finish_job(analysis_id, JobState.FAILED, _job_error(exc))
         finally:
             self._user_cancelled.discard(analysis_id)
+
+    async def _save(self, analysis_id: str, report: AnalysisReport) -> None:
+        await self.repo.update_stage(
+            analysis_id,
+            StageProgress(
+                stage=StageName.SAVING,
+                status=StageStatus.RUNNING,
+                started_at=datetime.now(UTC),
+            ),
+        )
+        await self.repo.save_report(report)
+        await self.repo.update_stage(
+            analysis_id,
+            StageProgress(
+                stage=StageName.SAVING,
+                status=StageStatus.DONE,
+                finished_at=datetime.now(UTC),
+            ),
+        )
+
+    async def _finish_with_report(self, analysis_id: str, report: AnalysisReport) -> None:
+        is_partial = report.state is ReportState.PARTIAL
+        counts = Counter(f.severity for f in report.findings)
+        await self.repo.finish_job(
+            analysis_id,
+            JobState.PARTIAL if is_partial else JobState.COMPLETED,
+            None,
+            explanation_status=report.explanation.status,
+            finding_counts={severity: counts.get(severity, 0) for severity in Severity},
+            report_available=True,
+        )
+
+
+def _job_error(exc: Exception) -> JobError:
+    """Source failures are reported as such; anything else is internal (type name only)."""
+    if isinstance(exc, SourceError):
+        return JobError(code=ErrorCode.METRICS_SOURCE_UNAVAILABLE, message=exc.message)
+    return JobError(code=ErrorCode.INTERNAL_ERROR, message=type(exc).__name__)

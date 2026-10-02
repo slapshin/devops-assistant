@@ -6,13 +6,16 @@ import uvicorn
 
 from app.settings import ConfigError, load_settings
 
+CONFIG_ERROR_EXIT_CODE = 2
+
 
 def main() -> int:
     try:
         settings = load_settings()
     except ConfigError as exc:
         print(exc, file=sys.stderr)
-        return 2
+        return CONFIG_ERROR_EXIT_CODE
+
     uvicorn.run(
         "app.main:create_app",
         factory=True,

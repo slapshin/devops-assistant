@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 from app.ai.providers import explain_findings
 from app.domain.detector_config import DetectorConfig
-from app.domain.explanation import ExplanationResult, ExplanationStatus
+from app.domain.explanation import ExplanationStatus
 from app.domain.interfaces import (
     CancellationToken,
     Detector,
@@ -19,6 +19,7 @@ from app.domain.interfaces import (
 )
 from app.domain.jobs import StageName, StageProgress, StageStatus
 from app.domain.report import (
+    TREND_DAYS,
     AnalysisReport,
     AnalysisRequest,
     AnalysisWindows,
@@ -30,6 +31,11 @@ log = logging.getLogger("app.service")
 
 PARTIAL_CODES = {"query_failed", "query_timeout", "series_truncated", "evidence_dropped"}
 MAX_REPORT_BYTES = 20 * 1024 * 1024
+MAX_EPISODES_PER_DAY_WHEN_OVER_BUDGET = 50
+EXPLANATION_STAGE_STATUS = {
+    ExplanationStatus.SUCCEEDED: StageStatus.DONE,
+    ExplanationStatus.FAILED: StageStatus.FAILED,
+}
 
 
 class AnalysisPipeline:
@@ -86,7 +92,7 @@ class AnalysisPipeline:
         await stage(StageName.DETECTION, StageStatus.RUNNING)
         result = self.detector.detect(request, windows, capabilities, collection, self.config)
         await stage(StageName.DETECTION, StageStatus.DONE, f"{len(result.findings)} findings")
-        await stage(StageName.TRENDS, StageStatus.DONE, "14 daily buckets")
+        await stage(StageName.TRENDS, StageStatus.DONE, f"{TREND_DAYS} daily buckets")
         cancel.raise_if_cancelled()
 
         await stage(StageName.EXPLANATION, StageStatus.RUNNING)
@@ -101,16 +107,13 @@ class AnalysisPipeline:
         )
         await stage(
             StageName.EXPLANATION,
-            StageStatus.DONE
-            if explanation.status is ExplanationStatus.SUCCEEDED
-            else StageStatus.SKIPPED
-            if explanation.status is not ExplanationStatus.FAILED
-            else StageStatus.FAILED,
+            EXPLANATION_STAGE_STATUS.get(explanation.status, StageStatus.SKIPPED),
             explanation.reason,
         )
         cancel.raise_if_cancelled()
 
         exclusions = [*collection.exclusions, *result.exclusions]
+        is_partial = any(e.code in PARTIAL_CODES for e in exclusions)
         report = AnalysisReport(
             analysis_id=analysis_id,
             scope=request.scope,
@@ -119,9 +122,7 @@ class AnalysisPipeline:
             detector_version=request.detector_version,
             config_hash=request.config_hash,
             source=source_info,
-            state=ReportState.PARTIAL
-            if any(e.code in PARTIAL_CODES for e in exclusions)
-            else ReportState.COMPLETED,
+            state=ReportState.PARTIAL if is_partial else ReportState.COMPLETED,
             capabilities=capabilities,
             coverage=result.coverage,
             findings=result.findings,
@@ -135,42 +136,52 @@ class AnalysisPipeline:
 
     def _fit(self, report: AnalysisReport) -> AnalysisReport:
         """Keep the snapshot within the storage budget, disclosing everything dropped."""
-        if len(report.model_dump_json()) <= self.max_report_bytes:
+        if self._fits(report):
             return report
-        primary = {f.evidence_ids[0] for f in report.findings}
-        dropped = [e for e in report.evidence if e.evidence_id not in primary]
-        findings = [
-            f.model_copy(update={"evidence_ids": f.evidence_ids[:1]}) for f in report.findings
-        ]
-        exclusions = list(report.exclusions)
-        if dropped:
-            exclusions.append(
-                Exclusion(
-                    code="evidence_dropped",
-                    message=f"{len(dropped)} supporting evidence series (operands, p99) dropped to "
-                    "respect the report size budget.",
-                )
-            )
-        trends = report.trends
-        slim = report.model_copy(
-            update={
-                "findings": findings,
-                "evidence": [e for e in report.evidence if e.evidence_id in primary],
-                "exclusions": exclusions,
-                "state": ReportState.PARTIAL,
-            }
-        )
-        if len(slim.model_dump_json()) > self.max_report_bytes:
-            trends = [t.model_copy(update={"episodes": t.episodes[:50]}) for t in trends]
-            exclusions.append(
-                Exclusion(
-                    code="evidence_dropped",
-                    message="Daily episode lists truncated to 50 per day (counts are complete).",
-                )
-            )
-            slim = slim.model_copy(update={"trends": trends, "exclusions": exclusions})
+
+        slim = _keep_primary_evidence(report)
+        if not self._fits(slim):
+            slim = _truncate_daily_episodes(slim)
         return AnalysisReport.model_validate(slim.model_dump())
 
+    def _fits(self, report: AnalysisReport) -> bool:
+        return len(report.model_dump_json()) <= self.max_report_bytes
 
-def explanation_status(result: ExplanationResult) -> ExplanationStatus:
-    return result.status
+
+def _keep_primary_evidence(report: AnalysisReport) -> AnalysisReport:
+    """Keep only each finding's first evidence series; mark the report partial."""
+    primary = {f.evidence_ids[0] for f in report.findings}
+    dropped = [e for e in report.evidence if e.evidence_id not in primary]
+    findings = [f.model_copy(update={"evidence_ids": f.evidence_ids[:1]}) for f in report.findings]
+
+    exclusions = list(report.exclusions)
+    if dropped:
+        exclusions.append(
+            Exclusion(
+                code="evidence_dropped",
+                message=f"{len(dropped)} supporting evidence series (operands, p99) dropped to "
+                "respect the report size budget.",
+            )
+        )
+
+    return report.model_copy(
+        update={
+            "findings": findings,
+            "evidence": [e for e in report.evidence if e.evidence_id in primary],
+            "exclusions": exclusions,
+            "state": ReportState.PARTIAL,
+        }
+    )
+
+
+def _truncate_daily_episodes(report: AnalysisReport) -> AnalysisReport:
+    limit = MAX_EPISODES_PER_DAY_WHEN_OVER_BUDGET
+    trends = [t.model_copy(update={"episodes": t.episodes[:limit]}) for t in report.trends]
+    exclusions = [
+        *report.exclusions,
+        Exclusion(
+            code="evidence_dropped",
+            message=f"Daily episode lists truncated to {limit} per day (counts are complete).",
+        ),
+    ]
+    return report.model_copy(update={"trends": trends, "exclusions": exclusions})

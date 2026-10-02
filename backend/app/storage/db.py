@@ -8,6 +8,8 @@ from alembic import command
 from alembic.config import Config
 
 MIGRATIONS = Path(__file__).resolve().parents[2] / "migrations"
+# Wait this long for a competing writer (e.g. a maintenance command) before failing.
+BUSY_TIMEOUT_MS = 5000
 
 metadata = sa.MetaData()
 
@@ -51,7 +53,7 @@ def make_engine(path: Path) -> sa.Engine:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
         cursor.close()
 
     return engine

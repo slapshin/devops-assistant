@@ -34,6 +34,17 @@ log = logging.getLogger("app.metrics")
 
 HISTORY_DAYS = 28
 OTHER_ROUTES = "(other routes)"
+SECONDS_PER_DAY = 86400
+HISTORY_PROBE_DAYS = 30
+HISTORY_PROBE_STEP_SECONDS = 3600
+
+HTTP_TRAFFIC_SIGNAL = "http_requests"
+RPC_TRAFFIC_SIGNAL = "rpc_requests"
+MEAN_LATENCY_SIGNAL = "http_latency_mean"
+_FALLBACK_REASON_PREFIX = "Fallback"
+_MEAN_LATENCY_FALLBACK_REASON = f"{_FALLBACK_REASON_PREFIX} only; percentiles are available."
+# service_instance_id and cAdvisor container ids are matched on Docker's 12-char short id.
+CONTAINER_ID_PREFIX_LENGTH = 12
 
 
 @dataclass(frozen=True)
@@ -91,8 +102,9 @@ class PrometheusMetricsSource:
 
     async def _label_values(self, label: str, match: str, limit: int) -> DiscoveredValues:
         end = _ts(self._now())
+        # Ask for one extra value to learn whether the list was truncated.
         values = await self.client.label_values(
-            label, [match], end - HISTORY_DAYS * 86400, end, limit + 1
+            label, [match], end - HISTORY_DAYS * SECONDS_PER_DAY, end, limit + 1
         )
         return DiscoveredValues(values=values[:limit], truncated=len(values) > limit)
 
@@ -118,31 +130,21 @@ class PrometheusMetricsSource:
             )
         }
         history_days = await self._history_days(scope, at)
+
         gate_cache: dict[str, bool] = {}
         caps: list[MetricCapability] = []
-        percentile_ok: dict[SignalFamily, bool] = {}
         for defn in CATALOG:
-            cap = await self._capability(defn, scope, at, present, history_days, gate_cache)
-            caps.append(cap)
-            if defn.signal.endswith(("_p95", "_p99")) and defn.signal.startswith("http"):
-                percentile_ok[defn.family] = percentile_ok.get(defn.family, False) or (
-                    cap.status is CapabilityStatus.SUPPORTED
-                )
-        return [
-            c.model_copy(update={"reason": "Fallback only; percentiles are available."})
-            if c.signal == "http_latency_mean"
-            and percentile_ok.get(SignalFamily.LATENCY)
-            and c.status is CapabilityStatus.SUPPORTED
-            else c
-            for c in caps
-        ]
+            caps.append(await self._capability(defn, scope, at, present, history_days, gate_cache))
+        return _mark_mean_latency_fallback(caps)
 
     async def _history_days(self, scope: Scope, at: int) -> float | None:
         query = f"count(up{{{scope_matchers(scope)}}})"
         assert_scoped(query, scope, ("up",))
-        res = await self.client.query_range(query, at - 30 * 86400, at, 3600)
+        res = await self.client.query_range(
+            query, at - HISTORY_PROBE_DAYS * SECONDS_PER_DAY, at, HISTORY_PROBE_STEP_SECONDS
+        )
         stamps = [ts for r in res for ts, v in r.samples if v]
-        return round((at - min(stamps)) / 86400, 2) if stamps else None
+        return round((at - min(stamps)) / SECONDS_PER_DAY, 2) if stamps else None
 
     async def _capability(
         self,
@@ -227,21 +229,13 @@ class PrometheusMetricsSource:
     ) -> CollectionResult:
         step = windows.step_seconds
         grid_start = windows.end_time - timedelta(days=HISTORY_DAYS)
-        n = int((windows.end_time - grid_start).total_seconds()) // step
-        by_signal = {c.signal: c for c in capabilities}
-        plan = [
-            BY_SIGNAL[c.signal]
-            for c in capabilities
-            if c.status in (CapabilityStatus.SUPPORTED, CapabilityStatus.PARTIAL)
-            and c.signal in BY_SIGNAL
-            and not (
-                c.signal == "http_latency_mean" and c.reason and c.reason.startswith("Fallback")
-            )
-        ]
-        # Traffic signals first: they decide which routes are analysed individually.
-        plan.sort(
-            key=lambda d: (d.signal not in ("http_requests", "rpc_requests"), CATALOG.index(d))
+        grid = _Grid(
+            start=grid_start,
+            step=step,
+            size=int((windows.end_time - grid_start).total_seconds()) // step,
         )
+        plan = _collection_plan(capabilities)
+
         exclusions: list[Exclusion] = []
         series: list[MetricSeries] = []
         top_routes: dict[str, set[tuple[str, ...]]] = {}
@@ -268,54 +262,9 @@ class PrometheusMetricsSource:
                     )
                 )
                 continue
-            query = defn.query.render(scope)
-            try:
-                results = await self.client.query_range(
-                    query, _ts(grid_start) + step, _ts(windows.end_time), step
-                )
-            except SourceError as exc:
-                code = "query_timeout" if exc.kind is SourceErrorKind.TIMEOUT else "query_failed"
-                exclusions.append(
-                    Exclusion(
-                        code=code,
-                        family=defn.family,
-                        message=f"{defn.signal}: {exc.message}",
-                    )
-                )
-                continue
-            results = self._scoped_results(results, scope, defn, exclusions)
-            if len(results) > self.budget.max_series_per_query:
-                exclusions.append(
-                    Exclusion(
-                        code="series_truncated",
-                        family=defn.family,
-                        message=f"{defn.signal}: {len(results)} series exceed the per-query budget "
-                        f"({self.budget.max_series_per_query}); kept the first "
-                        f"{self.budget.max_series_per_query} by identity.",
-                    )
-                )
-                results = results[: self.budget.max_series_per_query]
-            grids = [(dict(r.labels), _to_grid(r, _ts(grid_start), step, n)) for r in results]
-            if defn.route_level:
-                grids = self._limit_routes(defn, grids, top_routes, n)
-            for labels, values in grids:
-                entity = entity_for(defn, dict(labels))
-                coverage = sum(v is not None for v in values) / n
-                series.append(
-                    MetricSeries(
-                        series_id=series_id(query, entity.key),
-                        family=defn.family,
-                        signal=defn.signal,
-                        entity=entity,
-                        labels={"project": scope.project, "env": scope.env, **entity.labels},
-                        unit=defn.unit,
-                        query=query,
-                        step_seconds=step,
-                        start=grid_start,
-                        values=values,
-                        coverage=coverage,
-                    )
-                )
+            series += await self._collect_signal(
+                defn, scope, windows.end_time, grid, exclusions, top_routes
+            )
         await progress.update(
             StageProgress(
                 stage=StageName.COLLECTION,
@@ -326,7 +275,9 @@ class PrometheusMetricsSource:
                 total=len(plan),
             )
         )
-        mappings = await self._mappings(scope, windows, by_signal, exclusions)
+
+        mappings = await self._mappings(scope, windows, exclusions)
+
         log.info(
             "collected scope=%s/%s catalog=%s series=%d exclusions=%d requests=%d",
             scope.project,
@@ -337,6 +288,66 @@ class PrometheusMetricsSource:
             self.client.request_count,
         )
         return CollectionResult(series=series, exclusions=exclusions, mappings=mappings)
+
+    async def _collect_signal(
+        self,
+        defn: SignalDef,
+        scope: Scope,
+        end_time: datetime,
+        grid: _Grid,
+        exclusions: list[Exclusion],
+        top_routes: dict[str, set[tuple[str, ...]]],
+    ) -> list[MetricSeries]:
+        """Query one signal over the grid; failures and truncation become exclusions."""
+        query = defn.query.render(scope)
+        grid_start = _ts(grid.start)
+        try:
+            results = await self.client.query_range(
+                query, grid_start + grid.step, _ts(end_time), grid.step
+            )
+        except SourceError as exc:
+            code = "query_timeout" if exc.kind is SourceErrorKind.TIMEOUT else "query_failed"
+            exclusions.append(
+                Exclusion(code=code, family=defn.family, message=f"{defn.signal}: {exc.message}")
+            )
+            return []
+
+        results = self._scoped_results(results, scope, defn, exclusions)
+        max_series = self.budget.max_series_per_query
+        if len(results) > max_series:
+            exclusions.append(
+                Exclusion(
+                    code="series_truncated",
+                    family=defn.family,
+                    message=f"{defn.signal}: {len(results)} series exceed the per-query budget "
+                    f"({max_series}); kept the first {max_series} by identity.",
+                )
+            )
+            results = results[:max_series]
+
+        grids = [(dict(r.labels), _to_grid(r, grid_start, grid.step, grid.size)) for r in results]
+        if defn.route_level:
+            grids = self._limit_routes(defn, grids, top_routes, grid.size)
+
+        out: list[MetricSeries] = []
+        for labels, values in grids:
+            entity = entity_for(defn, dict(labels))
+            out.append(
+                MetricSeries(
+                    series_id=series_id(query, entity.key),
+                    family=defn.family,
+                    signal=defn.signal,
+                    entity=entity,
+                    labels={"project": scope.project, "env": scope.env, **entity.labels},
+                    unit=defn.unit,
+                    query=query,
+                    step_seconds=grid.step,
+                    start=grid.start,
+                    values=values,
+                    coverage=sum(v is not None for v in values) / grid.size,
+                )
+            )
+        return out
 
     @staticmethod
     def _scoped_results(
@@ -368,35 +379,26 @@ class PrometheusMetricsSource:
     ) -> list[tuple[dict[str, str], list[float | None]]]:
         """Keep the top routes per service by 14-day volume; sum the rest (rates only)."""
         route_labels = defn.identity[1:]
-        traffic = "rpc_requests" if "rpc_method" in defn.identity else "http_requests"
-        recent = n // 2
+        traffic = RPC_TRAFFIC_SIGNAL if "rpc_method" in defn.identity else HTTP_TRAFFIC_SIGNAL
+        # The traffic signal is collected first, so it decides the routes for its operands.
         if defn.signal == traffic:
-            per_job: dict[str, list[tuple[float, tuple[str, ...]]]] = defaultdict(list)
-            for labels, values in grids:
-                lab = labels
-                volume = sum(v for v in values[recent:] if v is not None)
-                per_job[lab.get("job", "")].append(
-                    (volume, tuple(lab.get(k, "") for k in route_labels))
-                )
-            for job, items in per_job.items():
-                items.sort(key=lambda x: (-x[0], x[1]))
-                top_routes[f"{traffic}|{job}"] = {
-                    r for _, r in items[: self.budget.top_routes_per_service]
-                }
+            top_routes.update(self._rank_top_routes(traffic, grids, route_labels, n))
+
         kept: list[tuple[dict[str, str], list[float | None]]] = []
         other: dict[str, list[float | None]] = {}
         for labels, values in grids:
-            lab = labels
-            job = lab.get("job", "")
+            job = labels.get("job", "")
             allowed = top_routes.get(f"{traffic}|{job}")
-            route = tuple(lab.get(k, "") for k in route_labels)
+            route = tuple(labels.get(k, "") for k in route_labels)
             if allowed is None or route in allowed:
                 kept.append((labels, values))
             elif defn.unit.value.endswith("per_second"):
+                # Only rates add up meaningfully; other units drop the long tail.
                 acc = other.setdefault(job, [None] * n)
                 for i, v in enumerate(values):
                     if v is not None:
                         acc[i] = (acc[i] or 0.0) + v
+
         for job, values in sorted(other.items()):
             labels = {
                 "job": job,
@@ -405,50 +407,35 @@ class PrometheusMetricsSource:
             kept.append((labels, values))
         return kept
 
-    async def _mappings(
+    def _rank_top_routes(
         self,
-        scope: Scope,
-        windows: AnalysisWindows,
-        by_signal: dict[str, MetricCapability],
-        exclusions: list[Exclusion],
+        traffic: str,
+        grids: list[tuple[dict[str, str], list[float | None]]],
+        route_labels: tuple[str, ...],
+        n: int,
+    ) -> dict[str, set[tuple[str, ...]]]:
+        """Top routes per job by request volume over the trend range (second half of the grid)."""
+        trend_start = n // 2
+        per_job: dict[str, list[tuple[float, tuple[str, ...]]]] = defaultdict(list)
+        for labels, values in grids:
+            volume = sum(v for v in values[trend_start:] if v is not None)
+            route = tuple(labels.get(k, "") for k in route_labels)
+            per_job[labels.get("job", "")].append((volume, route))
+
+        top: dict[str, set[tuple[str, ...]]] = {}
+        for job, items in per_job.items():
+            items.sort(key=lambda x: (-x[0], x[1]))
+            top[f"{traffic}|{job}"] = {r for _, r in items[: self.budget.top_routes_per_service]}
+        return top
+
+    async def _mappings(
+        self, scope: Scope, windows: AnalysisWindows, exclusions: list[Exclusion]
     ) -> list[EntityMapping]:
         at = _ts(windows.end_time)
-        s = scope_matchers(scope)
         out: set[tuple[MappingKind, str, str]] = set()
         try:
-            services = await self._instant(
-                f"max by (job, service_instance_id) (target_info{{{s}}})", scope, at
-            )
-            if services:
-                containers = await self._instant(
-                    f'max by (instance, id) (container_start_time_seconds{{{s}, name!=""}})',
-                    scope,
-                    at,
-                )
-                by_prefix: dict[str, str] = {}
-                for c in containers:
-                    cid = c.labels.get("id", "").rsplit("docker-", 1)[-1].removesuffix(".scope")
-                    if len(cid) >= 12:
-                        by_prefix[cid[:12]] = c.labels.get("instance", "")
-                for svc in services:
-                    host = by_prefix.get(svc.labels.get("service_instance_id", "")[:12])
-                    if host:
-                        out.add((MappingKind.OTEL_SERVICE, svc.labels.get("job", ""), host))
-            tasks = await self._instant(
-                f"count by (service_name, node_hostname) (docker_swarm_task_info{{{s}, "
-                f'state="running"}})',
-                scope,
-                at,
-            )
-            for t in tasks:
-                if t.labels.get("node_hostname"):
-                    out.add(
-                        (
-                            MappingKind.SWARM_SERVICE,
-                            t.labels.get("service_name", ""),
-                            t.labels["node_hostname"],
-                        )
-                    )
+            out |= await self._otel_mappings(scope, at)
+            out |= await self._swarm_mappings(scope, at)
         except SourceError as exc:
             exclusions.append(
                 Exclusion(
@@ -460,6 +447,106 @@ class PrometheusMetricsSource:
             EntityMapping(kind=k, service=svc, host=host, observed_at=windows.end_time)
             for k, svc, host in sorted(out)
         ]
+
+    async def _otel_mappings(self, scope: Scope, at: int) -> set[tuple[MappingKind, str, str]]:
+        """OTel job -> host, joined via the container id in service_instance_id."""
+        s = scope_matchers(scope)
+        services = await self._instant(
+            f"max by (job, service_instance_id) (target_info{{{s}}})", scope, at
+        )
+        if not services:
+            return set()
+
+        containers = await self._instant(
+            f'max by (instance, id) (container_start_time_seconds{{{s}, name!=""}})',
+            scope,
+            at,
+        )
+        host_by_container: dict[str, str] = {}
+        for c in containers:
+            # cAdvisor ids look like ".../docker-<64 hex>.scope".
+            container_id = c.labels.get("id", "").rsplit("docker-", 1)[-1].removesuffix(".scope")
+            if len(container_id) >= CONTAINER_ID_PREFIX_LENGTH:
+                short_id = container_id[:CONTAINER_ID_PREFIX_LENGTH]
+                host_by_container[short_id] = c.labels.get("instance", "")
+
+        out: set[tuple[MappingKind, str, str]] = set()
+        for svc in services:
+            instance_id = svc.labels.get("service_instance_id", "")
+            host = host_by_container.get(instance_id[:CONTAINER_ID_PREFIX_LENGTH])
+            if host:
+                out.add((MappingKind.OTEL_SERVICE, svc.labels.get("job", ""), host))
+        return out
+
+    async def _swarm_mappings(self, scope: Scope, at: int) -> set[tuple[MappingKind, str, str]]:
+        """Swarm service -> nodes currently running one of its tasks."""
+        s = scope_matchers(scope)
+        tasks = await self._instant(
+            f"count by (service_name, node_hostname) (docker_swarm_task_info{{{s}, "
+            f'state="running"}})',
+            scope,
+            at,
+        )
+        return {
+            (MappingKind.SWARM_SERVICE, t.labels.get("service_name", ""), t.labels["node_hostname"])
+            for t in tasks
+            if t.labels.get("node_hostname")
+        }
+
+
+@dataclass(frozen=True)
+class _Grid:
+    """The regular collection grid: ``size`` steps of ``step`` seconds from ``start``."""
+
+    start: datetime
+    step: int
+    size: int
+
+
+def _collection_plan(capabilities: Sequence[MetricCapability]) -> list[SignalDef]:
+    """Signals to query, traffic first: traffic decides which routes are analysed individually."""
+    plan = [
+        BY_SIGNAL[c.signal]
+        for c in capabilities
+        if c.status in (CapabilityStatus.SUPPORTED, CapabilityStatus.PARTIAL)
+        and c.signal in BY_SIGNAL
+        and not _is_mean_latency_fallback(c)
+    ]
+    plan.sort(
+        key=lambda d: (
+            d.signal not in (HTTP_TRAFFIC_SIGNAL, RPC_TRAFFIC_SIGNAL),
+            CATALOG.index(d),
+        )
+    )
+    return plan
+
+
+def _is_mean_latency_fallback(capability: MetricCapability) -> bool:
+    """Mean latency is collected only when no percentile is available."""
+    return bool(
+        capability.signal == MEAN_LATENCY_SIGNAL
+        and capability.reason
+        and capability.reason.startswith(_FALLBACK_REASON_PREFIX)
+    )
+
+
+def _mark_mean_latency_fallback(caps: list[MetricCapability]) -> list[MetricCapability]:
+    """Demote supported mean latency to a fallback when an HTTP percentile is supported."""
+    percentile_supported = any(
+        c.signal.startswith("http")
+        and c.signal.endswith(("_p95", "_p99"))
+        and c.family is SignalFamily.LATENCY
+        and c.status is CapabilityStatus.SUPPORTED
+        for c in caps
+    )
+    if not percentile_supported:
+        return caps
+    return [
+        c.model_copy(update={"reason": _MEAN_LATENCY_FALLBACK_REASON})
+        if c.signal == MEAN_LATENCY_SIGNAL and c.status is CapabilityStatus.SUPPORTED
+        else c
+        for c in caps
+    ]
 
 
 def _to_grid(result: RangeResult, grid_start: int, step: int, n: int) -> list[float | None]:

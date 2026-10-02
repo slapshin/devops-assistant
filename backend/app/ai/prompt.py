@@ -13,6 +13,11 @@ from app.domain.findings import Finding, SignalCoverage, SignalStatus
 MAX_FINDINGS = 20
 MAX_INPUT_CHARS = 40_000
 MAX_LABEL_CHARS = 200
+MAX_LABEL_NAME_CHARS = 64
+MAX_ENTITY_KEY_CHARS = 400
+MAX_REASON_CHARS = 160
+MAX_REASONS_PER_SIGNAL = 2
+MAX_COVERAGE_SUMMARY_CHARS = 4000
 # Control and format characters (incl. zero-width and bidi overrides) are removed *after*
 # redaction, so they can neither split a secret away from its pattern nor survive into output.
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
@@ -71,23 +76,14 @@ def _entity(entity: Entity) -> Entity:
     return entity.model_copy(
         update={
             "display_name": clean(entity.display_name),
-            "key": clean(entity.key, 400),
-            "labels": {clean(k, 64): clean(v) for k, v in entity.labels.items()},
+            "key": clean(entity.key, MAX_ENTITY_KEY_CHARS),
+            "labels": {clean(k, MAX_LABEL_NAME_CHARS): clean(v) for k, v in entity.labels.items()},
         }
     )
 
 
 def digest(finding: Finding) -> FindingDigest:
     unit = finding.observed.unit
-    expected = None
-    if finding.expected is not None:
-        e = finding.expected
-        expected = (
-            f"{format_value(e.median, unit)} (normal range {format_value(e.lower, unit)}"
-            f"-{format_value(e.upper, unit)})"
-        )
-    elif finding.threshold is not None:
-        expected = f"below heuristic threshold {format_value(finding.threshold, unit)}"
     return FindingDigest(
         finding_id=finding.finding_id,
         title=clean(finding.title),
@@ -98,23 +94,37 @@ def digest(finding: Finding) -> FindingDigest:
         start=finding.start,
         end=finding.end,
         observed=format_value(finding.observed.value, unit),
-        expected=expected,
+        expected=_expected_text(finding),
         related_finding_ids=list(finding.related_finding_ids),
         host=clean(finding.attributes["host"]) if "host" in finding.attributes else None,
     )
 
 
+def _expected_text(finding: Finding) -> str | None:
+    unit = finding.observed.unit
+    if finding.expected is not None:
+        expected = finding.expected
+        return (
+            f"{format_value(expected.median, unit)} (normal range "
+            f"{format_value(expected.lower, unit)}-{format_value(expected.upper, unit)})"
+        )
+    if finding.threshold is not None:
+        return f"below heuristic threshold {format_value(finding.threshold, unit)}"
+    return None
+
+
 def coverage_summary(coverage: Sequence[SignalCoverage]) -> str:
     parts = []
     for row in coverage:
-        if row.status in (SignalStatus.NO_ANOMALY, SignalStatus.ANOMALOUS):
-            parts.append(f"{row.family.value}: {row.status.value}")
-        else:
-            reason = "; ".join(clean(r.message, 160) for r in row.reasons[:2])
-            parts.append(
-                f"{row.family.value}: {row.status.value}" + (f" ({reason})" if reason else "")
-            )
-    return clean(" | ".join(parts), 4000)
+        part = f"{row.family.value}: {row.status.value}"
+        # Evaluated signals need no explanation; for the rest, say why they are limited.
+        if row.status not in (SignalStatus.NO_ANOMALY, SignalStatus.ANOMALOUS):
+            reasons = row.reasons[:MAX_REASONS_PER_SIGNAL]
+            reason = "; ".join(clean(r.message, MAX_REASON_CHARS) for r in reasons)
+            if reason:
+                part += f" ({reason})"
+        parts.append(part)
+    return clean(" | ".join(parts), MAX_COVERAGE_SUMMARY_CHARS)
 
 
 def build_input(
@@ -127,11 +137,12 @@ def build_input(
 ) -> tuple[ExplanationInput, list[str]]:
     """Return the bounded input plus notes about anything omitted to fit the budget."""
     notes: list[str] = []
-    ordered = list(findings)[:max_findings]
     if len(findings) > max_findings:
         notes.append(f"Only the {max_findings} most severe of {len(findings)} findings were sent.")
-    digests = [digest(f) for f in ordered]
+    digests = [digest(f) for f in list(findings)[:max_findings]]
     summary = coverage_summary(coverage)
+
+    # Drop the least severe findings until the rendered input fits the character budget.
     while True:
         payload = ExplanationInput(
             scope=Scope(project=clean(scope.project), env=clean(scope.env)),
@@ -142,7 +153,6 @@ def build_input(
         if len(render(payload)) <= max_chars or not digests:
             break
         digests = digests[:-1]
-        ordered = ordered[:-1]
         notes.append("A finding was omitted to respect the input size budget.")
     return payload, notes
 

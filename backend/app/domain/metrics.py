@@ -47,9 +47,11 @@ class MetricSeries(Contract):
         if self.values:
             observed = sum(v is not None for v in self.values) / len(self.values)
             if abs(observed - self.coverage) > 1e-6:
-                raise ValueError(f"coverage {self.coverage} != observed share {observed:.6f}")
+                raise ValueError(
+                    f"{self.series_id}: coverage {self.coverage} != observed share {observed:.6f}"
+                )
         elif self.coverage != 0.0:
-            raise ValueError("empty series must have coverage 0")
+            raise ValueError(f"{self.series_id}: empty series must have coverage 0")
         return self
 
 

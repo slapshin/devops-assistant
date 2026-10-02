@@ -61,6 +61,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
+
     stale = []
     for name, text in outputs().items():
         path = OUT / name
@@ -70,6 +71,7 @@ def main() -> int:
         else:
             OUT.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
+
     if stale:
         print(
             "Stale contract exports (run: uv run python -m scripts.export_schemas):",

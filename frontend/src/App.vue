@@ -1,6 +1,11 @@
+<script setup lang="ts">
+import ThemeSwitch from "./components/ThemeSwitch.vue";
+</script>
+
 <template>
   <header class="header">
     <RouterLink to="/" class="brand">DevOps AI Assistant</RouterLink>
+    <ThemeSwitch />
   </header>
   <main class="main">
     <RouterView />
@@ -11,21 +16,27 @@
 .header {
   display: flex;
   gap: calc(var(--space) * 2);
-  align-items: baseline;
-  padding: calc(var(--space) * 1.5) calc(var(--space) * 2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space) calc(var(--space) * 4);
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--bg);
 }
 
 .brand {
-  font-weight: 600;
+  font-weight: 700;
   color: inherit;
   text-decoration: none;
 }
 
 .main {
-  padding: calc(var(--space) * 2);
-  max-width: 1400px;
+  padding: calc(var(--space) * 3) calc(var(--space) * 4) calc(var(--space) * 6);
+  max-width: 1320px;
   margin: 0 auto;
+}
+
+@media (max-width: 600px) {
+  .header { padding: var(--space) calc(var(--space) * 2); }
+  .main { padding: calc(var(--space) * 2); }
 }
 </style>

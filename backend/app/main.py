@@ -27,6 +27,8 @@ from app.storage.repository import SqliteReportRepository
 
 log = logging.getLogger("app")
 
+CONFIG_ERROR_EXIT_CODE = 2
+
 
 def build_source(settings: Settings) -> tuple[MetricsSource, PrometheusClient | None]:
     scenario = settings.synthetic_scenario
@@ -37,24 +39,29 @@ def build_source(settings: Settings) -> tuple[MetricsSource, PrometheusClient | 
                 f" (expected one of {', '.join(sorted(SCENARIOS))})"
             )
         return SyntheticMetricsSource(scenario), None
+
     client = PrometheusClient.from_settings(settings)
     return PrometheusMetricsSource(client), client
 
 
 def load_detector_config(settings: Settings) -> DetectorConfig:
-    """Defaults from DECISIONS §5, optionally overridden by a DETECTOR_CONFIG JSON file."""
+    """Defaults from DECISIONS §5, optionally overridden by a DETECTOR_CONFIG_FILE JSON file."""
     defaults = DetectorConfig()
-    if settings.detector_config is None:
+    config_file = settings.detector_config_file
+    if config_file is None:
         return defaults
+
     try:
-        override = json.loads(settings.detector_config.read_text())
+        override = json.loads(config_file.read_text())
         merged = defaults.model_dump()
         signals = {**merged["signals"], **override.pop("signals", {})}
         merged.update(override)
         merged["signals"] = signals
         return DetectorConfig.model_validate(merged)
     except (OSError, ValueError) as exc:
-        raise ConfigError(f"Invalid configuration:\n  DETECTOR_CONFIG: {exc}") from None
+        raise ConfigError(
+            f"Invalid configuration:\n  DETECTOR_CONFIG_FILE ({config_file}): {exc}"
+        ) from None
 
 
 def build_services(
@@ -64,12 +71,15 @@ def build_services(
     limits: RunnerLimits | None = None,
 ) -> Services:
     config = load_detector_config(settings)
+
     client = None
     if source is None:
         source, client = build_source(settings)
+
     unavailable, reason = settings.explanation_status, None
     if provider is None:
         provider, unavailable, reason = provider_from_settings(settings)
+
     pipeline = AnalysisPipeline(source, RobustDetector(), config, provider, unavailable, reason)
     repo = SqliteReportRepository(settings.database_path)
     runner = JobRunner(repo, pipeline, config, settings.explanation_status, limits)
@@ -87,13 +97,14 @@ def create_app(
             settings = load_settings()
         except ConfigError as exc:
             print(exc, file=sys.stderr)
-            raise SystemExit(2) from None
+            raise SystemExit(CONFIG_ERROR_EXIT_CODE) from None
+
     logging.basicConfig(level=settings.log_level)
     try:
         services = build_services(settings, source, provider, limits)
     except ConfigError as exc:
         print(exc, file=sys.stderr)
-        raise SystemExit(2) from None
+        raise SystemExit(CONFIG_ERROR_EXIT_CODE) from None
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -125,6 +136,7 @@ def create_app(
     app.state.settings = settings
     app.state.detector_config = services.config
     app.state.services = services
+
     install_problem_handlers(app)
     app.include_router(router)
     if settings.ui_dir is not None:

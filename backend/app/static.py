@@ -11,6 +11,7 @@ def mount_ui(app: FastAPI, ui_dir: Path) -> None:
     assets = ui_dir / "assets"
     if assets.is_dir():
         app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
     index = ui_dir / "index.html"
     root = ui_dir.resolve()
 
@@ -18,6 +19,7 @@ def mount_ui(app: FastAPI, ui_dir: Path) -> None:
     async def spa(path: str, request: Request) -> Response:
         if path.startswith("api/") or path == "api":
             raise HTTPException(status_code=404)
+
         candidate = (ui_dir / path).resolve()
         if path and candidate.is_file() and candidate.is_relative_to(root):
             return FileResponse(candidate)

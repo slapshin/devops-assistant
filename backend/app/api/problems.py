@@ -34,15 +34,6 @@ def problem_response(problem: Problem, headers: dict[str, str] | None = None) ->
     )
 
 
-def not_implemented(task: str) -> ProblemError:
-    return ProblemError(
-        501,
-        ErrorCode.NOT_IMPLEMENTED,
-        "Not implemented yet",
-        f"This route is part of the frozen contract; {task} implements it.",
-    )
-
-
 def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
     """OpenAPI documentation for problem responses."""
     return {

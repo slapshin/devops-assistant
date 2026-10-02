@@ -15,11 +15,14 @@ from app.domain.common import format_utc
 from app.settings import ConfigError, load_settings
 from app.storage.repository import ACTIVE, SqliteReportRepository
 
+CONFIG_ERROR_EXIT_CODE = 2
+
 
 def backup(db: Path, target: Path) -> int:
     if target.exists():
         print(f"Refusing to overwrite {target}", file=sys.stderr)
         return 1
+
     target.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db) as src, sqlite3.connect(target) as dst:
         src.backup(dst)  # safe while the application is running (WAL)
@@ -30,49 +33,64 @@ def backup(db: Path, target: Path) -> int:
 def prune(db: Path, days: int, yes: bool) -> int:
     SqliteReportRepository(db).close()  # ensures migrations are applied
     cutoff = format_utc(datetime.now(UTC) - timedelta(days=days))
+
     with sqlite3.connect(db) as conn:
         conn.execute("PRAGMA foreign_keys=ON")
-        placeholders = ",".join("?" for _ in ACTIVE)
-        rows = conn.execute(
-            "SELECT analysis_id, project, env, end_time, state, created_at FROM analysis_jobs "
-            f"WHERE created_at < ? AND state NOT IN ({placeholders}) ORDER BY created_at",
-            (cutoff, *ACTIVE),
-        ).fetchall()
+        rows = _finished_before(conn, cutoff)
         if not rows:
             print(f"Nothing older than {days} days ({cutoff}).")
             return 0
-        for r in rows:
+
+        verb = "delete" if yes else "would delete"
+        for analysis_id, project, env, end_time, state, created_at in rows:
             print(
-                f"{'delete' if yes else 'would delete'} {r[0]} {r[1]}/{r[2]} end={r[3]} "
-                f"state={r[4]} created={r[5]}"
+                f"{verb} {analysis_id} {project}/{env} end={end_time} "
+                f"state={state} created={created_at}"
             )
         if not yes:
             print(f"{len(rows)} analyses would be deleted. Re-run with --yes to delete.")
             return 0
-        ids = [r[0] for r in rows]
+
+        ids = [row[0] for row in rows]
         marks = ",".join("?" for _ in ids)
         conn.execute(f"DELETE FROM reports WHERE analysis_id IN ({marks})", ids)
         conn.execute(f"DELETE FROM analysis_jobs WHERE analysis_id IN ({marks})", ids)
+
+    # VACUUM cannot run inside an open transaction, so it runs after the deletes commit.
     with sqlite3.connect(db) as conn:
         conn.execute("VACUUM")
     print(f"Deleted {len(rows)} analyses.")
     return 0
 
 
+def _finished_before(conn: sqlite3.Connection, cutoff: str) -> list[tuple[str, ...]]:
+    placeholders = ",".join("?" for _ in ACTIVE)
+    rows: list[tuple[str, ...]] = conn.execute(
+        "SELECT analysis_id, project, env, end_time, state, created_at FROM analysis_jobs "
+        f"WHERE created_at < ? AND state NOT IN ({placeholders}) ORDER BY created_at",
+        (cutoff, *ACTIVE),
+    ).fetchall()
+    return rows
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.maintenance")
-    sub = parser.add_subparsers(dest="command", required=True)
-    b = sub.add_parser("backup", help="copy the database to a new file")
-    b.add_argument("target", type=Path)
-    p = sub.add_parser("prune", help="delete finished analyses older than N days")
-    p.add_argument("--older-than", type=int, required=True, metavar="DAYS")
-    p.add_argument("--yes", action="store_true", help="actually delete (default: dry run)")
+    commands = parser.add_subparsers(dest="command", required=True)
+    backup_parser = commands.add_parser("backup", help="copy the database to a new file")
+    backup_parser.add_argument("target", type=Path)
+    prune_parser = commands.add_parser("prune", help="delete finished analyses older than N days")
+    prune_parser.add_argument("--older-than", type=int, required=True, metavar="DAYS")
+    prune_parser.add_argument(
+        "--yes", action="store_true", help="actually delete (default: dry run)"
+    )
     args = parser.parse_args(argv)
+
     try:
         settings = load_settings()
     except ConfigError as exc:
         print(exc, file=sys.stderr)
-        return 2
+        return CONFIG_ERROR_EXIT_CODE
+
     if args.command == "backup":
         return backup(settings.database_path, args.target)
     return prune(settings.database_path, args.older_than, args.yes)

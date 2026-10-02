@@ -4,11 +4,13 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const out = join(mkdtempSync(join(tmpdir(), "api-types-")), "schema.d.ts");
-execFileSync("npx", ["openapi-typescript", "../docs/contracts/openapi.json", "-o", out], {
-  stdio: "ignore",
-});
-if (readFileSync(out, "utf8") !== readFileSync("src/api/schema.d.ts", "utf8")) {
-  console.error("src/api/schema.d.ts is stale; run: npm run gen:api");
+const OPENAPI_PATH = "../docs/contracts/openapi.json";
+const COMMITTED_TYPES_PATH = "src/api/schema.d.ts";
+
+const generatedTypesPath = join(mkdtempSync(join(tmpdir(), "api-types-")), "schema.d.ts");
+execFileSync("npx", ["openapi-typescript", OPENAPI_PATH, "-o", generatedTypesPath], { stdio: "ignore" });
+
+if (readFileSync(generatedTypesPath, "utf8") !== readFileSync(COMMITTED_TYPES_PATH, "utf8")) {
+  console.error(`${COMMITTED_TYPES_PATH} is stale relative to ${OPENAPI_PATH}; run: npm run gen:api`);
   process.exit(1);
 }

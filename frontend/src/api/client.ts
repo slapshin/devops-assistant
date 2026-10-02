@@ -20,6 +20,7 @@ export type MetricSeries = Schemas["MetricSeries"];
 /** Error carrying an RFC 9457 problem body, or a synthetic one for network failures. */
 export class ApiError extends Error {
   readonly problem: Problem;
+  /** Seconds from the Retry-After header, when the server sent one. */
   readonly retryAfter: number | null;
 
   constructor(problem: Problem, retryAfter: number | null = null) {
@@ -30,34 +31,35 @@ export class ApiError extends Error {
   }
 }
 
+const PROBLEM_CONTENT_TYPE = "application/problem+json";
+
+/** Problem body for failures where the server gave none (network error, non-problem response). */
+function syntheticProblem(title: string, status: number): Problem {
+  return { type: "about:blank", title, status, code: "internal_error" };
+}
+
 async function request<T>(method: string, path: `/api/${string}`, body?: unknown): Promise<T> {
-  let res: Response;
+  let response: Response;
   try {
-    res = await fetch(path, {
+    response = await fetch(path, {
       method,
       headers: { Accept: "application/json", ...(body ? { "Content-Type": "application/json" } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError({
-      type: "about:blank",
-      title: "Lost connection to the assistant",
-      status: 0,
-      code: "internal_error",
-    });
+    throw new ApiError(syntheticProblem("Lost connection to the assistant", 0));
   }
-  if (!res.ok) {
-    const type = res.headers.get("content-type") ?? "";
-    const retry = Number(res.headers.get("retry-after")) || null;
-    if (type.includes("application/problem+json")) {
-      throw new ApiError((await res.json()) as Problem, retry);
+
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type") ?? "";
+    const retryAfterSeconds = Number(response.headers.get("retry-after")) || null;
+    if (contentType.includes(PROBLEM_CONTENT_TYPE)) {
+      throw new ApiError((await response.json()) as Problem, retryAfterSeconds);
     }
-    throw new ApiError(
-      { type: "about:blank", title: `Unexpected response (${res.status})`, status: res.status, code: "internal_error" },
-      retry,
-    );
+    throw new ApiError(syntheticProblem(`Unexpected response (${response.status})`, response.status), retryAfterSeconds);
   }
-  return (await res.json()) as T;
+
+  return (await response.json()) as T;
 }
 
 export const apiGet = <T>(path: `/api/${string}`) => request<T>("GET", path);

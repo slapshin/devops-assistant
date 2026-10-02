@@ -1,5 +1,8 @@
 import js from "@eslint/js";
-import { defineConfigWithVueTs, vueTsConfigs } from "@vue/eslint-config-typescript";
+import {
+  defineConfigWithVueTs,
+  vueTsConfigs,
+} from "@vue/eslint-config-typescript";
 import pluginVue from "eslint-plugin-vue";
 import globals from "globals";
 

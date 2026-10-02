@@ -6,11 +6,22 @@ import { useReport, useSubmit } from "../../api/queries";
 import { formatTime, timezone, utcTooltip } from "../../lib/format";
 import { provideReport } from "./context";
 
+const SECONDS_PER_MINUTE = 60;
+/** WAI-ARIA tabs pattern: arrow keys wrap, Home/End jump to the ends. */
+const TAB_KEY_TARGETS: Record<string, (index: number, count: number) => number> = {
+  ArrowRight: (index, count) => (index + 1) % count,
+  ArrowLeft: (index, count) => (index - 1 + count) % count,
+  Home: () => 0,
+  End: (_, count) => count - 1,
+};
+
 const props = defineProps<{ id: string }>();
+
 const route = useRoute();
 const router = useRouter();
 const query = useReport(() => props.id);
 const submit = useSubmit();
+const tabRefs = ref<HTMLElement[]>([]);
 
 const report = computed(() => query.data.value as AnalysisReport);
 provideReport({
@@ -25,33 +36,30 @@ const tabs = computed(() => [
   { name: "trends", label: "Trends", to: `/reports/${props.id}/trends` },
 ]);
 const activeTab = computed(() => (route.name === "evidence" ? "findings" : String(route.name)));
-const tabRefs = ref<HTMLElement[]>([]);
+const error = computed(() => (query.error.value instanceof ApiError ? query.error.value.problem : null));
+const stepMinutes = computed(() => report.value.windows.step_seconds / SECONDS_PER_MINUTE);
 
 async function onTabKey(event: KeyboardEvent, index: number) {
-  const n = tabs.value.length;
-  const next =
-    event.key === "ArrowRight" ? (index + 1) % n
-    : event.key === "ArrowLeft" ? (index - 1 + n) % n
-    : event.key === "Home" ? 0
-    : event.key === "End" ? n - 1
-    : null;
-  if (next === null) return;
+  const resolveTarget = TAB_KEY_TARGETS[event.key];
+  if (!resolveTarget) return;
   event.preventDefault();
+
+  const next = resolveTarget(index, tabs.value.length);
   const tab = tabs.value[next];
   if (!tab) return;
+
   await router.push(tab.to);
   await nextTick();
   tabRefs.value[next]?.focus();
 }
 
-const error = computed(() => (query.error.value instanceof ApiError ? query.error.value.problem : null));
-
 async function runAgain() {
   const scope = query.data.value?.scope;
   if (!scope) return;
+
   try {
-    const res = await submit.mutateAsync({ project: scope.project, env: scope.env });
-    await router.push(`/analyses/${res.analysis.analysis_id}`);
+    const submitted = await submit.mutateAsync({ project: scope.project, env: scope.env });
+    await router.push(`/analyses/${submitted.analysis.analysis_id}`);
   } catch {
     /* shown from submit.error */
   }
@@ -83,7 +91,7 @@ async function runAgain() {
           <time :datetime="report.windows.latest_day.start" :title="utcTooltip(report.windows.latest_day.start)">{{ formatTime(report.windows.latest_day.start) }}</time>
           –
           <time :datetime="report.windows.latest_day.end" :title="utcTooltip(report.windows.latest_day.end)">{{ formatTime(report.windows.latest_day.end) }}</time>
-          (latest 24 h, {{ report.windows.step_seconds / 60 }}-min steps)
+          (latest 24 h, {{ stepMinutes }}-min steps)
         </span>
       </div>
       <div class="meta row">
@@ -130,12 +138,15 @@ async function runAgain() {
 </template>
 
 <style scoped>
-.frame { border-bottom: 1px solid var(--border); margin-bottom: calc(var(--space) * 2); }
-.scope { display: flex; gap: calc(var(--space) * 2); flex-wrap: wrap; align-items: baseline; }
-.meta { margin: var(--space) 0; font-size: 0.9rem; }
-.tabs { display: flex; gap: var(--space); }
-.tab { padding: var(--space) calc(var(--space) * 1.5); text-decoration: none; color: var(--text); border-bottom: 3px solid transparent; }
-.tab[aria-selected="true"] { border-bottom-color: var(--focus); font-weight: 600; }
-.synthetic { border: 1px solid var(--status-warn); color: var(--status-warn); border-radius: var(--radius); padding: 0 6px; }
+.frame { margin-bottom: calc(var(--space) * 3); padding: calc(var(--space) * 2) calc(var(--space) * 2.5) 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.scope { display: flex; gap: calc(var(--space) * 1.5); flex-wrap: wrap; align-items: baseline; }
+.scope strong { font-family: var(--font-mono); font-size: 1.05rem; }
+.scope span { color: var(--text-muted); font-size: 0.9rem; }
+.meta { margin: var(--space) 0; font-size: 0.85rem; }
+.tabs { display: flex; gap: calc(var(--space) * 3); }
+.tab { padding: 12px 4px; text-decoration: none; color: var(--text-muted); border-bottom: 2px solid transparent; }
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--focus); font-weight: 600; }
+.synthetic { background: var(--sev-medium-bg); color: var(--sev-medium); border-radius: 999px; padding: 0 10px; font-weight: 500; }
 .tz { display: inline-flex; gap: 4px; align-items: center; }
 </style>

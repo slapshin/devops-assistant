@@ -23,6 +23,15 @@ log = logging.getLogger("app.metrics")
 
 MAX_RESPONSE_BYTES = 64 * 1024 * 1024
 CHUNK_SECONDS = 7 * 86400
+RETRY_BACKOFF_SECONDS = 0.5
+MAX_ERROR_MESSAGE_CHARS = 500
+LABEL_CACHE_BUCKET_SECONDS = 300
+"""Discovery calls within the same 5-minute bucket share a cache entry."""
+
+AUTH_FAILURE_STATUSES = (401, 403)
+UNAVAILABLE_STATUSES = (502, 503, 504)
+MIN_SERVER_ERROR_STATUS = 500
+MIN_CLIENT_ERROR_STATUS = 400
 
 
 class SourceErrorKind(StrEnum):
@@ -32,6 +41,9 @@ class SourceErrorKind(StrEnum):
     TOO_LARGE = "too_large"
     SERVER_ERROR = "server_error"
     AUTH = "auth"
+
+
+TRANSIENT_ERROR_KINDS = (SourceErrorKind.UNAVAILABLE, SourceErrorKind.SERVER_ERROR)
 
 
 class SourceError(Exception):
@@ -145,14 +157,34 @@ class PrometheusClient:
                     self.request_count += 1
                     return await self._get_once(url, params)
             except SourceError as exc:
-                transient = exc.kind in (SourceErrorKind.UNAVAILABLE, SourceErrorKind.SERVER_ERROR)
-                if not transient or attempt > self.limits.retries:
+                if exc.kind not in TRANSIENT_ERROR_KINDS or attempt > self.limits.retries:
                     raise
                 log.warning("retrying %s after %s: %s", path, exc.kind, exc.message)
-                await asyncio.sleep(0.5 * attempt)
+                await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
 
     async def _get_once(self, url: str, params: Sequence[tuple[str, str]]) -> Any:
         started = time.monotonic()
+        status, body = await self._read_bounded(url, params)
+        log.debug("GET %s %s %.2fs %dB", url, status, time.monotonic() - started, len(body))
+
+        if status in AUTH_FAILURE_STATUSES:
+            raise SourceError(SourceErrorKind.AUTH, f"source rejected credentials (HTTP {status})")
+
+        payload: Any
+        try:
+            payload = httpx.Response(status, content=body).json()
+        except ValueError:
+            payload = None
+        is_success = isinstance(payload, dict) and payload.get("status") == "success"
+        if is_success and status < MIN_CLIENT_ERROR_STATUS:
+            return payload["data"]
+
+        error = payload.get("error") if isinstance(payload, dict) else None
+        message = str(error or f"HTTP {status}")[:MAX_ERROR_MESSAGE_CHARS]
+        raise SourceError(_error_kind(status, message), message)
+
+    async def _read_bounded(self, url: str, params: Sequence[tuple[str, str]]) -> tuple[int, bytes]:
+        """Stream the body, aborting as soon as it exceeds the response-size cap."""
         try:
             async with self._http.stream("GET", url, params=list(params)) as res:
                 chunks: list[bytes] = []
@@ -165,34 +197,13 @@ class PrometheusClient:
                             f"response exceeded {self.limits.max_response_bytes} bytes",
                         )
                     chunks.append(chunk)
-                body = b"".join(chunks)
-                status = res.status_code
+                return res.status_code, b"".join(chunks)
         except httpx.TimeoutException:
             raise SourceError(
                 SourceErrorKind.TIMEOUT, f"no response within {self.limits.timeout_seconds:.0f} s"
             ) from None
         except httpx.TransportError as exc:
             raise SourceError(SourceErrorKind.UNAVAILABLE, f"cannot reach source: {exc}") from None
-        log.debug("GET %s %s %.2fs %dB", url, status, time.monotonic() - started, len(body))
-        if status in (401, 403):
-            raise SourceError(SourceErrorKind.AUTH, f"source rejected credentials (HTTP {status})")
-        payload: Any
-        try:
-            payload = httpx.Response(status, content=body).json()
-        except ValueError:
-            payload = None
-        if isinstance(payload, dict) and payload.get("status") == "success" and status < 400:
-            return payload["data"]
-        error = payload.get("error") if isinstance(payload, dict) else None
-        message = str(error or f"HTTP {status}")[:500]
-        lowered = message.lower()
-        if "timeout" in lowered or "deadline" in lowered:
-            raise SourceError(SourceErrorKind.TIMEOUT, message)
-        if status in (502, 503, 504):
-            raise SourceError(SourceErrorKind.UNAVAILABLE, message)
-        if status >= 500:
-            raise SourceError(SourceErrorKind.SERVER_ERROR, message)
-        raise SourceError(SourceErrorKind.BAD_QUERY, message)
 
     async def buildinfo(self) -> dict[str, Any]:
         data = await self._get("/api/v1/status/buildinfo", [])
@@ -203,7 +214,8 @@ class PrometheusClient:
     ) -> list[str]:
         params = [("start", str(start)), ("end", str(end)), ("limit", str(limit))]
         params += [("match[]", m) for m in match]
-        key = ("labels", self.base_url, label, tuple(match), start // 300, end // 300, limit)
+        bucket = LABEL_CACHE_BUCKET_SECONDS
+        key = ("labels", self.base_url, label, tuple(match), start // bucket, end // bucket, limit)
         if (hit := self._cache.get(key)) is not None:
             return list(hit)
         data = await self._get(f"/api/v1/label/{label}/values", params)
@@ -218,7 +230,8 @@ class PrometheusClient:
         data = await self._get("/api/v1/query", [("query", query), ("time", str(at))])
         if data.get("resultType") not in ("vector", "scalar", None):
             raise SourceError(
-                SourceErrorKind.BAD_QUERY, f"unexpected result type {data.get('resultType')}"
+                SourceErrorKind.BAD_QUERY,
+                f"unexpected result type {data.get('resultType')} for query {query}",
             )
         if data.get("resultType") == "scalar":
             ts, raw = data["result"]
@@ -255,9 +268,9 @@ class PrometheusClient:
             )
             for r in data.get("result", []):
                 labels = {k: str(v) for k, v in r.get("metric", {}).items()}
-                lkey = tuple(sorted(labels.items()))
-                labels_by_key[lkey] = labels
-                points = merged.setdefault(lkey, {})
+                label_key = tuple(sorted(labels.items()))
+                labels_by_key[label_key] = labels
+                points = merged.setdefault(label_key, {})
                 for ts, raw in r.get("values", []):
                     points[int(float(ts))] = _value(raw)
             cursor = chunk_end + step
@@ -267,3 +280,14 @@ class PrometheusClient:
         ]
         self._cache.put(key, results)
         return results
+
+
+def _error_kind(status: int, message: str) -> SourceErrorKind:
+    lowered = message.lower()
+    if "timeout" in lowered or "deadline" in lowered:
+        return SourceErrorKind.TIMEOUT
+    if status in UNAVAILABLE_STATUSES:
+        return SourceErrorKind.UNAVAILABLE
+    if status >= MIN_SERVER_ERROR_STATUS:
+        return SourceErrorKind.SERVER_ERROR
+    return SourceErrorKind.BAD_QUERY

@@ -227,6 +227,31 @@ describe("report", () => {
     routes["GET /api/analyses/old/report"] = () => problem(404, "schema_unsupported", "Unsupported", "Saved with schema 2.0.");
   });
 
+  it("overview leads with the worst finding, blind spots and a timeline", async () => {
+    await renderAt(report(anomalies));
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("CPU on node · paas-production peaked at 96.3 % over 3 h");
+    expect(screen.getByText(/4\.4× the usual 22\.0 %/)).toBeInTheDocument();
+    expect(screen.getByText("Blind spots").parentElement).toHaveTextContent("Containers (no metrics found) is not evaluated");
+    const timeline = screen.getByRole("region", { name: "When it happened" });
+    expect(within(timeline).getAllByRole("link")).toHaveLength(anomalies.findings.length);
+  });
+
+  it("findings filter by recurrence through the URL", async () => {
+    const router = await renderAt(`${report(anomalies)}/findings`);
+    const group = await screen.findByRole("group", { name: "Recurrence" });
+    await fireEvent.click(within(group).getByRole("button", { name: /New today/ }));
+    await waitFor(() => expect(router.currentRoute.value.query.recurrence).toBe("new"));
+    expect(screen.queryByRole("link", { name: /404 increase/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /CPU utilisation/ })).toBeInTheDocument();
+  });
+
+  it("trends state the direction and the week-over-week numbers", async () => {
+    await renderAt(`${report(anomalies)}/trends`);
+    expect(await screen.findByRole("heading", { name: "Getting worse: more anomalies in the last 7 days" })).toBeInTheDocument();
+    expect(screen.getByText("1.79 %")).toBeInTheDocument();
+    expect(screen.getByText("The latest day is the worst of the 14.")).toBeInTheDocument();
+  });
+
   it("tabs follow the arrow-key pattern", async () => {
     const router = await renderAt(report(anomalies));
     const overview = await screen.findByRole("tab", { name: "Overview" });
@@ -234,5 +259,19 @@ describe("report", () => {
     await fireEvent.keyDown(overview, { key: "ArrowRight" });
     await waitFor(() => expect(router.currentRoute.value.name).toBe("findings"));
     await waitFor(() => expect(screen.getByRole("tab", { name: /Findings/ })).toHaveFocus());
+  });
+});
+
+describe("theme", () => {
+  it("switches between auto, light and dark and remembers the choice", async () => {
+    await renderAt("/");
+    const group = await screen.findByRole("group", { name: "Theme" });
+    expect(within(group).getByRole("button", { name: "Auto" })).toHaveAttribute("aria-pressed", "true");
+    await fireEvent.click(within(group).getByRole("button", { name: "Dark" }));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+    expect(localStorage.getItem("assistant.theme")).toBe("dark");
+    await fireEvent.click(within(group).getByRole("button", { name: "Auto" }));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBeUndefined());
+    expect(localStorage.getItem("assistant.theme")).toBeNull();
   });
 });

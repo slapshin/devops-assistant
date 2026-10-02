@@ -11,6 +11,7 @@ from pydantic import Field
 from app.domain.common import STEP_SECONDS, Contract
 
 DETECTOR_VERSION = "detectors-2026.09.1"
+CONFIG_HASH_HEX_CHARS = 12
 
 
 class SignalThresholds(Contract):
@@ -92,4 +93,4 @@ class DetectorConfig(Contract):
     @property
     def config_hash(self) -> str:
         payload = json.dumps(self.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-        return hashlib.sha256(payload.encode()).hexdigest()[:12]
+        return hashlib.sha256(payload.encode()).hexdigest()[:CONFIG_HASH_HEX_CHARS]

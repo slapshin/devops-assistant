@@ -7,12 +7,12 @@ export interface ReportContext {
   evidenceById: ComputedRef<Map<string, Evidence>>;
 }
 
-const KEY: InjectionKey<ReportContext> = Symbol("report");
+const REPORT_CONTEXT_KEY: InjectionKey<ReportContext> = Symbol("report");
 
-export const provideReport = (ctx: ReportContext) => provide(KEY, ctx);
+export const provideReport = (context: ReportContext) => provide(REPORT_CONTEXT_KEY, context);
 
 export function useReportContext(): ReportContext {
-  const ctx = inject(KEY);
-  if (!ctx) throw new Error("report context missing");
-  return ctx;
+  const context = inject(REPORT_CONTEXT_KEY);
+  if (!context) throw new Error("report context missing: useReportContext() must run inside ReportLayout");
+  return context;
 }

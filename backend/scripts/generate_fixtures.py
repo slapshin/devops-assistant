@@ -28,6 +28,7 @@ from app.domain.common import (
     SignalFamily,
     TimeRange,
     Unit,
+    format_utc,
 )
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import (
@@ -125,10 +126,6 @@ ALL_FAMILIES = list(SignalFamily)
 
 def analysis_key(analysis_id: str) -> str:
     return f"{analysis_id}|{SCOPE.project}|{SCOPE.env}|{T.isoformat()}|{CONFIG.config_hash}"
-
-
-def iso(dt: datetime) -> str:
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # --- capabilities -----------------------------------------------------------------------------
@@ -490,7 +487,7 @@ def cpu_finding(
     related: list[str],
 ) -> tuple[Finding, Evidence]:
     start, end = T - timedelta(hours=5), T - timedelta(hours=2)
-    fid = finding_id(analysis_key(aid), NODE.key, "cpu_utilization", iso(start))
+    fid = finding_id(analysis_key(aid), NODE.key, "cpu_utilization", format_utc(start))
     ev_start = start - timedelta(hours=6)
     n = int((min(end + timedelta(hours=6), T) - ev_start) / STEP)
     values: list[float | None] = []
@@ -550,7 +547,7 @@ def cpu_finding(
 
 def not_found_finding(aid: str) -> tuple[Finding, Evidence]:
     start, end = T - timedelta(hours=9), T - timedelta(hours=7, minutes=30)
-    fid = finding_id(analysis_key(aid), ROUTE.key, "client_error_rate", iso(start))
+    fid = finding_id(analysis_key(aid), ROUTE.key, "client_error_rate", format_utc(start))
     ev_start = start - timedelta(hours=6)
     n = int((end + timedelta(hours=6) - ev_start) / STEP)
     values: list[float | None] = []
@@ -628,7 +625,7 @@ def trends(
     for i in range(TREND_DAYS):
         end = T - timedelta(days=i)
         start = end - timedelta(days=1)
-        preceding = max(0, min(14, history_days - (i + 1)))
+        preceding = max(0, min(CONFIG.baseline_max_days, history_days - (i + 1)))
         observed_days = history_days > i
         episodes: list[EpisodeSummary] = []
         if i == 0:
@@ -636,7 +633,7 @@ def trends(
                 episodes.append(
                     EpisodeSummary(
                         episode_id=episode_id(
-                            analysis_key(aid), f.entity.key, f.signal, iso(f.start)
+                            analysis_key(aid), f.entity.key, f.signal, format_utc(f.start)
                         ),
                         finding_id=f.finding_id,
                         entity=f.entity,
@@ -655,7 +652,7 @@ def trends(
             episodes.append(
                 EpisodeSummary(
                     episode_id=episode_id(
-                        analysis_key(aid), ROUTE.key, "client_error_rate", iso(s)
+                        analysis_key(aid), ROUTE.key, "client_error_rate", format_utc(s)
                     ),
                     finding_id=None,
                     entity=ROUTE,
@@ -801,7 +798,8 @@ def report(
     source_error: SignalFamily | None = None,
     recurring: tuple[int, ...] = (),
 ) -> AnalysisReport:
-    baseline_days = min(14, history_days - 1)
+    baseline_days = min(CONFIG.baseline_max_days, history_days - 1)
+    daily = trends(aid, history_days=history_days, findings=findings, recurring_404_days=recurring)
     return AnalysisReport(
         analysis_id=aid,
         scope=SCOPE,
@@ -814,12 +812,8 @@ def report(
         capabilities=capabilities(float(history_days), histogram, containers=False),
         coverage=coverage(findings, baseline_days, histogram, source_error),
         findings=findings,
-        trend_summary=trend_summary(
-            trends(aid, history_days=history_days, findings=findings, recurring_404_days=recurring)
-        ),
-        trends=trends(
-            aid, history_days=history_days, findings=findings, recurring_404_days=recurring
-        ),
+        trend_summary=trend_summary(daily),
+        trends=daily,
         evidence=evidence,
         exclusions=exclusions or [],
         explanation=explanation,
@@ -1086,6 +1080,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true", help="fail if fixtures are stale")
     args = parser.parse_args()
+
     stale = []
     for rel, model in build().items():
         path = ROOT / rel
@@ -1096,6 +1091,7 @@ def main() -> int:
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
+
     if stale:
         print(
             "Stale fixtures (run: uv run python -m scripts.generate_fixtures):",

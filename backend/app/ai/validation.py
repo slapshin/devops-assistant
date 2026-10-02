@@ -12,6 +12,7 @@ MAX_SUMMARY = 2000
 def validate(explanation: Explanation, known_ids: Iterable[str]) -> ExplanationResult:
     known = set(known_ids)
     notes: list[str] = []
+
     hypotheses = []
     for h in explanation.hypotheses:
         unknown = sorted(set(h.finding_ids) - known)
@@ -19,6 +20,7 @@ def validate(explanation: Explanation, known_ids: Iterable[str]) -> ExplanationR
             notes.append(f"Dropped a hypothesis citing unknown finding IDs {unknown}.")
             continue
         hypotheses.append(h.model_copy(update={"text": clean(h.text, MAX_TEXT)}))
+
     steps = []
     for s in explanation.investigation_steps:
         unknown = sorted(set(s.finding_ids) - known)
@@ -26,8 +28,10 @@ def validate(explanation: Explanation, known_ids: Iterable[str]) -> ExplanationR
             notes.append(f"Dropped an investigation step citing unknown finding IDs {unknown}.")
             continue
         steps.append(s.model_copy(update={"text": clean(s.text, MAX_TEXT)}))
+
     summary = clean(explanation.summary, MAX_SUMMARY).strip()
     offered = len(explanation.hypotheses) + len(explanation.investigation_steps)
+    # An answer whose every citation was invalid is not an explanation of this report.
     if not summary or (offered and not hypotheses and not steps):
         return ExplanationResult(
             status=ExplanationStatus.FAILED,

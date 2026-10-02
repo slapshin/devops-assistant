@@ -7,9 +7,13 @@ from the frozen job inputs, so re-running identical inputs yields identical IDs.
 import hashlib
 import uuid
 
+DIGEST_HEX_CHARS = 16
+# ASCII unit separator, absent from real label values, keeps ("a", "bc") and ("ab", "c") apart.
+_PART_SEPARATOR = "\x1f"
+
 
 def _digest(*parts: str) -> str:
-    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()[:16]
+    return hashlib.sha256(_PART_SEPARATOR.join(parts).encode()).hexdigest()[:DIGEST_HEX_CHARS]
 
 
 def new_analysis_id() -> str:

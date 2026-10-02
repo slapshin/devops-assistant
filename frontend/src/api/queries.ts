@@ -13,8 +13,14 @@ import {
   type RuntimeConfig,
 } from "./client";
 
-const ACTIVE = new Set(["queued", "running"]);
-export const POLL_MS = 2000;
+const ACTIVE_JOB_STATES = new Set(["queued", "running"]);
+const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_FETCH_RETRY_COUNT = 3;
+const RETRY_BASE_DELAY_MS = 1000;
+const RETRY_MAX_DELAY_MS = 8000;
+const RECENT_ANALYSES_LIMIT = 20;
+
+export const isActive = (state: string) => ACTIVE_JOB_STATES.has(state);
 
 export function useConfig() {
   return useQuery({ queryKey: ["config"], queryFn: () => apiGet<RuntimeConfig>("/api/config") });
@@ -37,8 +43,12 @@ export function useAnalyses(project: MaybeRefOrGetter<string | null>, env: Maybe
   return useQuery({
     queryKey: computed(() => ["analyses", toValue(project), toValue(env)]),
     queryFn: () => {
-      const p = new URLSearchParams({ project: toValue(project) ?? "", env: toValue(env) ?? "", limit: "20" });
-      return apiGet<AnalysisList>(`/api/analyses?${p}`);
+      const params = new URLSearchParams({
+        project: toValue(project) ?? "",
+        env: toValue(env) ?? "",
+        limit: String(RECENT_ANALYSES_LIMIT),
+      });
+      return apiGet<AnalysisList>(`/api/analyses?${params}`);
     },
     enabled: computed(() => !!toValue(project) && !!toValue(env)),
   });
@@ -48,10 +58,10 @@ export function useAnalysis(id: MaybeRefOrGetter<string>) {
   return useQuery({
     queryKey: computed(() => ["analysis", toValue(id)]),
     queryFn: () => apiGet<AnalysisJob>(`/api/analyses/${encodeURIComponent(toValue(id))}`),
-    refetchInterval: (query) => (query.state.data && !ACTIVE.has(query.state.data.state) ? false : POLL_MS),
+    refetchInterval: (query) => (query.state.data && !isActive(query.state.data.state) ? false : JOB_POLL_INTERVAL_MS),
     refetchIntervalInBackground: true, // progress must not freeze in an unfocused tab
-    retry: 3,
-    retryDelay: (attempt) => Math.min(8000, 1000 * 2 ** attempt),
+    retry: JOB_FETCH_RETRY_COUNT,
+    retryDelay: (attempt) => Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** attempt),
   });
 }
 
@@ -83,5 +93,3 @@ export function useCancel() {
     onSuccess: (job) => client.setQueryData(["analysis", job.analysis_id], job),
   });
 }
-
-export const isActive = (state: string) => ACTIVE.has(state);

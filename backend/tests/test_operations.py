@@ -30,7 +30,7 @@ def test_ui_is_served_with_spa_fallback_and_api_untouched(tmp_path: Path) -> Non
     (ui / "index.html").write_text("<!doctype html><div id=root></div>")
     (ui / "assets" / "app.js").write_text("console.log(1)")
     (tmp_path / "secret.txt").write_text("nope")
-    with TestClient(create_app(settings(tmp_path, static_dir=ui))) as client:
+    with TestClient(create_app(settings(tmp_path, ui_static_dir=ui))) as client:
         assert "id=root" in client.get("/").text
         assert "id=root" in client.get("/reports/abc/findings").text  # deep link
         assert client.get("/assets/app.js").text == "console.log(1)"
@@ -55,15 +55,15 @@ def test_detector_config_override_changes_hash(tmp_path: Path) -> None:
             }
         )
     )
-    config = load_detector_config(settings(tmp_path, detector_config=override))
+    config = load_detector_config(settings(tmp_path, detector_config_file=override))
     default = load_detector_config(settings(tmp_path))
     assert config.z_threshold == 5.0 and config.signals["cpu_utilization"].absolute_high == 0.95
     assert "memory_utilization" in config.signals
     assert config.config_hash != default.config_hash
     bad = tmp_path / "bad.json"
     bad.write_text('{"z_threshold": "high"}')
-    with pytest.raises(ConfigError, match="DETECTOR_CONFIG"):
-        load_detector_config(settings(tmp_path, detector_config=bad))
+    with pytest.raises(ConfigError, match="DETECTOR_CONFIG_FILE"):
+        load_detector_config(settings(tmp_path, detector_config_file=bad))
 
 
 def test_backup_and_prune_are_explicit(
