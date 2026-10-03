@@ -72,7 +72,8 @@ All settings come from environment (optionally the repository-root `config.env`,
 | `OPENAI_API_KEY` | unset | If `AI_PROVIDER=openai` and the key is missing, the app starts and reports explanation status `not_configured` (numerical analysis must still work). |
 | `OPENAI_MODEL` | unset | Required for explanations; no model name is hard-coded in code. It must support Structured Outputs on the Responses API. No key was available during T006, so choose the model per account and check it with `uv run python -m scripts.check_openai [--structured]`. |
 | `OPENAI_BASE_URL` | unset | Optional, for compatible gateways. |
-| `DATA_DIR` | `./data` | SQLite and nothing else. |
+| `DATA_DIR` | `./data` | SQLite database and the generated `secret.key`. |
+| `SECRET_KEY` | unset | Fernet key (32 url-safe base64 bytes) encrypting stored project secrets. Unset: generated once into `DATA_DIR/secret.key` (mode 0600). A lost or changed key makes stored secrets unreadable (projects report `credentials_readable: false`) but never stops startup (T011). |
 | `APP_HOST` / `APP_PORT` | `127.0.0.1` / `8000` | Local-only binding by default (no auth in this release). |
 | `DETECTOR_CONFIG_FILE` | unset | Optional path to a **JSON** override of §5 defaults (T009: JSON only, to avoid a YAML dependency). A changed config yields a new `config_hash` in reports. |
 | `UI_STATIC_DIR` | `../frontend/dist` if built | Built UI served at `/` with an SPA fallback (T009). |
@@ -87,15 +88,20 @@ All settings come from environment (optionally the repository-root `config.env`,
 | --- | --- |
 | `GET /api/health` | `{status, version, database, metrics_source: {reachable, checked_at}}`; never fails because the metrics source is down. |
 | `GET /api/config` | Public runtime facts only: AI provider/status, model name, detector version, config hash, limits. No secrets. |
-| `GET /api/projects` | `{items: [{project}], source_status}` — discovered from label values over the last 28 days. |
-| `GET /api/projects/{project}/envs` | `{project, items: [{env}]}`; 404 `project_not_found` if not discovered. |
+| `GET /api/discovery/projects` | Legacy (removed by T012): `{items: [{project}], source_status}` discovered from label values over the last 28 days. |
+| `GET /api/discovery/projects/{project}/envs` | Legacy (removed by T012): `{project, items: [{env}]}`; 404 `project_not_found` if not discovered. |
+| `GET /api/projects` | `{items: [Project]}` sorted by name. Secrets are never returned: auth shows only `token_set` / `password_set`. |
+| `POST /api/projects` | Body `ProjectInput {name, description?, matchers: [{name, value}] (1–10, equality only), sources: [{kind: "prometheus", url, tls_verify, auth}]}` → `201 Project`. Name is unique case-insensitively → `409 project_name_taken`. |
+| `GET / PUT / DELETE /api/projects/{id}` | Read, full replace, hard delete (`204`). On PUT an omitted secret keeps the stored one when the auth type is unchanged; otherwise `422` names the missing field. |
+| `POST /api/projects/test-connection` | Body `{project_id?, matchers, source}` → `ConnectionTest {reachable, auth_ok, matched_series, history_days, families, message, checked_at}`. Bounded (20 s), read-only; `project_id` fills omitted secrets from the stored project. |
+| `GET /api/projects/{id}/health` | Cached (60 s, reset on update) connection test of the stored project; `null` without a metrics source. |
 | `POST /api/analyses` | Body `{project, env, end_time?}` → `202 {analysis}`; duplicate active job → `200 {analysis, duplicate_of_active: true}`. |
 | `GET /api/analyses?project=&env=&limit=&cursor=` | Saved/recent analyses, newest first (reopening reports). Default limit 20, max 100. |
 | `GET /api/analyses/{id}` | Job status and progress (polled by the UI every 2 s while active). |
 | `GET /api/analyses/{id}/report` | Report snapshot; `409 report_not_ready` while active; `404 report_unavailable` for failed/cancelled jobs without a report. |
 | `DELETE /api/analyses/{id}` | Cancels an active job → `202`; terminal job → `409 analysis_not_active`. Does not delete saved reports (deletion is out of scope; see §6 retention). |
 
-Error codes: `validation_error` (422), `project_not_found` / `env_not_found` (404; pair must be discovered), `analysis_not_found` (404), `report_not_ready` (409), `report_unavailable` (404), `analysis_not_active` (409), `queue_full` (429, `Retry-After`), `metrics_source_unavailable` (503, discovery only), `end_time_invalid` (422: future, older than 90 days, or not aligned — it is floored to the step), `internal_error` (500, with log correlation ID).
+Error codes: `validation_error` (422), `project_not_found` / `env_not_found` (404), `project_name_taken` (409), `credentials_unreadable` (409: stored secrets cannot be decrypted; re-enter them), `analysis_not_found` (404), `report_not_ready` (409), `report_unavailable` (404), `analysis_not_active` (409), `queue_full` (429, `Retry-After`), `metrics_source_unavailable` (503, discovery only), `end_time_invalid` (422: future, older than 90 days, or not aligned — it is floored to the step), `internal_error` (500, with log correlation ID).
 
 ## 4. Jobs, persistence, and lifecycle
 

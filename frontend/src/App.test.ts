@@ -30,9 +30,9 @@ beforeEach(() => {
   calls = [];
   routes = {
     "GET /api/config": () => json(config),
-    "GET /api/projects": () => json({ items: [{ project: "paas" }, { project: "pw" }], source_status: { reachable: true } }),
-    "GET /api/projects/paas/envs": () => json({ project: "paas", items: [{ env: "production" }] }),
-    "GET /api/projects/pw/envs": () => json({ project: "pw", items: [{ env: "development" }, { env: "production" }] }),
+    "GET /api/discovery/projects": () => json({ items: [{ project: "paas" }, { project: "pw" }], source_status: { reachable: true } }),
+    "GET /api/discovery/projects/paas/envs": () => json({ project: "paas", items: [{ env: "production" }] }),
+    "GET /api/discovery/projects/pw/envs": () => json({ project: "pw", items: [{ env: "development" }, { env: "production" }] }),
   };
   localStorage.clear();
   vi.stubGlobal(
@@ -71,7 +71,7 @@ function report(fixture: { analysis_id: string }) {
 describe("start", () => {
   it("resets env when the project changes and ignores stale env responses", async () => {
     let releasePw: (r: Response) => void = () => {};
-    routes["GET /api/projects/pw/envs"] = () => new Promise<Response>((resolve) => (releasePw = resolve));
+    routes["GET /api/discovery/projects/pw/envs"] = () => new Promise<Response>((resolve) => (releasePw = resolve));
     await renderAt("/");
     const project = await screen.findByLabelText("Project");
     await fireEvent.update(project, "pw");
@@ -102,7 +102,7 @@ describe("start", () => {
   });
 
   it("reports an unreachable source", async () => {
-    routes["GET /api/projects"] = () => problem(503, "metrics_source_unavailable", "Metrics source unavailable", "cannot reach source");
+    routes["GET /api/discovery/projects"] = () => problem(503, "metrics_source_unavailable", "Metrics source unavailable", "cannot reach source");
     await renderAt("/");
     expect(await screen.findByRole("alert")).toHaveTextContent("Metrics source unreachable");
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();

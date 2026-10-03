@@ -32,7 +32,7 @@ def test_credentials_in_url_are_rejected_with_actionable_message() -> None:
     with pytest.raises(ConfigError) as exc:
         settings(metrics_url="http://user:pw@localhost:8428")
     assert "METRICS_URL" in str(exc.value)
-    assert "METRICS_BEARER_TOKEN" in str(exc.value)
+    assert "must not contain credentials" in str(exc.value)
 
 
 def test_invalid_url_names_variable_and_expected_form() -> None:

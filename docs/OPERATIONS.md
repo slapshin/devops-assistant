@@ -47,7 +47,8 @@ All settings are environment variables, optionally read from `config.env` in the
 | `METRICS_TLS_VERIFY` | `true` | TLS verification for https sources. |
 | `AI_PROVIDER` | `openai` | `openai`, `none`, or `fake` (deterministic template, no network). |
 | `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | unset | The model must support Structured Outputs on the Responses API. Check it with `cd backend && uv run python -m scripts.check_openai [--structured]` (`--structured` makes one small paid call). |
-| `DATA_DIR` | `./data` (native), `/data` (image) | SQLite database `assistant.sqlite3`. |
+| `DATA_DIR` | `./data` (native), `/data` (image) | SQLite database `assistant.sqlite3` and `secret.key`. |
+| `SECRET_KEY` | unset | Encrypts project credentials stored in the database. When unset, a key is generated once into `DATA_DIR/secret.key` (mode 0600). Generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
 | `APP_HOST` / `APP_PORT` | `127.0.0.1` / `8000` (image: `0.0.0.0` inside the container, published on 127.0.0.1) | Listen address. |
 | `UI_STATIC_DIR` | `../frontend/dist` if built (image: `/app/static`) | Built UI served at `/`. |
 | `DETECTOR_CONFIG_FILE` | unset | JSON file overriding detector defaults (see below). |
@@ -121,7 +122,7 @@ docker compose -f tools/compose/compose.yml exec assistant /app/backend/.venv/bi
 docker compose -f tools/compose/compose.yml cp assistant:/data/backup.sqlite3 ./backup.sqlite3
 ```
 
-`backup` uses SQLite's online backup, which is safe while the app runs, and refuses to overwrite an existing file. `prune` never touches queued or running jobs, and deletes only when `--yes` is given.
+`backup` uses SQLite's online backup, which is safe while the app runs, and refuses to overwrite an existing file. It does **not** include `DATA_DIR/secret.key`: back that file up separately (or set `SECRET_KEY`), because project credentials in the database cannot be decrypted without it. With a lost key the app still starts; affected projects show unreadable credentials until they are re-entered. `prune` never touches queued or running jobs, and deletes only when `--yes` is given.
 
 ## Troubleshooting
 

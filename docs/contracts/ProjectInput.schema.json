@@ -1,11 +1,22 @@
 {
   "$defs": {
-    "BasicAuth": {
+    "BasicAuthInput": {
       "additionalProperties": false,
       "properties": {
-        "password_set": {
-          "title": "Password Set",
-          "type": "boolean"
+        "password": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Omit to keep the stored password (update only).",
+          "title": "Password"
         },
         "type": {
           "const": "basic",
@@ -14,23 +25,35 @@
           "type": "string"
         },
         "username": {
+          "maxLength": 256,
+          "minLength": 1,
           "title": "Username",
           "type": "string"
         }
       },
       "required": [
-        "username",
-        "password_set"
+        "username"
       ],
-      "title": "BasicAuth",
+      "title": "BasicAuthInput",
       "type": "object"
     },
-    "BearerAuth": {
+    "BearerAuthInput": {
       "additionalProperties": false,
       "properties": {
-        "token_set": {
-          "title": "Token Set",
-          "type": "boolean"
+        "token": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Omit to keep the stored token (update only).",
+          "title": "Token"
         },
         "type": {
           "const": "bearer",
@@ -39,10 +62,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "token_set"
-      ],
-      "title": "BearerAuth",
+      "title": "BearerAuthInput",
       "type": "object"
     },
     "LabelMatcher": {
@@ -82,77 +102,14 @@
       "title": "NoAuth",
       "type": "object"
     },
-    "Project": {
-      "additionalProperties": false,
-      "properties": {
-        "created_at": {
-          "title": "Created At",
-          "type": "string"
-        },
-        "credentials_readable": {
-          "default": true,
-          "description": "False when stored secrets cannot be decrypted (lost or changed key).",
-          "title": "Credentials Readable",
-          "type": "boolean"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "matchers": {
-          "items": {
-            "$ref": "#/$defs/LabelMatcher"
-          },
-          "title": "Matchers",
-          "type": "array"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "project_id": {
-          "title": "Project Id",
-          "type": "string"
-        },
-        "sources": {
-          "items": {
-            "$ref": "#/$defs/PrometheusSource"
-          },
-          "title": "Sources",
-          "type": "array"
-        },
-        "updated_at": {
-          "title": "Updated At",
-          "type": "string"
-        }
-      },
-      "required": [
-        "project_id",
-        "name",
-        "matchers",
-        "sources",
-        "created_at",
-        "updated_at"
-      ],
-      "title": "Project",
-      "type": "object"
-    },
-    "PrometheusSource": {
+    "PrometheusSourceInput": {
       "additionalProperties": false,
       "properties": {
         "auth": {
           "discriminator": {
             "mapping": {
-              "basic": "#/$defs/BasicAuth",
-              "bearer": "#/$defs/BearerAuth",
+              "basic": "#/$defs/BasicAuthInput",
+              "bearer": "#/$defs/BearerAuthInput",
               "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
@@ -162,10 +119,10 @@
               "$ref": "#/$defs/NoAuth"
             },
             {
-              "$ref": "#/$defs/BearerAuth"
+              "$ref": "#/$defs/BearerAuthInput"
             },
             {
-              "$ref": "#/$defs/BasicAuth"
+              "$ref": "#/$defs/BasicAuthInput"
             }
           ],
           "title": "Auth"
@@ -177,36 +134,67 @@
           "type": "string"
         },
         "tls_verify": {
+          "default": true,
           "title": "Tls Verify",
           "type": "boolean"
         },
         "url": {
+          "maxLength": 2048,
           "title": "Url",
           "type": "string"
         }
       },
       "required": [
-        "url",
-        "tls_verify",
-        "auth"
+        "url"
       ],
-      "title": "PrometheusSource",
+      "title": "PrometheusSourceInput",
       "type": "object"
     }
   },
   "additionalProperties": false,
+  "description": "Body of POST /api/projects and PUT /api/projects/{project_id}.",
   "properties": {
-    "items": {
+    "description": {
+      "anyOf": [
+        {
+          "maxLength": 1000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "matchers": {
       "items": {
-        "$ref": "#/$defs/Project"
+        "$ref": "#/$defs/LabelMatcher"
       },
-      "title": "Items",
+      "maxItems": 10,
+      "minItems": 1,
+      "title": "Matchers",
+      "type": "array"
+    },
+    "name": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/PrometheusSourceInput"
+      },
+      "maxItems": 1,
+      "title": "Sources",
       "type": "array"
     }
   },
   "required": [
-    "items"
+    "name",
+    "matchers"
   ],
-  "title": "ProjectList",
+  "title": "ProjectInput",
   "type": "object"
 }

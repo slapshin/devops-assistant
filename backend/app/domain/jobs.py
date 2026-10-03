@@ -51,6 +51,8 @@ class StageProgress(Contract):
 class ErrorCode(StrEnum):
     VALIDATION_ERROR = "validation_error"
     PROJECT_NOT_FOUND = "project_not_found"
+    PROJECT_NAME_TAKEN = "project_name_taken"
+    CREDENTIALS_UNREADABLE = "credentials_unreadable"
     ENV_NOT_FOUND = "env_not_found"
     ANALYSIS_NOT_FOUND = "analysis_not_found"
     REPORT_NOT_READY = "report_not_ready"
@@ -119,7 +121,9 @@ class ProjectItem(Contract):
     project: str
 
 
-class ProjectList(Contract):
+class DiscoveredProjectList(Contract):
+    """``project`` label values found in the global metrics source (legacy, until T012)."""
+
     items: list[ProjectItem]
     source_status: SourceStatus
     truncated: bool = False

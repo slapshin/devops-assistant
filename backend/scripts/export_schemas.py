@@ -15,12 +15,13 @@ from app.domain.jobs import (
     AnalysisJob,
     AnalysisSubmission,
     AnalysisSubmitted,
+    DiscoveredProjectList,
     EnvList,
     Problem,
-    ProjectList,
     RuntimeConfig,
 )
 from app.domain.metrics import MetricCapability, MetricSeries
+from app.domain.projects import ConnectionTest, ConnectionTestRequest, ProjectInput, ProjectList
 from app.domain.report import AnalysisReport, AnalysisRequest
 from app.main import create_app
 from app.settings import load_settings
@@ -37,7 +38,11 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "MetricCapability": MetricCapability,
     "ExplanationInput": ExplanationInput,
     "Problem": Problem,
+    "DiscoveredProjectList": DiscoveredProjectList,
     "ProjectList": ProjectList,
+    "ProjectInput": ProjectInput,
+    "ConnectionTestRequest": ConnectionTestRequest,
+    "ConnectionTest": ConnectionTest,
     "EnvList": EnvList,
     "RuntimeConfig": RuntimeConfig,
 }

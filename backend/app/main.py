@@ -12,6 +12,7 @@ from app import __version__
 from app.ai.providers import provider_from_settings
 from app.analysis.engine import RobustDetector
 from app.api.problems import install_problem_handlers
+from app.api.projects import router as projects_router
 from app.api.routes import router
 from app.container import Services
 from app.domain.detector_config import DetectorConfig
@@ -23,7 +24,9 @@ from app.metrics.synthetic import SCENARIOS, SyntheticMetricsSource
 from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
 from app.static import mount_ui
+from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository
+from app.storage.secrets import load_secret_box
 
 log = logging.getLogger("app")
 
@@ -82,8 +85,9 @@ def build_services(
 
     pipeline = AnalysisPipeline(source, RobustDetector(), config, provider, unavailable, reason)
     repo = SqliteReportRepository(settings.database_path)
+    projects = SqliteProjectRepository(repo.engine, load_secret_box(settings))
     runner = JobRunner(repo, pipeline, config, settings.explanation_status, limits)
-    return Services(settings, config, source, repo, runner, client)
+    return Services(settings, config, source, repo, runner, client, projects)
 
 
 def create_app(
@@ -139,6 +143,7 @@ def create_app(
 
     install_problem_handlers(app)
     app.include_router(router)
+    app.include_router(projects_router)
     if settings.ui_dir is not None:
         mount_ui(app, settings.ui_dir)
     return app

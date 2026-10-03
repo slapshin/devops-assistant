@@ -18,13 +18,13 @@ from app.domain.jobs import (
     AnalysisList,
     AnalysisSubmission,
     AnalysisSubmitted,
+    DiscoveredProjectList,
     EnvItem,
     EnvList,
     ErrorCode,
     HealthResponse,
     Limits,
     ProjectItem,
-    ProjectList,
     RuntimeConfig,
     SourceStatus,
 )
@@ -142,13 +142,17 @@ async def runtime_config(settings: SettingsDep, services: ServicesDep) -> Runtim
     )
 
 
-@router.get("/projects", response_model=ProjectList, responses=problem_responses(503))
-async def list_projects(services: ServicesDep) -> ProjectList:
+@router.get(
+    "/discovery/projects",
+    response_model=DiscoveredProjectList,
+    responses=problem_responses(503),
+)
+async def discover_projects(services: ServicesDep) -> DiscoveredProjectList:
     try:
         found = await services.source.list_projects()
     except SourceError as exc:
         raise _source_unavailable(exc) from None
-    return ProjectList(
+    return DiscoveredProjectList(
         items=[ProjectItem(project=p) for p in found.values],
         source_status=SourceStatus(
             reachable=True, checked_at=datetime.now(UTC).replace(microsecond=0)
@@ -179,9 +183,11 @@ async def _require_scope(services: Services, project: str, env: str | None) -> N
 
 
 @router.get(
-    "/projects/{project}/envs", response_model=EnvList, responses=problem_responses(404, 503)
+    "/discovery/projects/{project}/envs",
+    response_model=EnvList,
+    responses=problem_responses(404, 503),
 )
-async def list_envs(project: str, services: ServicesDep) -> EnvList:
+async def discover_envs(project: str, services: ServicesDep) -> EnvList:
     await _require_scope(services, project, None)
     try:
         found = await services.source.list_envs(project)

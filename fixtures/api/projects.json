@@ -1,13 +1,33 @@
 {
   "items": [
     {
-      "project": "paas"
+      "project_id": "01999a3c-0000-7000-8000-000000000001",
+      "name": "paas / production",
+      "description": "Synthetic example project.",
+      "matchers": [
+        {
+          "name": "env",
+          "value": "production"
+        },
+        {
+          "name": "project",
+          "value": "paas"
+        }
+      ],
+      "sources": [
+        {
+          "kind": "prometheus",
+          "url": "http://victoriametrics.example:8428",
+          "tls_verify": true,
+          "auth": {
+            "type": "bearer",
+            "token_set": true
+          }
+        }
+      ],
+      "credentials_readable": true,
+      "created_at": "2026-09-30T10:05:00Z",
+      "updated_at": "2026-09-30T10:05:00Z"
     }
-  ],
-  "source_status": {
-    "reachable": true,
-    "checked_at": "2026-09-30T10:05:00Z",
-    "message": null
-  },
-  "truncated": false
+  ]
 }

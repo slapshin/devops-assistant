@@ -116,9 +116,11 @@ def submit(client: TestClient, **body: Any) -> Any:
 
 
 def test_discovery(client: TestClient) -> None:
-    assert client.get("/api/projects").json()["items"] == [{"project": "paas"}]
-    assert client.get("/api/projects/paas/envs").json()["items"] == [{"env": "production"}]
-    res = client.get("/api/projects/other/envs")
+    assert client.get("/api/discovery/projects").json()["items"] == [{"project": "paas"}]
+    assert client.get("/api/discovery/projects/paas/envs").json()["items"] == [
+        {"env": "production"}
+    ]
+    res = client.get("/api/discovery/projects/other/envs")
     assert res.status_code == 404 and res.json()["code"] == "project_not_found"
 
 

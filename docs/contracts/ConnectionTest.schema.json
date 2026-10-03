@@ -1,0 +1,134 @@
+{
+  "$defs": {
+    "CapabilityStatus": {
+      "enum": [
+        "supported",
+        "partial",
+        "unsupported",
+        "unverified"
+      ],
+      "title": "CapabilityStatus",
+      "type": "string"
+    },
+    "FamilyCapability": {
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "$ref": "#/$defs/SignalFamily"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "status": {
+          "$ref": "#/$defs/CapabilityStatus"
+        }
+      },
+      "required": [
+        "family",
+        "status"
+      ],
+      "title": "FamilyCapability",
+      "type": "object"
+    },
+    "SignalFamily": {
+      "enum": [
+        "cpu",
+        "memory",
+        "filesystem",
+        "disk_io",
+        "network",
+        "container",
+        "request_traffic",
+        "request_failures",
+        "client_errors",
+        "latency"
+      ],
+      "title": "SignalFamily",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "auth_ok": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Null when the source could not be reached.",
+      "title": "Auth Ok"
+    },
+    "checked_at": {
+      "title": "Checked At",
+      "type": "string"
+    },
+    "families": {
+      "items": {
+        "$ref": "#/$defs/FamilyCapability"
+      },
+      "title": "Families",
+      "type": "array"
+    },
+    "history_days": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Days of matching history found, up to 30.",
+      "title": "History Days"
+    },
+    "matched_series": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Series currently matching all matchers.",
+      "title": "Matched Series"
+    },
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "reachable": {
+      "title": "Reachable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "reachable",
+    "auth_ok",
+    "checked_at"
+  ],
+  "title": "ConnectionTest",
+  "type": "object"
+}

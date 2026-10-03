@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.domain.common import Scope
+from app.domain.projects import LabelMatcher
 
 
 class ScopeViolation(ValueError):
@@ -23,6 +24,11 @@ class ScopeViolation(ValueError):
 def escape_label_value(value: str) -> str:
     """Escape for a double-quoted PromQL string literal."""
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def render_matchers(matchers: Sequence[LabelMatcher]) -> str:
+    """Exact equality matchers in the given order, e.g. ``project="a", env="b"``."""
+    return ", ".join(f'{m.name}="{escape_label_value(m.value)}"' for m in matchers)
 
 
 def scope_matchers(scope: Scope) -> str:

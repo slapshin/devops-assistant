@@ -57,6 +57,7 @@ from app.domain.ids import episode_id, evidence_id, finding_id, series_id
 from app.domain.jobs import (
     AnalysisJob,
     AnalysisSubmitted,
+    DiscoveredProjectList,
     EnvItem,
     EnvList,
     ErrorCode,
@@ -65,7 +66,6 @@ from app.domain.jobs import (
     Limits,
     Problem,
     ProjectItem,
-    ProjectList,
     RuntimeConfig,
     SourceStatus,
     StageName,
@@ -73,6 +73,14 @@ from app.domain.jobs import (
     StageStatus,
 )
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
+from app.domain.projects import (
+    BearerAuth,
+    ConnectionTest,
+    LabelMatcher,
+    Project,
+    ProjectList,
+    PrometheusSource,
+)
 from app.domain.report import (
     TREND_DAYS,
     AnalysisReport,
@@ -1042,9 +1050,38 @@ def build() -> dict[str, BaseModel]:
                 report_max_bytes=20 * 1024 * 1024,
             ),
         ),
-        "api/projects.json": ProjectList(
+        "api/discovered_projects.json": DiscoveredProjectList(
             items=[ProjectItem(project="paas")],
             source_status=SourceStatus(reachable=True, checked_at=T),
+        ),
+        "api/projects.json": ProjectList(
+            items=[
+                Project(
+                    project_id="01999a3c-0000-7000-8000-000000000001",
+                    name="paas / production",
+                    description="Synthetic example project.",
+                    matchers=[
+                        LabelMatcher(name="env", value="production"),
+                        LabelMatcher(name="project", value="paas"),
+                    ],
+                    sources=[
+                        PrometheusSource(
+                            url="http://victoriametrics.example:8428",
+                            tls_verify=True,
+                            auth=BearerAuth(token_set=True),
+                        )
+                    ],
+                    created_at=T,
+                    updated_at=T,
+                )
+            ]
+        ),
+        "api/connection_test.json": ConnectionTest(
+            reachable=True,
+            auth_ok=True,
+            matched_series=1832,
+            history_days=30.0,
+            checked_at=T,
         ),
         "api/envs.json": EnvList(project="paas", items=[EnvItem(env="production")]),
         "api/problem_queue_full.json": Problem(

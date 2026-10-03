@@ -342,6 +342,114 @@
         "title": "BaselineMode",
         "type": "string"
       },
+      "BasicAuth": {
+        "additionalProperties": false,
+        "properties": {
+          "password_set": {
+            "title": "Password Set",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "basic",
+            "default": "basic",
+            "title": "Type",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password_set"
+        ],
+        "title": "BasicAuth",
+        "type": "object"
+      },
+      "BasicAuthInput": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "anyOf": [
+              {
+                "format": "password",
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to keep the stored password (update only).",
+            "title": "Password"
+          },
+          "type": {
+            "const": "basic",
+            "default": "basic",
+            "title": "Type",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "title": "BasicAuthInput",
+        "type": "object"
+      },
+      "BearerAuth": {
+        "additionalProperties": false,
+        "properties": {
+          "token_set": {
+            "title": "Token Set",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "bearer",
+            "default": "bearer",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token_set"
+        ],
+        "title": "BearerAuth",
+        "type": "object"
+      },
+      "BearerAuthInput": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to keep the stored token (update only).",
+            "title": "Token"
+          },
+          "type": {
+            "const": "bearer",
+            "default": "bearer",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "BearerAuthInput",
+        "type": "object"
+      },
       "CapabilityStatus": {
         "enum": [
           "supported",
@@ -360,6 +468,116 @@
         ],
         "title": "ConfidenceLevel",
         "type": "string"
+      },
+      "ConnectionTest": {
+        "additionalProperties": false,
+        "properties": {
+          "auth_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the source could not be reached.",
+            "title": "Auth Ok"
+          },
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "families": {
+            "items": {
+              "$ref": "#/components/schemas/FamilyCapability"
+            },
+            "title": "Families",
+            "type": "array"
+          },
+          "history_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Days of matching history found, up to 30.",
+            "title": "History Days"
+          },
+          "matched_series": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Series currently matching all matchers.",
+            "title": "Matched Series"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reachable": {
+            "title": "Reachable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reachable",
+          "auth_ok",
+          "checked_at"
+        ],
+        "title": "ConnectionTest",
+        "type": "object"
+      },
+      "ConnectionTestRequest": {
+        "additionalProperties": false,
+        "description": "Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets.",
+        "properties": {
+          "matchers": {
+            "items": {
+              "$ref": "#/components/schemas/LabelMatcher"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Matchers",
+            "type": "array"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reuse this project's stored secrets for omitted ones.",
+            "title": "Project Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PrometheusSourceInput"
+          }
+        },
+        "required": [
+          "matchers",
+          "source"
+        ],
+        "title": "ConnectionTestRequest",
+        "type": "object"
       },
       "DailyTrend": {
         "additionalProperties": false,
@@ -469,6 +687,33 @@
         ],
         "title": "DetectionMethod",
         "type": "string"
+      },
+      "DiscoveredProjectList": {
+        "additionalProperties": false,
+        "description": "``project`` label values found in the global metrics source (legacy, until T012).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "source_status": {
+            "$ref": "#/components/schemas/SourceStatus"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "source_status"
+        ],
+        "title": "DiscoveredProjectList",
+        "type": "object"
       },
       "Entity": {
         "additionalProperties": false,
@@ -639,6 +884,8 @@
         "enum": [
           "validation_error",
           "project_not_found",
+          "project_name_taken",
+          "credentials_unreadable",
           "env_not_found",
           "analysis_not_found",
           "report_not_ready",
@@ -940,6 +1187,34 @@
         ],
         "title": "ExplanationStatus",
         "type": "string"
+      },
+      "FamilyCapability": {
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "$ref": "#/components/schemas/SignalFamily"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CapabilityStatus"
+          }
+        },
+        "required": [
+          "family",
+          "status"
+        ],
+        "title": "FamilyCapability",
+        "type": "object"
       },
       "Finding": {
         "additionalProperties": false,
@@ -1270,6 +1545,30 @@
         "title": "JobState",
         "type": "string"
       },
+      "LabelMatcher": {
+        "additionalProperties": false,
+        "description": "Exact ``name=\"value\"`` matcher added to every selector of the project's queries.",
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "LabelMatcher",
+        "type": "object"
+      },
       "Likelihood": {
         "enum": [
           "plausible",
@@ -1479,6 +1778,19 @@
         "title": "MetricSeries",
         "type": "object"
       },
+      "NoAuth": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "none",
+            "default": "none",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "NoAuth",
+        "type": "object"
+      },
       "ObservedValue": {
         "additionalProperties": false,
         "properties": {
@@ -1554,6 +1866,115 @@
         "title": "Problem",
         "type": "object"
       },
+      "Project": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "credentials_readable": {
+            "default": true,
+            "description": "False when stored secrets cannot be decrypted (lost or changed key).",
+            "title": "Credentials Readable",
+            "type": "boolean"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "matchers": {
+            "items": {
+              "$ref": "#/components/schemas/LabelMatcher"
+            },
+            "title": "Matchers",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/PrometheusSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "matchers",
+          "sources",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Project",
+        "type": "object"
+      },
+      "ProjectInput": {
+        "additionalProperties": false,
+        "description": "Body of POST /api/projects and PUT /api/projects/{project_id}.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "matchers": {
+            "items": {
+              "$ref": "#/components/schemas/LabelMatcher"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Matchers",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/PrometheusSourceInput"
+            },
+            "maxItems": 1,
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "matchers"
+        ],
+        "title": "ProjectInput",
+        "type": "object"
+      },
       "ProjectItem": {
         "additionalProperties": false,
         "properties": {
@@ -1573,25 +1994,112 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ProjectItem"
+              "$ref": "#/components/schemas/Project"
             },
             "title": "Items",
             "type": "array"
-          },
-          "source_status": {
-            "$ref": "#/components/schemas/SourceStatus"
-          },
-          "truncated": {
-            "default": false,
-            "title": "Truncated",
-            "type": "boolean"
           }
         },
         "required": [
-          "items",
-          "source_status"
+          "items"
         ],
         "title": "ProjectList",
+        "type": "object"
+      },
+      "PrometheusSource": {
+        "additionalProperties": false,
+        "properties": {
+          "auth": {
+            "discriminator": {
+              "mapping": {
+                "basic": "#/components/schemas/BasicAuth",
+                "bearer": "#/components/schemas/BearerAuth",
+                "none": "#/components/schemas/NoAuth"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/BearerAuth"
+              },
+              {
+                "$ref": "#/components/schemas/BasicAuth"
+              }
+            ],
+            "title": "Auth"
+          },
+          "kind": {
+            "const": "prometheus",
+            "default": "prometheus",
+            "title": "Kind",
+            "type": "string"
+          },
+          "tls_verify": {
+            "title": "Tls Verify",
+            "type": "boolean"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "tls_verify",
+          "auth"
+        ],
+        "title": "PrometheusSource",
+        "type": "object"
+      },
+      "PrometheusSourceInput": {
+        "additionalProperties": false,
+        "properties": {
+          "auth": {
+            "discriminator": {
+              "mapping": {
+                "basic": "#/components/schemas/BasicAuthInput",
+                "bearer": "#/components/schemas/BearerAuthInput",
+                "none": "#/components/schemas/NoAuth"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/BearerAuthInput"
+              },
+              {
+                "$ref": "#/components/schemas/BasicAuthInput"
+              }
+            ],
+            "title": "Auth"
+          },
+          "kind": {
+            "const": "prometheus",
+            "default": "prometheus",
+            "title": "Kind",
+            "type": "string"
+          },
+          "tls_verify": {
+            "default": true,
+            "title": "Tls Verify",
+            "type": "boolean"
+          },
+          "url": {
+            "maxLength": 2048,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "PrometheusSourceInput",
         "type": "object"
       },
       "Reason": {
@@ -2527,33 +3035,15 @@
         "summary": "Runtime Config"
       }
     },
-    "/api/health": {
+    "/api/discovery/projects": {
       "get": {
-        "operationId": "health_api_health_get",
+        "operationId": "discover_projects_api_discovery_projects_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Health"
-      }
-    },
-    "/api/projects": {
-      "get": {
-        "operationId": "list_projects_api_projects_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProjectList"
+                  "$ref": "#/components/schemas/DiscoveredProjectList"
                 }
               }
             },
@@ -2571,12 +3061,12 @@
             "description": "Problem"
           }
         },
-        "summary": "List Projects"
+        "summary": "Discover Projects"
       }
     },
-    "/api/projects/{project}/envs": {
+    "/api/discovery/projects/{project}/envs": {
       "get": {
-        "operationId": "list_envs_api_projects__project__envs_get",
+        "operationId": "discover_envs_api_discovery_projects__project__envs_get",
         "parameters": [
           {
             "in": "path",
@@ -2632,7 +3122,404 @@
             "description": "Problem"
           }
         },
-        "summary": "List Envs"
+        "summary": "Discover Envs"
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "operationId": "list_projects_api_projects_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Projects",
+        "tags": [
+          "projects"
+        ]
+      },
+      "post": {
+        "operationId": "create_project_api_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Create Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/test-connection": {
+      "post": {
+        "operationId": "test_connection_api_projects_test_connection_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Test Connection",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}": {
+      "delete": {
+        "operationId": "delete_project_api_projects__project_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Project",
+        "tags": [
+          "projects"
+        ]
+      },
+      "get": {
+        "operationId": "get_project_api_projects__project_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project",
+        "tags": [
+          "projects"
+        ]
+      },
+      "put": {
+        "operationId": "update_project_api_projects__project_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Update Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/health": {
+      "get": {
+        "description": "Null when the project has no metrics source configured.",
+        "operationId": "get_project_health_api_projects__project_id__health_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ConnectionTest"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Project Health Api Projects  Project Id  Health Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project Health",
+        "tags": [
+          "projects"
+        ]
       }
     }
   }

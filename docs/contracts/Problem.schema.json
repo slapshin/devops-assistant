@@ -4,6 +4,8 @@
       "enum": [
         "validation_error",
         "project_not_found",
+        "project_name_taken",
+        "credentials_unreadable",
         "env_not_found",
         "analysis_not_found",
         "report_not_ready",

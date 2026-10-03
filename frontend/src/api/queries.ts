@@ -9,7 +9,7 @@ import {
   type AnalysisReport,
   type AnalysisSubmitted,
   type EnvList,
-  type ProjectList,
+  type DiscoveredProjectList,
   type RuntimeConfig,
 } from "./client";
 
@@ -27,14 +27,14 @@ export function useConfig() {
 }
 
 export function useProjects() {
-  return useQuery({ queryKey: ["projects"], queryFn: () => apiGet<ProjectList>("/api/projects") });
+  return useQuery({ queryKey: ["discovered-projects"], queryFn: () => apiGet<DiscoveredProjectList>("/api/discovery/projects") });
 }
 
 /** Keyed by project, so a late response for a previous project can never fill the list. */
 export function useEnvs(project: MaybeRefOrGetter<string | null>) {
   return useQuery({
     queryKey: computed(() => ["envs", toValue(project)]),
-    queryFn: () => apiGet<EnvList>(`/api/projects/${encodeURIComponent(toValue(project) ?? "")}/envs`),
+    queryFn: () => apiGet<EnvList>(`/api/discovery/projects/${encodeURIComponent(toValue(project) ?? "")}/envs`),
     enabled: computed(() => !!toValue(project)),
   });
 }

@@ -17,6 +17,7 @@ from typing import Any
 
 import httpx
 
+from app.domain.projects import PrometheusConnection
 from app.settings import Settings
 
 log = logging.getLogger("app.metrics")
@@ -124,25 +125,26 @@ class PrometheusClient:
         self.request_count = 0
 
     @classmethod
-    def from_settings(
-        cls, settings: Settings, transport: httpx.AsyncBaseTransport | None = None
+    def from_connection(
+        cls, conn: PrometheusConnection, transport: httpx.AsyncBaseTransport | None = None
     ) -> PrometheusClient:
         headers: dict[str, str] = {}
         auth: httpx.Auth | None = None
-        if settings.metrics_bearer_token is not None:
-            headers["Authorization"] = f"Bearer {settings.metrics_bearer_token.get_secret_value()}"
-        if settings.metrics_basic_auth_user and settings.metrics_basic_auth_password:
+        if conn.bearer_token is not None:
+            headers["Authorization"] = f"Bearer {conn.bearer_token.get_secret_value()}"
+        if conn.basic_auth_user and conn.basic_auth_password:
             auth = httpx.BasicAuth(
-                settings.metrics_basic_auth_user,
-                settings.metrics_basic_auth_password.get_secret_value(),
+                conn.basic_auth_user, conn.basic_auth_password.get_secret_value()
             )
         return cls(
-            settings.metrics_url,
-            headers=headers,
-            auth=auth,
-            verify=settings.metrics_tls_verify,
-            transport=transport,
+            conn.url, headers=headers, auth=auth, verify=conn.tls_verify, transport=transport
         )
+
+    @classmethod
+    def from_settings(
+        cls, settings: Settings, transport: httpx.AsyncBaseTransport | None = None
+    ) -> PrometheusClient:
+        return cls.from_connection(settings.metrics_connection, transport)
 
     async def aclose(self) -> None:
         await self._http.aclose()

@@ -9,6 +9,7 @@ from pydantic import Field, SecretStr, ValidationError, field_validator, model_v
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.domain.explanation import ExplanationStatus
+from app.domain.projects import PrometheusConnection, validate_source_url
 
 
 class AIProvider(StrEnum):
@@ -47,24 +48,13 @@ class Settings(BaseSettings):
     ui_static_dir: Path | None = None
     """Built web UI to serve at /. Defaults to ../frontend/dist when it exists."""
     log_level: str = "INFO"
+    secret_key: SecretStr | None = None
+    """Fernet key for stored project secrets. Defaults to DATA_DIR/secret.key (generated)."""
 
     @field_validator("metrics_url")
     @classmethod
     def _valid_metrics_url(cls, value: str) -> str:
-        parts = urlsplit(value)
-        if parts.scheme == "synthetic":
-            if not parts.netloc:
-                raise ValueError("expected synthetic://<scenario>, e.g. synthetic://incident")
-            return value
-        if parts.scheme not in ("http", "https") or not parts.hostname:
-            raise ValueError("expected an http(s) URL such as http://localhost:8428")
-        if parts.username or parts.password:
-            raise ValueError(
-                "must not contain credentials; use METRICS_BEARER_TOKEN or METRICS_BASIC_AUTH_*"
-            )
-        if parts.query or parts.fragment:
-            raise ValueError("must not contain a query string or fragment")
-        return value.rstrip("/")
+        return validate_source_url(value)
 
     @field_validator("log_level")
     @classmethod
@@ -97,6 +87,16 @@ class Settings(BaseSettings):
         """Scheme, host, port, and path prefix only — safe for logs, UI, and reports."""
         parts = urlsplit(self.metrics_url)
         return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+
+    @property
+    def metrics_connection(self) -> PrometheusConnection:
+        return PrometheusConnection(
+            url=self.metrics_url,
+            tls_verify=self.metrics_tls_verify,
+            bearer_token=self.metrics_bearer_token,
+            basic_auth_user=self.metrics_basic_auth_user,
+            basic_auth_password=self.metrics_basic_auth_password,
+        )
 
     @property
     def explanation_status(self) -> ExplanationStatus:
@@ -139,6 +139,10 @@ class Settings(BaseSettings):
     @property
     def database_path(self) -> Path:
         return self.data_dir / "assistant.sqlite3"
+
+    @property
+    def secret_key_path(self) -> Path:
+        return self.data_dir / "secret.key"
 
 
 def load_settings(**overrides: object) -> Settings:

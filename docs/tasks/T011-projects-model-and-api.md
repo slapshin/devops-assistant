@@ -60,17 +60,26 @@ A **project** is a stored, user-managed entity that holds the configuration of e
 
 ## Acceptance
 
-- [ ] Project CRUD round-trips through the API and persists across restart.
-- [ ] Secrets are stored encrypted (verified by reading the raw DB row), are never present in any API response, log line, or fixture, and an omitted secret on update keeps the stored value.
-- [ ] A missing or wrong key degrades only the affected projects, with an actionable message.
-- [ ] Invalid matchers (bad name, `__name__`, duplicates, empty value) and invalid URLs return `validation_error` with field paths.
-- [ ] Test connection reports reachability, auth failure, zero matching series, and family capabilities correctly against a mocked HTTP source and `synthetic://`.
-- [ ] `make contracts`, `make fixtures`, and `make check` pass.
+- [x] Project CRUD round-trips through the API and persists across restart.
+- [x] Secrets are stored encrypted (verified by reading the raw DB row), are never present in any API response, log line, or fixture, and an omitted secret on update keeps the stored value.
+- [x] A missing or wrong key degrades only the affected projects, with an actionable message.
+- [x] Invalid matchers (bad name, `__name__`, duplicates, empty value) and invalid URLs return `validation_error` with field paths.
+- [x] Test connection reports reachability, auth failure, zero matching series, and family capabilities correctly against a mocked HTTP source and `synthetic://`.
+- [x] `make contracts`, `make fixtures`, and `make check` pass.
 
 ## Completion record
 
-- Completed date:
+- Completed date: 2026-10-03
 - Actual changed files and artifacts:
-- Commands/checks and results:
+  - new: `backend/app/domain/projects.py`, `backend/app/storage/projects.py`, `backend/app/storage/secrets.py`, `backend/app/api/projects.py`, `backend/app/metrics/probe.py`, `backend/migrations/versions/0002_projects.py`, `backend/tests/test_projects.py`
+  - changed: `app/settings.py` (shared URL validator, `SECRET_KEY`), `app/metrics/client.py` (`from_connection`), `app/metrics/promql.py` (`render_matchers`), `app/storage/db.py`, `app/container.py`, `app/main.py`, `app/domain/jobs.py` (new error codes, `DiscoveredProjectList`), `app/api/routes.py`
+  - `cryptography==50.0.2` added (`pyproject.toml`, `uv.lock`)
+  - regenerated contracts, `frontend/src/api/schema.d.ts`, fixtures (`api/projects.json` is now the project list; the label list moved to `api/discovered_projects.json`; new `api/connection_test.json`)
+  - frontend: legacy discovery paths in `src/api/queries.ts`, `src/api/client.ts`, `src/App.test.ts`
+  - docs: `DECISIONS.md` §2–§3, `OPERATIONS.md` (`SECRET_KEY`, backing up the key), `config.env.template`
+- Commands/checks and results: `make contracts`, `make fixtures`, `make check` pass (293 backend tests passed, 2 skipped; 20 frontend tests; build).
 - Decisions or dependency changes:
-- Remaining limitations or blockers:
+  - The old label-discovery routes moved to `/api/discovery/projects[/{project}/envs]` so the current UI keeps working until T012/T013 remove them.
+  - `ConnectionTest.families` is part of the contract but is filled by T012. Capability discovery is still keyed by `Scope(project, env)` until then. The T011 probe measures reachability, auth, matching series, and history from the matchers directly.
+  - `SourceInput` is a single model for now. It becomes a discriminated union on `kind` when a second source kind is added.
+- Remaining limitations or blockers: none.

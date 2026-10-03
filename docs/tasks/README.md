@@ -18,8 +18,8 @@ All tasks T001–T010 are DONE. The first release is validated; see [RELEASE_CHE
 | T008 | [Web interface and evidence exploration](T008-web-interface.md) | T002, T007 | DONE |
 | T009 | [Local packaging and operation documentation](T009-packaging-and-operation.md) | T007, T008 | DONE |
 | T010 | [First-release acceptance and agent handoff](T010-release-validation.md) | T009 | DONE |
-| T011 | [Project model, encrypted source config, and project API](T011-projects-model-and-api.md) | T010 | TODO |
-| T012 | [Project-scoped analyses, reports, and legacy migration](T012-project-scoped-analysis.md) | T011 | TODO |
+| T011 | [Project model, encrypted source config, and project API](T011-projects-model-and-api.md) 
+| T012 | [Project-scoped analyses, reports, and legacy migration](T012-project-scoped-analysis.md) | T011 | IN_PROGRESS |
 | T013 | [Projects UI](T013-projects-ui.md) | T012 | TODO |
 
 ## How the next agent should work

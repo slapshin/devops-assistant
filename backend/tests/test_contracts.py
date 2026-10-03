@@ -12,12 +12,13 @@ from app.domain.common import Scope
 from app.domain.jobs import (
     AnalysisJob,
     AnalysisSubmitted,
+    DiscoveredProjectList,
     EnvList,
     Problem,
-    ProjectList,
     RuntimeConfig,
 )
 from app.domain.metrics import MetricSeries
+from app.domain.projects import ConnectionTest, ProjectList
 from app.domain.report import AnalysisReport, AnalysisRequest, AnalysisWindows
 from scripts.export_schemas import SCHEMAS
 from scripts.generate_fixtures import build, render
@@ -39,7 +40,9 @@ def fixture_model(rel: str) -> type[BaseModel] | None:
     if name.startswith("problem_"):
         return Problem
     discovery: dict[str, type[BaseModel]] = {
+        "discovered_projects.json": DiscoveredProjectList,
         "projects.json": ProjectList,
+        "connection_test.json": ConnectionTest,
         "envs.json": EnvList,
         "config.json": RuntimeConfig,
     }

@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "ProjectItem": {
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "title": "Project",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project"
+      ],
+      "title": "ProjectItem",
+      "type": "object"
+    },
+    "SourceStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checked At"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
+        },
+        "reachable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null when not checked.",
+          "title": "Reachable"
+        }
+      },
+      "required": [
+        "reachable"
+      ],
+      "title": "SourceStatus",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``project`` label values found in the global metrics source (legacy, until T012).",
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/ProjectItem"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "source_status": {
+      "$ref": "#/$defs/SourceStatus"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "items",
+    "source_status"
+  ],
+  "title": "DiscoveredProjectList",
+  "type": "object"
+}

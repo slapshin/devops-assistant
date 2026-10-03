@@ -74,6 +74,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/discovery/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discover Projects */
+        get: operations["discover_projects_api_discovery_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discovery/projects/{project}/envs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discover Envs */
+        get: operations["discover_envs_api_discovery_projects__project__envs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -101,22 +135,62 @@ export interface paths {
         /** List Projects */
         get: operations["list_projects_api_projects_get"];
         put?: never;
-        post?: never;
+        /** Create Project */
+        post: operations["create_project_api_projects_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/projects/{project}/envs": {
+    "/api/projects/test-connection": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Envs */
-        get: operations["list_envs_api_projects__project__envs_get"];
+        get?: never;
+        put?: never;
+        /** Test Connection */
+        post: operations["test_connection_api_projects_test_connection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Project */
+        get: operations["get_project_api_projects__project_id__get"];
+        /** Update Project */
+        put: operations["update_project_api_projects__project_id__put"];
+        post?: never;
+        /** Delete Project */
+        delete: operations["delete_project_api_projects__project_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Project Health
+         * @description Null when the project has no metrics source configured.
+         */
+        get: operations["get_project_health_api_projects__project_id__health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -238,6 +312,56 @@ export interface components {
          * @enum {string}
          */
         BaselineMode: "whole_baseline" | "time_of_day";
+        /** BasicAuth */
+        BasicAuth: {
+            /** Password Set */
+            password_set: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "basic";
+            /** Username */
+            username: string;
+        };
+        /** BasicAuthInput */
+        BasicAuthInput: {
+            /**
+             * Password
+             * @description Omit to keep the stored password (update only).
+             */
+            password?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "basic";
+            /** Username */
+            username: string;
+        };
+        /** BearerAuth */
+        BearerAuth: {
+            /** Token Set */
+            token_set: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bearer";
+        };
+        /** BearerAuthInput */
+        BearerAuthInput: {
+            /**
+             * Token
+             * @description Omit to keep the stored token (update only).
+             */
+            token?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bearer";
+        };
         /**
          * CapabilityStatus
          * @enum {string}
@@ -248,6 +372,46 @@ export interface components {
          * @enum {string}
          */
         ConfidenceLevel: "low" | "medium" | "high";
+        /** ConnectionTest */
+        ConnectionTest: {
+            /**
+             * Auth Ok
+             * @description Null when the source could not be reached.
+             */
+            auth_ok: boolean | null;
+            /** Checked At */
+            checked_at: string;
+            /** Families */
+            families?: components["schemas"]["FamilyCapability"][];
+            /**
+             * History Days
+             * @description Days of matching history found, up to 30.
+             */
+            history_days?: number | null;
+            /**
+             * Matched Series
+             * @description Series currently matching all matchers.
+             */
+            matched_series?: number | null;
+            /** Message */
+            message?: string | null;
+            /** Reachable */
+            reachable: boolean;
+        };
+        /**
+         * ConnectionTestRequest
+         * @description Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets.
+         */
+        ConnectionTestRequest: {
+            /** Matchers */
+            matchers: components["schemas"]["LabelMatcher"][];
+            /**
+             * Project Id
+             * @description Reuse this project's stored secrets for omitted ones.
+             */
+            project_id?: string | null;
+            source: components["schemas"]["PrometheusSourceInput"];
+        };
         /**
          * DailyTrend
          * @description One 24-hour bucket; bucket_index 0 is the latest day [T-24h, T).
@@ -289,6 +453,20 @@ export interface components {
          * @enum {string}
          */
         DetectionMethod: "relative" | "absolute";
+        /**
+         * DiscoveredProjectList
+         * @description ``project`` label values found in the global metrics source (legacy, until T012).
+         */
+        DiscoveredProjectList: {
+            /** Items */
+            items: components["schemas"]["ProjectItem"][];
+            source_status: components["schemas"]["SourceStatus"];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
         /**
          * Entity
          * @description Resource identity built from actual labels only; never inferred across namespaces.
@@ -360,7 +538,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "project_not_found" | "env_not_found" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
+        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "credentials_unreadable" | "env_not_found" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
         /**
          * Evidence
          * @description Chart data for a finding, persisted so a report reopens without the source.
@@ -442,6 +620,13 @@ export interface components {
          * @enum {string}
          */
         ExplanationStatus: "disabled" | "not_configured" | "pending" | "succeeded" | "failed" | "skipped_no_findings";
+        /** FamilyCapability */
+        FamilyCapability: {
+            family: components["schemas"]["SignalFamily"];
+            /** Reason */
+            reason?: string | null;
+            status: components["schemas"]["CapabilityStatus"];
+        };
         /** Finding */
         Finding: {
             /**
@@ -568,6 +753,16 @@ export interface components {
          */
         JobState: "queued" | "running" | "completed" | "partial" | "failed" | "cancelled";
         /**
+         * LabelMatcher
+         * @description Exact ``name="value"`` matcher added to every selector of the project's queries.
+         */
+        LabelMatcher: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
+        };
+        /**
          * Likelihood
          * @enum {string}
          */
@@ -656,6 +851,14 @@ export interface components {
             /** Values */
             values: (number | null)[];
         };
+        /** NoAuth */
+        NoAuth: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "none";
+        };
         /** ObservedValue */
         ObservedValue: {
             unit: components["schemas"]["Unit"];
@@ -684,6 +887,43 @@ export interface components {
              */
             type: string;
         };
+        /** Project */
+        Project: {
+            /** Created At */
+            created_at: string;
+            /**
+             * Credentials Readable
+             * @description False when stored secrets cannot be decrypted (lost or changed key).
+             * @default true
+             */
+            credentials_readable: boolean;
+            /** Description */
+            description?: string | null;
+            /** Matchers */
+            matchers: components["schemas"]["LabelMatcher"][];
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: string;
+            /** Sources */
+            sources: components["schemas"]["PrometheusSource"][];
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * ProjectInput
+         * @description Body of POST /api/projects and PUT /api/projects/{project_id}.
+         */
+        ProjectInput: {
+            /** Description */
+            description?: string | null;
+            /** Matchers */
+            matchers: components["schemas"]["LabelMatcher"][];
+            /** Name */
+            name: string;
+            /** Sources */
+            sources?: components["schemas"]["PrometheusSourceInput"][];
+        };
         /** ProjectItem */
         ProjectItem: {
             /** Project */
@@ -692,13 +932,40 @@ export interface components {
         /** ProjectList */
         ProjectList: {
             /** Items */
-            items: components["schemas"]["ProjectItem"][];
-            source_status: components["schemas"]["SourceStatus"];
+            items: components["schemas"]["Project"][];
+        };
+        /** PrometheusSource */
+        PrometheusSource: {
+            /** Auth */
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuth"] | components["schemas"]["BasicAuth"];
             /**
-             * Truncated
-             * @default false
+             * Kind
+             * @default prometheus
+             * @constant
              */
-            truncated: boolean;
+            kind: "prometheus";
+            /** Tls Verify */
+            tls_verify: boolean;
+            /** Url */
+            url: string;
+        };
+        /** PrometheusSourceInput */
+        PrometheusSourceInput: {
+            /** Auth */
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuthInput"] | components["schemas"]["BasicAuthInput"];
+            /**
+             * Kind
+             * @default prometheus
+             * @constant
+             */
+            kind: "prometheus";
+            /**
+             * Tls Verify
+             * @default true
+             */
+            tls_verify: boolean;
+            /** Url */
+            url: string;
         };
         /**
          * Reason
@@ -1178,7 +1445,7 @@ export interface operations {
             };
         };
     };
-    health_api_health_get: {
+    discover_projects_api_discovery_projects_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1193,27 +1460,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HealthResponse"];
-                };
-            };
-        };
-    };
-    list_projects_api_projects_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProjectList"];
+                    "application/json": components["schemas"]["DiscoveredProjectList"];
                 };
             };
             /** @description Problem */
@@ -1228,7 +1475,7 @@ export interface operations {
             };
         };
     };
-    list_envs_api_projects__project__envs_get: {
+    discover_envs_api_discovery_projects__project__envs_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1275,6 +1522,331 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                     "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    health_api_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    list_projects_api_projects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectList"];
+                };
+            };
+        };
+    };
+    create_project_api_projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    test_connection_api_projects_test_connection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTest"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    get_project_api_projects__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project_api_projects__project_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    delete_project_api_projects__project_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project_health_api_projects__project_id__health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTest"] | null;
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
