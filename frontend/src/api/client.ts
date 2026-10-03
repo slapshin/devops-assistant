@@ -9,6 +9,10 @@ export type AnalysisList = Schemas["AnalysisList"];
 export type AnalysisSubmitted = Schemas["AnalysisSubmitted"];
 export type ProjectList = Schemas["ProjectList"];
 export type ProjectSummary = Schemas["ProjectSummary"];
+export type ProjectInput = Schemas["ProjectInput"];
+export type LabelMatcher = Schemas["LabelMatcher"];
+export type ConnectionTest = Schemas["ConnectionTest"];
+export type ConnectionTestRequest = Schemas["ConnectionTestRequest"];
 export type Finding = Schemas["Finding"];
 export type Evidence = Schemas["Evidence"];
 export type DailyTrend = Schemas["DailyTrend"];
@@ -32,6 +36,7 @@ export class ApiError extends Error {
 }
 
 const PROBLEM_CONTENT_TYPE = "application/problem+json";
+const NO_CONTENT = 204;
 
 /** Problem body for failures where the server gave none (network error, non-problem response). */
 function syntheticProblem(title: string, status: number): Problem {
@@ -59,9 +64,11 @@ async function request<T>(method: string, path: `/api/${string}`, body?: unknown
     throw new ApiError(syntheticProblem(`Unexpected response (${response.status})`, response.status), retryAfterSeconds);
   }
 
+  if (response.status === NO_CONTENT) return undefined as T;
   return (await response.json()) as T;
 }
 
 export const apiGet = <T>(path: `/api/${string}`) => request<T>("GET", path);
 export const apiPost = <T>(path: `/api/${string}`, body: unknown) => request<T>("POST", path, body);
+export const apiPut = <T>(path: `/api/${string}`, body: unknown) => request<T>("PUT", path, body);
 export const apiDelete = <T>(path: `/api/${string}`) => request<T>("DELETE", path);

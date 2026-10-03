@@ -1,14 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import {
   apiDelete,
   apiGet,
   apiPost,
+  apiPut,
   type AnalysisJob,
   type AnalysisList,
   type AnalysisReport,
   type AnalysisSubmitted,
+  type ConnectionTest,
+  type ConnectionTestRequest,
+  type ProjectInput,
   type ProjectList,
+  type ProjectSummary,
   type RuntimeConfig,
 } from "./client";
 
@@ -25,17 +30,85 @@ export function useConfig() {
   return useQuery({ queryKey: ["config"], queryFn: () => apiGet<RuntimeConfig>("/api/config") });
 }
 
+const HEALTH_STALE_MS = 60_000;
+const projectPath = (id: string) => `/api/projects/${encodeURIComponent(id)}` as const;
+
+/** Polls while any project has a queued or running analysis, so inline progress stays live. */
 export function useProjects() {
-  return useQuery({ queryKey: ["projects"], queryFn: () => apiGet<ProjectList>("/api/projects") });
+  return useQuery({
+    queryKey: ["projects"],
+    queryFn: () => apiGet<ProjectList>("/api/projects"),
+    refetchInterval: (query) => (query.state.data?.items.some((p) => p.active_analysis) ? JOB_POLL_INTERVAL_MS : false),
+  });
 }
 
-export function useAnalyses(projectId: MaybeRefOrGetter<string | null>) {
+export function useProject(id: MaybeRefOrGetter<string | null>) {
   return useQuery({
-    queryKey: computed(() => ["analyses", toValue(projectId)]),
-    queryFn: () => {
-      const params = new URLSearchParams({ project_id: toValue(projectId) ?? "", limit: String(RECENT_ANALYSES_LIMIT) });
+    queryKey: computed(() => ["project", toValue(id)]),
+    queryFn: () => apiGet<ProjectSummary>(projectPath(toValue(id) ?? "")),
+    enabled: computed(() => !!toValue(id)),
+    refetchInterval: (query) => (query.state.data?.active_analysis ? JOB_POLL_INTERVAL_MS : false),
+    retry: false,
+  });
+}
+
+/** Lazy, cached connection test of a stored project (the server caches it for 60 s too). */
+export function useProjectHealth(id: MaybeRefOrGetter<string>, enabled: MaybeRefOrGetter<boolean>) {
+  return useQuery({
+    queryKey: computed(() => ["project-health", toValue(id)]),
+    queryFn: () => apiGet<ConnectionTest | null>(`${projectPath(toValue(id))}/health`),
+    enabled: computed(() => toValue(enabled)),
+    staleTime: HEALTH_STALE_MS,
+    retry: false,
+  });
+}
+
+function useProjectMutation<A, T>(fn: (args: A) => Promise<T>, removes?: (args: A) => string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (_data, args) => {
+      // A deleted project's own queries must not refetch (they would 404).
+      const gone = removes?.(args);
+      if (gone) {
+        client.removeQueries({ queryKey: ["project", gone] });
+        client.removeQueries({ queryKey: ["project-health", gone] });
+      }
+      void client.invalidateQueries({ queryKey: ["projects"] });
+      void client.invalidateQueries({ queryKey: ["project"] });
+      void client.invalidateQueries({ queryKey: ["project-health"] });
+    },
+  });
+}
+
+export const useCreateProject = () =>
+  useProjectMutation((body: ProjectInput) => apiPost<ProjectSummary>("/api/projects", body));
+
+export const useUpdateProject = () =>
+  useProjectMutation(({ id, body }: { id: string; body: ProjectInput }) => apiPut<ProjectSummary>(projectPath(id), body));
+
+export const useDeleteProject = () =>
+  useProjectMutation(
+    (id: string) => apiDelete<void>(projectPath(id)),
+    (id) => id,
+  );
+
+export function useTestConnection() {
+  return useMutation({
+    mutationFn: (body: ConnectionTestRequest) => apiPost<ConnectionTest>("/api/projects/test-connection", body),
+  });
+}
+
+export function useAnalyses(projectId: MaybeRefOrGetter<string | null>, limit = RECENT_ANALYSES_LIMIT) {
+  return useInfiniteQuery({
+    queryKey: computed(() => ["analyses", toValue(projectId), limit]),
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ project_id: toValue(projectId) ?? "", limit: String(limit) });
+      if (pageParam) params.set("cursor", pageParam);
       return apiGet<AnalysisList>(`/api/analyses?${params}`);
     },
+    initialPageParam: "",
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
     enabled: computed(() => !!toValue(projectId)),
   });
 }
@@ -69,6 +142,7 @@ export function useSubmit() {
       client.setQueryData(["analysis", data.analysis.analysis_id], data.analysis);
       void client.invalidateQueries({ queryKey: ["analyses"] });
       void client.invalidateQueries({ queryKey: ["projects"] });
+      void client.invalidateQueries({ queryKey: ["project"] });
     },
   });
 }
@@ -77,6 +151,10 @@ export function useCancel() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiDelete<AnalysisJob>(`/api/analyses/${encodeURIComponent(id)}`),
-    onSuccess: (job) => client.setQueryData(["analysis", job.analysis_id], job),
+    onSuccess: (job) => {
+      client.setQueryData(["analysis", job.analysis_id], job);
+      void client.invalidateQueries({ queryKey: ["projects"] });
+      void client.invalidateQueries({ queryKey: ["project"] });
+    },
   });
 }

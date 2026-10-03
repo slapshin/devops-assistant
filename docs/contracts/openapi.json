@@ -1936,7 +1936,7 @@
       },
       "ProjectSummary": {
         "additionalProperties": false,
-        "description": "A project with its latest finished and currently active analysis (list page).",
+        "description": "A project with its analysis activity (list and detail pages).",
         "properties": {
           "active_analysis": {
             "anyOf": [
@@ -1946,7 +1946,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Queued or running job."
           },
           "created_at": {
             "title": "Created At",
@@ -1977,7 +1978,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Newest finished job."
           },
           "matchers": {
             "items": {
@@ -1993,6 +1995,13 @@
           "project_id": {
             "title": "Project Id",
             "type": "string"
+          },
+          "report_count": {
+            "default": 0,
+            "description": "Saved reports (deleted with it).",
+            "minimum": 0.0,
+            "title": "Report Count",
+            "type": "integer"
           },
           "sources": {
             "items": {
@@ -3216,7 +3225,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Project"
+                  "$ref": "#/components/schemas/ProjectSummary"
                 }
               }
             },

@@ -50,14 +50,23 @@ Empty state: an explanation plus a "Create project" call to action. Rows are sor
 
 ## Acceptance
 
-- [ ] Vitest covers: list rendering with all health/latest states, running from the list with inline progress, form validation and secret-keep semantics, the test-connection result display, and delete confirmation.
-- [ ] Manual flow on `make demo`: create a project → test connection → run → open the report → edit → delete. Desktop and narrow screenshots use synthetic data.
-- [ ] `docs/UI_SPEC.md` is updated. `make check` passes.
+- [x] Vitest covers: list rendering with all health/latest states, running from the list with inline progress, form validation and secret-keep semantics, the test-connection result display, and delete confirmation.
+- [x] Manual flow on `make demo`: create a project → test connection → run → open the report → edit → delete. Desktop and narrow screenshots use synthetic data.
+- [x] `docs/UI_SPEC.md` is updated. `make check` passes.
 
 ## Completion record
 
-- Completed date:
+- Completed date: 2026-10-03
 - Actual changed files and artifacts:
+  - new views: `src/views/projects/ProjectsView.vue` (`/`), `ProjectView.vue`, `ProjectFormView.vue`. `StartView.vue` was removed.
+  - new components: `src/components/projects/{ProjectCard,HealthBadge,MatcherChips,TrendSparkline,RunAnalysis,ConnectionTestResult}.vue`, `src/components/{AnalysesTable,SeverityCounts}.vue`
+  - `src/lib/projects.ts` (draft model, validation that mirrors the backend, input mapping, health states), `src/lib/format.ts` (`STAGE_LABELS`, `CAPABILITY_LABELS`, `formatAge`), `src/api/{client,queries}.ts` (project queries/mutations, `apiPut`, 204 handling, infinite history), `src/router.ts`, `src/styles/tokens.css`, `JobView.vue` and `ReportLayout.vue` (project links), `src/App.test.ts`
+  - backend: `ProjectSummary.report_count`, and `GET /api/projects/{id}` now returns the summary (`ProjectActivity` in `domain/interfaces.py`, `storage/repository.py`, `api/projects.py`); contracts, schema types and fixtures were regenerated
+  - docs: `docs/UI_SPEC.md` (§1 routes, §2 frame, §3 projects), `README.md`, screenshots `docs/screenshots/{projects-running-desktop,projects-narrow,project-form-desktop,project-form-narrow,project-detail-desktop,project-delete}.png` (synthetic data)
 - Commands/checks and results:
+  - `make check` passes (354 backend tests passed, 2 skipped; 29 frontend tests; build). `docker build` passes.
+  - Manual flow against the native app with `DEMO_PROJECTS=true AI_PROVIDER=fake` in a temporary data dir, in Playwright at 1280×900 and 390×844: create project → test connection → create → run from list (inline progress) → open report → project link → edit → delete with typed confirmation. The flow found and fixed: card columns shifting while a run is shown, and the deleted project's queries refetching (404 console errors).
 - Decisions or dependency changes:
-- Remaining limitations or blockers:
+  - The trend sparkline is a small SVG component rather than ECharts, to keep list rows light; it follows the `EvidenceSparkline` approach.
+  - Label-value autocomplete (the optional T011 helper) was not built. Matchers are typed, and *Test connection* shows whether they match.
+- Remaining limitations or blockers: none. Live checks against a real VictoriaMetrics source and the existing Docker volume upgrade remain for the owner's environment (see T012).

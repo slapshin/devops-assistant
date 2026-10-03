@@ -88,6 +88,7 @@ def test_hard_delete_cascades_and_is_refused_while_active(tmp_path: Path) -> Non
                 "UPDATE analysis_jobs SET state='running' WHERE analysis_id=?",
                 (done["analysis_id"],),
             )
+        assert client.get(f"/api/projects/{doomed}").json()["report_count"] == 1
         res = client.delete(f"/api/projects/{doomed}")
         assert res.status_code == 409 and res.json()["code"] == "project_busy"
         with sqlite3.connect(db) as conn:

@@ -8,6 +8,8 @@ A local web assistant for one `project`/`env` scope of a Prometheus-compatible m
 
 It covers node exporter, cAdvisor, Docker Swarm, and OpenTelemetry HTTP/RPC metrics. Numerical findings never depend on AI, missing telemetry is never reported as healthy, and thresholds are diagnostic heuristics, not SLOs.
 
+![Projects](docs/screenshots/projects-running-desktop.png)
+
 ![Overview](docs/screenshots/overview-desktop.png)
 
 ## Run

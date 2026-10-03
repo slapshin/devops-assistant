@@ -183,3 +183,19 @@ main { overflow-wrap: anywhere; }
 .tag { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; line-height: 20px; white-space: nowrap; }
 .tag.new { background: var(--info-bg); color: var(--link-strong); }
 .tag.seen { background: var(--subtle); color: var(--text-2); }
+
+/* Links that act as buttons (navigation, e.g. "New project"). */
+a.button {
+  display: inline-block;
+  padding: calc(var(--space) * 0.5) calc(var(--space) * 1.5);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+a.button.primary { background: var(--focus); color: var(--inv-fg); border-color: var(--focus); }
+button.danger { color: var(--sev-critical); border-color: var(--sev-critical); }
+button.danger.solid { background: var(--sev-critical); color: var(--inv-fg); }
+.field-error { color: var(--sev-critical); font-size: 0.85rem; margin: 2px 0 0; }
+[aria-invalid="true"] { border-color: var(--sev-critical); }

@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from app.domain.common import REPORT_SCHEMA_VERSION, Severity, format_utc
 from app.domain.explanation import ExplanationStatus
+from app.domain.interfaces import ProjectActivity
 from app.domain.jobs import AnalysisJob, ErrorCode, JobError, JobState, StageProgress, StageStatus
 from app.domain.report import AnalysisReport, AnalysisRequest
 from app.storage.db import analysis_jobs, make_engine, migrate, reports
@@ -123,10 +124,7 @@ class SqliteReportRepository:
 
         return await self._run(q)
 
-    async def project_activity(
-        self, project_ids: Sequence[str]
-    ) -> dict[str, tuple[AnalysisJob | None, AnalysisJob | None]]:
-        """project_id -> (latest finished job, active job)."""
+    async def project_activity(self, project_ids: Sequence[str]) -> dict[str, ProjectActivity]:
 
         def newest(conn: sa.Connection, project_id: str, active: bool) -> AnalysisJob | None:
             state = analysis_jobs.c.state
@@ -139,9 +137,22 @@ class SqliteReportRepository:
             ).first()
             return AnalysisJob.model_validate_json(row[0]) if row else None
 
-        def q(conn: sa.Connection) -> dict[str, tuple[AnalysisJob | None, AnalysisJob | None]]:
+        def report_count(conn: sa.Connection, project_id: str) -> int:
+            return int(
+                conn.execute(
+                    sa.select(sa.func.count())
+                    .select_from(reports.join(analysis_jobs))
+                    .where(analysis_jobs.c.project_id == project_id)
+                ).scalar_one()
+            )
+
+        def q(conn: sa.Connection) -> dict[str, ProjectActivity]:
             return {
-                pid: (newest(conn, pid, active=False), newest(conn, pid, active=True))
+                pid: ProjectActivity(
+                    latest=newest(conn, pid, active=False),
+                    active=newest(conn, pid, active=True),
+                    report_count=report_count(conn, pid),
+                )
                 for pid in project_ids
             }
 

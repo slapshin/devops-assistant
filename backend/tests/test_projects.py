@@ -88,9 +88,9 @@ def test_crud_round_trip_and_persistence(tmp_path: Path) -> None:
 
     with make_client(tmp_path) as c:  # restart
         pid = project["project_id"]
-        listed = c.get("/api/projects").json()["items"]
-        assert listed == [{**project, "latest_analysis": None, "active_analysis": None}]
-        assert c.get(f"/api/projects/{pid}").json() == project
+        summary = {**project, "latest_analysis": None, "active_analysis": None, "report_count": 0}
+        assert c.get("/api/projects").json()["items"] == [summary]
+        assert c.get(f"/api/projects/{pid}").json() == summary
 
         res = c.put(f"/api/projects/{pid}", json=body(name="Shop", sources=[]))
         assert res.status_code == 200

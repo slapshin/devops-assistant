@@ -8,7 +8,9 @@ Interface language: English (default; strings are kept in one module so they can
 
 | URL | View |
 | --- | --- |
-| `/` | **Start**: scope selectors, Analyze, recent reports for the selected scope |
+| `/` | **Projects**: one card per project with health, latest report, 14-day trend and Run (T013) |
+| `/projects/new`, `/projects/:projectId/edit` | **Project form**: labels, source, Test connection, delete |
+| `/projects/:projectId` | **Project**: configuration, Run, analysis history |
 | `/analyses/:id` | **Job progress**; switches to the report route when a report exists |
 | `/reports/:id` | **Overview** (default report tab) |
 | `/reports/:id/findings` | **Findings** list; `?category=&severity=&entity=` filters live in the URL |
@@ -28,20 +30,30 @@ Tabs:  Overview | Findings (12) | Trends
 ```
 
 - The scope and the frozen end time `T` are always visible. Times are shown in UTC by default, with a toggle for local time; tooltips always include UTC.
-- *Run again* uses the same scope with `T = now`. *New analysis* returns to Start with the scope preselected.
+- The project name links to its project page. *Run again* uses the same project with `T = now`. *Project* returns to the project page.
 - A `partial` report shows a persistent amber banner ("Some signals could not be collected — see Coverage"), with a link to the coverage section.
 
-## 3. Start view (scope selection)
+## 3. Projects (T013)
 
-- A **Project** combobox (typeahead) lists `GET /api/projects`. The **Env** combobox is disabled until a project is chosen, then loads `GET /api/projects/{project}/envs`. Changing the project clears the env.
-- The last-used pair is remembered in `localStorage`, and only reapplied if it is still discovered.
-- **Analyze** is enabled only when both are selected. It posts the analysis. On `200 duplicate_of_active` it navigates to the existing job and shows "An analysis for this scope is already running."
-- **Recent reports** for the selected scope (`GET /api/analyses?project=&env=`) is a table of end time, state, finding counts by severity, and explanation status. Each row is a link.
-- States:
-  - Loading: skeleton rows.
-  - No projects discovered: an explanation that no series with `project` labels were found in the last 28 days, plus the configured source's host.
-  - Source unreachable: an error with a Retry button. Recent saved reports still load from storage.
-  - `queue_full`: a message showing the Retry-After time.
+Replaces the original start view (project/env selectors). Screenshots: `docs/screenshots/projects-running-desktop.png`, `projects-narrow.png`, `project-form-desktop.png`, `project-form-narrow.png`, `project-detail-desktop.png`, `project-delete.png`.
+
+**List (`/`).** One card per project, sorted by name:
+
+- Name (links to the project page), label matchers as chips, and the source host (`synthetic: <scenario>` for demo sources).
+- **Source health**: fetched lazily per project from `GET /api/projects/{id}/health` (cached 60 s). States: *Reachable*, *Unreachable*, *Auth failed*, *No matching series*, *No source*, *Credentials unreadable*, *Checking…*. Projects that cannot be checked (no source, unreadable credentials) are never probed. Text and icon carry the state; colour is never the only signal.
+- **Latest report**: state and relative age (UTC tooltip), linking to the report or, without one, to the job. Shows severity counts, or the error code for a failed run.
+- **14-day anomalies**: an SVG bar sparkline of `daily_episodes` (oldest first; the latest day is emphasised; days without enough data are dashed stubs). Its accessible name summarises the total and the latest day. "No trend yet" without a report.
+- **Run analysis**: posts `{project_id}`. While a job is queued or running, the card shows "Running · <stage> (done/total)" linked to the job instead of the button, and the list polls every 2 s. `queue_full` shows the Retry-After time inline. Without a source, or with unreadable credentials, the button is disabled with a reason and an Edit link.
+- Empty state: an explanation and a *Create project* call to action. Load errors show a Retry button. A text filter (name or `label=value`) appears once there are more than 10 projects.
+
+**Project page (`/projects/:projectId`).** Name, description, matchers, source (host, auth type, TLS note, health), saved report count, Edit and Run. The analysis history pages through `GET /api/analyses?project_id=` (20 per page, *Load older analyses*). The report and job headers link back here.
+
+**Form (`/projects/new`, `/projects/:projectId/edit`).**
+
+- Name, optional description, and **Labels**: rows of `name = value` (add/remove, 1–10). Client validation mirrors the server: label name syntax, reserved `__` prefix, duplicates, required values. Server `422` errors map back to the field.
+- **Sources → Prometheus-compatible metrics**: URL (no credentials, query or fragment; `synthetic://<scenario>` allowed; empty means no source), TLS verification, and authentication (none, bearer, basic). Secret inputs are write-only. When a secret of the chosen type is stored, the placeholder reads "Stored — leave empty to keep" and an empty input keeps it. Switching the type requires the new secret. Future source kinds get their own section here.
+- **Test connection** runs on the unsaved draft (stored secrets are reused in edit mode) and shows reachability/auth, matching series, history days, and a capability table per signal family. Editing labels or the source after a test marks the result stale. Saving is never blocked by the test, but a missing, stale or failed test (or no source at all) shows a warning next to Save.
+- **Delete** (edit only): states how many saved reports will be removed, is disabled while an analysis is queued or running, and requires typing the project name before *Delete permanently* is enabled.
 
 ## 4. Job progress view
 

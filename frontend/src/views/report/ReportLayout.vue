@@ -79,13 +79,13 @@ async function runAgain() {
     <template v-else-if="error.code === 'report_unavailable'">No report was saved for this analysis: {{ error.detail }}</template>
     <template v-else-if="error.code === 'analysis_not_found'">This report does not exist.</template>
     <template v-else>{{ error.title }}. <button type="button" @click="query.refetch()">Retry</button></template>
-    <p><RouterLink to="/">New analysis</RouterLink></p>
+    <p><RouterLink to="/">Projects</RouterLink></p>
   </section>
 
   <template v-else-if="report">
     <header class="frame">
       <div class="scope">
-        <strong>{{ report.scope.project_name }}</strong>
+        <RouterLink :to="`/projects/${report.scope.project_id}`" class="project-link"><strong>{{ report.scope.project_name }}</strong></RouterLink>
         <span>
           Window:
           <time :datetime="report.windows.latest_day.start" :title="utcTooltip(report.windows.latest_day.start)">{{ formatTime(report.windows.latest_day.start) }}</time>
@@ -107,7 +107,7 @@ async function runAgain() {
           </select>
         </label>
         <button type="button" :disabled="submit.isPending.value" @click="runAgain">Run again</button>
-        <RouterLink :to="{ path: '/', query: { project: report.scope.project_id } }">New analysis</RouterLink>
+        <RouterLink :to="`/projects/${report.scope.project_id}`">Project</RouterLink>
       </div>
       <p v-if="submit.error.value" role="alert" class="banner error">Could not start a new analysis: {{ submit.error.value.message }}</p>
       <p v-if="report.state === 'partial'" class="banner" role="status">
@@ -140,6 +140,7 @@ async function runAgain() {
 <style scoped>
 .frame { margin-bottom: calc(var(--space) * 3); padding: calc(var(--space) * 2) calc(var(--space) * 2.5) 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
 .scope { display: flex; gap: calc(var(--space) * 1.5); flex-wrap: wrap; align-items: baseline; }
+.project-link { color: inherit; }
 .scope strong { font-family: var(--font-mono); font-size: 1.05rem; }
 .scope span { color: var(--text-muted); font-size: 0.9rem; }
 .meta { margin: var(--space) 0; font-size: 0.85rem; }

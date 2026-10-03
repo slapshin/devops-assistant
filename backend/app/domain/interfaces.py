@@ -25,6 +25,14 @@ from app.domain.report import (
 )
 
 
+class ProjectActivity(Contract):
+    latest: AnalysisJob | None = None
+    """Newest finished job."""
+    active: AnalysisJob | None = None
+    """Queued or running job."""
+    report_count: int = 0
+
+
 class Cancelled(Exception):
     """Raised at a cancellation checkpoint."""
 
@@ -168,11 +176,7 @@ class ReportRepository(Protocol):
         self, project_id: str | None, limit: int, cursor: str | None
     ) -> tuple[list[AnalysisJob], str | None]: ...
 
-    async def project_activity(
-        self, project_ids: Sequence[str]
-    ) -> dict[str, tuple[AnalysisJob | None, AnalysisJob | None]]:
-        """project_id -> (latest finished job, active job)."""
-        ...
+    async def project_activity(self, project_ids: Sequence[str]) -> dict[str, ProjectActivity]: ...
 
     async def mark_running(self, analysis_id: str, at: datetime) -> AnalysisJob | None: ...
 

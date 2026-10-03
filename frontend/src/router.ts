@@ -5,11 +5,16 @@ import FindingsView from "./views/report/FindingsView.vue";
 import OverviewView from "./views/report/OverviewView.vue";
 import ReportLayout from "./views/report/ReportLayout.vue";
 import TrendsView from "./views/report/TrendsView.vue";
-import StartView from "./views/StartView.vue";
+import ProjectFormView from "./views/projects/ProjectFormView.vue";
+import ProjectsView from "./views/projects/ProjectsView.vue";
+import ProjectView from "./views/projects/ProjectView.vue";
 
 /** Routes from docs/UI_SPEC.md §1. */
 export const routes: RouteRecordRaw[] = [
-  { path: "/", name: "start", component: StartView },
+  { path: "/", name: "projects", component: ProjectsView },
+  { path: "/projects/new", name: "project-new", component: ProjectFormView },
+  { path: "/projects/:projectId", name: "project", component: ProjectView, props: true },
+  { path: "/projects/:projectId/edit", name: "project-edit", component: ProjectFormView, props: true },
   { path: "/analyses/:id", name: "job", component: JobView, props: true },
   {
     path: "/reports/:id",

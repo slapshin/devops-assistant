@@ -3,16 +3,8 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ApiError } from "../api/client";
 import { isActive, useAnalysis, useCancel, useSubmit } from "../api/queries";
-import { JOB_STATES, formatTime, utcTooltip } from "../lib/format";
+import { JOB_STATES, STAGE_LABELS, formatTime, utcTooltip } from "../lib/format";
 
-const STAGE_LABELS: Record<string, string> = {
-  discovery: "Discover capabilities",
-  collection: "Collect metrics",
-  detection: "Detect anomalies",
-  trends: "Build 14-day trends",
-  explanation: "AI explanation",
-  saving: "Save report",
-};
 const STAGE_STATUS_ICONS: Record<string, string> = { pending: "○", running: "◔", done: "●", failed: "✕", skipped: "–" };
 
 const props = defineProps<{ id: string }>();
@@ -60,7 +52,7 @@ watch(
     <h1 id="job-title">Analysis progress</h1>
     <p v-if="route.query.duplicate" class="banner">An analysis for this scope is already running; showing it.</p>
 
-    <p v-if="notFound" role="alert" class="banner error">This analysis does not exist. <RouterLink to="/">Start a new one</RouterLink>.</p>
+    <p v-if="notFound" role="alert" class="banner error">This analysis does not exist. <RouterLink to="/">Back to projects</RouterLink>.</p>
     <p v-else-if="job.isError.value" role="alert" class="banner error">
       Lost connection to the assistant — retrying failed. <button type="button" @click="job.refetch()">Retry</button>
     </p>
@@ -68,7 +60,7 @@ watch(
 
     <template v-else-if="current">
       <p>
-        <strong>{{ current.scope.project_name }}</strong>
+        <RouterLink :to="`/projects/${current.scope.project_id}`"><strong>{{ current.scope.project_name }}</strong></RouterLink>
         · window ends <span :title="utcTooltip(current.end_time)">{{ formatTime(current.end_time) }}</span>
         · {{ JOB_STATES[current.state] }}
       </p>
@@ -103,7 +95,7 @@ watch(
       <p v-if="submit.error.value" role="alert" class="banner error">Could not start a new analysis: {{ submit.error.value.message }}</p>
       <div v-if="!active && !current.report_available" class="row">
         <button type="button" class="primary" :disabled="submit.isPending.value" @click="runAgain">Run again</button>
-        <RouterLink :to="{ path: '/', query: { project: current.scope.project_id } }">New analysis</RouterLink>
+        <RouterLink :to="`/projects/${current.scope.project_id}`">Back to project</RouterLink>
       </div>
     </template>
   </section>

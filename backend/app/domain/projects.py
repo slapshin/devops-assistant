@@ -166,10 +166,11 @@ class Project(Contract):
 
 
 class ProjectSummary(Project):
-    """A project with its latest finished and currently active analysis (list page)."""
+    """A project with its analysis activity (list and detail pages)."""
 
-    latest_analysis: AnalysisJob | None = None
-    active_analysis: AnalysisJob | None = None
+    latest_analysis: AnalysisJob | None = Field(default=None, description="Newest finished job.")
+    active_analysis: AnalysisJob | None = Field(default=None, description="Queued or running job.")
+    report_count: int = Field(default=0, ge=0, description="Saved reports (deleted with it).")
 
 
 class ProjectList(Contract):

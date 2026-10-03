@@ -2,7 +2,7 @@
 
 This is the execution index for the first usable DevOps AI assistant release. Read [the product plan](../PRODUCT_PLAN.md) and [architecture](../ARCHITECTURE.md) before starting. Web UI, project/env selection, 24-hour analysis, two-week trends, and OpenAI-first explanations are confirmed. The Vue.js frontend is an owner decision (2026-09-30); Python/FastAPI, TypeScript, SQLite, and Docker are proposed defaults made concrete in T001.
 
-All tasks T001–T010 are DONE. The first release is validated; see [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for evidence and remaining limitations. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
+All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. The first release is validated; see [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for evidence and remaining limitations. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
 
 ## Ordered backlog
 
@@ -20,7 +20,7 @@ All tasks T001–T010 are DONE. The first release is validated; see [RELEASE_CHE
 | T010 | [First-release acceptance and agent handoff](T010-release-validation.md) | T009 | DONE |
 | T011 | [Project model, encrypted source config, and project API](T011-projects-model-and-api.md) | T010 | DONE |
 | T012 | [Project-scoped analyses, reports, and legacy migration](T012-project-scoped-analysis.md) | T011 | DONE |
-| T013 | [Projects UI](T013-projects-ui.md) | T012 | IN_PROGRESS |
+| T013 | [Projects UI](T013-projects-ui.md) | T012 | DONE |
 
 ## How the next agent should work
 

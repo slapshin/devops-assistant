@@ -84,20 +84,22 @@ def _write_error(exc: Exception, field_prefix: str) -> ProblemError:
     raise exc
 
 
+async def _summaries(services: Services, found: list[Project]) -> list[ProjectSummary]:
+    activity = await services.repo.project_activity([p.project_id for p in found])
+    return [
+        ProjectSummary(
+            **p.model_dump(),
+            latest_analysis=activity[p.project_id].latest,
+            active_analysis=activity[p.project_id].active,
+            report_count=activity[p.project_id].report_count,
+        )
+        for p in found
+    ]
+
+
 @router.get("", response_model=ProjectList)
 async def list_projects(services: ServicesDep) -> ProjectList:
-    found = await services.projects.list()
-    activity = await services.repo.project_activity([p.project_id for p in found])
-    return ProjectList(
-        items=[
-            ProjectSummary(
-                **p.model_dump(),
-                latest_analysis=activity[p.project_id][0],
-                active_analysis=activity[p.project_id][1],
-            )
-            for p in found
-        ]
-    )
+    return ProjectList(items=await _summaries(services, await services.projects.list()))
 
 
 @router.post("", status_code=201, response_model=Project, responses=problem_responses(409, 422))
@@ -109,12 +111,12 @@ async def create_project(data: ProjectInput, services: ServicesDep) -> Project:
         raise _write_error(exc, "body.sources.0") from None
 
 
-@router.get("/{project_id}", response_model=Project, responses=problem_responses(404))
-async def get_project(project_id: str, services: ServicesDep) -> Project:
+@router.get("/{project_id}", response_model=ProjectSummary, responses=problem_responses(404))
+async def get_project(project_id: str, services: ServicesDep) -> ProjectSummary:
     project = await services.projects.get(project_id)
     if project is None:
         raise _not_found(project_id)
-    return project
+    return (await _summaries(services, [project]))[0]
 
 
 @router.put("/{project_id}", response_model=Project, responses=problem_responses(404, 409, 422))

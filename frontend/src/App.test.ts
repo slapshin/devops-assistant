@@ -6,12 +6,14 @@ import config from "../../fixtures/api/config.json";
 import jobCompleted from "../../fixtures/jobs/job_completed.json";
 import jobInterrupted from "../../fixtures/jobs/job_interrupted.json";
 import jobRunning from "../../fixtures/jobs/job_running.json";
+import connectionTest from "../../fixtures/api/connection_test.json";
 import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
+import type { AnalysisJob, ProjectSummary } from "./api/client";
 import App from "./App.vue";
 import { makeRouter } from "./router";
 
@@ -67,18 +69,78 @@ function report(fixture: { analysis_id: string }) {
   return `/reports/${fixture.analysis_id}`;
 }
 
-describe("start", () => {
-  it("selects the only project and shows queue-full with retry time", async () => {
-    routes["POST /api/analyses"] = () => problem(429, "queue_full", "Analysis queue is full", undefined, { "retry-after": "45" });
-    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+type Summary = ProjectSummary;
+const base = projects.items[0] as unknown as Summary;
+const running = jobRunning as unknown as AnalysisJob;
+const PID = base.project_id;
+const withId = (id: string, changes: Partial<Summary> = {}): Summary => ({ ...base, project_id: id, name: id, ...changes });
+const reachable = { reachable: true, auth_ok: true, matched_series: 12, history_days: 30, families: [], checked_at: "2026-09-30T10:05:00Z" };
+
+describe("projects list", () => {
+  it("shows health, latest report, trend and empty states for every project", async () => {
+    const items = [
+      withId("ok"),
+      withId("down", { latest_analysis: null }),
+      withId("denied"),
+      withId("empty-match"),
+      withId("no-source", { sources: [] }),
+      withId("locked", { credentials_readable: false }),
+    ];
+    routes["GET /api/projects"] = () => json({ items });
+    routes["GET /api/projects/ok/health"] = () => json(reachable);
+    routes["GET /api/projects/down/health"] = () => json({ ...reachable, reachable: false, auth_ok: null, matched_series: null });
+    routes["GET /api/projects/denied/health"] = () => json({ ...reachable, auth_ok: false, matched_series: null });
+    routes["GET /api/projects/empty-match/health"] = () => json({ ...reachable, matched_series: 0 });
     await renderAt("/");
-    const analyze = await screen.findByRole("button", { name: "Analyze" });
-    await waitFor(() => expect(analyze).toBeEnabled());
-    await fireEvent.click(analyze);
-    await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
+
+    const card = (name: string) => screen.getByRole("article", { name });
+    await waitFor(() => expect(within(card("ok")).getByText(/Reachable/)).toBeInTheDocument());
+    expect(await within(card("down")).findByText(/Unreachable/)).toBeInTheDocument();
+    expect(await within(card("denied")).findByText(/Auth failed/)).toBeInTheDocument();
+    expect(await within(card("empty-match")).findByText(/No matching series/)).toBeInTheDocument();
+    expect(within(card("no-source")).getByText(/No source/)).toBeInTheDocument();
+    expect(within(card("locked")).getByText(/Credentials unreadable/)).toBeInTheDocument();
+    // health is never requested for projects that cannot be checked
+    expect(calls.some((c) => c.url.includes("no-source/health") || c.url.includes("locked/health"))).toBe(false);
+
+    expect(within(card("ok")).getByRole("link", { name: /Completed/ })).toHaveAttribute("href", `/reports/${base.latest_analysis?.analysis_id}`);
+    expect(within(card("ok")).getByText("1 critical")).toBeInTheDocument();
+    expect(within(card("ok")).getByRole("img", { name: /Anomaly episodes over 14 days/ })).toBeInTheDocument();
+    expect(within(card("down")).getByText("No report yet")).toBeInTheDocument();
+    expect(within(card("down")).getByText("No trend yet")).toBeInTheDocument();
+    expect(within(card("no-source")).getByRole("button", { name: "Run analysis" })).toBeDisabled();
+    expect(within(card("no-source")).getByText(/Add a metrics source/)).toBeInTheDocument();
+  });
+
+  it("runs an analysis from the list and shows its progress inline", async () => {
+    let active = false;
+    routes["GET /api/projects"] = () => json({ items: [{ ...base, active_analysis: active ? running : null }] });
+    routes[`GET /api/projects/${PID}/health`] = () => json(reachable);
+    routes["POST /api/analyses"] = () => {
+      active = true;
+      return json({ analysis: jobRunning, duplicate_of_active: false }, 202);
+    };
+    await renderAt("/");
+    await fireEvent.click(await screen.findByRole("button", { name: "Run analysis" }));
+    expect(JSON.parse(calls.find((c) => c.method === "POST")?.body ?? "{}")).toEqual({ project_id: PID });
+    expect(await screen.findByRole("link", { name: "Running" })).toHaveAttribute("href", `/analyses/${jobRunning.analysis_id}`);
+    expect(screen.getByText(/Collect metrics \(38\/52\)/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run analysis" })).not.toBeInTheDocument();
+  });
+
+  it("shows queue-full with the retry time", async () => {
+    routes[`GET /api/projects/${PID}/health`] = () => json(reachable);
+    routes["POST /api/analyses"] = () => problem(429, "queue_full", "Analysis queue is full", undefined, { "retry-after": "45" });
+    await renderAt("/");
+    await fireEvent.click(await screen.findByRole("button", { name: "Run analysis" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Try again in 45 seconds");
-    const projectId = projects.items[0]?.project_id;
-    expect(JSON.parse(calls.find((c) => c.method === "POST")?.body ?? "{}")).toEqual({ project_id: projectId });
+  });
+
+  it("explains an empty list and a failed load", async () => {
+    routes["GET /api/projects"] = () => json({ items: [] });
+    await renderAt("/");
+    expect(await screen.findByRole("heading", { name: "No projects yet" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create project" })).toHaveAttribute("href", "/projects/new");
   });
 
   it("reports projects that cannot be loaded", async () => {
@@ -86,6 +148,159 @@ describe("start", () => {
     await renderAt("/");
     expect(await screen.findByRole("alert")).toHaveTextContent("Projects could not be loaded");
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  it("filters long lists by name or label", async () => {
+    const items = Array.from({ length: 11 }, (_, i) => withId(`p${i}`, { sources: [] }));
+    routes["GET /api/projects"] = () => json({ items });
+    await renderAt("/");
+    await fireEvent.update(await screen.findByPlaceholderText("Filter by name or label"), "p10");
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+  });
+});
+
+describe("project form", () => {
+  it("validates like the server before creating", async () => {
+    routes["POST /api/projects"] = () => json({ ...base, project_id: "new-id" }, 201);
+    routes["GET /api/projects/new-id"] = () => json({ ...base, project_id: "new-id" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt("/projects/new");
+    await fireEvent.click(await screen.findByRole("button", { name: "Create project" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Some fields need attention");
+    expect(screen.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Label value 1")).toHaveAttribute("aria-invalid", "true");
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+
+    await fireEvent.update(screen.getByLabelText("Name"), "Shop");
+    await fireEvent.update(screen.getByLabelText("Label name 2"), "__name__");
+    await fireEvent.update(screen.getByLabelText("Label value 1"), "shop");
+    await fireEvent.update(screen.getByLabelText("Label value 2"), "prod");
+    expect(await screen.findByText("Labels starting with __ are reserved")).toBeInTheDocument();
+    await fireEvent.update(screen.getByLabelText("Label name 2"), "env");
+    await fireEvent.update(screen.getByLabelText("URL"), "http://user:pw@vm:8428");
+    expect(await screen.findByText(/Must not contain credentials/)).toBeInTheDocument();
+    await fireEvent.update(screen.getByLabelText("URL"), "http://vm:8428/prom");
+    await fireEvent.update(screen.getByLabelText("Authentication"), "bearer");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    expect(screen.getByLabelText("Token")).toHaveAttribute("aria-invalid", "true");
+    await fireEvent.update(screen.getByLabelText("Token"), "tok");
+    expect(screen.getByText("The connection has not been tested.")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/new-id"));
+    expect(JSON.parse(calls.find((c) => c.method === "POST")?.body ?? "{}")).toEqual({
+      name: "Shop",
+      description: null,
+      matchers: [
+        { name: "project", value: "shop" },
+        { name: "env", value: "prod" },
+      ],
+      sources: [{ kind: "prometheus", url: "http://vm:8428/prom", tls_verify: true, auth: { type: "bearer", token: "tok" } }],
+    });
+  });
+
+  it("keeps a stored secret when the field is left empty and shows server errors", async () => {
+    routes[`GET /api/projects/${PID}`] = () => json(base);
+    let attempt = 0;
+    routes[`PUT /api/projects/${PID}`] = () =>
+      ++attempt === 1
+        ? json({ type: "about:blank", title: "Request validation failed", status: 422, code: "validation_error", errors: [{ field: "body.matchers.0.name", message: "bad label" }] }, 422)
+        : json(base);
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    await renderAt(`/projects/${PID}/edit`);
+    expect(await screen.findByLabelText("Token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    expect(screen.getByLabelText("Name")).toHaveValue(base.name);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("bad label")).toBeInTheDocument();
+    const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
+    expect(put.sources[0].auth).toEqual({ type: "bearer" });
+
+    // switching the auth type needs the new secret
+    await fireEvent.update(screen.getByLabelText("Authentication"), "basic");
+    expect(screen.getByLabelText("Password")).toHaveAttribute("placeholder", "");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByLabelText("Password")).toHaveAttribute("aria-invalid", "true");
+    expect(calls.filter((c) => c.method === "PUT")).toHaveLength(1);
+  });
+
+  it("tests the connection with the draft and marks the result stale after edits", async () => {
+    routes["POST /api/projects/test-connection"] = () => json(connectionTest);
+    await renderAt("/projects/new");
+    await fireEvent.update(await screen.findByLabelText("Label value 1"), "paas");
+    await fireEvent.update(screen.getByLabelText("Label value 2"), "production");
+    await fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(await screen.findByText("Required to test the connection")).toBeInTheDocument();
+    expect(calls.some((c) => c.url.includes("test-connection"))).toBe(false);
+
+    await fireEvent.update(screen.getByLabelText("URL"), "http://vm:8428");
+    await fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    const result = await screen.findByRole("region", { name: "Connection test result" });
+    expect(result).toHaveTextContent("Reachable · 1832 matching series · 30 days of history");
+    expect(within(result).getByRole("row", { name: /Latency.*Unsupported.*histogram/ })).toBeInTheDocument();
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({
+      project_id: null,
+      matchers: [
+        { name: "project", value: "paas" },
+        { name: "env", value: "production" },
+      ],
+      source: { kind: "prometheus", url: "http://vm:8428", tls_verify: true, auth: { type: "none" } },
+    });
+    expect(screen.queryByText(/not tested/)).not.toBeInTheDocument();
+
+    await fireEvent.update(screen.getByLabelText("URL"), "http://other:8428");
+    expect(screen.getByText(/The form changed after this test/)).toBeInTheDocument();
+    expect(screen.getByText("The connection was not tested with the current values.")).toBeInTheDocument();
+  });
+
+  it("deletes only after the name is typed and never while an analysis runs", async () => {
+    let current: Summary = { ...base, report_count: 3, active_analysis: running };
+    routes[`GET /api/projects/${PID}`] = () => json(current);
+    routes[`DELETE /api/projects/${PID}`] = () => new Response(null, { status: 204 });
+    const router = await renderAt(`/projects/${PID}/edit`);
+    expect(await screen.findByText("3 saved reports")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete project…" })).toBeDisabled();
+
+    current = { ...current, active_analysis: null };
+    await router.push("/");
+    await router.push(`/projects/${PID}/edit`);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete project…" })).toBeEnabled());
+    await fireEvent.click(screen.getByRole("button", { name: "Delete project…" }));
+    const confirm = screen.getByRole("button", { name: "Delete permanently" });
+    await fireEvent.update(screen.getByLabelText(/to confirm/), "paas");
+    expect(confirm).toBeDisabled();
+    await fireEvent.update(screen.getByLabelText(/to confirm/), base.name);
+    expect(confirm).toBeEnabled();
+    await fireEvent.click(confirm);
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/"));
+    expect(calls.some((c) => c.method === "DELETE" && c.url === `/api/projects/${PID}`)).toBe(true);
+  });
+});
+
+describe("project page", () => {
+  it("shows configuration and pages through the analysis history", async () => {
+    routes[`GET /api/projects/${PID}`] = () => json(base);
+    routes[`GET /api/projects/${PID}/health`] = () => json(reachable);
+    routes["GET /api/analyses"] = (init) => {
+      void init;
+      const cursor = new URL(calls.at(-1)?.url ?? "", "http://x").searchParams.get("cursor");
+      return cursor ? json({ items: [jobInterrupted], next_cursor: null }) : json({ items: [jobCompleted], next_cursor: jobCompleted.analysis_id });
+    };
+    await renderAt(`/projects/${PID}`);
+    expect(await screen.findByRole("heading", { name: base.name })).toBeInTheDocument();
+    expect(screen.getByText("victoriametrics.example:8428")).toBeInTheDocument();
+    expect(screen.getByText(/Bearer token/)).toBeInTheDocument();
+    expect(await screen.findAllByRole("row")).toHaveLength(2);
+    await fireEvent.click(screen.getByRole("button", { name: "Load older analyses" }));
+    await waitFor(() => expect(screen.getAllByRole("row")).toHaveLength(3));
+    expect(screen.queryByRole("button", { name: "Load older analyses" })).not.toBeInTheDocument();
+    expect(calls.some((c) => c.url.includes(`project_id=${PID}`))).toBe(true);
+  });
+
+  it("explains a deleted project", async () => {
+    routes["GET /api/projects/gone"] = () => problem(404, "project_not_found", "Project not found");
+    await renderAt("/projects/gone");
+    expect(await screen.findByRole("alert")).toHaveTextContent("This project does not exist");
   });
 });
 

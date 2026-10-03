@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
 const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
 const BYTES_PER_KIBIBYTE = 1024;
 const BYTE_UNITS = ["B", "KiB", "MiB", "GiB", "TiB"];
 /** Ratios below this (but above zero) get an extra decimal so they do not round to 0.0 %. */
@@ -115,6 +116,32 @@ export const STATUS_LABELS: Record<string, { label: string; icon: string }> = {
   source_error: { label: "Source error", icon: "!" },
   not_evaluated: { label: "Not evaluated", icon: "–" },
 };
+
+export const STAGE_LABELS: Record<string, string> = {
+  discovery: "Discover capabilities",
+  collection: "Collect metrics",
+  detection: "Detect anomalies",
+  trends: "Build 14-day trends",
+  explanation: "AI explanation",
+  saving: "Save report",
+};
+
+export const CAPABILITY_LABELS: Record<string, { label: string; icon: string }> = {
+  supported: { label: "Supported", icon: "✓" },
+  partial: { label: "Partial", icon: "◐" },
+  unverified: { label: "Unverified", icon: "?" },
+  unsupported: { label: "Unsupported", icon: "⊘" },
+};
+
+/** "3 h ago"-style age for list pages; the absolute time goes in a tooltip. */
+export function formatAge(iso: string, now = Date.now()): string {
+  const minutes = Math.round((now - new Date(iso).getTime()) / (MS_PER_SECOND * SECONDS_PER_MINUTE));
+  if (minutes < 1) return "just now";
+  if (minutes < MINUTES_PER_HOUR) return `${minutes} min ago`;
+  const hours = Math.round(minutes / MINUTES_PER_HOUR);
+  if (hours < HOURS_PER_DAY) return `${hours} h ago`;
+  return `${Math.round(hours / HOURS_PER_DAY)} d ago`;
+}
 
 export const JOB_STATES: Record<string, string> = {
   queued: "Queued",

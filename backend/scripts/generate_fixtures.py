@@ -1074,6 +1074,7 @@ def build() -> dict[str, BaseModel]:
                     created_at=T,
                     updated_at=T,
                     latest_analysis=completed,
+                    report_count=1,
                 )
             ]
         ),

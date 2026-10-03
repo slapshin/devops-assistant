@@ -871,9 +871,10 @@ export interface components {
         };
         /**
          * ProjectSummary
-         * @description A project with its latest finished and currently active analysis (list page).
+         * @description A project with its analysis activity (list and detail pages).
          */
         ProjectSummary: {
+            /** @description Queued or running job. */
             active_analysis?: components["schemas"]["AnalysisJob"] | null;
             /** Created At */
             created_at: string;
@@ -885,6 +886,7 @@ export interface components {
             credentials_readable: boolean;
             /** Description */
             description?: string | null;
+            /** @description Newest finished job. */
             latest_analysis?: components["schemas"]["AnalysisJob"] | null;
             /** Matchers */
             matchers: components["schemas"]["LabelMatcher"][];
@@ -892,6 +894,12 @@ export interface components {
             name: string;
             /** Project Id */
             project_id: string;
+            /**
+             * Report Count
+             * @description Saved reports (deleted with it).
+             * @default 0
+             */
+            report_count: number;
             /** Sources */
             sources: components["schemas"]["PrometheusSource"][];
             /** Updated At */
@@ -1550,7 +1558,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Project"];
+                    "application/json": components["schemas"]["ProjectSummary"];
                 };
             };
             /** @description Problem */
