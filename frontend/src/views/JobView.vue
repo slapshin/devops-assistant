@@ -39,7 +39,7 @@ async function runAgain() {
   if (!current.value) return;
 
   try {
-    const submitted = await submit.mutateAsync({ project: current.value.scope.project, env: current.value.scope.env });
+    const submitted = await submit.mutateAsync({ project_id: current.value.scope.project_id });
     await router.push(`/analyses/${submitted.analysis.analysis_id}`);
   } catch {
     /* shown from submit.error */
@@ -68,7 +68,7 @@ watch(
 
     <template v-else-if="current">
       <p>
-        <strong>{{ current.scope.project }} / {{ current.scope.env }}</strong>
+        <strong>{{ current.scope.project_name }}</strong>
         · window ends <span :title="utcTooltip(current.end_time)">{{ formatTime(current.end_time) }}</span>
         · {{ JOB_STATES[current.state] }}
       </p>
@@ -103,7 +103,7 @@ watch(
       <p v-if="submit.error.value" role="alert" class="banner error">Could not start a new analysis: {{ submit.error.value.message }}</p>
       <div v-if="!active && !current.report_available" class="row">
         <button type="button" class="primary" :disabled="submit.isPending.value" @click="runAgain">Run again</button>
-        <RouterLink :to="{ path: '/', query: { project: current.scope.project, env: current.scope.env } }">New analysis</RouterLink>
+        <RouterLink :to="{ path: '/', query: { project: current.scope.project_id } }">New analysis</RouterLink>
       </div>
     </template>
   </section>

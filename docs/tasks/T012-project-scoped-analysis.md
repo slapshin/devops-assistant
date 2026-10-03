@@ -43,17 +43,31 @@ Every analysis job and report belongs to a project. Collection uses that project
 
 ## Acceptance
 
-- [ ] Every generated query for a project contains all of its matchers (property test over the catalog with 1–3 matchers, including values with quotes and backslashes).
-- [ ] Two projects on different sources and URLs run, store, and list independently. No cache or report is shared between them.
-- [ ] Upgrading a database copy from the current release produces correct projects, keeps all old reports readable, and imports the legacy source once.
-- [ ] Hard delete removes the project, jobs, and reports and is refused while a job is active.
-- [ ] Interrupted-job handling, partial/exclusion semantics, and AI-independence still hold, with existing tests adapted.
-- [ ] `make check`, `docker build`, and `make demo` pass. Docs are updated: DECISIONS (API/config), ARCHITECTURE, OPERATIONS (backing up `secret.key` with the DB, migration notes), metrics-catalog (scope rule), AGENTS.md.
+- [x] Every generated query for a project contains all of its matchers (property test over the catalog with 1–3 matchers, including values with quotes and backslashes).
+- [x] Two projects on different sources and URLs run, store, and list independently. No cache or report is shared between them.
+- [x] Upgrading a database copy from the current release produces correct projects, keeps all old reports readable, and imports the legacy source once.
+- [x] Hard delete removes the project, jobs, and reports and is refused while a job is active.
+- [x] Interrupted-job handling, partial/exclusion semantics, and AI-independence still hold, with existing tests adapted.
+- [x] `make check`, `docker build`, and `make demo` pass. Docs are updated: DECISIONS (API/config), ARCHITECTURE, OPERATIONS (backing up `secret.key` with the DB, migration notes), metrics-catalog (scope rule), AGENTS.md.
 
 ## Completion record
 
-- Completed date:
+- Completed date: 2026-10-03
 - Actual changed files and artifacts:
+  - new: `app/metrics/factory.py` (`ProjectSources`, `connect`), `app/bootstrap.py` (legacy import, demo seeding), `migrations/versions/0003_project_scoped_jobs.py`, `tests/test_project_analyses.py`, `tests/helpers.py`, `tests/conftest.py`
+  - domain: `Scope {project_id, project_name, matchers}` with `LabelMatcher` moved to `common.py`; `REPORT_SCHEMA_VERSION` 2.0; `SourceProvider`; `AnalysisSubmission {project_id}`; `AnalysisJob.daily_episodes`; `ProjectSummary`; error codes `project_busy` and `source_not_configured` added, `env_not_found` removed; `SourceStatus`/discovery contracts removed
+  - metrics: `promql` requires every matcher; label discovery removed from `PrometheusMetricsSource`/`SyntheticMetricsSource`; `probe.py` adds capability families
+  - `service.py`, `jobs.py`, `main.py`, `container.py`, `settings.py` (deprecated `METRICS_*`, `DEMO_PROJECTS`), `storage/db.py` (FK-safe migrate), `storage/repository.py`, `storage/projects.py`, `api/routes.py`, `api/projects.py`, `ai/prompt.py`, `analysis/engine.py`, `maintenance.py`
+  - `scripts/export_schemas.py` now builds the app in a temporary data dir. Before this, `make contracts` migrated the developer's `backend/data` database in place.
+  - minimal frontend switch to `project_id` (`StartView.vue`, `JobView.vue`, `ReportLayout.vue`, `api/*`, `App.test.ts`); T013 replaces the start page
+  - `Makefile` (`make demo`), `tools/compose/compose.yml`, `config.env.template`, `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/OPERATIONS.md`, `docs/metrics-catalog.md`, `docs/contracts.md`; regenerated contracts, schema types and fixtures
 - Commands/checks and results:
+  - `make check` passes (354 backend tests passed, 2 skipped; 19 frontend tests; build).
+  - `docker build` passes. The packaged image was run with `DEMO_PROJECTS=true AI_PROVIDER=fake` in a throwaway container: 4 demo projects were seeded, an analysis of `Demo: incident` completed, and `/api/projects/{id}/health` returned the capability families.
+  - Real upgrade: the developer database `backend/data/assistant.sqlite3` (7 jobs, 7 reports, pairs `paas/production` and `pw-com/production`) was migrated to 0003. A copy served all 7 reports through the API, and the legacy import attached the source to both projects. `PRAGMA foreign_key_check` is clean.
 - Decisions or dependency changes:
-- Remaining limitations or blockers:
+  - Migration 0003 converts the saved snapshots itself (to schema 2.0), so reports are not upgraded at read time.
+  - Every analysis opens its own client from the stored project and closes it afterwards. No client is cached across jobs, so edits and deletes never affect a running job.
+  - The analysis key (and therefore the derived IDs) is now based on the project's matchers instead of project/env.
+  - `docker-compose` still passes `METRICS_URL` (default `http://host.docker.internal:8428`) only for the one-time import into Docker volumes from the pre-project release.
+- Remaining limitations or blockers: the existing Docker volume `ai-assistant_assistant-data` was not upgraded here. It migrates on the next `make up`; back it up first with `make docker-backup`.

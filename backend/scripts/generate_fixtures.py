@@ -22,6 +22,7 @@ from app.domain.common import (
     ConfidenceLevel,
     Entity,
     EntityKind,
+    LabelMatcher,
     Reason,
     Scope,
     Severity,
@@ -57,17 +58,12 @@ from app.domain.ids import episode_id, evidence_id, finding_id, series_id
 from app.domain.jobs import (
     AnalysisJob,
     AnalysisSubmitted,
-    DiscoveredProjectList,
-    EnvItem,
-    EnvList,
     ErrorCode,
     JobError,
     JobState,
     Limits,
     Problem,
-    ProjectItem,
     RuntimeConfig,
-    SourceStatus,
     StageName,
     StageProgress,
     StageStatus,
@@ -76,9 +72,9 @@ from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.projects import (
     BearerAuth,
     ConnectionTest,
-    LabelMatcher,
-    Project,
+    FamilyCapability,
     ProjectList,
+    ProjectSummary,
     PrometheusSource,
 )
 from app.domain.report import (
@@ -89,9 +85,19 @@ from app.domain.report import (
     ReportState,
     SourceInfo,
 )
+from app.jobs import daily_episodes
 
 ROOT = Path(__file__).resolve().parents[2] / "fixtures"
-SCOPE = Scope(project="paas", env="production")
+PROJECT_ID = "01999a3c-0000-7000-8000-000000000001"
+SCOPE = Scope(
+    project_id=PROJECT_ID,
+    project_name="paas / production",
+    matchers=[
+        LabelMatcher(name="env", value="production"),
+        LabelMatcher(name="project", value="paas"),
+    ],
+)
+SCOPE_LABELS = {m.name: m.value for m in SCOPE.matchers}
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
 STEP = timedelta(seconds=STEP_SECONDS)
 CONFIG = DetectorConfig()
@@ -133,7 +139,8 @@ ALL_FAMILIES = list(SignalFamily)
 
 
 def analysis_key(analysis_id: str) -> str:
-    return f"{analysis_id}|{SCOPE.project}|{SCOPE.env}|{T.isoformat()}|{CONFIG.config_hash}"
+    scope = ",".join(f"{m.name}={m.value}" for m in SCOPE.matchers)
+    return f"{analysis_id}|{scope}|{T.isoformat()}|{CONFIG.config_hash}"
 
 
 # --- capabilities -----------------------------------------------------------------------------
@@ -461,7 +468,7 @@ def make_series(
     values: list[float | None],
     extra_labels: dict[str, str] | None = None,
 ) -> MetricSeries:
-    labels = {"project": SCOPE.project, "env": SCOPE.env, **entity.labels, **(extra_labels or {})}
+    labels = {**SCOPE_LABELS, **entity.labels, **(extra_labels or {})}
     coverage = sum(v is not None for v in values) / len(values) if values else 0.0
     return MetricSeries(
         series_id=series_id(query, entity.key),
@@ -1003,6 +1010,13 @@ def build() -> dict[str, BaseModel]:
     )
 
     counts = {Severity.CRITICAL: 1, Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 0}
+    completed = job(
+        ids["anomalies"],
+        JobState.COMPLETED,
+        report_available=True,
+        explanation=ExplanationStatus.SUCCEEDED,
+        counts=counts,
+    ).model_copy(update={"daily_episodes": daily_episodes(anomalies)})
     return {
         "reports/report_healthy.json": healthy,
         "reports/report_anomalies.json": anomalies,
@@ -1012,13 +1026,7 @@ def build() -> dict[str, BaseModel]:
         "jobs/job_running.json": job(
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
-        "jobs/job_completed.json": job(
-            ids["anomalies"],
-            JobState.COMPLETED,
-            report_available=True,
-            explanation=ExplanationStatus.SUCCEEDED,
-            counts=counts,
-        ),
+        "jobs/job_completed.json": completed,
         "jobs/job_interrupted.json": job(
             ids["interrupted"],
             JobState.FAILED,
@@ -1040,7 +1048,6 @@ def build() -> dict[str, BaseModel]:
             explanation_status=ExplanationStatus.NOT_CONFIGURED,
             detector_version=CONFIG.version,
             config_hash=CONFIG.config_hash,
-            metrics_source="http://localhost:8428",
             limits=Limits(
                 max_running_jobs=1,
                 max_queued_jobs=4,
@@ -1050,20 +1057,13 @@ def build() -> dict[str, BaseModel]:
                 report_max_bytes=20 * 1024 * 1024,
             ),
         ),
-        "api/discovered_projects.json": DiscoveredProjectList(
-            items=[ProjectItem(project="paas")],
-            source_status=SourceStatus(reachable=True, checked_at=T),
-        ),
         "api/projects.json": ProjectList(
             items=[
-                Project(
-                    project_id="01999a3c-0000-7000-8000-000000000001",
-                    name="paas / production",
+                ProjectSummary(
+                    project_id=PROJECT_ID,
+                    name=SCOPE.project_name,
                     description="Synthetic example project.",
-                    matchers=[
-                        LabelMatcher(name="env", value="production"),
-                        LabelMatcher(name="project", value="paas"),
-                    ],
+                    matchers=SCOPE.matchers,
                     sources=[
                         PrometheusSource(
                             url="http://victoriametrics.example:8428",
@@ -1073,6 +1073,7 @@ def build() -> dict[str, BaseModel]:
                     ],
                     created_at=T,
                     updated_at=T,
+                    latest_analysis=completed,
                 )
             ]
         ),
@@ -1081,9 +1082,16 @@ def build() -> dict[str, BaseModel]:
             auth_ok=True,
             matched_series=1832,
             history_days=30.0,
+            families=[
+                FamilyCapability(family=SignalFamily.CPU, status=CapabilityStatus.SUPPORTED),
+                FamilyCapability(
+                    family=SignalFamily.LATENCY,
+                    status=CapabilityStatus.UNSUPPORTED,
+                    reason="No histogram buckets for http_server_request_duration_seconds.",
+                ),
+            ],
             checked_at=T,
         ),
-        "api/envs.json": EnvList(project="paas", items=[EnvItem(env="production")]),
         "api/problem_queue_full.json": Problem(
             title="Analysis queue is full",
             status=429,

@@ -4,12 +4,12 @@ The catalog is `catalog-2026.09.1` in `backend/app/metrics/catalog.py`. It holds
 
 ## Scope enforcement
 
-Templates write each selector as `metric{{{s}, …}}`. `{s}` expands to `project="<p>", env="<e>"`, with `\`, `"` and newlines escaped. `QueryTemplate.render` rejects a query when:
+Templates write each selector as `metric{{{s}, …}}`. `{s}` expands to the project's equality matchers sorted by label name, e.g. `env="<e>", project="<p>"` (T012: any 1–10 labels, not only project/env), with `\`, `"` and newlines escaped. `QueryTemplate.render` rejects a query when:
 
-- any matcher block lacks the exact project **and** env matchers (this covers both operands of every ratio and every gate query), or
+- any matcher block lacks **any** of the project's exact matchers (this covers both operands of every ratio and every gate query), or
 - a declared metric name appears without a matcher block.
 
-String literals are masked before the check, so label values cannot fake a selector. Discovery calls are scoped where the scope is known: env values use `match[]={project="<p>", env!=""}`. As a second line of defence, the source drops any returned series whose `project`/`env` labels differ from the scope and records this in `exclusions`. Every result series is labelled with the scope.
+String literals are masked before the check, so label values cannot fake a selector. As a second line of defence, the source drops any returned series whose matcher labels differ from the scope and records this in `exclusions`. Every result series is labelled with the scope's matchers. The project connection test (`app/metrics/probe.py`) uses the same scope rules.
 
 ## Semantics
 

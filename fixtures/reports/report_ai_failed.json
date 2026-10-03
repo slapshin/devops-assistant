@@ -1,9 +1,19 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "analysis_id": "01999a2b-0000-7000-8000-000000000003",
   "scope": {
-    "project": "paas",
-    "env": "production"
+    "project_id": "01999a3c-0000-7000-8000-000000000001",
+    "project_name": "paas / production",
+    "matchers": [
+      {
+        "name": "env",
+        "value": "production"
+      },
+      {
+        "name": "project",
+        "value": "paas"
+      }
+    ]
   },
   "windows": {
     "end_time": "2026-09-30T10:05:00Z",
@@ -323,7 +333,7 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_1689789ab01b7492",
+      "finding_id": "fnd_033e01fe75e4093f",
       "detector": "robust_baseline",
       "detector_version": "detectors-2026.09.1",
       "method": "relative",
@@ -362,7 +372,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_4e8b4c1c541dcbd7"
+        "evd_9b0773122055126a"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -371,7 +381,7 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_1bb67ba9bdacf615",
+      "finding_id": "fnd_19868b3b148378cc",
       "detector": "robust_baseline",
       "detector_version": "detectors-2026.09.1",
       "method": "relative",
@@ -420,7 +430,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_8cefa9aa92819c94"
+        "evd_3ef7d53a704702e6"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -453,8 +463,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_1689789ab01b7492",
-          "finding_id": "fnd_1689789ab01b7492",
+          "episode_id": "eps_033e01fe75e4093f",
+          "finding_id": "fnd_033e01fe75e4093f",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=paas-production",
@@ -474,8 +484,8 @@
           "unit": "ratio"
         },
         {
-          "episode_id": "eps_1bb67ba9bdacf615",
-          "finding_id": "fnd_1bb67ba9bdacf615",
+          "episode_id": "eps_19868b3b148378cc",
+          "finding_id": "fnd_19868b3b148378cc",
           "entity": {
             "kind": "route",
             "key": "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
@@ -730,8 +740,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_4e8b4c1c541dcbd7",
-      "finding_id": "fnd_1689789ab01b7492",
+      "evidence_id": "evd_9b0773122055126a",
+      "finding_id": "fnd_033e01fe75e4093f",
       "series": {
         "series_id": "ser_063ed23f9b327c5f",
         "family": "cpu",
@@ -746,8 +756,8 @@
           }
         },
         "labels": {
-          "project": "paas",
           "env": "production",
+          "project": "paas",
           "job": "node",
           "instance": "paas-production"
         },
@@ -1297,8 +1307,8 @@
       "threshold_label": "Diagnostic heuristic: 90 % for ≥ 15 min (not an SLO)"
     },
     {
-      "evidence_id": "evd_8cefa9aa92819c94",
-      "finding_id": "fnd_1bb67ba9bdacf615",
+      "evidence_id": "evd_3ef7d53a704702e6",
+      "finding_id": "fnd_19868b3b148378cc",
       "series": {
         "series_id": "ser_02c37ee087ed4e7e",
         "family": "client_errors",
@@ -1314,8 +1324,8 @@
           }
         },
         "labels": {
-          "project": "paas",
           "env": "production",
+          "project": "paas",
           "job": "dispatcher-api",
           "http_route": "/api/v3/tasks/:task",
           "http_request_method": "GET",

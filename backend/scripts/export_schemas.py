@@ -6,6 +6,7 @@ Usage: uv run python -m scripts.export_schemas [--check]
 import argparse
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -15,8 +16,6 @@ from app.domain.jobs import (
     AnalysisJob,
     AnalysisSubmission,
     AnalysisSubmitted,
-    DiscoveredProjectList,
-    EnvList,
     Problem,
     RuntimeConfig,
 )
@@ -38,12 +37,10 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "MetricCapability": MetricCapability,
     "ExplanationInput": ExplanationInput,
     "Problem": Problem,
-    "DiscoveredProjectList": DiscoveredProjectList,
     "ProjectList": ProjectList,
     "ProjectInput": ProjectInput,
     "ConnectionTestRequest": ConnectionTestRequest,
     "ConnectionTest": ConnectionTest,
-    "EnvList": EnvList,
     "RuntimeConfig": RuntimeConfig,
 }
 
@@ -57,8 +54,11 @@ def outputs() -> dict[str, str]:
         f"{name}.schema.json": dump(model.model_json_schema(mode="serialization"))
         for name, model in SCHEMAS.items()
     }
-    app = create_app(load_settings(ai_provider="none", _env_file=None))
-    files["openapi.json"] = dump(app.openapi())
+    # A throwaway data dir: building the app migrates its database and creates a secret key.
+    with tempfile.TemporaryDirectory() as data_dir:
+        app = create_app(load_settings(ai_provider="none", data_dir=data_dir, _env_file=None))
+        files["openapi.json"] = dump(app.openapi())
+        app.state.services.repo.close()
     return files
 
 

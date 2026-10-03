@@ -1,11 +1,11 @@
 """Scope-enforcing PromQL/MetricsQL construction.
 
 Templates write every metric selector as ``metric{{{s}}}`` or ``metric{{{s}, extra="x"}}``;
-``{s}`` expands to the escaped exact project/env matchers and ``{w}`` to the rate window.
+``{s}`` expands to the project's escaped exact label matchers and ``{w}`` to the rate window.
 ``render`` enforces two invariants, so a template can never silently leave its scope
 (including both operands of a ratio):
 
-1. every ``{...}`` matcher block contains the exact project and env matchers;
+1. every ``{...}`` matcher block contains every one of the project's exact matchers;
 2. every declared metric name is immediately followed by a matcher block (no bare names).
 """
 
@@ -13,8 +13,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from app.domain.common import Scope
-from app.domain.projects import LabelMatcher
+from app.domain.common import LabelMatcher, Scope
 
 
 class ScopeViolation(ValueError):
@@ -32,7 +31,7 @@ def render_matchers(matchers: Sequence[LabelMatcher]) -> str:
 
 
 def scope_matchers(scope: Scope) -> str:
-    return f'project="{escape_label_value(scope.project)}", env="{escape_label_value(scope.env)}"'
+    return render_matchers(scope.matchers)
 
 
 def selector(metric: str, scope: Scope, extra: str = "") -> str:
@@ -50,8 +49,7 @@ def _mask_strings(query: str) -> str:
 
 
 def assert_scoped(query: str, scope: Scope, metrics: Sequence[str]) -> None:
-    project = f'project="{escape_label_value(scope.project)}"'
-    env = f'env="{escape_label_value(scope.env)}"'
+    required = [render_matchers([m]) for m in scope.matchers]
     masked = _mask_strings(query)
     blocks = [(m.start(), m.end()) for m in re.finditer(r"\{[^{}]*\}", masked)]
     if not blocks:
@@ -60,8 +58,8 @@ def assert_scoped(query: str, scope: Scope, metrics: Sequence[str]) -> None:
         # Check against the original text: the masked text hides label values.
         block = query[start:end]
         matchers = [m.strip() for m in _split_matchers(block[1:-1])]
-        if project not in matchers or env not in matchers:
-            raise ScopeViolation(f"selector block {block} is not scoped to {scope}")
+        if any(r not in matchers for r in required):
+            raise ScopeViolation(f"selector block {block} is not scoped to {scope.matchers}")
     for metric in metrics:
         for m in re.finditer(rf"(?<![A-Za-z0-9_:]){re.escape(metric)}(?![A-Za-z0-9_:])", masked):
             if not masked[m.end() :].startswith("{"):

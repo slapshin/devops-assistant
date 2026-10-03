@@ -12,7 +12,6 @@ from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
     CollectionResult,
-    DiscoveredValues,
     EntityMapping,
     MappingKind,
     ProgressReporter,
@@ -28,7 +27,7 @@ from app.metrics.catalog import (
     SignalDef,
 )
 from app.metrics.client import PrometheusClient, RangeResult, SourceError, SourceErrorKind
-from app.metrics.promql import assert_scoped, escape_label_value, scope_matchers
+from app.metrics.promql import assert_scoped, scope_matchers
 
 log = logging.getLogger("app.metrics")
 
@@ -52,8 +51,10 @@ class CollectionBudget:
     max_series_per_query: int = 500
     max_series_per_job: int = 5000
     top_routes_per_service: int = 20
-    max_projects: int = 200
-    max_envs: int = 50
+
+
+def scope_labels(scope: Scope) -> dict[str, str]:
+    return {m.name: m.value for m in scope.matchers}
 
 
 def entity_for(defn: SignalDef, labels: dict[str, str]) -> Entity:
@@ -99,21 +100,6 @@ class PrometheusMetricsSource:
         with contextlib.suppress(SourceError):
             version = (await self.client.buildinfo()).get("version")
         return SourceInfo(base_url=self.client.base_url, backend=None, version=version)
-
-    async def _label_values(self, label: str, match: str, limit: int) -> DiscoveredValues:
-        end = _ts(self._now())
-        # Ask for one extra value to learn whether the list was truncated.
-        values = await self.client.label_values(
-            label, [match], end - HISTORY_DAYS * SECONDS_PER_DAY, end, limit + 1
-        )
-        return DiscoveredValues(values=values[:limit], truncated=len(values) > limit)
-
-    async def list_projects(self) -> DiscoveredValues:
-        return await self._label_values("project", '{project!=""}', self.budget.max_projects)
-
-    async def list_envs(self, project: str) -> DiscoveredValues:
-        match = f'{{project="{escape_label_value(project)}", env!=""}}'
-        return await self._label_values("env", match, self.budget.max_envs)
 
     async def _instant(self, query: str, scope: Scope, at: int) -> list[RangeResult]:
         assert_scoped(query, scope, ())
@@ -161,7 +147,7 @@ class PrometheusMetricsSource:
             "signal": defn.signal,
             "verified": True,
             "required_metrics": list(defn.required_metrics),
-            "required_labels": ["project", "env", *defn.identity],
+            "required_labels": [*scope.label_names, *defn.identity],
         }
         if missing:
             return MetricCapability(
@@ -279,9 +265,9 @@ class PrometheusMetricsSource:
         mappings = await self._mappings(scope, windows, exclusions)
 
         log.info(
-            "collected scope=%s/%s catalog=%s series=%d exclusions=%d requests=%d",
-            scope.project,
-            scope.env,
+            "collected project=%s matchers=%s catalog=%s series=%d exclusions=%d requests=%d",
+            scope.project_id,
+            scope_matchers(scope),
             CATALOG_VERSION,
             len(series),
             len(exclusions),
@@ -338,7 +324,7 @@ class PrometheusMetricsSource:
                     family=defn.family,
                     signal=defn.signal,
                     entity=entity,
-                    labels={"project": scope.project, "env": scope.env, **entity.labels},
+                    labels={**scope_labels(scope), **entity.labels},
                     unit=defn.unit,
                     query=query,
                     step_seconds=grid.step,
@@ -357,8 +343,7 @@ class PrometheusMetricsSource:
         kept = [
             r
             for r in results
-            if r.labels.get("project", scope.project) == scope.project
-            and r.labels.get("env", scope.env) == scope.env
+            if all(r.labels.get(m.name, m.value) == m.value for m in scope.matchers)
         ]
         if len(kept) != len(results):
             exclusions.append(

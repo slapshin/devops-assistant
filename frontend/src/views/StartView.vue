@@ -2,68 +2,56 @@
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ApiError } from "../api/client";
-import { useAnalyses, useEnvs, useProjects, useSubmit } from "../api/queries";
+import { useAnalyses, useProjects, useSubmit } from "../api/queries";
 import { JOB_STATES, SEVERITIES, formatTime, utcTooltip } from "../lib/format";
 
-const LAST_SCOPE_STORAGE_KEY = "assistant.lastScope";
+const LAST_PROJECT_STORAGE_KEY = "assistant.lastProject";
 /** Shown when a queue_full response carries no Retry-After header. */
 const DEFAULT_RETRY_AFTER_SECONDS = 30;
-
-type RememberedScope = { project?: string; env?: string };
 
 const route = useRoute();
 const router = useRouter();
 
-const project = ref<string | null>((route.query.project as string) || null);
-const env = ref<string | null>((route.query.env as string) || null);
+const projectId = ref<string | null>((route.query.project as string) || null);
 const projects = useProjects();
-const envs = useEnvs(project);
-const analyses = useAnalyses(project, env);
+const analyses = useAnalyses(projectId);
 const submit = useSubmit();
 
-const envOptions = computed(() =>
-  envs.data.value && envs.data.value.project === project.value ? envs.data.value.items : [],
-);
-const envPlaceholder = computed(() => {
-  if (!project.value) return "Select a project first";
-  return envs.isPending.value ? "Loading…" : "Select an environment";
-});
-const canAnalyze = computed(() => !!project.value && !!env.value && !submit.isPending.value);
+const selected = computed(() => projects.data.value?.items.find((p) => p.project_id === projectId.value) ?? null);
+const canAnalyze = computed(() => !!selected.value && !submit.isPending.value);
 const submitError = computed(() => (submit.error.value instanceof ApiError ? submit.error.value : null));
 
-function readLastScope(): RememberedScope {
+function readLastProject(): string | null {
   try {
-    return JSON.parse(localStorage.getItem(LAST_SCOPE_STORAGE_KEY) ?? "{}") as RememberedScope;
+    return localStorage.getItem(LAST_PROJECT_STORAGE_KEY);
   } catch {
-    return {};
+    return null;
   }
 }
 
-function rememberScope(scope: RememberedScope) {
+function rememberProject(id: string) {
   try {
-    localStorage.setItem(LAST_SCOPE_STORAGE_KEY, JSON.stringify(scope));
+    localStorage.setItem(LAST_PROJECT_STORAGE_KEY, id);
   } catch {
-    /* storage unavailable: the scope is just not remembered */
+    /* storage unavailable: the project is just not remembered */
   }
 }
 
 const reportLink = (id: string, available: boolean) => (available ? `/reports/${id}` : `/analyses/${id}`);
 
-// Changing the project always clears the environment and stale results.
 function selectProject(value: string) {
-  project.value = value || null;
-  env.value = null;
+  projectId.value = value || null;
   submit.reset();
 }
 
 async function analyze() {
-  if (!project.value || !env.value) return;
+  if (!selected.value) return;
 
-  rememberScope({ project: project.value, env: env.value });
+  rememberProject(selected.value.project_id);
 
   let result;
   try {
-    result = await submit.mutateAsync({ project: project.value, env: env.value });
+    result = await submit.mutateAsync({ project_id: selected.value.project_id });
   } catch {
     return; // shown from submit.error
   }
@@ -74,60 +62,41 @@ async function analyze() {
   });
 }
 
-// Reapply the last pair only if it is still discovered.
+// Reapply the last project only if it still exists.
 watch(
   () => projects.data.value,
   (data) => {
-    if (!data || project.value) return;
+    if (!data || projectId.value) return;
 
-    const last = readLastScope();
-    if (last.project && data.items.some((p) => p.project === last.project)) {
-      project.value = last.project;
-      env.value = last.env ?? null;
-    }
+    const last = readLastProject();
+    if (last && data.items.some((p) => p.project_id === last)) projectId.value = last;
+    else if (data.items.length === 1) projectId.value = data.items[0]?.project_id ?? null;
   },
   { immediate: true },
-);
-
-watch(
-  () => envs.data.value,
-  (data) => {
-    if (!data || data.project !== project.value) return; // ignore responses for a previous project
-    if (env.value && !data.items.some((e) => e.env === env.value)) env.value = null;
-    if (!env.value && data.items.length === 1) env.value = data.items[0]?.env ?? null;
-  },
 );
 </script>
 
 <template>
   <section aria-labelledby="start-title" class="stack">
-    <h1 id="start-title">Analyse a project environment</h1>
+    <h1 id="start-title">Analyse a project</h1>
     <p class="muted">Anomalies in the latest 24 hours, compared with up to 14 preceding days, plus a 14-day trend.</p>
 
     <div v-if="projects.isPending.value" aria-busy="true"><div class="skeleton" style="width: 40%" /></div>
     <div v-else-if="projects.isError.value" role="alert" class="banner error">
-      <strong>Metrics source unreachable.</strong>
+      <strong>Projects could not be loaded.</strong>
       {{ projects.error.value?.message }}
       <button type="button" @click="projects.refetch()">Retry</button>
-      <p class="muted">Saved reports can still be opened from their links.</p>
     </div>
     <div v-else-if="projects.data.value && projects.data.value.items.length === 0" class="banner">
-      No series with a <code>project</code> label were found in the last 28 days.
+      No projects yet. Create one with <code>POST /api/projects</code>.
     </div>
 
     <form v-else class="row selectors" @submit.prevent="analyze">
       <label>
         Project
-        <select :value="project ?? ''" @change="selectProject(($event.target as HTMLSelectElement).value)">
+        <select :value="projectId ?? ''" @change="selectProject(($event.target as HTMLSelectElement).value)">
           <option value="" disabled>Select a project</option>
-          <option v-for="p in projects.data.value?.items" :key="p.project" :value="p.project">{{ p.project }}</option>
-        </select>
-      </label>
-      <label>
-        Environment
-        <select v-model="env" :disabled="!project || envs.isPending.value" :aria-busy="envs.isFetching.value">
-          <option :value="null" disabled>{{ envPlaceholder }}</option>
-          <option v-for="e in envOptions" :key="e.env" :value="e.env">{{ e.env }}</option>
+          <option v-for="p in projects.data.value?.items" :key="p.project_id" :value="p.project_id">{{ p.name }}</option>
         </select>
       </label>
       <button type="submit" class="primary" :disabled="!canAnalyze">
@@ -135,7 +104,6 @@ watch(
       </button>
     </form>
 
-    <p v-if="envs.isError.value" role="alert" class="banner error">Environments could not be loaded: {{ envs.error.value?.message }}</p>
     <p v-if="submitError" role="alert" class="banner error">
       <template v-if="submitError.problem.code === 'queue_full'">
         The analysis queue is full. Try again in {{ submitError.retryAfter ?? DEFAULT_RETRY_AFTER_SECONDS }} seconds.
@@ -143,10 +111,10 @@ watch(
       <template v-else>{{ submitError.problem.title }}<span v-if="submitError.problem.detail">: {{ submitError.problem.detail }}</span></template>
     </p>
 
-    <template v-if="project && env">
-      <h2>Recent reports for {{ project }} / {{ env }}</h2>
+    <template v-if="selected">
+      <h2>Recent reports for {{ selected.name }}</h2>
       <div v-if="analyses.isPending.value" aria-busy="true"><div class="skeleton" /><div class="skeleton" /></div>
-      <p v-else-if="analyses.data.value?.items.length === 0" class="muted">No analyses yet for this scope.</p>
+      <p v-else-if="analyses.data.value?.items.length === 0" class="muted">No analyses yet for this project.</p>
       <div v-else-if="analyses.data.value" class="table-wrap">
         <table class="table">
           <thead>

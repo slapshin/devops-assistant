@@ -54,7 +54,7 @@ Interfaces (`domain/interfaces.py`). T004 added `DiscoveredValues` (values plus 
 | `episode_id` | `eps_` + 16 hex | T005 | same inputs as findings |
 | `evidence_id` | `evd_` + 16 hex | T005 | hash of finding ID + series ID |
 
-The analysis key is `project|env|T|config_hash` (T005). It deliberately excludes `analysis_id`, so identical inputs yield identical IDs. Report validation rejects any finding, evidence, related-finding, or explanation reference that does not resolve inside the same report.
+The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is the project's sorted `name=value` list joined by commas). It deliberately excludes `analysis_id`, so identical inputs yield identical IDs. Report validation rejects any finding, evidence, related-finding, or explanation reference that does not resolve inside the same report.
 
 ## States
 
@@ -71,7 +71,7 @@ The analysis key is `project|env|T|config_hash` (T005). It deliberately excludes
 
 ## Errors and routes
 
-Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-api-conventions), and are visible in `docs/contracts/openapi.json`. Errors are `application/problem+json` with `{type, title, status, detail?, code, errors?}`. Validation errors list `errors[{field, message}]`, where `field` is a dotted location such as `body.env`.
+Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-api-conventions), and are visible in `docs/contracts/openapi.json`. Errors are `application/problem+json` with `{type, title, status, detail?, code, errors?}`. Validation errors list `errors[{field, message}]`, where `field` is a dotted location such as `body.matchers.0.name`.
 
 `not_implemented` (501) was a foundation-only code; since T007 no route returns it. Cancelled jobs have `error: null`. An unreadable saved schema returns 404 with `code=schema_unsupported`. `METRICS_URL=synthetic://<healthy|incident|short-history|degraded>` selects the deterministic demo source; its reports carry `source.backend="synthetic"`.
 
@@ -91,7 +91,7 @@ All fixtures are synthetic and sanitised. They use the supplied label convention
 | `reports/report_short_history.json` | 5 days of history: 4 baseline days, medium confidence, trend buckets 2–4 `insufficient_baseline` and 5–13 `insufficient_data`; latency `unsupported` (no histogram); AI `disabled` |
 | `reports/report_partial_source_error.json` | Partial report: network queries timed out (exclusion listed); AI `not_configured` |
 | `jobs/job_running.json`, `job_completed.json`, `job_interrupted.json`, `submitted_duplicate.json` | Lifecycle states, including restart interruption and a duplicate submission |
-| `api/config.json`, `projects.json`, `envs.json`, `problem_queue_full.json`, `problem_report_not_ready.json` | API bodies |
+| `api/config.json`, `projects.json`, `connection_test.json`, `problem_queue_full.json`, `problem_report_not_ready.json` | API bodies |
 | `metrics/capabilities_supplied_unverified.json` | Capability manifest from supplied examples only (all `verified=false`); fallback for scopes not yet discovered |
 | `metrics/capabilities_paas_production_observed.json` | paas/production capabilities verified live by T003, including `partial` containers and `unsupported` memory limits/throttling |
 

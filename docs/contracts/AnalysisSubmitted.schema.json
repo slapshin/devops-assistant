@@ -15,6 +15,29 @@
           "title": "Created At",
           "type": "string"
         },
+        "daily_episodes": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Anomaly episodes per trend day, oldest first; null for days without enough data. Present once a report is saved.",
+          "title": "Daily Episodes"
+        },
         "detector_version": {
           "title": "Detector Version",
           "type": "string"
@@ -118,8 +141,9 @@
         "validation_error",
         "project_not_found",
         "project_name_taken",
+        "project_busy",
+        "source_not_configured",
         "credentials_unreadable",
-        "env_not_found",
         "analysis_not_found",
         "report_not_ready",
         "report_unavailable",
@@ -178,26 +202,56 @@
       "title": "JobState",
       "type": "string"
     },
-    "Scope": {
+    "LabelMatcher": {
       "additionalProperties": false,
-      "description": "Exactly one project/env pair. Every query and report stays inside it.",
+      "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
       "properties": {
-        "env": {
-          "maxLength": 256,
+        "name": {
+          "maxLength": 128,
           "minLength": 1,
-          "title": "Env",
+          "title": "Name",
           "type": "string"
         },
-        "project": {
+        "value": {
           "maxLength": 256,
           "minLength": 1,
-          "title": "Project",
+          "title": "Value",
           "type": "string"
         }
       },
       "required": [
-        "project",
-        "env"
+        "name",
+        "value"
+      ],
+      "title": "LabelMatcher",
+      "type": "object"
+    },
+    "Scope": {
+      "additionalProperties": false,
+      "description": "One project's series: every query carries all of its matchers; reports stay inside it.",
+      "properties": {
+        "matchers": {
+          "items": {
+            "$ref": "#/$defs/LabelMatcher"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Matchers",
+          "type": "array"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "project_name": {
+          "title": "Project Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "project_name",
+        "matchers"
       ],
       "title": "Scope",
       "type": "object"

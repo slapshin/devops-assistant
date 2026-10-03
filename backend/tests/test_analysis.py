@@ -8,7 +8,7 @@ from app.analysis.derive import AnalysisSeries, derive
 from app.analysis.detect import TREND_STEPS, evaluate
 from app.analysis.engine import RobustDetector, severity_from_points, trend_summary
 from app.analysis.rules import RULES
-from app.domain.common import Entity, EntityKind, Scope, Severity, SignalFamily, Unit
+from app.domain.common import Entity, EntityKind, Severity, SignalFamily, Unit
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import ExplanationResult, ExplanationStatus
 from app.domain.findings import (
@@ -26,10 +26,11 @@ from app.domain.jobs import StageProgress
 from app.domain.metrics import MetricCapability, MetricSeries
 from app.domain.report import AnalysisReport, AnalysisRequest, AnalysisWindows, ReportState
 from app.metrics.synthetic import N, Scenario, SyntheticMetricsSource
+from tests.helpers import make_scope
 
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
 WINDOWS = AnalysisWindows.for_end(T)
-SCOPE = Scope(project="paas", env="production")
+SCOPE = make_scope()
 CONFIG = DetectorConfig()
 REQUEST = AnalysisRequest(
     scope=SCOPE, end_time=T, detector_version=CONFIG.version, config_hash=CONFIG.config_hash

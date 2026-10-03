@@ -13,37 +13,6 @@ BUSY_TIMEOUT_MS = 5000
 
 metadata = sa.MetaData()
 
-analysis_jobs = sa.Table(
-    "analysis_jobs",
-    metadata,
-    sa.Column("analysis_id", sa.String(36), primary_key=True),
-    sa.Column("project", sa.String(256), nullable=False),
-    sa.Column("env", sa.String(256), nullable=False),
-    sa.Column("end_time", sa.String(20), nullable=False),
-    sa.Column("config_hash", sa.String(12), nullable=False),
-    sa.Column("state", sa.String(16), nullable=False),
-    sa.Column("created_at", sa.String(20), nullable=False),
-    sa.Column("job", sa.Text, nullable=False),
-    sa.Index("ix_jobs_scope", "project", "env", "analysis_id"),
-    sa.Index("ix_jobs_state", "state"),
-)
-
-reports = sa.Table(
-    "reports",
-    metadata,
-    sa.Column(
-        "analysis_id",
-        sa.String(36),
-        sa.ForeignKey("analysis_jobs.analysis_id"),
-        primary_key=True,
-    ),
-    sa.Column("schema_version", sa.String(8), nullable=False),
-    sa.Column("created_at", sa.String(20), nullable=False),
-    sa.Column("size_bytes", sa.Integer, nullable=False),
-    sa.Column("body", sa.LargeBinary, nullable=False),
-)
-
-
 projects = sa.Table(
     "projects",
     metadata,
@@ -70,6 +39,47 @@ project_sources = sa.Table(
     sa.Column("updated_at", sa.String(20), nullable=False),
 )
 
+analysis_jobs = sa.Table(
+    "analysis_jobs",
+    metadata,
+    sa.Column("analysis_id", sa.String(36), primary_key=True),
+    sa.Column(
+        "project_id",
+        sa.String(36),
+        sa.ForeignKey("projects.project_id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("end_time", sa.String(20), nullable=False),
+    sa.Column("config_hash", sa.String(12), nullable=False),
+    sa.Column("state", sa.String(16), nullable=False),
+    sa.Column("created_at", sa.String(20), nullable=False),
+    sa.Column("job", sa.Text, nullable=False),
+    sa.Index("ix_jobs_project", "project_id", "analysis_id"),
+    sa.Index("ix_jobs_state", "state"),
+)
+
+reports = sa.Table(
+    "reports",
+    metadata,
+    sa.Column(
+        "analysis_id",
+        sa.String(36),
+        sa.ForeignKey("analysis_jobs.analysis_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    sa.Column("schema_version", sa.String(8), nullable=False),
+    sa.Column("created_at", sa.String(20), nullable=False),
+    sa.Column("size_bytes", sa.Integer, nullable=False),
+    sa.Column("body", sa.LargeBinary, nullable=False),
+)
+
+app_meta = sa.Table(
+    "app_meta",
+    metadata,
+    sa.Column("key", sa.String(64), primary_key=True),
+    sa.Column("value", sa.Text, nullable=False),
+)
+
 
 def make_engine(path: Path) -> sa.Engine:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,9 +97,23 @@ def make_engine(path: Path) -> sa.Engine:
 
 
 def migrate(engine: sa.Engine) -> None:
-    """Apply pending migrations. Never drops data; existing reports are preserved."""
+    """Apply pending migrations. Never drops data; existing reports are preserved.
+
+    Foreign keys are off while migrating so tables can be rebuilt (SQLite cannot alter
+    constraints in place) and are verified before they are switched back on.
+    """
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS))
-    with engine.begin() as connection:
-        config.attributes["connection"] = connection
-        command.upgrade(config, "head")
+    with engine.connect() as connection:
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        connection.commit()  # a pragma inside an open transaction would be ignored
+        try:
+            with connection.begin():
+                config.attributes["connection"] = connection
+                command.upgrade(config, "head")
+                violations = connection.exec_driver_sql("PRAGMA foreign_key_check").all()
+                if violations:
+                    raise RuntimeError(f"migration left foreign key violations: {violations[:5]}")
+        finally:
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+            connection.commit()

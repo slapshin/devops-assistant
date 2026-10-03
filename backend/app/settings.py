@@ -3,7 +3,6 @@
 from enum import StrEnum
 from pathlib import Path
 from typing import Self
-from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,7 +29,9 @@ CONFIG_ENV_FILE = Path(__file__).resolve().parents[2] / "config.env"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=CONFIG_ENV_FILE, extra="ignore", frozen=True)
 
-    metrics_url: str = "http://localhost:8428"
+    # Deprecated (T012): sources are configured per project. Read only once, to give projects
+    # migrated from pre-project reports the source those reports were produced from.
+    metrics_url: str | None = None
     metrics_bearer_token: SecretStr | None = None
     metrics_basic_auth_user: str | None = None
     metrics_basic_auth_password: SecretStr | None = None
@@ -51,10 +52,13 @@ class Settings(BaseSettings):
     secret_key: SecretStr | None = None
     """Fernet key for stored project secrets. Defaults to DATA_DIR/secret.key (generated)."""
 
-    @field_validator("metrics_url")
+    demo_projects: bool = False
+    """Seed one synthetic demo project per scenario when no project exists."""
+
+    @field_validator("metrics_url", mode="before")
     @classmethod
-    def _valid_metrics_url(cls, value: str) -> str:
-        return validate_source_url(value)
+    def _valid_metrics_url(cls, value: str | None) -> str | None:
+        return validate_source_url(value) if value else None
 
     @field_validator("log_level")
     @classmethod
@@ -83,13 +87,9 @@ class Settings(BaseSettings):
         return self
 
     @property
-    def metrics_source_display(self) -> str:
-        """Scheme, host, port, and path prefix only — safe for logs, UI, and reports."""
-        parts = urlsplit(self.metrics_url)
-        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
-
-    @property
-    def metrics_connection(self) -> PrometheusConnection:
+    def metrics_connection(self) -> PrometheusConnection | None:
+        if self.metrics_url is None:
+            return None
         return PrometheusConnection(
             url=self.metrics_url,
             tls_verify=self.metrics_tls_verify,
@@ -122,12 +122,6 @@ class Settings(BaseSettings):
             if not value
         ]
         return f"Set {' and '.join(missing)} or AI_PROVIDER=none"
-
-    @property
-    def synthetic_scenario(self) -> str | None:
-        """Scenario name when METRICS_URL=synthetic://<scenario> (demo/testing only)."""
-        parts = urlsplit(self.metrics_url)
-        return parts.netloc if parts.scheme == "synthetic" else None
 
     @property
     def ui_dir(self) -> Path | None:

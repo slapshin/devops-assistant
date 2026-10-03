@@ -74,40 +74,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/discovery/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Discover Projects */
-        get: operations["discover_projects_api_discovery_projects_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/discovery/projects/{project}/envs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Discover Envs */
-        get: operations["discover_envs_api_discovery_projects__project__envs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -172,7 +138,10 @@ export interface paths {
         /** Update Project */
         put: operations["update_project_api_projects__project_id__put"];
         post?: never;
-        /** Delete Project */
+        /**
+         * Delete Project
+         * @description Hard delete, including the project's analyses and reports.
+         */
         delete: operations["delete_project_api_projects__project_id__delete"];
         options?: never;
         head?: never;
@@ -211,6 +180,11 @@ export interface components {
             config_hash: string;
             /** Created At */
             created_at: string;
+            /**
+             * Daily Episodes
+             * @description Anomaly episodes per trend day, oldest first; null for days without enough data. Present once a report is saved.
+             */
+            daily_episodes?: (number | null)[] | null;
             /** Detector Version */
             detector_version: string;
             /** End Time */
@@ -265,10 +239,10 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 1.0
+             * @default 2.0
              * @constant
              */
-            schema_version: "1.0";
+            schema_version: "2.0";
             scope: components["schemas"]["Scope"];
             source: components["schemas"]["SourceInfo"];
             state: components["schemas"]["ReportState"];
@@ -284,10 +258,8 @@ export interface components {
         AnalysisSubmission: {
             /** End Time */
             end_time?: string | null;
-            /** Env */
-            env: string;
-            /** Project */
-            project: string;
+            /** Project Id */
+            project_id: string;
         };
         /** AnalysisSubmitted */
         AnalysisSubmitted: {
@@ -454,20 +426,6 @@ export interface components {
          */
         DetectionMethod: "relative" | "absolute";
         /**
-         * DiscoveredProjectList
-         * @description ``project`` label values found in the global metrics source (legacy, until T012).
-         */
-        DiscoveredProjectList: {
-            /** Items */
-            items: components["schemas"]["ProjectItem"][];
-            source_status: components["schemas"]["SourceStatus"];
-            /**
-             * Truncated
-             * @default false
-             */
-            truncated: boolean;
-        };
-        /**
          * Entity
          * @description Resource identity built from actual labels only; never inferred across namespaces.
          */
@@ -482,7 +440,7 @@ export interface components {
             kind: components["schemas"]["EntityKind"];
             /**
              * Labels
-             * @description Identity labels only (no project/env).
+             * @description Identity labels only (no scope matchers).
              */
             labels: {
                 [key: string]: string;
@@ -493,23 +451,6 @@ export interface components {
          * @enum {string}
          */
         EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route";
-        /** EnvItem */
-        EnvItem: {
-            /** Env */
-            env: string;
-        };
-        /** EnvList */
-        EnvList: {
-            /** Items */
-            items: components["schemas"]["EnvItem"][];
-            /** Project */
-            project: string;
-            /**
-             * Truncated
-             * @default false
-             */
-            truncated: boolean;
-        };
         /** EpisodeSummary */
         EpisodeSummary: {
             /** End */
@@ -538,7 +479,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "credentials_unreadable" | "env_not_found" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
+        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
         /**
          * Evidence
          * @description Chart data for a finding, persisted so a report reopens without the source.
@@ -714,10 +655,9 @@ export interface components {
         HealthResponse: {
             /**
              * Database
-             * @description 'ok', 'unavailable', or 'not_initialized' before T007.
+             * @description 'ok' or 'unavailable'.
              */
             database: string;
-            metrics_source: components["schemas"]["SourceStatus"];
             /** Status */
             status: string;
             /** Version */
@@ -754,7 +694,7 @@ export interface components {
         JobState: "queued" | "running" | "completed" | "partial" | "failed" | "cancelled";
         /**
          * LabelMatcher
-         * @description Exact ``name="value"`` matcher added to every selector of the project's queries.
+         * @description Exact ``name="value"`` matcher added to every selector of a project's queries.
          */
         LabelMatcher: {
             /** Name */
@@ -924,15 +864,38 @@ export interface components {
             /** Sources */
             sources?: components["schemas"]["PrometheusSourceInput"][];
         };
-        /** ProjectItem */
-        ProjectItem: {
-            /** Project */
-            project: string;
-        };
         /** ProjectList */
         ProjectList: {
             /** Items */
-            items: components["schemas"]["Project"][];
+            items: components["schemas"]["ProjectSummary"][];
+        };
+        /**
+         * ProjectSummary
+         * @description A project with its latest finished and currently active analysis (list page).
+         */
+        ProjectSummary: {
+            active_analysis?: components["schemas"]["AnalysisJob"] | null;
+            /** Created At */
+            created_at: string;
+            /**
+             * Credentials Readable
+             * @description False when stored secrets cannot be decrypted (lost or changed key).
+             * @default true
+             */
+            credentials_readable: boolean;
+            /** Description */
+            description?: string | null;
+            latest_analysis?: components["schemas"]["AnalysisJob"] | null;
+            /** Matchers */
+            matchers: components["schemas"]["LabelMatcher"][];
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: string;
+            /** Sources */
+            sources: components["schemas"]["PrometheusSource"][];
+            /** Updated At */
+            updated_at: string;
         };
         /** PrometheusSource */
         PrometheusSource: {
@@ -1005,8 +968,6 @@ export interface components {
             /** @description disabled, not_configured, or pending (configured, per-report status varies). */
             explanation_status: components["schemas"]["ExplanationStatus"];
             limits: components["schemas"]["Limits"];
-            /** Metrics Source */
-            metrics_source: string;
             /** Report Count */
             report_count?: number | null;
             /** Version */
@@ -1014,13 +975,15 @@ export interface components {
         };
         /**
          * Scope
-         * @description Exactly one project/env pair. Every query and report stays inside it.
+         * @description One project's series: every query carries all of its matchers; reports stay inside it.
          */
         Scope: {
-            /** Env */
-            env: string;
-            /** Project */
-            project: string;
+            /** Matchers */
+            matchers: components["schemas"]["LabelMatcher"][];
+            /** Project Id */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
         };
         /**
          * Severity
@@ -1071,18 +1034,6 @@ export interface components {
             base_url: string;
             /** Version */
             version?: string | null;
-        };
-        /** SourceStatus */
-        SourceStatus: {
-            /** Checked At */
-            checked_at?: string | null;
-            /** Message */
-            message?: string | null;
-            /**
-             * Reachable
-             * @description Null when not checked.
-             */
-            reachable: boolean | null;
         };
         /**
          * StageName
@@ -1177,8 +1128,7 @@ export interface operations {
     list_analyses_api_analyses_get: {
         parameters: {
             query?: {
-                project?: string | null;
-                env?: string | null;
+                project_id?: string | null;
                 limit?: number;
                 cursor?: string | null;
             };
@@ -1251,6 +1201,16 @@ export interface operations {
                 };
             };
             /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1262,16 +1222,6 @@ export interface operations {
             };
             /** @description Problem */
             429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "application/problem+json": unknown;
-                };
-            };
-            /** @description Problem */
-            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1441,87 +1391,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuntimeConfig"];
-                };
-            };
-        };
-    };
-    discover_projects_api_discovery_projects_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DiscoveredProjectList"];
-                };
-            };
-            /** @description Problem */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "application/problem+json": unknown;
-                };
-            };
-        };
-    };
-    discover_envs_api_discovery_projects__project__envs_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                project: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvList"];
-                };
-            };
-            /** @description Problem */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "application/problem+json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Problem */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "application/problem+json": unknown;
                 };
             };
         };
@@ -1781,6 +1650,16 @@ export interface operations {
             };
             /** @description Problem */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

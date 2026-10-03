@@ -11,11 +11,12 @@ import pytest
 from app.ai.openai_adapter import OpenAIExplanationProvider
 from app.ai.prompt import INSTRUCTIONS, build_input, clean, render
 from app.ai.providers import FakeExplanationProvider, explain_findings, provider_from_settings
-from app.domain.common import Scope, TimeRange
+from app.domain.common import TimeRange
 from app.domain.explanation import ExplanationStatus, Likelihood
 from app.domain.findings import Finding, SignalCoverage
 from app.domain.report import AnalysisReport
 from app.settings import load_settings
+from tests.helpers import make_scope
 
 REPO = Path(__file__).resolve().parents[2]
 REPORT = AnalysisReport.model_validate_json(
@@ -23,7 +24,7 @@ REPORT = AnalysisReport.model_validate_json(
 )
 FINDINGS = REPORT.findings
 IDS = [f.finding_id for f in FINDINGS]
-SCOPE = Scope(project="paas", env="production")
+SCOPE = make_scope()
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
 DAY = TimeRange(start=T - timedelta(days=1), end=T)
 

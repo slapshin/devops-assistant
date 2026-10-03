@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from app.domain.common import Contract, LabelValue, Scope, Severity, UtcDatetime
+from app.domain.common import Contract, Scope, Severity, UtcDatetime
 from app.domain.explanation import ExplanationStatus
 
 
@@ -52,8 +52,9 @@ class ErrorCode(StrEnum):
     VALIDATION_ERROR = "validation_error"
     PROJECT_NOT_FOUND = "project_not_found"
     PROJECT_NAME_TAKEN = "project_name_taken"
+    PROJECT_BUSY = "project_busy"
+    SOURCE_NOT_CONFIGURED = "source_not_configured"
     CREDENTIALS_UNREADABLE = "credentials_unreadable"
-    ENV_NOT_FOUND = "env_not_found"
     ANALYSIS_NOT_FOUND = "analysis_not_found"
     REPORT_NOT_READY = "report_not_ready"
     REPORT_UNAVAILABLE = "report_unavailable"
@@ -91,13 +92,17 @@ class AnalysisJob(Contract):
     finding_counts: dict[Severity, int] | None = Field(
         default=None, description="Present once a report is saved."
     )
+    daily_episodes: list[int | None] | None = Field(
+        default=None,
+        description="Anomaly episodes per trend day, oldest first; null for days without "
+        "enough data. Present once a report is saved.",
+    )
 
 
 class AnalysisSubmission(Contract):
     """Body of POST /api/analyses. end_time is floored to the step server-side."""
 
-    project: LabelValue
-    env: LabelValue
+    project_id: str
     end_time: UtcDatetime | None = None
 
 
@@ -109,34 +114,6 @@ class AnalysisSubmitted(Contract):
 class AnalysisList(Contract):
     items: list[AnalysisJob]
     next_cursor: str | None = None
-
-
-class SourceStatus(Contract):
-    reachable: bool | None = Field(description="Null when not checked.")
-    checked_at: UtcDatetime | None = None
-    message: str | None = None
-
-
-class ProjectItem(Contract):
-    project: str
-
-
-class DiscoveredProjectList(Contract):
-    """``project`` label values found in the global metrics source (legacy, until T012)."""
-
-    items: list[ProjectItem]
-    source_status: SourceStatus
-    truncated: bool = False
-
-
-class EnvItem(Contract):
-    env: str
-
-
-class EnvList(Contract):
-    project: str
-    items: list[EnvItem]
-    truncated: bool = False
 
 
 class Problem(Contract):
@@ -153,8 +130,7 @@ class Problem(Contract):
 class HealthResponse(Contract):
     status: str
     version: str
-    database: str = Field(description="'ok', 'unavailable', or 'not_initialized' before T007.")
-    metrics_source: SourceStatus
+    database: str = Field(description="'ok' or 'unavailable'.")
 
 
 class Limits(Contract):
@@ -177,7 +153,6 @@ class RuntimeConfig(Contract):
     )
     detector_version: str
     config_hash: str
-    metrics_source: str
     limits: Limits
     report_count: int | None = None
     database_bytes: int | None = None

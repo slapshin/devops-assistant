@@ -1,7 +1,5 @@
 """HTTP routes (docs/DECISIONS.md §3). Thin adapters over the job runner and repository."""
 
-import asyncio
-import time
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -18,20 +16,16 @@ from app.domain.jobs import (
     AnalysisList,
     AnalysisSubmission,
     AnalysisSubmitted,
-    DiscoveredProjectList,
-    EnvItem,
-    EnvList,
     ErrorCode,
     HealthResponse,
     Limits,
-    ProjectItem,
     RuntimeConfig,
-    SourceStatus,
 )
+from app.domain.projects import SourceKind
 from app.domain.report import AnalysisReport
 from app.jobs import NotActive, QueueFull
-from app.metrics.client import ClientLimits, SourceError
-from app.metrics.source import HISTORY_DAYS, CollectionBudget
+from app.metrics.client import ClientLimits
+from app.metrics.source import CollectionBudget
 from app.settings import AIProvider, Settings
 from app.storage.repository import SchemaUnsupported
 
@@ -41,13 +35,8 @@ MAX_END_TIME_AGE_DAYS = 90
 MAX_END_TIME_AGE = timedelta(days=MAX_END_TIME_AGE_DAYS)
 END_TIME_FUTURE_TOLERANCE = timedelta(minutes=1)
 QUEUE_FULL_RETRY_AFTER_SECONDS = 30
-SOURCE_PROBE_CACHE_SECONDS = 30
-SOURCE_PROBE_TIMEOUT_SECONDS = 10
-SOURCE_PROBE_CACHE_KEY = "source"
 # Model names reported by /api/config for providers that do not take OPENAI_MODEL.
 FIXED_PROVIDER_MODELS = {AIProvider.FAKE: FAKE_MODEL}
-
-_health_cache: dict[str, tuple[float, SourceStatus]] = {}
 
 
 def get_settings(request: Request) -> Settings:
@@ -62,33 +51,6 @@ def get_services(request: Request) -> Services:
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 ServicesDep = Annotated[Services, Depends(get_services)]
-
-
-def _source_unavailable(exc: SourceError) -> ProblemError:
-    return ProblemError(
-        503,
-        ErrorCode.METRICS_SOURCE_UNAVAILABLE,
-        "Metrics source unavailable",
-        f"{exc.kind.value}: {exc.message}",
-    )
-
-
-async def _probe(services: Services) -> SourceStatus:
-    cached = _health_cache.get(SOURCE_PROBE_CACHE_KEY)
-    if cached and time.monotonic() - cached[0] < SOURCE_PROBE_CACHE_SECONDS:
-        return cached[1]
-
-    now = datetime.now(UTC).replace(microsecond=0)
-    try:
-        await asyncio.wait_for(services.source.list_projects(), SOURCE_PROBE_TIMEOUT_SECONDS)
-        status = SourceStatus(reachable=True, checked_at=now)
-    except (SourceError, TimeoutError) as exc:
-        status = SourceStatus(
-            reachable=False, checked_at=now, message=getattr(exc, "message", "timeout")
-        )
-
-    _health_cache[SOURCE_PROBE_CACHE_KEY] = (time.monotonic(), status)
-    return status
 
 
 def _ai_model(settings: Settings) -> str | None:
@@ -109,7 +71,6 @@ async def health(services: ServicesDep) -> HealthResponse:
         status="ok" if database == "ok" else "degraded",
         version=__version__,
         database=database,
-        metrics_source=await _probe(services),
     )
 
 
@@ -128,7 +89,6 @@ async def runtime_config(settings: SettingsDep, services: ServicesDep) -> Runtim
         explanation_status=settings.explanation_status,
         detector_version=detector.version,
         config_hash=detector.config_hash,
-        metrics_source=settings.metrics_source_display,
         limits=Limits(
             max_running_jobs=limits.max_running,
             max_queued_jobs=limits.max_queued,
@@ -142,59 +102,29 @@ async def runtime_config(settings: SettingsDep, services: ServicesDep) -> Runtim
     )
 
 
-@router.get(
-    "/discovery/projects",
-    response_model=DiscoveredProjectList,
-    responses=problem_responses(503),
-)
-async def discover_projects(services: ServicesDep) -> DiscoveredProjectList:
-    try:
-        found = await services.source.list_projects()
-    except SourceError as exc:
-        raise _source_unavailable(exc) from None
-    return DiscoveredProjectList(
-        items=[ProjectItem(project=p) for p in found.values],
-        source_status=SourceStatus(
-            reachable=True, checked_at=datetime.now(UTC).replace(microsecond=0)
-        ),
-        truncated=found.truncated,
-    )
-
-
-async def _require_scope(services: Services, project: str, env: str | None) -> None:
-    try:
-        projects = await services.source.list_projects()
-        if project not in projects.values:
-            raise ProblemError(
-                404,
-                ErrorCode.PROJECT_NOT_FOUND,
-                "Project not found",
-                f"No series with project={project!r} in the last {HISTORY_DAYS} days.",
-            )
-        if env is not None and env not in (await services.source.list_envs(project)).values:
-            raise ProblemError(
-                404,
-                ErrorCode.ENV_NOT_FOUND,
-                "Environment not found",
-                f"No series with project={project!r}, env={env!r}.",
-            )
-    except SourceError as exc:
-        raise _source_unavailable(exc) from None
-
-
-@router.get(
-    "/discovery/projects/{project}/envs",
-    response_model=EnvList,
-    responses=problem_responses(404, 503),
-)
-async def discover_envs(project: str, services: ServicesDep) -> EnvList:
-    await _require_scope(services, project, None)
-    try:
-        found = await services.source.list_envs(project)
-    except SourceError as exc:
-        raise _source_unavailable(exc) from None
-    return EnvList(
-        project=project, items=[EnvItem(env=e) for e in found.values], truncated=found.truncated
+async def project_scope(services: Services, project_id: str) -> Scope:
+    """Scope of a project that can be analysed now; problem responses otherwise."""
+    project = await services.projects.get(project_id)
+    if project is None:
+        raise ProblemError(
+            404, ErrorCode.PROJECT_NOT_FOUND, "Project not found", f"No project {project_id}."
+        )
+    if project.source(SourceKind.PROMETHEUS) is None:
+        raise ProblemError(
+            409,
+            ErrorCode.SOURCE_NOT_CONFIGURED,
+            "No metrics source",
+            f"Project {project.name!r} has no metrics source configured.",
+        )
+    if not project.credentials_readable:
+        raise ProblemError(
+            409,
+            ErrorCode.CREDENTIALS_UNREADABLE,
+            "Stored credentials are unreadable",
+            "The secret key changed or was lost; re-enter the source credentials.",
+        )
+    return Scope(
+        project_id=project.project_id, project_name=project.name, matchers=project.matchers
     )
 
 
@@ -202,7 +132,7 @@ async def discover_envs(project: str, services: ServicesDep) -> EnvList:
     "/analyses",
     status_code=202,
     response_model=AnalysisSubmitted,
-    responses={200: {"model": AnalysisSubmitted}, **problem_responses(404, 422, 429, 503)},
+    responses={200: {"model": AnalysisSubmitted}, **problem_responses(404, 409, 422, 429)},
 )
 async def submit_analysis(
     submission: AnalysisSubmission, response: Response, services: ServicesDep
@@ -224,10 +154,8 @@ async def submit_analysis(
             f"End time must be within the last {MAX_END_TIME_AGE_DAYS} days.",
         )
 
-    await _require_scope(services, submission.project, submission.env)
-    request = services.runner.request_for(
-        Scope(project=submission.project, env=submission.env), _align_to_step(min(requested, now))
-    )
+    scope = await project_scope(services, submission.project_id)
+    request = services.runner.request_for(scope, _align_to_step(min(requested, now)))
 
     try:
         job, duplicate = await services.runner.submit(request)
@@ -254,21 +182,11 @@ def _align_to_step(moment: datetime) -> datetime:
 @router.get("/analyses", response_model=AnalysisList, responses=problem_responses(422))
 async def list_analyses(
     services: ServicesDep,
-    project: str | None = None,
-    env: str | None = None,
+    project_id: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     cursor: str | None = None,
 ) -> AnalysisList:
-    if (project is None) != (env is None):
-        raise ProblemError(
-            422,
-            ErrorCode.VALIDATION_ERROR,
-            "project and env go together",
-            "Pass both project and env, or neither.",
-        )
-
-    scope = Scope(project=project, env=env) if project and env else None
-    jobs, next_cursor = await services.repo.list_jobs(scope, limit, cursor)
+    jobs, next_cursor = await services.repo.list_jobs(project_id, limit, cursor)
     return AnalysisList(items=jobs, next_cursor=next_cursor)
 
 

@@ -3,6 +3,7 @@ storage and orchestration). Kept free of web framework and LLM SDK types."""
 
 import asyncio
 from collections.abc import Sequence
+from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
@@ -50,11 +51,6 @@ class ProgressReporter(Protocol):
     async def update(self, progress: StageProgress) -> None: ...
 
 
-class DiscoveredValues(Contract):
-    values: list[str]
-    truncated: bool = False
-
-
 class MappingKind(StrEnum):
     OTEL_SERVICE = "otel_service"
     """target_info.service_instance_id -> cAdvisor container id -> cAdvisor instance (host)."""
@@ -82,10 +78,6 @@ class MetricsSource(Protocol):
 
     async def source_info(self) -> SourceInfo: ...
 
-    async def list_projects(self) -> DiscoveredValues: ...
-
-    async def list_envs(self, project: str) -> DiscoveredValues: ...
-
     async def capabilities(
         self, scope: Scope, windows: AnalysisWindows
     ) -> list[MetricCapability]: ...
@@ -98,6 +90,12 @@ class MetricsSource(Protocol):
         progress: ProgressReporter,
         cancel: CancellationToken,
     ) -> CollectionResult: ...
+
+
+class SourceProvider(Protocol):
+    """Opens a project's MetricsSource for the duration of one analysis or probe."""
+
+    def open(self, scope: Scope) -> AbstractAsyncContextManager[MetricsSource]: ...
 
 
 class DetectionResult(Contract):
@@ -167,8 +165,14 @@ class ReportRepository(Protocol):
     async def count_active(self) -> dict[JobState, int]: ...
 
     async def list_jobs(
-        self, scope: Scope | None, limit: int, cursor: str | None
+        self, project_id: str | None, limit: int, cursor: str | None
     ) -> tuple[list[AnalysisJob], str | None]: ...
+
+    async def project_activity(
+        self, project_ids: Sequence[str]
+    ) -> dict[str, tuple[AnalysisJob | None, AnalysisJob | None]]:
+        """project_id -> (latest finished job, active job)."""
+        ...
 
     async def mark_running(self, analysis_id: str, at: datetime) -> AnalysisJob | None: ...
 
@@ -182,6 +186,7 @@ class ReportRepository(Protocol):
         *,
         explanation_status: ExplanationStatus | None = None,
         finding_counts: dict[Severity, int] | None = None,
+        daily_episodes: list[int | None] | None = None,
         report_available: bool = False,
     ) -> AnalysisJob: ...
 

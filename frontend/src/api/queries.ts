@@ -8,8 +8,7 @@ import {
   type AnalysisList,
   type AnalysisReport,
   type AnalysisSubmitted,
-  type EnvList,
-  type DiscoveredProjectList,
+  type ProjectList,
   type RuntimeConfig,
 } from "./client";
 
@@ -27,30 +26,17 @@ export function useConfig() {
 }
 
 export function useProjects() {
-  return useQuery({ queryKey: ["discovered-projects"], queryFn: () => apiGet<DiscoveredProjectList>("/api/discovery/projects") });
+  return useQuery({ queryKey: ["projects"], queryFn: () => apiGet<ProjectList>("/api/projects") });
 }
 
-/** Keyed by project, so a late response for a previous project can never fill the list. */
-export function useEnvs(project: MaybeRefOrGetter<string | null>) {
+export function useAnalyses(projectId: MaybeRefOrGetter<string | null>) {
   return useQuery({
-    queryKey: computed(() => ["envs", toValue(project)]),
-    queryFn: () => apiGet<EnvList>(`/api/discovery/projects/${encodeURIComponent(toValue(project) ?? "")}/envs`),
-    enabled: computed(() => !!toValue(project)),
-  });
-}
-
-export function useAnalyses(project: MaybeRefOrGetter<string | null>, env: MaybeRefOrGetter<string | null>) {
-  return useQuery({
-    queryKey: computed(() => ["analyses", toValue(project), toValue(env)]),
+    queryKey: computed(() => ["analyses", toValue(projectId)]),
     queryFn: () => {
-      const params = new URLSearchParams({
-        project: toValue(project) ?? "",
-        env: toValue(env) ?? "",
-        limit: String(RECENT_ANALYSES_LIMIT),
-      });
+      const params = new URLSearchParams({ project_id: toValue(projectId) ?? "", limit: String(RECENT_ANALYSES_LIMIT) });
       return apiGet<AnalysisList>(`/api/analyses?${params}`);
     },
-    enabled: computed(() => !!toValue(project) && !!toValue(env)),
+    enabled: computed(() => !!toValue(projectId)),
   });
 }
 
@@ -77,11 +63,12 @@ export function useReport(id: MaybeRefOrGetter<string>) {
 export function useSubmit() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { project: string; env: string; end_time?: string }) =>
+    mutationFn: (body: { project_id: string; end_time?: string }) =>
       apiPost<AnalysisSubmitted>("/api/analyses", body),
     onSuccess: (data) => {
       client.setQueryData(["analysis", data.analysis.analysis_id], data.analysis);
       void client.invalidateQueries({ queryKey: ["analyses"] });
+      void client.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }

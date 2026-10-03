@@ -42,9 +42,9 @@ def prune(db: Path, days: int, yes: bool) -> int:
             return 0
 
         verb = "delete" if yes else "would delete"
-        for analysis_id, project, env, end_time, state, created_at in rows:
+        for analysis_id, project, end_time, state, created_at in rows:
             print(
-                f"{verb} {analysis_id} {project}/{env} end={end_time} "
+                f"{verb} {analysis_id} project={project!r} end={end_time} "
                 f"state={state} created={created_at}"
             )
         if not yes:
@@ -66,8 +66,9 @@ def prune(db: Path, days: int, yes: bool) -> int:
 def _finished_before(conn: sqlite3.Connection, cutoff: str) -> list[tuple[str, ...]]:
     placeholders = ",".join("?" for _ in ACTIVE)
     rows: list[tuple[str, ...]] = conn.execute(
-        "SELECT analysis_id, project, env, end_time, state, created_at FROM analysis_jobs "
-        f"WHERE created_at < ? AND state NOT IN ({placeholders}) ORDER BY created_at",
+        "SELECT j.analysis_id, p.name, j.end_time, j.state, j.created_at FROM analysis_jobs j "
+        "JOIN projects p ON p.project_id = j.project_id "
+        f"WHERE j.created_at < ? AND j.state NOT IN ({placeholders}) ORDER BY j.created_at",
         (cutoff, *ACTIVE),
     ).fetchall()
     return rows

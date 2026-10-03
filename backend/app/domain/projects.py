@@ -6,21 +6,24 @@ one is stored. New source kinds (Wazuh, Cloudflare, Sentry, ...) are added as ne
 ``SourceKind`` and of the source unions without changing storage.
 """
 
-import re
 from enum import StrEnum
 from typing import Annotated, Literal, Self
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 
-from app.domain.common import Contract, LabelValue, SignalFamily, UtcDatetime
+from app.domain.common import (
+    Contract,
+    LabelMatcher,
+    Matchers,
+    SignalFamily,
+    UtcDatetime,
+)
+from app.domain.jobs import AnalysisJob
 from app.domain.metrics import CapabilityStatus
 
-MAX_MATCHERS = 10
 MAX_PROJECT_NAME_CHARS = 100
 MAX_DESCRIPTION_CHARS = 1000
-LABEL_NAME = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-RESERVED_LABEL_PREFIX = "__"
 
 
 def validate_source_url(value: str) -> str:
@@ -37,32 +40,6 @@ def validate_source_url(value: str) -> str:
     if parts.query or parts.fragment:
         raise ValueError("must not contain a query string or fragment")
     return value.rstrip("/")
-
-
-class LabelMatcher(Contract):
-    """Exact ``name="value"`` matcher added to every selector of the project's queries."""
-
-    name: str = Field(min_length=1, max_length=128)
-    value: LabelValue
-
-    @field_validator("name")
-    @classmethod
-    def _valid_name(cls, value: str) -> str:
-        if not LABEL_NAME.match(value):
-            raise ValueError("must match [a-zA-Z_][a-zA-Z0-9_]*")
-        if value.startswith(RESERVED_LABEL_PREFIX):
-            raise ValueError("labels starting with '__' are reserved")
-        return value
-
-
-def _normalise_matchers(matchers: list[LabelMatcher]) -> list[LabelMatcher]:
-    names = [m.name for m in matchers]
-    if duplicates := sorted({n for n in names if names.count(n) > 1}):
-        raise ValueError(f"duplicate label names: {', '.join(duplicates)}")
-    return sorted(matchers, key=lambda m: m.name)
-
-
-Matchers = Annotated[list[LabelMatcher], Field(min_length=1, max_length=MAX_MATCHERS)]
 
 
 class SourceKind(StrEnum):
@@ -136,11 +113,6 @@ class ProjectInput(Contract):
     def _strip_description(cls, value: str | None) -> str | None:
         return (value or "").strip() or None
 
-    @field_validator("matchers")
-    @classmethod
-    def _matchers(cls, value: list[LabelMatcher]) -> list[LabelMatcher]:
-        return _normalise_matchers(value)
-
     @model_validator(mode="after")
     def _one_source_per_kind(self) -> Self:
         kinds = [s.kind for s in self.sources]
@@ -193,8 +165,15 @@ class Project(Contract):
         return next((s for s in self.sources if s.kind is kind), None)
 
 
+class ProjectSummary(Project):
+    """A project with its latest finished and currently active analysis (list page)."""
+
+    latest_analysis: AnalysisJob | None = None
+    active_analysis: AnalysisJob | None = None
+
+
 class ProjectList(Contract):
-    items: list[Project]
+    items: list[ProjectSummary]
 
 
 # --- connection test --------------------------------------------------------------------------
@@ -208,11 +187,6 @@ class ConnectionTestRequest(Contract):
     )
     matchers: Matchers
     source: SourceInput
-
-    @field_validator("matchers")
-    @classmethod
-    def _matchers(cls, value: list[LabelMatcher]) -> list[LabelMatcher]:
-        return _normalise_matchers(value)
 
 
 class FamilyCapability(Contract):

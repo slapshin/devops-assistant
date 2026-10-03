@@ -8,12 +8,9 @@ import jsonschema
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from app.domain.common import Scope
 from app.domain.jobs import (
     AnalysisJob,
     AnalysisSubmitted,
-    DiscoveredProjectList,
-    EnvList,
     Problem,
     RuntimeConfig,
 )
@@ -22,6 +19,7 @@ from app.domain.projects import ConnectionTest, ProjectList
 from app.domain.report import AnalysisReport, AnalysisRequest, AnalysisWindows
 from scripts.export_schemas import SCHEMAS
 from scripts.generate_fixtures import build, render
+from tests.helpers import make_scope
 
 REPO = Path(__file__).resolve().parents[2]
 FIXTURES = REPO / "fixtures"
@@ -40,10 +38,8 @@ def fixture_model(rel: str) -> type[BaseModel] | None:
     if name.startswith("problem_"):
         return Problem
     discovery: dict[str, type[BaseModel]] = {
-        "discovered_projects.json": DiscoveredProjectList,
         "projects.json": ProjectList,
         "connection_test.json": ConnectionTest,
-        "envs.json": EnvList,
         "config.json": RuntimeConfig,
     }
     return discovery.get(name)
@@ -162,7 +158,7 @@ def test_series_coverage_must_match_gaps() -> None:
 
 
 def test_naive_datetimes_are_rejected_and_output_is_utc_z() -> None:
-    scope = {"project": "paas", "env": "production"}
+    scope = make_scope().model_dump()
     with pytest.raises(ValidationError):
         AnalysisRequest.model_validate(
             {
@@ -186,7 +182,7 @@ def test_naive_datetimes_are_rejected_and_output_is_utc_z() -> None:
 def test_request_end_time_must_be_step_aligned() -> None:
     with pytest.raises(ValidationError, match="aligned"):
         AnalysisRequest(
-            scope=Scope(project="paas", env="production"),
+            scope=make_scope(),
             end_time=datetime(2026, 9, 30, 10, 7, tzinfo=UTC),
             detector_version="x",
             config_hash="0" * 12,

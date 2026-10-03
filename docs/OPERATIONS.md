@@ -15,8 +15,7 @@ make down                          # keeps the data volume (reports survive)
 
 - The image is built from `devops/docker/Dockerfile` (context: repository root); the compose file is `tools/compose/compose.yml`. The make targets wrap `docker compose -f tools/compose/compose.yml …` and export `config.env`. Compose project name is `ai-assistant`.
 - The port is published on `127.0.0.1` only. Override it with `APP_PORT=18000 make up`.
-- Inside the container `localhost` is the container itself. The default `METRICS_URL=http://host.docker.internal:8428` reaches a metrics source, or an SSH tunnel such as `ssh -N -L 8428:localhost:8428 <monitoring-host>`, running on the Docker host. `extra_hosts: host-gateway` makes this work on Linux as well as Docker Desktop.
-- To point at a network address instead: `METRICS_URL=http://vm.internal:8428 make up`. A `METRICS_URL` set in `config.env` applies to Docker too, so leave it unset there if it points at `localhost`.
+- Metrics sources are configured per project in the UI. Inside the container `localhost` is the container itself: a project URL of `http://host.docker.internal:8428` reaches a metrics source, or an SSH tunnel such as `ssh -N -L 8428:localhost:8428 <monitoring-host>`, running on the Docker host. `extra_hosts: host-gateway` makes this work on Linux as well as Docker Desktop. Natively the same tunnel is `http://localhost:8428`.
 - Reports live in the named volume `assistant-data` (mounted at `/data`). `make down` and `up --force-recreate` keep it. **Only `docker compose -f tools/compose/compose.yml down -v` deletes it.**
 
 ### Native
@@ -25,7 +24,7 @@ Requires uv 0.12+ (Python 3.14.7 is resolved from `backend/.python-version`) and
 
 ```sh
 make install                        # uv sync --locked; npm ci
-cp config.env.template config.env  # METRICS_URL defaults to http://localhost:8428
+cp config.env.template config.env  # optional: OPENAI_API_KEY, OPENAI_MODEL, …
 (cd frontend && npm run build)      # the backend serves frontend/dist at /
 cd backend && uv run python -m app  # http://127.0.0.1:8000 (APP_HOST/APP_PORT)
 ```
@@ -34,7 +33,7 @@ For development, run `make dev-backend` and `make dev-frontend`. The Vite dev se
 
 ### Offline demo
 
-`METRICS_URL=synthetic://incident AI_PROVIDER=fake` runs without a metrics source or an API key. Scenarios are `healthy`, `incident`, `short-history` and `degraded`. Reports produced this way are labelled **Synthetic data** in the UI and carry `source.backend="synthetic"`.
+`make demo` (Docker) or `DEMO_PROJECTS=true AI_PROVIDER=fake` (native) seeds one project per synthetic scenario when no project exists, and runs without a metrics source or an API key. Any project can use a `synthetic://<scenario>` URL. Scenarios are `healthy`, `incident`, `short-history` and `degraded`. Reports produced this way are labelled **Synthetic data** in the UI and carry `source.backend="synthetic"`.
 
 ## Configuration
 
@@ -42,9 +41,8 @@ All settings are environment variables, optionally read from `config.env` in the
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `METRICS_URL` | `http://localhost:8428` (native), `http://host.docker.internal:8428` (compose) | Prometheus-compatible base URL; a path prefix is kept. `synthetic://<scenario>` selects demo data. |
-| `METRICS_BEARER_TOKEN` or `METRICS_BASIC_AUTH_USER` + `METRICS_BASIC_AUTH_PASSWORD` | unset | Source credentials. They stay server-side and are never logged or stored in reports. |
-| `METRICS_TLS_VERIFY` | `true` | TLS verification for https sources. |
+| `DEMO_PROJECTS` | `false` | Seed synthetic demo projects when none exist. |
+| `METRICS_URL`, `METRICS_BEARER_TOKEN`, `METRICS_BASIC_AUTH_*`, `METRICS_TLS_VERIFY` | unset (compose: `METRICS_URL=http://host.docker.internal:8428`) | **Deprecated.** Read once when upgrading from a pre-project release (see below), then ignored. |
 | `AI_PROVIDER` | `openai` | `openai`, `none`, or `fake` (deterministic template, no network). |
 | `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | unset | The model must support Structured Outputs on the Responses API. Check it with `cd backend && uv run python -m scripts.check_openai [--structured]` (`--structured` makes one small paid call). |
 | `DATA_DIR` | `./data` (native), `/data` (image) | SQLite database `assistant.sqlite3` and `secret.key`. |
@@ -65,7 +63,7 @@ The catalog (`docs/metrics-catalog.md`) covers:
 - Docker Swarm: task failures and replica shortfall, used as restart proxies
 - OpenTelemetry HTTP and RPC: traffic, 5xx and RPC failures, 404 and other 4xx; p95/p99 latency from histograms, mean only as a fallback
 
-Capabilities are discovered for each project/env at run time. Anything missing is reported as *unsupported* or *insufficient data*, never as healthy.
+Capabilities are discovered for each project at run time (the project form's **Test connection** shows them before saving). Anything missing is reported as *unsupported* or *insufficient data*, never as healthy.
 
 For history:
 
@@ -107,7 +105,11 @@ Typical measured figures on a real deployment (paas/production, 360 series): ≈
 - Report snapshots are immutable and reopen without the metrics source, even after the source's retention has passed.
 - On startup, jobs that were queued or running when the process stopped are marked `failed` with `interrupted_by_restart`. They are **not** resumed; use *Run again*.
 - Shutdown (`make down` or Ctrl-C) cancels running work. The next start records it as interrupted.
-- Reports are **never** deleted automatically.
+- Reports are **never** deleted automatically. Deleting a project deletes its analyses and reports (after confirmation in the UI).
+
+### Upgrading from a pre-project release
+
+Migration 0003 runs once at startup. It creates one project per `(project, env)` pair found in saved analyses, named `<project> / <env>` with matchers `project=<project>, env=<env>`, attaches those analyses to it, and rewrites the saved snapshots to report schema 2.0. All reports stay readable. On the same start, the deprecated `METRICS_*` settings (if set) become the metrics source of those projects, with their credentials encrypted in the database. The log says how many projects were updated. Afterwards the `METRICS_*` settings can be removed. If they were not set, the migrated projects have no source until you add one in the UI. Back up the database first (`make backup` / `make docker-backup`).
 
 ### Backup and cleanup
 
@@ -128,8 +130,10 @@ docker compose -f tools/compose/compose.yml cp assistant:/data/backup.sqlite3 ./
 
 | Symptom | Cause and fix |
 | --- | --- |
-| Start page: "Metrics source unreachable"; `/api/health` shows `reachable: false` | Nothing listens at `METRICS_URL`. Natively, check the tunnel (`curl $METRICS_URL/api/v1/status/buildinfo`). In Docker, use `host.docker.internal` rather than `localhost`, and make sure the tunnel runs on the host. |
-| "No series with a project label were found" | The source is reachable but has no `project`/`env` labels in the last 28 days. |
+| Project shows *Unreachable* (Test connection: `reachable: false`) | Nothing listens at the project's URL. Natively, check the tunnel (`curl http://localhost:8428/api/v1/status/buildinfo`). In Docker, use `host.docker.internal` rather than `localhost`, and make sure the tunnel runs on the host. |
+| Project shows *Auth failed* | The source rejected the stored token or password; edit the project and re-enter it. |
+| Project shows *No matching series* | The source is reachable but no series carry all of the project's labels right now. Check the matcher names and values. |
+| Project shows *Credentials unreadable* | `DATA_DIR/secret.key` (or `SECRET_KEY`) changed or was lost. Restore it, or re-enter the credentials. |
 | Job `failed` / `metrics_source_unavailable` | The source went away during the run. Retry; saved reports are unaffected. |
 | Report `partial`, a family shows *Source error* | Individual queries timed out or were truncated; each one is listed under *Omitted from this report*. Large scopes may need a quieter time or tighter budgets. |
 | AI `not_configured` | Set `OPENAI_API_KEY` and `OPENAI_MODEL`, or use `AI_PROVIDER=none`. Numerical results are unaffected. |

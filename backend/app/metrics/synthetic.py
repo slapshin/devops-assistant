@@ -1,7 +1,8 @@
 """Deterministic synthetic MetricsSource for tests, UI development, and offline demos.
 
-Series follow the label conventions of the owner-supplied examples (project "paas", env
-"production", node "paas-production", HTTP job "dispatcher-api"). Values are synthetic. The
+Series follow the label conventions of the owner-supplied examples (node "paas-production",
+HTTP job "dispatcher-api") and carry whatever matchers the project's scope has, so any
+project can point at it. Values are synthetic. The
 source reports ``backend="synthetic"`` so reports can never be mistaken for live data.
 """
 
@@ -16,7 +17,6 @@ from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
     CollectionResult,
-    DiscoveredValues,
     EntityMapping,
     MappingKind,
     ProgressReporter,
@@ -25,7 +25,7 @@ from app.domain.jobs import StageName, StageProgress, StageStatus
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.report import AnalysisWindows, SourceInfo
 from app.metrics.catalog import BY_SIGNAL, CATALOG
-from app.metrics.source import HISTORY_DAYS, entity_for
+from app.metrics.source import HISTORY_DAYS, entity_for, scope_labels
 
 DAY = 288
 """Steps per day."""
@@ -131,7 +131,7 @@ class _SeriesBuilder:
                 family=defn.family,
                 signal=signal,
                 entity=entity,
-                labels={"project": self.scope.project, "env": self.scope.env, **entity.labels},
+                labels={**scope_labels(self.scope), **entity.labels},
                 unit=defn.unit,
                 query=query,
                 step_seconds=STEP_SECONDS,
@@ -251,12 +251,6 @@ class SyntheticMetricsSource:
     async def source_info(self) -> SourceInfo:
         return SourceInfo(base_url="synthetic://fixtures", backend="synthetic", version=None)
 
-    async def list_projects(self) -> DiscoveredValues:
-        return DiscoveredValues(values=["paas"])
-
-    async def list_envs(self, project: str) -> DiscoveredValues:
-        return DiscoveredValues(values=["production"] if project == "paas" else [])
-
     async def capabilities(self, scope: Scope, windows: AnalysisWindows) -> list[MetricCapability]:
         scenario = self.scenario
         produced = {
@@ -294,7 +288,7 @@ class SyntheticMetricsSource:
                     else CapabilityStatus.UNSUPPORTED,
                     verified=True,
                     required_metrics=list(defn.required_metrics),
-                    required_labels=["project", "env", *defn.identity],
+                    required_labels=[*scope.label_names, *defn.identity],
                     observed_metrics=list(defn.required_metrics) if supported else [],
                     reason=reason,
                     history_days=float(scenario.history_days) if supported else None,

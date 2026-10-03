@@ -1,7 +1,8 @@
 """Framework-independent analysis pipeline: the single entry point for web, CLI, and schedules.
 
-One immutable request (scope, frozen end time T, detector version/config hash) flows through
-capability discovery, collection, deterministic detection, and optional AI explanation.
+One immutable request (project scope, frozen end time T, detector version/config hash) flows
+through the project's metrics source (capability discovery, collection), deterministic
+detection, and optional AI explanation.
 """
 
 import logging
@@ -14,8 +15,8 @@ from app.domain.interfaces import (
     CancellationToken,
     Detector,
     ExplanationProvider,
-    MetricsSource,
     ProgressReporter,
+    SourceProvider,
 )
 from app.domain.jobs import StageName, StageProgress, StageStatus
 from app.domain.report import (
@@ -41,7 +42,7 @@ EXPLANATION_STAGE_STATUS = {
 class AnalysisPipeline:
     def __init__(
         self,
-        source: MetricsSource,
+        sources: SourceProvider,
         detector: Detector,
         config: DetectorConfig,
         provider: ExplanationProvider | None,
@@ -49,7 +50,7 @@ class AnalysisPipeline:
         unavailable_reason: str | None = None,
         max_report_bytes: int = MAX_REPORT_BYTES,
     ) -> None:
-        self.source = source
+        self.sources = sources
         self.detector = detector
         self.config = config
         self.provider = provider
@@ -79,14 +80,15 @@ class AnalysisPipeline:
             )
 
         await stage(StageName.DISCOVERY, StageStatus.RUNNING)
-        source_info = await self.source.source_info()
-        capabilities = await self.source.capabilities(request.scope, windows)
-        await stage(StageName.DISCOVERY, StageStatus.DONE)
-        cancel.raise_if_cancelled()
+        async with self.sources.open(request.scope) as source:
+            source_info = await source.source_info()
+            capabilities = await source.capabilities(request.scope, windows)
+            await stage(StageName.DISCOVERY, StageStatus.DONE)
+            cancel.raise_if_cancelled()
 
-        collection = await self.source.collect(
-            request.scope, windows, capabilities, progress, cancel
-        )
+            collection = await source.collect(
+                request.scope, windows, capabilities, progress, cancel
+            )
         cancel.raise_if_cancelled()
 
         await stage(StageName.DETECTION, StageStatus.RUNNING)

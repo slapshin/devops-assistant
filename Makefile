@@ -73,8 +73,8 @@ up: ## Build and start the container in the background
 	${COMPOSE} up -d --build --remove-orphans
 	@echo "assistant: ${APP_URL}"
 
-demo: ## Start with synthetic metrics and the fake AI provider
-	METRICS_URL=synthetic://incident AI_PROVIDER=fake ${COMPOSE} up -d --build --remove-orphans
+demo: ## Start with synthetic demo projects and the fake AI provider
+	DEMO_PROJECTS=true AI_PROVIDER=fake ${COMPOSE} up -d --build --remove-orphans
 	@echo "assistant (demo): ${APP_URL}"
 
 down: ## Stop and remove the container (keeps the data volume)

@@ -11,7 +11,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 
 from app.ai.openai_adapter import OpenAIExplanationProvider
-from app.domain.common import Scope, TimeRange
+from app.domain.common import LabelMatcher, Scope, TimeRange
 from app.domain.explanation import ExplanationInput
 from app.domain.interfaces import ExplanationError
 from app.settings import ConfigError, load_settings
@@ -54,7 +54,11 @@ async def main() -> int:
 
     now = datetime.now(UTC)
     payload = ExplanationInput(
-        scope=Scope(project="check", env="check"),
+        scope=Scope(
+            project_id="check",
+            project_name="check",
+            matchers=[LabelMatcher(name="project", value="check")],
+        ),
         latest_day=TimeRange(start=now - timedelta(days=1), end=now),
         coverage_summary="synthetic connectivity check",
         findings=[],

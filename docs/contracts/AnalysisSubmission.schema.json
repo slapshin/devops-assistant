@@ -14,22 +14,13 @@
       "default": null,
       "title": "End Time"
     },
-    "env": {
-      "maxLength": 256,
-      "minLength": 1,
-      "title": "Env",
-      "type": "string"
-    },
-    "project": {
-      "maxLength": 256,
-      "minLength": 1,
-      "title": "Project",
+    "project_id": {
+      "title": "Project Id",
       "type": "string"
     }
   },
   "required": [
-    "project",
-    "env"
+    "project_id"
   ],
   "title": "AnalysisSubmission",
   "type": "object"

@@ -13,11 +13,11 @@ It covers node exporter, cAdvisor, Docker Swarm, and OpenTelemetry HTTP/RPC metr
 ## Run
 
 ```sh
-make up                            # Docker: http://127.0.0.1:8000, metrics at http://host.docker.internal:8428
+make up                            # Docker: http://127.0.0.1:8000
 # or natively
-make install && make serve          # http://127.0.0.1:8000, metrics at http://localhost:8428
-# offline demo, no metrics source or API key
-METRICS_URL=synthetic://incident AI_PROVIDER=fake make up
+make install && make serve          # http://127.0.0.1:8000
+# offline demo with synthetic projects, no metrics source or API key
+make demo
 ```
 
 Configuration, Docker networking, backups, budgets and troubleshooting are in **[docs/OPERATIONS.md](docs/OPERATIONS.md)**. Copy `config.env.template` to `config.env` for settings such as `OPENAI_API_KEY` and `OPENAI_MODEL`.
@@ -26,7 +26,7 @@ Layout: `devops/docker/Dockerfile` builds the image, `tools/compose/compose.yml`
 
 ## Use
 
-1. Choose a project and environment, then **Analyze**. Progress is shown per stage, and you can cancel.
+1. Create a project: a name, the label matchers that select its series (e.g. `project="shop"`, `env="prod"`), and its Prometheus-compatible source (URL and credentials, stored encrypted). Then **Analyze** it. Progress is shown per stage, and you can cancel.
 2. **Overview**: severity counts, top findings, the AI explanation (hypotheses labelled unverified), and coverage and limitations.
 3. **Findings**: filter, open the evidence (chart with the expected range, gaps and heuristic line; data table; exact query; related findings). Keys `j`/`k` move between findings and `Esc` closes the detail.
 4. **Trends**: 14 daily buckets (anomalous share, episodes, minutes, entities, coverage). Select a day to see its episodes, and see which problems recur.

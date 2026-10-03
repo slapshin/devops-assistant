@@ -1,17 +1,19 @@
 import json
 import re
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from itertools import pairwise
 from typing import Any
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
-from app.domain.common import STEP_SECONDS, Scope
+from app.domain.common import STEP_SECONDS, LabelMatcher, Scope
 from app.domain.interfaces import CancellationToken, Cancelled
 from app.domain.jobs import StageProgress
 from app.domain.metrics import CapabilityStatus
+from app.domain.projects import PrometheusConnection
 from app.domain.report import AnalysisWindows
 from app.metrics.catalog import BY_SIGNAL, CATALOG
 from app.metrics.client import ClientLimits, PrometheusClient, SourceError, SourceErrorKind
@@ -23,9 +25,10 @@ from app.metrics.promql import (
     scope_matchers,
 )
 from app.metrics.source import CollectionBudget, PrometheusMetricsSource, _to_grid
+from tests.helpers import make_scope
 
-SCOPE = Scope(project="paas", env="production")
-WEIRD = Scope(project='pa"as\\x', env="prod\nuction")
+SCOPE = make_scope()
+WEIRD = make_scope('pa"as\\x', "prod\nuction")
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
 WINDOWS = AnalysisWindows.for_end(T)
 
@@ -90,11 +93,25 @@ def vector(*series: tuple[dict[str, str], str]) -> httpx.Response:
 
 def test_label_values_are_escaped() -> None:
     assert escape_label_value('a"b\\c\nd') == 'a\\"b\\\\c\\nd'
-    assert scope_matchers(WEIRD) == 'project="pa\\"as\\\\x", env="prod\\nuction"'
+    assert scope_matchers(WEIRD) == 'env="prod\\nuction", project="pa\\"as\\\\x"'
+
+
+ONE = Scope(project_id="p", project_name="p", matchers=[LabelMatcher(name="team", value="a")])
+THREE = Scope(
+    project_id="p",
+    project_name="p",
+    matchers=[
+        LabelMatcher(name="project", value='q"u\\o"te'),
+        LabelMatcher(name="env", value="prod"),
+        LabelMatcher(name="cluster", value="eu,1}"),
+    ],
+)
 
 
 @pytest.mark.parametrize("defn", CATALOG, ids=lambda d: d.signal)
-@pytest.mark.parametrize("scope", [SCOPE, WEIRD], ids=["plain", "escaped"])
+@pytest.mark.parametrize(
+    "scope", [SCOPE, WEIRD, ONE, THREE], ids=["plain", "escaped", "one", "three"]
+)
 def test_every_catalog_selector_and_gate_is_scoped(defn: Any, scope: Scope) -> None:
     rendered = [defn.query.render(scope)] + [g.template.render(scope) for g in defn.gates]
     for query in rendered:
@@ -123,6 +140,16 @@ def test_string_literal_cannot_fake_scope() -> None:
 def test_other_project_matcher_does_not_satisfy_scope() -> None:
     with pytest.raises(ScopeViolation):
         assert_scoped('up{project="paas-gpu", env="production"}', SCOPE, ("up",))
+
+
+def test_every_matcher_is_required() -> None:
+    full = f"up{{{scope_matchers(THREE)}}}"
+    assert_scoped(full, THREE, ("up",))
+    for dropped in THREE.matchers:
+        rest = [m for m in THREE.matchers if m != dropped]
+        partial = "up{" + ", ".join(f'{m.name}="{escape_label_value(m.value)}"' for m in rest) + "}"
+        with pytest.raises(ScopeViolation):
+            assert_scoped(partial, THREE, ("up",))
 
 
 COUNTER = re.compile(r"\b([a-z_:]+_(?:total|count|sum|bucket))\{")
@@ -233,7 +260,7 @@ async def test_cache_is_keyed_by_exact_query() -> None:
     fake = FakeProm(lambda p, q: vector(({"a": "1"}, "1")))
     client = fake.client()
     paas = f"up{{{scope_matchers(SCOPE)}}}"
-    other = f"up{{{scope_matchers(Scope(project='paas-gpu', env='production'))}}}"
+    other = f"up{{{scope_matchers(make_scope('paas-gpu', 'production'))}}}"
     await client.query(paas, 10)
     await client.query(paas, 10)
     await client.query(other, 10)
@@ -241,16 +268,14 @@ async def test_cache_is_keyed_by_exact_query() -> None:
 
 
 async def test_bearer_token_is_sent_but_never_in_query() -> None:
-    from app.settings import load_settings
-
     seen: list[httpx.Request] = []
 
     def record(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         return ok({"result": []})
 
-    settings = load_settings(_env_file=None, metrics_bearer_token="tok-123")
-    client = PrometheusClient.from_settings(settings, transport=httpx.MockTransport(record))
+    conn = PrometheusConnection(url="http://vm.example", bearer_token=SecretStr("tok-123"))
+    client = PrometheusClient.from_connection(conn, transport=httpx.MockTransport(record))
     await client.query("up", 1)
     assert seen[0].headers["Authorization"] == "Bearer tok-123"
     assert "tok-123" not in str(seen[0].url)
@@ -428,15 +453,3 @@ async def test_service_to_host_mapping_by_container_id_prefix() -> None:
         ("otel_service", "dispatcher-api", "paas-production-2"),
         ("swarm_service", "paas_dispatcher-api", "paas-production-2"),
     ]
-
-
-async def test_discovery_reports_truncation_and_scopes_envs() -> None:
-    fake = FakeProm(lambda p, q: ok(["a", "b", "c"]))
-    source = PrometheusMetricsSource(fake.client(), CollectionBudget(max_projects=2), now=lambda: T)
-    projects = await source.list_projects()
-    assert projects.values == ["a", "b"] and projects.truncated
-    await source.list_envs('pa"as')
-    assert fake.requests[-1][1]["match[]"] == ['{project="pa\\"as", env!=""}']
-    assert timedelta(
-        seconds=int(fake.requests[-1][1]["end"][0]) - int(fake.requests[-1][1]["start"][0])
-    ) == timedelta(days=28)

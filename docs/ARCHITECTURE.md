@@ -8,9 +8,19 @@ Use a Python backend with FastAPI and a Vue.js/TypeScript web UI, packaged for l
 
 Use SQLite for analysis job status and report snapshots. Start with one application process and a bounded background job runner; Redis, distributed workers, and a separate time-series database are unnecessary for the first version. Metrics remain in the existing metrics backend.
 
-The backend reads `METRICS_URL`, optional metrics authentication settings, `AI_PROVIDER=openai`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. Select an available model during implementation; do not hard-code a model into domain logic. The browser calls only the application backend. Local execution is the initial deployment assumption; deployment beyond localhost requires a separate access-control decision.
+The backend reads `AI_PROVIDER=openai`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. Select an available model during implementation; do not hard-code a model into domain logic. The browser calls only the application backend. Local execution is the initial deployment assumption; deployment beyond localhost requires a separate access-control decision.
 
 Port 8428 suggests single-node VictoriaMetrics, but the product has not been verified. Support the common Prometheus API and preserve any configured URL path prefix. VictoriaMetrics documents this port and its query URL formats in its [API examples](https://docs.victoriametrics.com/url-examples/).
+
+## Projects (T011–T013)
+
+A **project** is the unit of analysis: a name, 1–10 equality label matchers that select its series (e.g. `project="shop", env="prod"`), and one configuration per source kind. Today the only kind is a Prometheus-compatible metrics source (URL, TLS verification, none/bearer/basic auth). Further kinds (Wazuh, Cloudflare, Sentry, …) are added as new `SourceKind` members and adapters; `project_sources` stores one row per (project, kind) with JSON config and Fernet-encrypted secrets, so no migration is needed per kind.
+
+- Projects are created in the UI and stored in SQLite (`projects`, `project_sources`). Secrets are write-only through the API and encrypted with `SECRET_KEY` or a generated `DATA_DIR/secret.key`.
+- `Scope` is `{project_id, project_name, matchers}`. `promql.render` requires every matcher in every selector block, so no query (including ratio operands) can leave the project.
+- `ProjectSources` (`app/metrics/factory.py`) opens the project's source for each analysis or connection test and closes it afterwards; editing a project never affects a running job.
+- Every job and report belongs to one project (`analysis_jobs.project_id`, cascading to reports). Deleting a project deletes its analyses; it is refused while one is queued or running.
+- Migration 0003 turned each distinct pre-project `(project, env)` into a project and rewrote saved snapshots to report schema 2.0; the deprecated `METRICS_*` settings are imported once into those projects at startup.
 
 ## Version policy
 
@@ -50,7 +60,7 @@ Logical flow: browser → API/job runner → metrics source → deterministic an
 
 | Contract | Required content |
 | --- | --- |
-| `AnalysisRequest` | Exact project/env, optional end time, detector configuration version |
+| `AnalysisRequest` | Project scope (ID, name, label matchers), optional end time, detector configuration version |
 | `MetricSeries` | Metric family, resource identity, labels, unit, timestamps/values, query, step, coverage |
 | `MetricCapability` | Supported/unsupported/partial, required metrics/labels, reason, available history |
 | `Finding` | Stable ID, detector/version, entity, start/end, severity, confidence/reasons, observed and expected values, evidence references |
@@ -62,7 +72,7 @@ Freeze units, nullable fields, error codes, JSON examples, and ownership of evid
 
 ## Resource and HTTP semantics
 
-Node identity starts with `(project, env, job, instance)`. Preserve device/mountpoint for disk findings. Container identity needs discovery of actual container labels. Service identity prefers an explicit service label, falling back to `job`; preserve route/method and instance for drill-down.
+Node identity starts with the project scope plus `(job, instance)`. Preserve device/mountpoint for disk findings. Container identity needs discovery of actual container labels. Service identity prefers an explicit service label, falling back to `job`; preserve route/method and instance for drill-down.
 
 The supplied node instance `paas-production` and HTTP instance `10.0.4.251:5555` are different namespaces. Never infer a service-to-host relationship from these alone. Cross-layer attribution needs an explicit mapping or shared identifying labels; temporal overlap can only support a hypothesis.
 
@@ -72,7 +82,7 @@ Discover histogram buckets/native histograms before enabling p95/p99 latency. Co
 
 ## API and job lifecycle
 
-Proposed routes: `GET /api/projects`, `GET /api/projects/{project}/envs`, `POST /api/analyses`, `GET /api/analyses/{id}`, `GET /api/analyses/{id}/report`, and `DELETE /api/analyses/{id}` for cancellation. T001 freezes exact route/error conventions; T002 supplies contract examples.
+Routes: project management under `/api/projects` (T011), `POST /api/analyses` with a `project_id`, `GET /api/analyses/{id}`, `GET /api/analyses/{id}/report`, and `DELETE /api/analyses/{id}` for cancellation. T001 freezes exact route/error conventions; T002 supplies contract examples.
 
 Persist queued/running/completed/partial/failed/cancelled state and expose collection/detection/explanation progress. T001 specifies duplicate requests, queue limits, cancellation, and restart handling. Recovery must not leave abandoned jobs permanently running. AI failure does not erase numerical results.
 
@@ -84,7 +94,7 @@ SQLite stores jobs and versioned report snapshots; the existing metrics backend 
 
 Use explicit migrations and persistent container storage. Startup must not erase saved reports. Verify restart behavior with real SQLite storage.
 
-`METRICS_URL=http://localhost:8428` is the native default supplied by the owner. Inside Docker, localhost refers to the container; document a suitable host address/network option. Preserve configured URL prefixes and keep credentials server-side. Package for local operation; public exposure and external deployment are separate work.
+Each project's source URL is configured in the UI (`http://localhost:8428` natively for the owner's tunnel). Inside Docker, localhost refers to the container; use `host.docker.internal`. Preserve configured URL prefixes and keep credentials server-side. Package for local operation; public exposure and external deployment are separate work.
 
 ## Decisions delegated to T001
 

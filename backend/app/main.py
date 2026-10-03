@@ -14,13 +14,12 @@ from app.analysis.engine import RobustDetector
 from app.api.problems import install_problem_handlers
 from app.api.projects import router as projects_router
 from app.api.routes import router
+from app.bootstrap import bootstrap_projects
 from app.container import Services
 from app.domain.detector_config import DetectorConfig
 from app.domain.interfaces import ExplanationProvider, MetricsSource
 from app.jobs import JobRunner, RunnerLimits
-from app.metrics.client import PrometheusClient
-from app.metrics.source import PrometheusMetricsSource
-from app.metrics.synthetic import SCENARIOS, SyntheticMetricsSource
+from app.metrics.factory import ProjectSources
 from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
 from app.static import mount_ui
@@ -31,20 +30,6 @@ from app.storage.secrets import load_secret_box
 log = logging.getLogger("app")
 
 CONFIG_ERROR_EXIT_CODE = 2
-
-
-def build_source(settings: Settings) -> tuple[MetricsSource, PrometheusClient | None]:
-    scenario = settings.synthetic_scenario
-    if scenario is not None:
-        if scenario not in SCENARIOS:
-            raise ConfigError(
-                f"Invalid configuration:\n  METRICS_URL: unknown synthetic scenario {scenario!r}"
-                f" (expected one of {', '.join(sorted(SCENARIOS))})"
-            )
-        return SyntheticMetricsSource(scenario), None
-
-    client = PrometheusClient.from_settings(settings)
-    return PrometheusMetricsSource(client), client
 
 
 def load_detector_config(settings: Settings) -> DetectorConfig:
@@ -73,21 +58,19 @@ def build_services(
     provider: ExplanationProvider | None = None,
     limits: RunnerLimits | None = None,
 ) -> Services:
+    """``source``, when given, replaces every project's metrics source (tests, fixtures)."""
     config = load_detector_config(settings)
-
-    client = None
-    if source is None:
-        source, client = build_source(settings)
 
     unavailable, reason = settings.explanation_status, None
     if provider is None:
         provider, unavailable, reason = provider_from_settings(settings)
 
-    pipeline = AnalysisPipeline(source, RobustDetector(), config, provider, unavailable, reason)
     repo = SqliteReportRepository(settings.database_path)
     projects = SqliteProjectRepository(repo.engine, load_secret_box(settings))
+    sources = ProjectSources(projects, override=source)
+    pipeline = AnalysisPipeline(sources, RobustDetector(), config, provider, unavailable, reason)
     runner = JobRunner(repo, pipeline, config, settings.explanation_status, limits)
-    return Services(settings, config, source, repo, runner, client, projects)
+    return Services(settings, config, sources, repo, runner, projects)
 
 
 def create_app(
@@ -112,11 +95,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        await bootstrap_projects(settings, services.projects)
         recovered = await services.runner.start()
         log.info(
-            "started version=%s metrics_source=%s ai=%s db=%s interrupted_jobs_failed=%d",
+            "started version=%s ai=%s db=%s interrupted_jobs_failed=%d",
             __version__,
-            settings.metrics_source_display,
             settings.explanation_status.value,
             settings.database_path,
             recovered,
@@ -125,8 +108,6 @@ def create_app(
             yield
         finally:
             await services.runner.stop()
-            if services.client is not None:
-                await services.client.aclose()
             services.repo.close()
 
     app = FastAPI(

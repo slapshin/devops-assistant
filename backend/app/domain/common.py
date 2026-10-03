@@ -3,13 +3,22 @@
 Domain modules must not import web framework or LLM SDK types; see docs/contracts.md.
 """
 
+import re
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Final
 
-from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, PlainSerializer
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    field_validator,
+)
 
-REPORT_SCHEMA_VERSION: Final = "1.0"
+REPORT_SCHEMA_VERSION: Final = "2.0"
 STEP_SECONDS = 300
 
 
@@ -40,11 +49,52 @@ class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, use_enum_values=False)
 
 
-class Scope(Contract):
-    """Exactly one project/env pair. Every query and report stays inside it."""
+LABEL_NAME = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+RESERVED_LABEL_PREFIX = "__"
+MAX_MATCHERS = 10
 
-    project: LabelValue
-    env: LabelValue
+
+class LabelMatcher(Contract):
+    """Exact ``name="value"`` matcher added to every selector of a project's queries."""
+
+    name: str = Field(min_length=1, max_length=128)
+    value: LabelValue
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, value: str) -> str:
+        if not LABEL_NAME.match(value):
+            raise ValueError("must match [a-zA-Z_][a-zA-Z0-9_]*")
+        if value.startswith(RESERVED_LABEL_PREFIX):
+            raise ValueError("labels starting with '__' are reserved")
+        return value
+
+
+def normalise_matchers(matchers: list[LabelMatcher]) -> list[LabelMatcher]:
+    """Reject duplicate label names and sort by name, so equal scopes render identically."""
+    names = [m.name for m in matchers]
+    if duplicates := sorted({n for n in names if names.count(n) > 1}):
+        raise ValueError(f"duplicate label names: {', '.join(duplicates)}")
+    return sorted(matchers, key=lambda m: m.name)
+
+
+Matchers = Annotated[
+    list[LabelMatcher],
+    Field(min_length=1, max_length=MAX_MATCHERS),
+    AfterValidator(normalise_matchers),
+]
+
+
+class Scope(Contract):
+    """One project's series: every query carries all of its matchers; reports stay inside it."""
+
+    project_id: str
+    project_name: str
+    matchers: Matchers
+
+    @property
+    def label_names(self) -> list[str]:
+        return [m.name for m in self.matchers]
 
 
 class TimeRange(Contract):
@@ -110,7 +160,7 @@ class Entity(Contract):
         description="Stable canonical key, e.g. 'node|job=node|instance=paas-production'.",
     )
     display_name: str
-    labels: Labels = Field(description="Identity labels only (no project/env).")
+    labels: Labels = Field(description="Identity labels only (no scope matchers).")
 
 
 class Reason(Contract):

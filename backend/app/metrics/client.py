@@ -18,7 +18,6 @@ from typing import Any
 import httpx
 
 from app.domain.projects import PrometheusConnection
-from app.settings import Settings
 
 log = logging.getLogger("app.metrics")
 
@@ -139,12 +138,6 @@ class PrometheusClient:
         return cls(
             conn.url, headers=headers, auth=auth, verify=conn.tls_verify, transport=transport
         )
-
-    @classmethod
-    def from_settings(
-        cls, settings: Settings, transport: httpx.AsyncBaseTransport | None = None
-    ) -> PrometheusClient:
-        return cls.from_connection(settings.metrics_connection, transport)
 
     async def aclose(self) -> None:
         await self._http.aclose()

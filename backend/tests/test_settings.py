@@ -12,7 +12,7 @@ def test_defaults_need_no_metrics_connection_or_ai_key(monkeypatch: pytest.Monke
     for var in ("METRICS_URL", "AI_PROVIDER", "OPENAI_API_KEY", "OPENAI_MODEL"):
         monkeypatch.delenv(var, raising=False)
     s = settings()
-    assert s.metrics_url == "http://localhost:8428"
+    assert s.metrics_url is None and s.metrics_connection is None
     assert s.explanation_status is ExplanationStatus.NOT_CONFIGURED
     assert s.explanation_hint == "Set OPENAI_API_KEY and OPENAI_MODEL or AI_PROVIDER=none"
 

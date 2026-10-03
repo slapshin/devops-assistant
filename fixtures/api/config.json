@@ -5,7 +5,6 @@
   "explanation_status": "not_configured",
   "detector_version": "detectors-2026.09.1",
   "config_hash": "b177dc4ac897",
-  "metrics_source": "http://localhost:8428",
   "limits": {
     "max_running_jobs": 1,
     "max_queued_jobs": 4,

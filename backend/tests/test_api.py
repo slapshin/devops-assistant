@@ -26,8 +26,10 @@ from app.metrics.client import SourceError, SourceErrorKind
 from app.metrics.synthetic import SyntheticMetricsSource
 from app.service import AnalysisPipeline
 from app.settings import load_settings
+from tests.helpers import StaticSources, make_scope
 
-PAAS = {"project": "paas", "env": "production"}
+PAAS_MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "paas"}]
+PAAS_NAME = "paas / production"
 
 
 class GatedSource(SyntheticMetricsSource):
@@ -84,7 +86,6 @@ def make_client(
     config = {
         "_env_file": None,
         "data_dir": tmp_path,
-        "metrics_url": "synthetic://incident",
         "ai_provider": "fake",
         **settings,
     }
@@ -108,38 +109,49 @@ def wait(client: TestClient, analysis_id: str, *states: str, timeout: float = 30
     raise AssertionError(f"job did not reach {states}: {job}")
 
 
+def project_id(client: TestClient, name: str = PAAS_NAME, url: str = "synthetic://incident") -> str:
+    """ID of the named project, created on first use (projects persist across restarts)."""
+    for project in client.get("/api/projects").json()["items"]:
+        if project["name"] == name:
+            return str(project["project_id"])
+    res = client.post(
+        "/api/projects",
+        json={
+            "name": name,
+            "matchers": PAAS_MATCHERS,
+            "sources": [{"kind": "prometheus", "url": url}],
+        },
+    )
+    assert res.status_code == 201, res.text
+    return str(res.json()["project_id"])
+
+
 def submit(client: TestClient, **body: Any) -> Any:
-    return client.post("/api/analyses", json={**PAAS, **body})
+    return client.post("/api/analyses", json={"project_id": project_id(client), **body})
 
 
-# --- discovery and validation -------------------------------------------------------------
-
-
-def test_discovery(client: TestClient) -> None:
-    assert client.get("/api/discovery/projects").json()["items"] == [{"project": "paas"}]
-    assert client.get("/api/discovery/projects/paas/envs").json()["items"] == [
-        {"env": "production"}
-    ]
-    res = client.get("/api/discovery/projects/other/envs")
-    assert res.status_code == 404 and res.json()["code"] == "project_not_found"
+# --- validation ---------------------------------------------------------------------------
 
 
 def test_submission_validation(client: TestClient) -> None:
-    bad_env = client.post("/api/analyses", json={"project": "paas", "env": "staging"})
-    assert bad_env.status_code == 404 and bad_env.json()["code"] == "env_not_found"
+    missing = client.post("/api/analyses", json={"project_id": "nope"})
+    assert missing.status_code == 404 and missing.json()["code"] == "project_not_found"
+    sourceless = client.post("/api/projects", json={"name": "empty", "matchers": PAAS_MATCHERS})
+    res = client.post("/api/analyses", json={"project_id": sourceless.json()["project_id"]})
+    assert res.status_code == 409 and res.json()["code"] == "source_not_configured"
     future = submit(client, end_time=(datetime.now(UTC) + timedelta(hours=1)).isoformat())
     assert future.status_code == 422 and future.json()["code"] == "end_time_invalid"
     naive = submit(client, end_time="2026-09-30T10:00:00")
     assert naive.status_code == 422 and naive.json()["code"] == "validation_error"
-    res = client.get("/api/analyses", params={"project": "paas"})
+    res = client.get("/api/analyses", params={"limit": 0})
     assert res.status_code == 422
 
 
 def test_health_and_config(client: TestClient) -> None:
     health = client.get("/api/health").json()
-    assert health["database"] == "ok" and health["metrics_source"]["reachable"] is True
+    assert health["database"] == "ok" and health["status"] == "ok"
     config = client.get("/api/config").json()
-    assert config["report_count"] == 0 and config["metrics_source"] == "synthetic://incident"
+    assert config["report_count"] == 0
 
 
 # --- lifecycle ----------------------------------------------------------------------------
@@ -157,14 +169,22 @@ def test_submit_progress_and_report(client: TestClient) -> None:
     assert done["report_available"] and done["explanation_status"] == "succeeded"
     assert all(s["status"] in ("done", "skipped") for s in done["stages"])
     report = client.get(f"/api/analyses/{job['analysis_id']}/report").json()
-    assert report["scope"] == PAAS and report["windows"]["end_time"] == job["end_time"]
+    assert report["scope"] == {
+        "project_id": project_id(client),
+        "project_name": PAAS_NAME,
+        "matchers": PAAS_MATCHERS,
+    }
+    assert report["windows"]["end_time"] == job["end_time"]
     assert report["source"]["backend"] == "synthetic"
     assert sum(done["finding_counts"].values()) == len(report["findings"]) > 0
     ids = {f["finding_id"] for f in report["findings"]}
     for h in report["explanation"]["explanation"]["hypotheses"]:
         assert set(h["finding_ids"]) <= ids
-    listed = client.get("/api/analyses", params=PAAS).json()["items"]
-    assert [j["analysis_id"] for j in listed] == [job["analysis_id"]]
+    assert len(done["daily_episodes"]) == 14
+    listed = client.get("/api/analyses", params={"project_id": project_id(client)}).json()
+    assert [j["analysis_id"] for j in listed["items"]] == [job["analysis_id"]]
+    summary = client.get("/api/projects").json()["items"][0]
+    assert summary["latest_analysis"] == done and summary["active_analysis"] is None
     assert client.get("/api/config").json()["report_count"] == 1
 
 
@@ -283,14 +303,17 @@ def test_scope_isolation_and_pagination(tmp_path: Path) -> None:
         ]
         for analysis_id in ids:
             wait(client, analysis_id, "completed")
-        page = client.get("/api/analyses", params={**PAAS, "limit": 2}).json()
+        pid = {"project_id": project_id(client)}
+        page = client.get("/api/analyses", params={**pid, "limit": 2}).json()
         assert [j["analysis_id"] for j in page["items"]] == ids[::-1][:2]
         rest = client.get(
-            "/api/analyses", params={**PAAS, "limit": 2, "cursor": page["next_cursor"]}
+            "/api/analyses", params={**pid, "limit": 2, "cursor": page["next_cursor"]}
         ).json()
         assert [j["analysis_id"] for j in rest["items"]] == [ids[0]] and not rest["next_cursor"]
-        other = client.get("/api/analyses", params={"project": "x", "env": "y"}).json()
+        other_id = project_id(client, name="other", url="synthetic://healthy")
+        other = client.get("/api/analyses", params={"project_id": other_id}).json()
         assert other["items"] == []
+        assert len(client.get("/api/analyses").json()["items"]) == 3
 
 
 def test_unsupported_saved_schema_is_reported_not_crashed(tmp_path: Path) -> None:
@@ -298,24 +321,22 @@ def test_unsupported_saved_schema_is_reported_not_crashed(tmp_path: Path) -> Non
         analysis_id = submit(client).json()["analysis"]["analysis_id"]
         wait(client, analysis_id, "completed")
         with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
-            db.execute("UPDATE reports SET schema_version='2.0'")
+            db.execute("UPDATE reports SET schema_version='3.0'")
         res = client.get(f"/api/analyses/{analysis_id}/report")
         assert res.status_code == 404 and res.json()["code"] == "schema_unsupported"
-
-
-def test_unknown_synthetic_scenario_is_a_config_error(tmp_path: Path) -> None:
-    with pytest.raises(SystemExit):
-        create_app(load_settings(_env_file=None, data_dir=tmp_path, metrics_url="synthetic://nope"))
 
 
 async def test_pipeline_is_usable_without_the_web_framework() -> None:
     config = DetectorConfig()
     pipeline = AnalysisPipeline(
-        SyntheticMetricsSource("degraded"), RobustDetector(), config, FakeExplanationProvider()
+        StaticSources(SyntheticMetricsSource("degraded")),
+        RobustDetector(),
+        config,
+        FakeExplanationProvider(),
     )
     end = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
     request = AnalysisRequest(
-        scope=Scope(**PAAS),
+        scope=make_scope(),
         end_time=end,
         detector_version=config.version,
         config_hash=config.config_hash,
@@ -344,11 +365,15 @@ async def test_pipeline_is_usable_without_the_web_framework() -> None:
 def test_report_size_budget_disclosed() -> None:
     config = DetectorConfig()
     pipeline = AnalysisPipeline(
-        SyntheticMetricsSource("incident"), RobustDetector(), config, None, max_report_bytes=46_000
+        StaticSources(SyntheticMetricsSource("incident")),
+        RobustDetector(),
+        config,
+        None,
+        max_report_bytes=46_000,
     )
     end = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
     request = AnalysisRequest(
-        scope=Scope(**PAAS),
+        scope=make_scope(),
         end_time=end,
         detector_version=config.version,
         config_hash=config.config_hash,

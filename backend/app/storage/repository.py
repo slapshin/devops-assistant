@@ -2,13 +2,13 @@
 
 import asyncio
 import zlib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
 import sqlalchemy as sa
 
-from app.domain.common import REPORT_SCHEMA_VERSION, Scope, Severity, format_utc
+from app.domain.common import REPORT_SCHEMA_VERSION, Severity, format_utc
 from app.domain.explanation import ExplanationStatus
 from app.domain.jobs import AnalysisJob, ErrorCode, JobError, JobState, StageProgress, StageStatus
 from app.domain.report import AnalysisReport, AnalysisRequest
@@ -52,8 +52,7 @@ class SqliteReportRepository:
     def _row(job: AnalysisJob) -> dict[str, str]:
         return {
             "analysis_id": job.analysis_id,
-            "project": job.scope.project,
-            "env": job.scope.env,
+            "project_id": job.scope.project_id,
             "end_time": format_utc(job.end_time),
             "config_hash": job.config_hash,
             "state": job.state.value,
@@ -84,8 +83,7 @@ class SqliteReportRepository:
         def q(conn: sa.Connection) -> AnalysisJob | None:
             row = conn.execute(
                 sa.select(analysis_jobs.c.job)
-                .where(analysis_jobs.c.project == request.scope.project)
-                .where(analysis_jobs.c.env == request.scope.env)
+                .where(analysis_jobs.c.project_id == request.scope.project_id)
                 .where(analysis_jobs.c.end_time == format_utc(request.end_time))
                 .where(analysis_jobs.c.config_hash == request.config_hash)
                 .where(analysis_jobs.c.state.in_(ACTIVE))
@@ -107,14 +105,12 @@ class SqliteReportRepository:
         return await self._run(q)
 
     async def list_jobs(
-        self, scope: Scope | None, limit: int, cursor: str | None
+        self, project_id: str | None, limit: int, cursor: str | None
     ) -> tuple[list[AnalysisJob], str | None]:
         def q(conn: sa.Connection) -> tuple[list[AnalysisJob], str | None]:
             stmt = sa.select(analysis_jobs.c.job).order_by(analysis_jobs.c.analysis_id.desc())
-            if scope is not None:
-                stmt = stmt.where(analysis_jobs.c.project == scope.project).where(
-                    analysis_jobs.c.env == scope.env
-                )
+            if project_id is not None:
+                stmt = stmt.where(analysis_jobs.c.project_id == project_id)
             if cursor:
                 stmt = stmt.where(analysis_jobs.c.analysis_id < cursor)
 
@@ -124,6 +120,42 @@ class SqliteReportRepository:
             has_more = len(rows) > limit
             next_cursor = jobs[-1].analysis_id if has_more and jobs else None
             return jobs, next_cursor
+
+        return await self._run(q)
+
+    async def project_activity(
+        self, project_ids: Sequence[str]
+    ) -> dict[str, tuple[AnalysisJob | None, AnalysisJob | None]]:
+        """project_id -> (latest finished job, active job)."""
+
+        def newest(conn: sa.Connection, project_id: str, active: bool) -> AnalysisJob | None:
+            state = analysis_jobs.c.state
+            row = conn.execute(
+                sa.select(analysis_jobs.c.job)
+                .where(analysis_jobs.c.project_id == project_id)
+                .where(state.in_(ACTIVE) if active else state.not_in(ACTIVE))
+                .order_by(analysis_jobs.c.analysis_id.desc())
+                .limit(1)
+            ).first()
+            return AnalysisJob.model_validate_json(row[0]) if row else None
+
+        def q(conn: sa.Connection) -> dict[str, tuple[AnalysisJob | None, AnalysisJob | None]]:
+            return {
+                pid: (newest(conn, pid, active=False), newest(conn, pid, active=True))
+                for pid in project_ids
+            }
+
+        return await self._run(q)
+
+    async def has_active(self, project_id: str) -> bool:
+        def q(conn: sa.Connection) -> bool:
+            row = conn.execute(
+                sa.select(analysis_jobs.c.analysis_id)
+                .where(analysis_jobs.c.project_id == project_id)
+                .where(analysis_jobs.c.state.in_(ACTIVE))
+                .limit(1)
+            ).first()
+            return row is not None
 
         return await self._run(q)
 
@@ -158,6 +190,7 @@ class SqliteReportRepository:
         *,
         explanation_status: ExplanationStatus | None = None,
         finding_counts: dict[Severity, int] | None = None,
+        daily_episodes: list[int | None] | None = None,
         report_available: bool = False,
     ) -> AnalysisJob:
         now = datetime.now(UTC)
@@ -182,6 +215,7 @@ class SqliteReportRepository:
                     "stages": stages,
                     "report_available": report_available,
                     "finding_counts": finding_counts,
+                    "daily_episodes": daily_episodes,
                     "explanation_status": explanation_status or job.explanation_status,
                 }
             )

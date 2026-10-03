@@ -18,7 +18,6 @@ def settings(tmp_path: Path, **kw: Any) -> Any:
     return load_settings(
         _env_file=None,
         data_dir=tmp_path / "data",
-        metrics_url="synthetic://healthy",
         ai_provider="none",
         **kw,
     )
@@ -71,15 +70,22 @@ def test_backup_and_prune_are_explicit(
 ) -> None:
     s = settings(tmp_path)
     with TestClient(create_app(s)) as client:
+        project = client.post(
+            "/api/projects",
+            json={
+                "name": "paas",
+                "matchers": [{"name": "project", "value": "paas"}],
+                "sources": [{"kind": "prometheus", "url": "synthetic://healthy"}],
+            },
+        ).json()
         analysis_id = client.post(
-            "/api/analyses", json={"project": "paas", "env": "production"}
+            "/api/analyses", json={"project_id": project["project_id"]}
         ).json()["analysis"]["analysis_id"]
         for _ in range(200):
             if client.get(f"/api/analyses/{analysis_id}").json()["state"] == "completed":
                 break
             time.sleep(0.05)
     monkeypatch.setenv("DATA_DIR", str(s.data_dir))
-    monkeypatch.setenv("METRICS_URL", "synthetic://healthy")
     copy = tmp_path / "backup" / "copy.sqlite3"
     assert maintenance(["backup", str(copy)]) == 0
     with sqlite3.connect(copy) as db:

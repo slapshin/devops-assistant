@@ -9,7 +9,7 @@ from typing import Any
 import sqlalchemy as sa
 from pydantic import SecretStr
 
-from app.domain.common import format_utc
+from app.domain.common import LabelMatcher, format_utc
 from app.domain.ids import new_project_id
 from app.domain.projects import (
     AuthType,
@@ -17,7 +17,6 @@ from app.domain.projects import (
     BasicAuthInput,
     BearerAuth,
     BearerAuthInput,
-    LabelMatcher,
     NoAuth,
     Project,
     ProjectInput,
@@ -26,8 +25,13 @@ from app.domain.projects import (
     PrometheusSourceInput,
     SourceKind,
 )
-from app.storage.db import project_sources, projects
+from app.storage.db import app_meta, project_sources, projects
 from app.storage.secrets import SecretBox, SecretsUnreadable
+
+LEGACY_IMPORT_KEY = "legacy_source_import"
+"""Set to 'pending' by migration 0003 when it created projects from existing reports."""
+LEGACY_IMPORT_PENDING = "pending"
+LEGACY_IMPORT_DONE = "done"
 
 
 class ProjectNameTaken(Exception):
@@ -228,11 +232,81 @@ class SqliteProjectRepository:
         return await self._run(q)
 
     async def delete(self, project_id: str) -> bool:
+        """Delete the project; its sources, jobs, and reports go with it (FK cascade)."""
+
         def q(conn: sa.Connection) -> bool:
             result = conn.execute(projects.delete().where(projects.c.project_id == project_id))
             return result.rowcount > 0
 
         return await self._run(q)
+
+    async def count(self) -> int:
+        def q(conn: sa.Connection) -> int:
+            return int(conn.execute(sa.select(sa.func.count()).select_from(projects)).scalar_one())
+
+        return await self._run(q)
+
+    async def import_legacy_source(self, conn: PrometheusConnection | None) -> int | None:
+        """Once after migration 0003: give migrated projects the deprecated METRICS_* source.
+
+        Returns the number of projects updated, or None when no import was pending.
+        """
+        source = None
+        if conn is not None:
+            source = PrometheusSourceInput(
+                url=conn.url,
+                tls_verify=conn.tls_verify,
+                auth=_auth_input(conn),
+            )
+        now = format_utc(datetime.now(UTC))
+
+        def q(c: sa.Connection) -> int | None:
+            pending = c.execute(
+                sa.select(app_meta.c.value).where(app_meta.c.key == LEGACY_IMPORT_KEY)
+            ).first()
+            if pending is None or pending[0] != LEGACY_IMPORT_PENDING:
+                return None
+
+            updated = 0
+            if source is not None:
+                without = c.execute(
+                    sa.select(projects.c.project_id).where(
+                        ~sa.exists().where(project_sources.c.project_id == projects.c.project_id)
+                    )
+                ).all()
+                config, secrets = self._split(source, None)
+                for (project_id,) in without:
+                    c.execute(
+                        project_sources.insert().values(
+                            project_id=project_id,
+                            kind=SourceKind.PROMETHEUS.value,
+                            config=json.dumps(config, sort_keys=True),
+                            secrets=self.box.encrypt(secrets) if secrets else None,
+                            updated_at=now,
+                        )
+                    )
+                    c.execute(
+                        projects.update()
+                        .where(projects.c.project_id == project_id)
+                        .values(updated_at=now)
+                    )
+                    updated += 1
+            c.execute(
+                app_meta.update()
+                .where(app_meta.c.key == LEGACY_IMPORT_KEY)
+                .values(value=LEGACY_IMPORT_DONE)
+            )
+            return updated
+
+        return await self._run(q)
+
+
+def _auth_input(conn: PrometheusConnection) -> NoAuth | BearerAuthInput | BasicAuthInput:
+    if conn.bearer_token is not None:
+        return BearerAuthInput(token=conn.bearer_token)
+    if conn.basic_auth_user and conn.basic_auth_password is not None:
+        return BasicAuthInput(username=conn.basic_auth_user, password=conn.basic_auth_password)
+    return NoAuth()
 
 
 def _source_view(row: Any) -> PrometheusSource:

@@ -21,7 +21,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Identity labels only (no project/env).",
+          "description": "Identity labels only (no scope matchers).",
           "title": "Labels",
           "type": "object"
         }

@@ -10,10 +10,12 @@ import pytest
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
-from app.domain.projects import LabelMatcher, PrometheusConnection
+from app.domain.common import LabelMatcher, Scope
+from app.domain.projects import PrometheusConnection
 from app.main import create_app
 from app.metrics.client import PrometheusClient
-from app.metrics.probe import probe_prometheus
+from app.metrics.probe import probe
+from app.metrics.source import PrometheusMetricsSource
 from app.settings import load_settings
 from app.storage.secrets import SecretBox, SecretsUnreadable
 
@@ -25,7 +27,6 @@ def make_client(tmp_path: Path, **settings: Any) -> TestClient:
     config = {
         "_env_file": None,
         "data_dir": tmp_path,
-        "metrics_url": "synthetic://incident",
         "ai_provider": "fake",
         **settings,
     }
@@ -87,7 +88,8 @@ def test_crud_round_trip_and_persistence(tmp_path: Path) -> None:
 
     with make_client(tmp_path) as c:  # restart
         pid = project["project_id"]
-        assert c.get("/api/projects").json()["items"] == [project]
+        listed = c.get("/api/projects").json()["items"]
+        assert listed == [{**project, "latest_analysis": None, "active_analysis": None}]
         assert c.get(f"/api/projects/{pid}").json() == project
 
         res = c.put(f"/api/projects/{pid}", json=body(name="Shop", sources=[]))
@@ -270,6 +272,8 @@ def test_connection_test_synthetic_and_health(client: TestClient) -> None:
     )
     assert res.status_code == 200
     assert res.json()["reachable"] is True
+    families = {f["family"]: f["status"] for f in res.json()["families"]}
+    assert families["cpu"] == "supported" and families["latency"] == "supported"
 
     project = create(client, sources=[{"kind": "prometheus", "url": "synthetic://healthy"}])
     health = client.get(f"/api/projects/{project['project_id']}/health").json()
@@ -279,12 +283,24 @@ def test_connection_test_synthetic_and_health(client: TestClient) -> None:
     assert client.get("/api/projects/missing/health").status_code == 404
 
 
-MATCHERS = [LabelMatcher(name="project", value='sh"op')]
+SCOPE = Scope(
+    project_id="draft",
+    project_name="draft",
+    matchers=[LabelMatcher(name="project", value='sh"op')],
+)
 
 
-def probe_client(handler: Any) -> PrometheusClient:
+async def run_probe(handler: Any) -> Any:
     conn = PrometheusConnection(url="http://vm.example", bearer_token=TOKEN)
-    return PrometheusClient.from_connection(conn, transport=httpx.MockTransport(handler))
+    client = PrometheusClient.from_connection(conn, transport=httpx.MockTransport(handler))
+    return await probe(PrometheusMetricsSource(client), client, SCOPE)
+
+
+def empty(request: httpx.Request) -> httpx.Response:
+    kind = "vector" if request.url.path.endswith("/query") else "matrix"
+    return httpx.Response(
+        200, json={"status": "success", "data": {"resultType": kind, "result": []}}
+    )
 
 
 async def test_probe_counts_matching_series_and_history() -> None:
@@ -292,7 +308,8 @@ async def test_probe_counts_matching_series_and_history() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        if request.url.path.endswith("/query"):
+        query = request.url.params["query"]
+        if query == 'count({project="sh\\"op"})':
             return httpx.Response(
                 200,
                 json={
@@ -303,6 +320,8 @@ async def test_probe_counts_matching_series_and_history() -> None:
                     },
                 },
             )
+        if query != 'count(up{project="sh\\"op"})':
+            return empty(request)
         start = int(request.url.params["start"])
         values = [[start + 86400, "3"], [start + 2 * 86400, "3"]]
         return httpx.Response(
@@ -313,35 +332,31 @@ async def test_probe_counts_matching_series_and_history() -> None:
             },
         )
 
-    result = await probe_prometheus(probe_client(handler), MATCHERS)
+    result = await run_probe(handler)
     assert result.reachable and result.auth_ok
     assert result.matched_series == 42
     assert result.history_days == 29.0
     assert seen[0].headers["Authorization"] == f"Bearer {TOKEN}"
     assert seen[0].url.params["query"] == 'count({project="sh\\"op"})'
     assert seen[1].url.params["query"] == 'count(up{project="sh\\"op"})'
+    assert {f.family.value for f in result.families} >= {"cpu", "latency"}
+    assert all(f.status.value == "unsupported" for f in result.families)
 
 
 async def test_probe_reports_auth_failure_and_unreachable() -> None:
-    result = await probe_prometheus(probe_client(lambda _: httpx.Response(401)), MATCHERS)
+    result = await run_probe(lambda _: httpx.Response(401))
     assert (result.reachable, result.auth_ok) == (True, False)
     assert TOKEN not in (result.message or "")
 
     def refuse(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("refused", request=request)
 
-    result = await probe_prometheus(probe_client(refuse), MATCHERS)
+    result = await run_probe(refuse)
     assert (result.reachable, result.auth_ok) == (False, None)
 
 
 async def test_probe_reports_no_matching_series() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        kind = "vector" if request.url.path.endswith("/query") else "matrix"
-        return httpx.Response(
-            200, json={"status": "success", "data": {"resultType": kind, "result": []}}
-        )
-
-    result = await probe_prometheus(probe_client(handler), MATCHERS)
+    result = await run_probe(empty)
     assert result.matched_series == 0
     assert result.history_days is None
     assert result.message == "No series currently match these labels."

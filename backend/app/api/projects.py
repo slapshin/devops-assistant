@@ -1,26 +1,26 @@
 """Project management routes (T011): CRUD, connection test, and cached per-project health."""
 
 import time
-from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Response
 
 from app.api.problems import ProblemError, problem_responses
 from app.api.routes import ServicesDep
 from app.container import Services
+from app.domain.common import LabelMatcher, Scope
 from app.domain.jobs import ErrorCode
 from app.domain.projects import (
     ConnectionTest,
     ConnectionTestRequest,
-    LabelMatcher,
     Project,
     ProjectInput,
     ProjectList,
+    ProjectSummary,
     PrometheusConnection,
     SourceKind,
 )
-from app.metrics.client import PrometheusClient
-from app.metrics.probe import probe_prometheus, probe_synthetic
+from app.metrics.factory import connect, synthetic_scenario
+from app.metrics.probe import probe
 from app.metrics.synthetic import SCENARIOS
 from app.storage.projects import ProjectNameTaken, SecretRequired
 from app.storage.secrets import SecretsUnreadable
@@ -53,9 +53,13 @@ def _unreadable() -> ProblemError:
     )
 
 
+DRAFT_PROJECT_ID = "draft"
+DRAFT_PROJECT_NAME = "Connection test"
+
+
 def _check_scenario(url: str, field: str) -> None:
-    parts = urlsplit(url)
-    if parts.scheme == "synthetic" and parts.netloc not in SCENARIOS:
+    scenario = synthetic_scenario(url)
+    if scenario is not None and scenario not in SCENARIOS:
         raise _invalid(field, f"unknown synthetic scenario; expected one of {sorted(SCENARIOS)}")
 
 
@@ -82,7 +86,18 @@ def _write_error(exc: Exception, field_prefix: str) -> ProblemError:
 
 @router.get("", response_model=ProjectList)
 async def list_projects(services: ServicesDep) -> ProjectList:
-    return ProjectList(items=await services.projects.list())
+    found = await services.projects.list()
+    activity = await services.repo.project_activity([p.project_id for p in found])
+    return ProjectList(
+        items=[
+            ProjectSummary(
+                **p.model_dump(),
+                latest_analysis=activity[p.project_id][0],
+                active_analysis=activity[p.project_id][1],
+            )
+            for p in found
+        ]
+    )
 
 
 @router.post("", status_code=201, response_model=Project, responses=problem_responses(409, 422))
@@ -116,24 +131,33 @@ async def update_project(project_id: str, data: ProjectInput, services: Services
 
 
 @router.delete(
-    "/{project_id}", status_code=204, response_class=Response, responses=problem_responses(404)
+    "/{project_id}",
+    status_code=204,
+    response_class=Response,
+    responses=problem_responses(404, 409),
 )
 async def delete_project(project_id: str, services: ServicesDep) -> Response:
+    """Hard delete, including the project's analyses and reports."""
+    if await services.repo.has_active(project_id):
+        raise ProblemError(
+            409,
+            ErrorCode.PROJECT_BUSY,
+            "Project has an active analysis",
+            "Cancel the queued or running analysis before deleting the project.",
+        )
     if not await services.projects.delete(project_id):
         raise _not_found(project_id)
     services.health_cache.pop(project_id, None)
     return Response(status_code=204)
 
 
-async def _probe(conn: PrometheusConnection, matchers: list[LabelMatcher]) -> ConnectionTest:
-    parts = urlsplit(conn.url)
-    if parts.scheme == "synthetic":
-        return probe_synthetic(parts.netloc)
-    client = PrometheusClient.from_connection(conn)
-    try:
-        return await probe_prometheus(client, matchers)
-    finally:
-        await client.aclose()
+async def _probe(conn: PrometheusConnection, scope: Scope) -> ConnectionTest:
+    async with connect(conn) as (source, client):
+        return await probe(source, client, scope)
+
+
+def _draft_scope(matchers: list[LabelMatcher]) -> Scope:
+    return Scope(project_id=DRAFT_PROJECT_ID, project_name=DRAFT_PROJECT_NAME, matchers=matchers)
 
 
 @router.post(
@@ -147,7 +171,7 @@ async def test_connection(body: ConnectionTestRequest, services: ServicesDep) ->
         conn = await services.projects.resolve_connection(body.source, body.project_id)
     except (SecretRequired, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.source") from None
-    return await _probe(conn, body.matchers)
+    return await _probe(conn, _draft_scope(body.matchers))
 
 
 async def project_health(services: Services, project: Project) -> ConnectionTest | None:
@@ -165,7 +189,10 @@ async def project_health(services: Services, project: Project) -> ConnectionTest
         raise _unreadable() from None
     if conn is None:
         return None
-    result = await _probe(conn, project.matchers)
+    scope = Scope(
+        project_id=project.project_id, project_name=project.name, matchers=project.matchers
+    )
+    result = await _probe(conn, scope)
     services.health_cache[project.project_id] = (time.monotonic(), version, result)
     return result
 

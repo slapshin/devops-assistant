@@ -1,8 +1,18 @@
 {
   "analysis_id": "01999a2b-0000-7000-8000-000000000002",
   "scope": {
-    "project": "paas",
-    "env": "production"
+    "project_id": "01999a3c-0000-7000-8000-000000000001",
+    "project_name": "paas / production",
+    "matchers": [
+      {
+        "name": "env",
+        "value": "production"
+      },
+      {
+        "name": "project",
+        "value": "paas"
+      }
+    ]
   },
   "end_time": "2026-09-30T10:05:00Z",
   "detector_version": "detectors-2026.09.1",
@@ -75,5 +85,21 @@
     "high": 0,
     "medium": 1,
     "low": 0
-  }
+  },
+  "daily_episodes": [
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    2
+  ]
 }

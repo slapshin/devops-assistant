@@ -3,7 +3,18 @@
   "auth_ok": true,
   "matched_series": 1832,
   "history_days": 30.0,
-  "families": [],
+  "families": [
+    {
+      "family": "cpu",
+      "status": "supported",
+      "reason": null
+    },
+    {
+      "family": "latency",
+      "status": "unsupported",
+      "reason": "No histogram buckets for http_server_request_duration_seconds."
+    }
+  ],
   "message": null,
   "checked_at": "2026-09-30T10:05:00Z"
 }

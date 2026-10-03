@@ -67,7 +67,7 @@
     },
     "LabelMatcher": {
       "additionalProperties": false,
-      "description": "Exact ``name=\"value\"`` matcher added to every selector of the project's queries.",
+      "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
       "properties": {
         "name": {
           "maxLength": 128,

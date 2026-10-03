@@ -99,10 +99,8 @@ _CAPABILITY_RANK = {
 
 
 def analysis_key(request: AnalysisRequest) -> str:
-    return (
-        f"{request.scope.project}|{request.scope.env}|{request.end_time.isoformat()}|"
-        f"{request.config_hash}"
-    )
+    scope = ",".join(f"{m.name}={m.value}" for m in request.scope.matchers)
+    return f"{scope}|{request.end_time.isoformat()}|{request.config_hash}"
 
 
 def severity_from_points(points: int, cap: Severity | None) -> Severity:

@@ -97,10 +97,6 @@
     "limits": {
       "$ref": "#/$defs/Limits"
     },
-    "metrics_source": {
-      "title": "Metrics Source",
-      "type": "string"
-    },
     "report_count": {
       "anyOf": [
         {
@@ -125,7 +121,6 @@
     "explanation_status",
     "detector_version",
     "config_hash",
-    "metrics_source",
     "limits"
   ],
   "title": "RuntimeConfig",

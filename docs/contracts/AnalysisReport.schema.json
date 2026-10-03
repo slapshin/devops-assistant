@@ -184,7 +184,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Identity labels only (no project/env).",
+          "description": "Identity labels only (no scope matchers).",
           "title": "Labels",
           "type": "object"
         }
@@ -838,6 +838,30 @@
       "title": "InvestigationStep",
       "type": "object"
     },
+    "LabelMatcher": {
+      "additionalProperties": false,
+      "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
+      "properties": {
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "LabelMatcher",
+      "type": "object"
+    },
     "Likelihood": {
       "enum": [
         "plausible",
@@ -1067,24 +1091,30 @@
     },
     "Scope": {
       "additionalProperties": false,
-      "description": "Exactly one project/env pair. Every query and report stays inside it.",
+      "description": "One project's series: every query carries all of its matchers; reports stay inside it.",
       "properties": {
-        "env": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Env",
+        "matchers": {
+          "items": {
+            "$ref": "#/$defs/LabelMatcher"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Matchers",
+          "type": "array"
+        },
+        "project_id": {
+          "title": "Project Id",
           "type": "string"
         },
-        "project": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Project",
+        "project_name": {
+          "title": "Project Name",
           "type": "string"
         }
       },
       "required": [
-        "project",
-        "env"
+        "project_id",
+        "project_name",
+        "matchers"
       ],
       "title": "Scope",
       "type": "object"
@@ -1396,8 +1426,8 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "1.0",
-      "default": "1.0",
+      "const": "2.0",
+      "default": "2.0",
       "title": "Schema Version",
       "type": "string"
     },

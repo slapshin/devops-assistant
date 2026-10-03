@@ -1,9 +1,19 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "analysis_id": "01999a2b-0000-7000-8000-000000000002",
   "scope": {
-    "project": "paas",
-    "env": "production"
+    "project_id": "01999a3c-0000-7000-8000-000000000001",
+    "project_name": "paas / production",
+    "matchers": [
+      {
+        "name": "env",
+        "value": "production"
+      },
+      {
+        "name": "project",
+        "value": "paas"
+      }
+    ]
   },
   "windows": {
     "end_time": "2026-09-30T10:05:00Z",
@@ -323,7 +333,7 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_7d2b833088105436",
+      "finding_id": "fnd_9446d0ccf8203982",
       "detector": "robust_baseline",
       "detector_version": "detectors-2026.09.1",
       "method": "relative",
@@ -362,7 +372,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_6b0571de91a7a603"
+        "evd_f7317e37756f7d9b"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -371,7 +381,7 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_a1aeeae82e30ba72",
+      "finding_id": "fnd_554756fc583bbbbc",
       "detector": "robust_baseline",
       "detector_version": "detectors-2026.09.1",
       "method": "relative",
@@ -420,7 +430,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_19a13be9f2895ec0"
+        "evd_8527d97ae7bf5c84"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -453,8 +463,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_7d2b833088105436",
-          "finding_id": "fnd_7d2b833088105436",
+          "episode_id": "eps_9446d0ccf8203982",
+          "finding_id": "fnd_9446d0ccf8203982",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=paas-production",
@@ -474,8 +484,8 @@
           "unit": "ratio"
         },
         {
-          "episode_id": "eps_a1aeeae82e30ba72",
-          "finding_id": "fnd_a1aeeae82e30ba72",
+          "episode_id": "eps_554756fc583bbbbc",
+          "finding_id": "fnd_554756fc583bbbbc",
           "entity": {
             "kind": "route",
             "key": "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
@@ -550,7 +560,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_d36d70813557c157",
+          "episode_id": "eps_8f787cb8b3a84521",
           "finding_id": null,
           "entity": {
             "kind": "route",
@@ -609,7 +619,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_1cfa935683ff9a62",
+          "episode_id": "eps_6b2269909d4be440",
           "finding_id": null,
           "entity": {
             "kind": "route",
@@ -702,7 +712,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_df427369811dfd62",
+          "episode_id": "eps_0cf1db2bba2772f0",
           "finding_id": null,
           "entity": {
             "kind": "route",
@@ -805,8 +815,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_6b0571de91a7a603",
-      "finding_id": "fnd_7d2b833088105436",
+      "evidence_id": "evd_f7317e37756f7d9b",
+      "finding_id": "fnd_9446d0ccf8203982",
       "series": {
         "series_id": "ser_063ed23f9b327c5f",
         "family": "cpu",
@@ -821,8 +831,8 @@
           }
         },
         "labels": {
-          "project": "paas",
           "env": "production",
+          "project": "paas",
           "job": "node",
           "instance": "paas-production"
         },
@@ -1372,8 +1382,8 @@
       "threshold_label": "Diagnostic heuristic: 90 % for ≥ 15 min (not an SLO)"
     },
     {
-      "evidence_id": "evd_19a13be9f2895ec0",
-      "finding_id": "fnd_a1aeeae82e30ba72",
+      "evidence_id": "evd_8527d97ae7bf5c84",
+      "finding_id": "fnd_554756fc583bbbbc",
       "series": {
         "series_id": "ser_02c37ee087ed4e7e",
         "family": "client_errors",
@@ -1389,8 +1399,8 @@
           }
         },
         "labels": {
-          "project": "paas",
           "env": "production",
+          "project": "paas",
           "job": "dispatcher-api",
           "http_route": "/api/v3/tasks/:task",
           "http_request_method": "GET",
@@ -2071,14 +2081,14 @@
         {
           "text": "A batch or runaway process saturated CPU on paas-production.",
           "finding_ids": [
-            "fnd_7d2b833088105436"
+            "fnd_9446d0ccf8203982"
           ],
           "likelihood": "plausible"
         },
         {
           "text": "A client is polling for task IDs that no longer exist.",
           "finding_ids": [
-            "fnd_a1aeeae82e30ba72"
+            "fnd_554756fc583bbbbc"
           ],
           "likelihood": "possible"
         }
@@ -2087,13 +2097,13 @@
         {
           "text": "List top CPU consumers on paas-production for 05:05-08:05 UTC.",
           "finding_ids": [
-            "fnd_7d2b833088105436"
+            "fnd_9446d0ccf8203982"
           ]
         },
         {
           "text": "Group 404 requests on /api/v3/tasks/:task by client.",
           "finding_ids": [
-            "fnd_a1aeeae82e30ba72"
+            "fnd_554756fc583bbbbc"
           ]
         }
       ],

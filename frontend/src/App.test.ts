@@ -6,6 +6,7 @@ import config from "../../fixtures/api/config.json";
 import jobCompleted from "../../fixtures/jobs/job_completed.json";
 import jobInterrupted from "../../fixtures/jobs/job_interrupted.json";
 import jobRunning from "../../fixtures/jobs/job_running.json";
+import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
@@ -30,9 +31,7 @@ beforeEach(() => {
   calls = [];
   routes = {
     "GET /api/config": () => json(config),
-    "GET /api/discovery/projects": () => json({ items: [{ project: "paas" }, { project: "pw" }], source_status: { reachable: true } }),
-    "GET /api/discovery/projects/paas/envs": () => json({ project: "paas", items: [{ env: "production" }] }),
-    "GET /api/discovery/projects/pw/envs": () => json({ project: "pw", items: [{ env: "development" }, { env: "production" }] }),
+    "GET /api/projects": () => json(projects),
   };
   localStorage.clear();
   vi.stubGlobal(
@@ -69,42 +68,23 @@ function report(fixture: { analysis_id: string }) {
 }
 
 describe("start", () => {
-  it("resets env when the project changes and ignores stale env responses", async () => {
-    let releasePw: (r: Response) => void = () => {};
-    routes["GET /api/discovery/projects/pw/envs"] = () => new Promise<Response>((resolve) => (releasePw = resolve));
-    await renderAt("/");
-    const project = await screen.findByLabelText("Project");
-    await fireEvent.update(project, "pw");
-    await fireEvent.update(project, "paas");
-    // the single paas env is selected explicitly
-    await waitFor(() => expect((screen.getByLabelText("Environment") as HTMLSelectElement).value).toBe("production"));
-    releasePw(json({ project: "pw", items: [{ env: "development" }, { env: "staging" }] }));
-    await new Promise((r) => setTimeout(r, 20));
-    const options = within(screen.getByLabelText("Environment")).getAllByRole("option").map((o) => o.textContent);
-    expect(options).not.toContain("staging");
-    expect((screen.getByLabelText("Environment") as HTMLSelectElement).value).toBe("production");
-  });
-
-  it("requires an env before analysing and shows queue-full with retry time", async () => {
+  it("selects the only project and shows queue-full with retry time", async () => {
     routes["POST /api/analyses"] = () => problem(429, "queue_full", "Analysis queue is full", undefined, { "retry-after": "45" });
     routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
     await renderAt("/");
-    await fireEvent.update(await screen.findByLabelText("Project"), "pw");
-    const analyze = screen.getByRole("button", { name: "Analyze" });
-    expect(analyze).toBeDisabled();
-    await screen.findByRole("option", { name: "development" });
-    await fireEvent.update(screen.getByLabelText("Environment"), "production");
+    const analyze = await screen.findByRole("button", { name: "Analyze" });
     await waitFor(() => expect(analyze).toBeEnabled());
     await fireEvent.click(analyze);
     await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
     expect(await screen.findByRole("alert")).toHaveTextContent("Try again in 45 seconds");
-    expect(JSON.parse(calls.find((c) => c.method === "POST")?.body ?? "{}")).toEqual({ project: "pw", env: "production" });
+    const projectId = projects.items[0]?.project_id;
+    expect(JSON.parse(calls.find((c) => c.method === "POST")?.body ?? "{}")).toEqual({ project_id: projectId });
   });
 
-  it("reports an unreachable source", async () => {
-    routes["GET /api/discovery/projects"] = () => problem(503, "metrics_source_unavailable", "Metrics source unavailable", "cannot reach source");
+  it("reports projects that cannot be loaded", async () => {
+    routes["GET /api/projects"] = () => problem(500, "internal_error", "Internal error");
     await renderAt("/");
-    expect(await screen.findByRole("alert")).toHaveTextContent("Metrics source unreachable");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Projects could not be loaded");
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 });

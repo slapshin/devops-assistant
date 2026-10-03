@@ -16,6 +16,28 @@
             "title": "Created At",
             "type": "string"
           },
+          "daily_episodes": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Anomaly episodes per trend day, oldest first; null for days without enough data. Present once a report is saved.",
+            "title": "Daily Episodes"
+          },
           "detector_version": {
             "title": "Detector Version",
             "type": "string"
@@ -196,8 +218,8 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "1.0",
-            "default": "1.0",
+            "const": "2.0",
+            "default": "2.0",
             "title": "Schema Version",
             "type": "string"
           },
@@ -269,22 +291,13 @@
             ],
             "title": "End Time"
           },
-          "env": {
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Env",
-            "type": "string"
-          },
-          "project": {
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Project",
+          "project_id": {
+            "title": "Project Id",
             "type": "string"
           }
         },
         "required": [
-          "project",
-          "env"
+          "project_id"
         ],
         "title": "AnalysisSubmission",
         "type": "object"
@@ -688,33 +701,6 @@
         "title": "DetectionMethod",
         "type": "string"
       },
-      "DiscoveredProjectList": {
-        "additionalProperties": false,
-        "description": "``project`` label values found in the global metrics source (legacy, until T012).",
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ProjectItem"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "source_status": {
-            "$ref": "#/components/schemas/SourceStatus"
-          },
-          "truncated": {
-            "default": false,
-            "title": "Truncated",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "items",
-          "source_status"
-        ],
-        "title": "DiscoveredProjectList",
-        "type": "object"
-      },
       "Entity": {
         "additionalProperties": false,
         "description": "Resource identity built from actual labels only; never inferred across namespaces.",
@@ -736,7 +722,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Identity labels only (no project/env).",
+            "description": "Identity labels only (no scope matchers).",
             "title": "Labels",
             "type": "object"
           }
@@ -762,47 +748,6 @@
         ],
         "title": "EntityKind",
         "type": "string"
-      },
-      "EnvItem": {
-        "additionalProperties": false,
-        "properties": {
-          "env": {
-            "title": "Env",
-            "type": "string"
-          }
-        },
-        "required": [
-          "env"
-        ],
-        "title": "EnvItem",
-        "type": "object"
-      },
-      "EnvList": {
-        "additionalProperties": false,
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/EnvItem"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "project": {
-            "title": "Project",
-            "type": "string"
-          },
-          "truncated": {
-            "default": false,
-            "title": "Truncated",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "project",
-          "items"
-        ],
-        "title": "EnvList",
-        "type": "object"
       },
       "EpisodeSummary": {
         "additionalProperties": false,
@@ -885,8 +830,9 @@
           "validation_error",
           "project_not_found",
           "project_name_taken",
+          "project_busy",
+          "source_not_configured",
           "credentials_unreadable",
-          "env_not_found",
           "analysis_not_found",
           "report_not_ready",
           "report_unavailable",
@@ -1439,12 +1385,9 @@
         "additionalProperties": false,
         "properties": {
           "database": {
-            "description": "'ok', 'unavailable', or 'not_initialized' before T007.",
+            "description": "'ok' or 'unavailable'.",
             "title": "Database",
             "type": "string"
-          },
-          "metrics_source": {
-            "$ref": "#/components/schemas/SourceStatus"
           },
           "status": {
             "title": "Status",
@@ -1458,8 +1401,7 @@
         "required": [
           "status",
           "version",
-          "database",
-          "metrics_source"
+          "database"
         ],
         "title": "HealthResponse",
         "type": "object"
@@ -1547,7 +1489,7 @@
       },
       "LabelMatcher": {
         "additionalProperties": false,
-        "description": "Exact ``name=\"value\"`` matcher added to every selector of the project's queries.",
+        "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
         "properties": {
           "name": {
             "maxLength": 128,
@@ -1975,26 +1917,12 @@
         "title": "ProjectInput",
         "type": "object"
       },
-      "ProjectItem": {
-        "additionalProperties": false,
-        "properties": {
-          "project": {
-            "title": "Project",
-            "type": "string"
-          }
-        },
-        "required": [
-          "project"
-        ],
-        "title": "ProjectItem",
-        "type": "object"
-      },
       "ProjectList": {
         "additionalProperties": false,
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/Project"
+              "$ref": "#/components/schemas/ProjectSummary"
             },
             "title": "Items",
             "type": "array"
@@ -2004,6 +1932,89 @@
           "items"
         ],
         "title": "ProjectList",
+        "type": "object"
+      },
+      "ProjectSummary": {
+        "additionalProperties": false,
+        "description": "A project with its latest finished and currently active analysis (list page).",
+        "properties": {
+          "active_analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisJob"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "credentials_readable": {
+            "default": true,
+            "description": "False when stored secrets cannot be decrypted (lost or changed key).",
+            "title": "Credentials Readable",
+            "type": "boolean"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "latest_analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisJob"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matchers": {
+            "items": {
+              "$ref": "#/components/schemas/LabelMatcher"
+            },
+            "title": "Matchers",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/PrometheusSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "matchers",
+          "sources",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProjectSummary",
         "type": "object"
       },
       "PrometheusSource": {
@@ -2184,10 +2195,6 @@
           "limits": {
             "$ref": "#/components/schemas/Limits"
           },
-          "metrics_source": {
-            "title": "Metrics Source",
-            "type": "string"
-          },
           "report_count": {
             "anyOf": [
               {
@@ -2211,7 +2218,6 @@
           "explanation_status",
           "detector_version",
           "config_hash",
-          "metrics_source",
           "limits"
         ],
         "title": "RuntimeConfig",
@@ -2219,24 +2225,30 @@
       },
       "Scope": {
         "additionalProperties": false,
-        "description": "Exactly one project/env pair. Every query and report stays inside it.",
+        "description": "One project's series: every query carries all of its matchers; reports stay inside it.",
         "properties": {
-          "env": {
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Env",
+          "matchers": {
+            "items": {
+              "$ref": "#/components/schemas/LabelMatcher"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Matchers",
+            "type": "array"
+          },
+          "project_id": {
+            "title": "Project Id",
             "type": "string"
           },
-          "project": {
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Project",
+          "project_name": {
+            "title": "Project Name",
             "type": "string"
           }
         },
         "required": [
-          "project",
-          "env"
+          "project_id",
+          "project_name",
+          "matchers"
         ],
         "title": "Scope",
         "type": "object"
@@ -2369,50 +2381,6 @@
           "base_url"
         ],
         "title": "SourceInfo",
-        "type": "object"
-      },
-      "SourceStatus": {
-        "additionalProperties": false,
-        "properties": {
-          "checked_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Checked At"
-          },
-          "message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Message"
-          },
-          "reachable": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Null when not checked.",
-            "title": "Reachable"
-          }
-        },
-        "required": [
-          "reachable"
-        ],
-        "title": "SourceStatus",
         "type": "object"
       },
       "StageName": {
@@ -2682,7 +2650,7 @@
         "parameters": [
           {
             "in": "query",
-            "name": "project",
+            "name": "project_id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2693,23 +2661,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Project"
-            }
-          },
-          {
-            "in": "query",
-            "name": "env",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Env"
+              "title": "Project Id"
             }
           },
           {
@@ -2810,6 +2762,17 @@
             },
             "description": "Problem"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2822,17 +2785,6 @@
             "description": "Problem"
           },
           "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "application/problem+json": {}
-            },
-            "description": "Problem"
-          },
-          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3035,96 +2987,6 @@
         "summary": "Runtime Config"
       }
     },
-    "/api/discovery/projects": {
-      "get": {
-        "operationId": "discover_projects_api_discovery_projects_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DiscoveredProjectList"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "application/problem+json": {}
-            },
-            "description": "Problem"
-          }
-        },
-        "summary": "Discover Projects"
-      }
-    },
-    "/api/discovery/projects/{project}/envs": {
-      "get": {
-        "operationId": "discover_envs_api_discovery_projects__project__envs_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "project",
-            "required": true,
-            "schema": {
-              "title": "Project",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnvList"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "application/problem+json": {}
-            },
-            "description": "Problem"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "application/problem+json": {}
-            },
-            "description": "Problem"
-          }
-        },
-        "summary": "Discover Envs"
-      }
-    },
     "/api/health": {
       "get": {
         "operationId": "health_api_health_get",
@@ -3281,6 +3143,7 @@
     },
     "/api/projects/{project_id}": {
       "delete": {
+        "description": "Hard delete, including the project's analyses and reports.",
         "operationId": "delete_project_api_projects__project_id__delete",
         "parameters": [
           {
@@ -3298,6 +3161,17 @@
             "description": "Successful Response"
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {

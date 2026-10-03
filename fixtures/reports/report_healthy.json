@@ -1,9 +1,19 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "analysis_id": "01999a2b-0000-7000-8000-000000000001",
   "scope": {
-    "project": "paas",
-    "env": "production"
+    "project_id": "01999a3c-0000-7000-8000-000000000001",
+    "project_name": "paas / production",
+    "matchers": [
+      {
+        "name": "env",
+        "value": "production"
+      },
+      {
+        "name": "project",
+        "value": "paas"
+      }
+    ]
   },
   "windows": {
     "end_time": "2026-09-30T10:05:00Z",

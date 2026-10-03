@@ -1,5 +1,141 @@
 {
   "$defs": {
+    "AnalysisJob": {
+      "additionalProperties": false,
+      "properties": {
+        "analysis_id": {
+          "title": "Analysis Id",
+          "type": "string"
+        },
+        "config_hash": {
+          "title": "Config Hash",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "daily_episodes": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Anomaly episodes per trend day, oldest first; null for days without enough data. Present once a report is saved.",
+          "title": "Daily Episodes"
+        },
+        "detector_version": {
+          "title": "Detector Version",
+          "type": "string"
+        },
+        "end_time": {
+          "title": "End Time",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "explanation_status": {
+          "$ref": "#/$defs/ExplanationStatus"
+        },
+        "finding_counts": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "propertyNames": {
+                "$ref": "#/$defs/Severity"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Present once a report is saved.",
+          "title": "Finding Counts"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "report_available": {
+          "title": "Report Available",
+          "type": "boolean"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "stages": {
+          "items": {
+            "$ref": "#/$defs/StageProgress"
+          },
+          "title": "Stages",
+          "type": "array"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "state": {
+          "$ref": "#/$defs/JobState"
+        }
+      },
+      "required": [
+        "analysis_id",
+        "scope",
+        "end_time",
+        "detector_version",
+        "config_hash",
+        "state",
+        "stages",
+        "explanation_status",
+        "created_at",
+        "report_available"
+      ],
+      "title": "AnalysisJob",
+      "type": "object"
+    },
     "BasicAuth": {
       "additionalProperties": false,
       "properties": {
@@ -45,9 +181,75 @@
       "title": "BearerAuth",
       "type": "object"
     },
+    "ErrorCode": {
+      "enum": [
+        "validation_error",
+        "project_not_found",
+        "project_name_taken",
+        "project_busy",
+        "source_not_configured",
+        "credentials_unreadable",
+        "analysis_not_found",
+        "report_not_ready",
+        "report_unavailable",
+        "schema_unsupported",
+        "analysis_not_active",
+        "queue_full",
+        "metrics_source_unavailable",
+        "end_time_invalid",
+        "interrupted_by_restart",
+        "job_timeout",
+        "internal_error",
+        "not_implemented"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    },
+    "ExplanationStatus": {
+      "enum": [
+        "disabled",
+        "not_configured",
+        "pending",
+        "succeeded",
+        "failed",
+        "skipped_no_findings"
+      ],
+      "title": "ExplanationStatus",
+      "type": "string"
+    },
+    "JobError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "JobError",
+      "type": "object"
+    },
+    "JobState": {
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "partial",
+        "failed",
+        "cancelled"
+      ],
+      "title": "JobState",
+      "type": "string"
+    },
     "LabelMatcher": {
       "additionalProperties": false,
-      "description": "Exact ``name=\"value\"`` matcher added to every selector of the project's queries.",
+      "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
       "properties": {
         "name": {
           "maxLength": 128,
@@ -82,9 +284,21 @@
       "title": "NoAuth",
       "type": "object"
     },
-    "Project": {
+    "ProjectSummary": {
       "additionalProperties": false,
+      "description": "A project with its latest finished and currently active analysis (list page).",
       "properties": {
+        "active_analysis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnalysisJob"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "created_at": {
           "title": "Created At",
           "type": "string"
@@ -106,6 +320,17 @@
           ],
           "default": null,
           "title": "Description"
+        },
+        "latest_analysis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnalysisJob"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "matchers": {
           "items": {
@@ -142,7 +367,7 @@
         "created_at",
         "updated_at"
       ],
-      "title": "Project",
+      "title": "ProjectSummary",
       "type": "object"
     },
     "PrometheusSource": {
@@ -192,13 +417,155 @@
       ],
       "title": "PrometheusSource",
       "type": "object"
+    },
+    "Scope": {
+      "additionalProperties": false,
+      "description": "One project's series: every query carries all of its matchers; reports stay inside it.",
+      "properties": {
+        "matchers": {
+          "items": {
+            "$ref": "#/$defs/LabelMatcher"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Matchers",
+          "type": "array"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "project_name": {
+          "title": "Project Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "project_name",
+        "matchers"
+      ],
+      "title": "Scope",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "StageName": {
+      "enum": [
+        "discovery",
+        "collection",
+        "detection",
+        "trends",
+        "explanation",
+        "saving"
+      ],
+      "title": "StageName",
+      "type": "string"
+    },
+    "StageProgress": {
+      "additionalProperties": false,
+      "properties": {
+        "done": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Done"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
+        },
+        "stage": {
+          "$ref": "#/$defs/StageName"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "status": {
+          "$ref": "#/$defs/StageStatus"
+        },
+        "total": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total"
+        }
+      },
+      "required": [
+        "stage",
+        "status"
+      ],
+      "title": "StageProgress",
+      "type": "object"
+    },
+    "StageStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "failed",
+        "skipped"
+      ],
+      "title": "StageStatus",
+      "type": "string"
     }
   },
   "additionalProperties": false,
   "properties": {
     "items": {
       "items": {
-        "$ref": "#/$defs/Project"
+        "$ref": "#/$defs/ProjectSummary"
       },
       "title": "Items",
       "type": "array"

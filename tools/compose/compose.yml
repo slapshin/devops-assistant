@@ -17,8 +17,12 @@ services:
       - path: ../../config.env
         required: false
     environment:
-      # Inside the container "localhost" is the container itself. host.docker.internal
-      # reaches a metrics source or SSH tunnel listening on the Docker host.
+      # Metrics sources are configured per project in the UI. Inside the container
+      # "localhost" is the container itself: use host.docker.internal for a source or SSH
+      # tunnel listening on the Docker host.
+      DEMO_PROJECTS: ${DEMO_PROJECTS:-false}
+      # Deprecated: read once, to give projects migrated from pre-project reports the source
+      # those reports came from (the former compose default).
       METRICS_URL: ${METRICS_URL:-http://host.docker.internal:8428}
       AI_PROVIDER: ${AI_PROVIDER:-openai}
       OPENAI_MODEL: ${OPENAI_MODEL:-}

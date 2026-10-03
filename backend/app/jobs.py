@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from app.domain.common import Scope, Severity
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import ExplanationStatus
+from app.domain.findings import TrendBucketStatus
 from app.domain.ids import new_analysis_id
 from app.domain.interfaces import AnalysisService, CancellationToken, Cancelled, ReportRepository
 from app.domain.jobs import (
@@ -22,6 +23,8 @@ from app.domain.jobs import (
 )
 from app.domain.report import AnalysisReport, AnalysisRequest, ReportState
 from app.metrics.client import SourceError
+from app.metrics.factory import SourceNotConfigured
+from app.storage.secrets import SecretsUnreadable
 
 log = logging.getLogger("app.jobs")
 
@@ -222,12 +225,29 @@ class JobRunner:
             None,
             explanation_status=report.explanation.status,
             finding_counts={severity: counts.get(severity, 0) for severity in Severity},
+            daily_episodes=daily_episodes(report),
             report_available=True,
         )
+
+
+def daily_episodes(report: AnalysisReport) -> list[int | None]:
+    """Episodes per trend day, oldest first; None where the day could not be evaluated."""
+    ordered = sorted(report.trends, key=lambda t: t.bucket_index, reverse=True)
+    return [t.episode_count if t.status is TrendBucketStatus.OK else None for t in ordered]
 
 
 def _job_error(exc: Exception) -> JobError:
     """Source failures are reported as such; anything else is internal (type name only)."""
     if isinstance(exc, SourceError):
         return JobError(code=ErrorCode.METRICS_SOURCE_UNAVAILABLE, message=exc.message)
+    if isinstance(exc, SourceNotConfigured):
+        return JobError(
+            code=ErrorCode.SOURCE_NOT_CONFIGURED,
+            message="The project has no metrics source configured.",
+        )
+    if isinstance(exc, SecretsUnreadable):
+        return JobError(
+            code=ErrorCode.CREDENTIALS_UNREADABLE,
+            message="Stored credentials cannot be decrypted; re-enter them in the project.",
+        )
     return JobError(code=ErrorCode.INTERNAL_ERROR, message=type(exc).__name__)
