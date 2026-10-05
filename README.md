@@ -1,4 +1,4 @@
-# DevOps AI Assistant
+# DevOps Assistant
 
 A local web assistant for one `project`/`env` scope of a Prometheus-compatible metrics source (verified against VictoriaMetrics). For that scope it:
 

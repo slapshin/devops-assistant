@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.4` in `backend/app/metrics/catalog.py`. It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
+The catalog is `catalog-2026.10.4` in `backend/app/metrics/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
 
 ## Scope enforcement
 
@@ -34,7 +34,7 @@ String literals are masked before the check, so label values cannot fake a selec
 | Network | `device!~"lo\|veth.*\|docker.*\|br-.*\|virbr.*\|cali.*\|flannel.*\|cni.*"` |
 | Containers | `name!=""` |
 
-The rules are constants in `catalog.py`. Changing them requires a new `CATALOG_VERSION`.
+The rules are constants in the `catalog/` source modules (`host.py`, `container.py`). Changing them requires a new `CATALOG_VERSION`.
 
 ## Signals
 
