@@ -14,6 +14,7 @@ make down                          # keeps the data volume (reports survive)
 ```
 
 - The image is built from `devops/docker/Dockerfile` (context: repository root); the compose file is `tools/compose/compose.yml`. The make targets wrap `docker compose -f tools/compose/compose.yml …` and export `config.env`. Compose project name is `ai-assistant`.
+- CI publishes the smoke-tested image (linux/amd64) to `ghcr.io/slapshin/devops-assistant`: `:main` and `:sha-<short>` on every push to `main`; `:<version>`, `:<major>.<minor>` and `:latest` on a `v*` tag (e.g. `v1.2.3`). Pull requests build and test only. To run a published image instead of a local build, set `image:` in the compose file.
 - The port is published on `127.0.0.1` only. Override it with `APP_PORT=18000 make up`.
 - Metrics sources are configured per project in the UI. Inside the container `localhost` is the container itself: a project URL of `http://host.docker.internal:8428` reaches a metrics source, or an SSH tunnel such as `ssh -N -L 8428:localhost:8428 <monitoring-host>`, running on the Docker host. `extra_hosts: host-gateway` makes this work on Linux as well as Docker Desktop. Natively the same tunnel is `http://localhost:8428`.
 - Reports live in the named volume `assistant-data` (mounted at `/data`). `make down` and `up --force-recreate` keep it. **Only `docker compose -f tools/compose/compose.yml down -v` deletes it.**
