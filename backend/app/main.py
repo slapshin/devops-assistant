@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app import __version__
 from app.ai.providers import provider_from_settings
@@ -30,6 +31,9 @@ from app.storage.secrets import load_secret_box
 log = logging.getLogger("app")
 
 CONFIG_ERROR_EXIT_CODE = 2
+GZIP_MINIMUM_BYTES = 1024
+# Level 6 gets nearly all of level 9's ratio on JSON at a fraction of the CPU.
+GZIP_COMPRESSION_LEVEL = 6
 
 
 def load_detector_config(settings: Settings) -> DetectorConfig:
@@ -122,6 +126,10 @@ def create_app(
     app.state.detector_config = services.config
     app.state.services = services
 
+    # Reports are multi-MB JSON that compresses ~4x; uncompressed they are slow on remote links.
+    app.add_middleware(
+        GZipMiddleware, minimum_size=GZIP_MINIMUM_BYTES, compresslevel=GZIP_COMPRESSION_LEVEL
+    )
     install_problem_handlers(app)
     app.include_router(router)
     app.include_router(projects_router)

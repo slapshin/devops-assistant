@@ -168,7 +168,9 @@ def test_submit_progress_and_report(client: TestClient) -> None:
     assert done["state"] == "completed", done
     assert done["report_available"] and done["explanation_status"] == "succeeded"
     assert all(s["status"] in ("done", "skipped") for s in done["stages"])
-    report = client.get(f"/api/analyses/{job['analysis_id']}/report").json()
+    res = client.get(f"/api/analyses/{job['analysis_id']}/report")
+    assert res.headers["content-encoding"] == "gzip"  # multi-MB reports must not ship raw
+    report = res.json()
     assert report["scope"] == {
         "project_id": project_id(client),
         "project_name": PAAS_NAME,
