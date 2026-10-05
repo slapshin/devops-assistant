@@ -369,6 +369,104 @@ async def test_database_relations_need_the_same_server() -> None:
     assert not any(f.related_finding_ids for f in findings)  # same job, different servers
 
 
+async def test_mysql_contention_findings_relate_within_the_primary() -> None:
+    result = await detect(Scenario(mysql_contention=True))
+    mysql = {f.signal: f for f in result.findings if f.entity.labels.get("job") == "mysql"}
+    assert set(mysql) == {
+        "database_connections_ratio",
+        "database_connections_refused",
+        "database_slow_query_ratio",
+        "database_lock_waits",
+    }
+    assert {f.entity.labels["instance"] for f in mysql.values()} == {"mysql-primary:9104"}
+    connections = mysql["database_connections_ratio"]
+    assert connections.entity.kind is EntityKind.DATABASE
+    others = {f.finding_id for s, f in mysql.items() if s != "database_connections_ratio"}
+    assert others == set(connections.related_finding_ids)  # not the PostgreSQL server
+
+
+def test_mysql_signals_map_to_database_rules() -> None:
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    replica = {"job": "mysql", "instance": "db2:9104"}
+    builder.add("mysql_queries", replica, np.full(N, 100.0))
+    builder.add("mysql_slow_queries", replica, np.full(N, 0.1))
+    builder.add("mysql_replica_lag", replica, np.zeros(N))
+    builder.add("mysql_replica_stopped", replica, np.zeros(N))
+    builder.add("mysql_connections_refused", replica, np.zeros(N))
+    rules = sorted(s.rule.name for s in derive(builder.series, STEP_SECONDS, 30))
+    assert rules == [
+        "database_connections_refused",
+        "database_query_rate",
+        "database_replication_lag",
+        "database_replication_stopped",
+        "database_slow_query_ratio",
+    ]
+
+
+async def test_mysql_replication_stop_is_a_shortfall() -> None:
+    caps, col = await collect("healthy")
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    stopped = np.zeros(N)
+    stopped[N - 40 : N - 30] = 1.0
+    builder.add("mysql_replica_stopped", {"job": "mysql", "instance": "db2:9104"}, stopped)
+    col = col.model_copy(update={"series": [*col.series, *builder.series]})
+    result = RobustDetector().detect(REQUEST, WINDOWS, caps, col, CONFIG)
+    [finding] = by_signal(result, "database_replication_stopped")
+    assert finding.title == "Replication stopped (SQL or I/O thread not running)"
+
+
+async def test_redis_eviction_storm_findings_relate_within_the_master() -> None:
+    result = await detect(Scenario(redis_eviction_storm=True))
+    redis = {f.signal: f for f in result.findings if f.entity.labels.get("job") == "redis"}
+    assert set(redis) == {
+        "database_memory_ratio",
+        "database_evictions",
+        "database_cache_miss_ratio",
+        "database_command_latency",
+    }
+    assert {f.entity.display_name for f in redis.values()} == {"redis · redis://redis-master:6379"}
+    memory = redis["database_memory_ratio"]
+    others = {f.finding_id for s, f in redis.items() if s != "database_memory_ratio"}
+    assert others == set(memory.related_finding_ids)  # not the replica or other databases
+    assert redis["database_command_latency"].severity is not Severity.LOW
+
+
+def test_redis_signals_map_to_database_rules() -> None:
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    replica = {"job": "redis", "instance": "cache2:6379"}
+    for signal in (
+        "redis_commands",
+        "redis_command_latency_mean",
+        "redis_keyspace_lookups",
+        "redis_keyspace_misses",
+        "redis_replica_link_down",
+        "redis_persistence_failed",
+        "redis_rejected_connections",
+    ):
+        builder.add(signal, replica, np.full(N, 1.0))
+    rules = sorted(s.rule.name for s in derive(builder.series, STEP_SECONDS, 30))
+    assert rules == [  # lookups only guard the miss share
+        "database_cache_miss_ratio",
+        "database_command_latency",
+        "database_command_rate",
+        "database_connections_refused",
+        "database_persistence_failed",
+        "database_replica_link_down",
+    ]
+
+
+async def test_redis_replica_link_down_is_a_shortfall() -> None:
+    caps, col = await collect("healthy")
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    down = np.zeros(N)
+    down[N - 40 : N - 30] = 1.0
+    builder.add("redis_replica_link_down", {"job": "redis", "instance": "cache2:6379"}, down)
+    col = col.model_copy(update={"series": [*col.series, *builder.series]})
+    result = RobustDetector().detect(REQUEST, WINDOWS, caps, col, CONFIG)
+    [finding] = by_signal(result, "database_replica_link_down")
+    assert finding.title == "Replica disconnected from its master"
+
+
 def test_every_catalog_signal_is_consumed_by_derivation() -> None:
     consumed: set[str | None] = {*DIRECT, SWARM_FAILED_TASKS}
     for spec in _TRAFFIC_SPECS:

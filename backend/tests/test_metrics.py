@@ -167,7 +167,7 @@ def test_counters_are_rated_before_aggregation(defn: Any) -> None:
         assert query[: m.start()].rstrip().endswith(("rate(", "increase(")), query
 
 
-# Proxy and PostgreSQL counters exported without a conventional suffix.
+# Proxy, PostgreSQL and MySQL counters exported without a conventional suffix.
 UNSUFFIXED_COUNTERS = (
     "angie_http_server_zones_responses",
     "angie_connections_dropped",
@@ -177,6 +177,10 @@ UNSUFFIXED_COUNTERS = (
     "pg_stat_database_xact_rollback",
     "pg_stat_database_deadlocks",
     "pg_stat_database_temp_bytes",
+    "mysql_global_status_questions",
+    "mysql_global_status_slow_queries",
+    "mysql_global_status_innodb_row_lock_waits",
+    "mysql_global_status_created_tmp_disk_tables",
 )
 
 
@@ -205,6 +209,45 @@ def test_postgres_entity_names() -> None:
     assert server.display_name == "postgres · db1:9187"
     assert database.display_name == "postgres · db1:9187 · app"
     assert server.kind is database.kind is EntityKind.DATABASE
+
+
+def test_mysql_replication_signals_cover_both_status_syntaxes() -> None:
+    assert BY_SIGNAL["mysql_slave_lag"].required_metrics == (
+        "mysql_slave_status_seconds_behind_master",
+    )
+    assert BY_SIGNAL["mysql_replica_lag"].required_metrics == (
+        "mysql_slave_status_seconds_behind_source",
+    )
+    stopped = BY_SIGNAL["mysql_replica_stopped"].query.render(SCOPE)
+    assert "mysql_slave_status_replica_sql_running{" in stopped
+    assert "mysql_slave_status_replica_io_running{" in stopped
+    refused = BY_SIGNAL["mysql_connections_refused"].query.render(SCOPE)
+    assert 'error="max_connections"' in refused
+
+
+def test_mysql_entity_names() -> None:
+    server = entity_for(BY_SIGNAL["mysql_down"], {"job": "mysql", "instance": "db1:9104"})
+    assert server.display_name == "mysql · db1:9104"
+    assert server.kind is EntityKind.DATABASE
+
+
+def test_redis_ratios_need_a_configured_limit() -> None:
+    clients = BY_SIGNAL["redis_clients_used_ratio"]
+    query = clients.query.render(SCOPE)
+    assert "redis_max_clients{" in query and "redis_config_maxclients{" in query  # INFO or CONFIG
+    assert clients.required_metrics == ("redis_connected_clients",)
+    assert [g.template.render(SCOPE) for g in clients.gates]
+    memory = BY_SIGNAL["redis_memory_used_ratio"]
+    assert "redis_memory_max_bytes{" in memory.gates[0].template.render(SCOPE)
+    assert "> 0" in memory.query.render(SCOPE)  # maxmemory 0 means unlimited
+
+
+def test_redis_entity_names() -> None:
+    server = entity_for(
+        BY_SIGNAL["redis_down"], {"job": "redis", "instance": "redis://cache1:6379"}
+    )
+    assert server.display_name == "redis · redis://cache1:6379"
+    assert server.kind is EntityKind.DATABASE
 
 
 def test_proxy_entity_names() -> None:

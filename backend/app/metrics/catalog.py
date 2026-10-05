@@ -17,7 +17,7 @@ from enum import StrEnum
 from app.domain.common import EntityKind, SignalFamily, Unit
 from app.metrics.promql import QueryTemplate
 
-CATALOG_VERSION = "catalog-2026.10.2"
+CATALOG_VERSION = "catalog-2026.10.4"
 
 FS_FILTER = 'fstype=~"ext[234]|xfs|btrfs|zfs", mountpoint!~"/(run|dev|sys|proc)($|/).*"'
 DISK_FILTER = 'device!~"(sr|loop|ram|fd)[0-9]+"'
@@ -933,7 +933,319 @@ POSTGRES_CATALOG: tuple[SignalDef, ...] = (
     ),
 )
 
-CATALOG = CATALOG + PROXY_CATALOG + POSTGRES_CATALOG
+# --- MySQL ---------------------------------------------------------------------------------
+# prom/mysqld-exporter with its default collectors (global_status, global_variables,
+# slave_status). `instance` is the exporter target (one MySQL server) and every signal is
+# server-wide. SHOW GLOBAL STATUS counters have no conventional suffix.
+MYSQL = ("job", "instance")
+MYSQL_TRAFFIC = "mysql_queries"
+
+_MYSQL_QUESTIONS = "mysql_global_status_questions"
+_MYSQL_SLOW = "mysql_global_status_slow_queries"
+_MYSQL_CONN_ERRORS = "mysql_global_status_connection_errors_total"
+
+
+def _mysql_rate(metric: str, fn: str = "rate", extra: str = "") -> str:
+    extra = f", {extra}" if extra else ""
+    return f"sum by (job, instance) ({fn}({metric}{{{{{{s}}{extra}}}}}[{{w}}]))"
+
+
+def _mysql_replication(variant: str, source: str) -> tuple[SignalDef, SignalDef]:
+    """Lag and thread state, named after SHOW SLAVE STATUS or SHOW REPLICA STATUS columns.
+
+    The exporter lower-cases column names: MySQL 8.4 dropped SHOW SLAVE STATUS, so its replicas
+    export ``replica_*_running`` and ``seconds_behind_source`` instead.
+    """
+    lag = f"mysql_slave_status_seconds_behind_{source}"
+    sql = f"mysql_slave_status_{variant}_sql_running"
+    io = f"mysql_slave_status_{variant}_io_running"
+    return (
+        SignalDef(
+            f"mysql_{variant}_lag",
+            SignalFamily.DATABASE,
+            Unit.SECONDS,
+            EntityKind.DATABASE,
+            MYSQL,
+            q(f"max by (job, instance) ({lag}{{{{{{s}}}}}})", lag),
+            (lag,),
+            description="Replica lag; absent while the SQL thread is stopped.",
+        ),
+        SignalDef(
+            f"mysql_{variant}_stopped",
+            SignalFamily.DATABASE,
+            Unit.COUNT,
+            EntityKind.DATABASE,
+            MYSQL,
+            q(f"1 - min by (job, instance) ({sql}{{{{{{s}}}}}} * {io}{{{{{{s}}}}}})", sql, io),
+            (sql, io),
+            description="1 while the SQL or I/O thread is not running (incl. Connecting).",
+        ),
+    )
+
+
+MYSQL_CATALOG: tuple[SignalDef, ...] = (
+    SignalDef(
+        "mysql_down",
+        SignalFamily.DATABASE,
+        Unit.COUNT,
+        EntityKind.DATABASE,
+        MYSQL,
+        q("1 - max by (job, instance) (mysql_up{{{s}}})", "mysql_up"),
+        ("mysql_up",),
+        description="1 while the exporter cannot connect to MySQL.",
+    ),
+    SignalDef(
+        "mysql_connections_used_ratio",
+        SignalFamily.DATABASE,
+        Unit.RATIO,
+        EntityKind.DATABASE,
+        MYSQL,
+        q(
+            "max by (job, instance) (mysql_global_status_threads_connected{{{s}}})"
+            " / max by (job, instance) (mysql_global_variables_max_connections{{{s}}} > 0)",
+            "mysql_global_status_threads_connected",
+            "mysql_global_variables_max_connections",
+        ),
+        ("mysql_global_status_threads_connected", "mysql_global_variables_max_connections"),
+        description="Open client connections vs max_connections.",
+    ),
+    SignalDef(
+        "mysql_connections_refused",
+        SignalFamily.DATABASE,
+        Unit.COUNT,
+        EntityKind.DATABASE,
+        MYSQL,
+        q(
+            _mysql_rate(_MYSQL_CONN_ERRORS, "increase", 'error="max_connections"'),
+            _MYSQL_CONN_ERRORS,
+        ),
+        (_MYSQL_CONN_ERRORS,),
+        description="Connections refused per step because max_connections was reached.",
+    ),
+    *_mysql_replication("slave", "master"),
+    *_mysql_replication("replica", "source"),
+    SignalDef(
+        MYSQL_TRAFFIC,
+        SignalFamily.DATABASE,
+        Unit.PER_SECOND,
+        EntityKind.DATABASE,
+        MYSQL,
+        q(_mysql_rate(_MYSQL_QUESTIONS), _MYSQL_QUESTIONS),
+        (_MYSQL_QUESTIONS,),
+        direction=Direction.BOTH,
+        description="Statements sent by clients per second (Questions).",
+    ),
+    SignalDef(
+        "mysql_slow_queries",
+        SignalFamily.DATABASE,
+        Unit.PER_SECOND,
+        EntityKind.DATABASE,
+        MYSQL,
+        q(_mysql_rate(_MYSQL_SLOW), _MYSQL_SLOW),
+        (_MYSQL_SLOW,),
+        role=Role.OPERAND,
+    ),
+    SignalDef(
+        "mysql_row_lock_waits",
+        SignalFamily.DATABASE,
+        Unit.PER_SECOND,
+        EntityKind.DATABASE,
+        MYSQL,
+        q(
+            _mysql_rate("mysql_global_status_innodb_row_lock_waits"),
+            "mysql_global_status_innodb_row_lock_waits",
+        ),
+        ("mysql_global_status_innodb_row_lock_waits",),
+        description="InnoDB row lock waits per second.",
+    ),
+    SignalDef(
+        "mysql_tmp_disk_tables",
+        SignalFamily.DATABASE,
+        Unit.PER_SECOND,
+        EntityKind.DATABASE,
+        MYSQL,
+        q(
+            _mysql_rate("mysql_global_status_created_tmp_disk_tables"),
+            "mysql_global_status_created_tmp_disk_tables",
+        ),
+        ("mysql_global_status_created_tmp_disk_tables",),
+        description="Internal temporary tables created on disk per second.",
+    ),
+)
+
+# --- Redis ---------------------------------------------------------------------------------
+# oliver006/redis_exporter with its defaults (INFO, CONFIG GET maxclients/maxmemory,
+# commandstats). `instance` is one Redis server: the exporter address in single-target mode,
+# or the target after the usual relabelling in multi-target mode. Every signal is server-wide.
+REDIS = ("job", "instance")
+REDIS_TRAFFIC = "redis_commands"
+REDIS_LOOKUPS = "redis_keyspace_lookups"
+
+_REDIS_HITS = "redis_keyspace_hits_total"
+_REDIS_MISSES = "redis_keyspace_misses_total"
+_REDIS_CALLS = "redis_commands_total"
+_REDIS_CALL_SECONDS = "redis_commands_duration_seconds_total"
+
+
+def _redis_rate(metric: str, fn: str = "rate") -> str:
+    return f"sum by (job, instance) ({fn}({metric}{{{{{{s}}}}}}[{{w}}]))"
+
+
+REDIS_CATALOG: tuple[SignalDef, ...] = (
+    SignalDef(
+        "redis_down",
+        SignalFamily.DATABASE,
+        Unit.COUNT,
+        EntityKind.DATABASE,
+        REDIS,
+        q("1 - max by (job, instance) (redis_up{{{s}}})", "redis_up"),
+        ("redis_up",),
+        description="1 while the exporter cannot connect to Redis.",
+    ),
+    SignalDef(
+        "redis_clients_used_ratio",
+        SignalFamily.DATABASE,
+        Unit.RATIO,
+        EntityKind.DATABASE,
+        REDIS,
+        q(
+            "max by (job, instance) (redis_connected_clients{{{s}}})"
+            " / (max by (job, instance) (redis_max_clients{{{s}}} > 0)"
+            " or max by (job, instance) (redis_config_maxclients{{{s}}} > 0))",
+            "redis_connected_clients",
+            "redis_max_clients",
+            "redis_config_maxclients",
+        ),
+        ("redis_connected_clients",),
+        gates=(
+            Gate(
+                q(
+                    "count(redis_max_clients{{{s}}} > 0 or redis_config_maxclients{{{s}}} > 0)",
+                    "redis_max_clients",
+                    "redis_config_maxclients",
+                ),
+                "maxclients is not exported (INFO needs Redis 7+, CONFIG GET may be disabled).",
+            ),
+        ),
+        description="Connected clients vs maxclients (INFO, else CONFIG GET).",
+    ),
+    SignalDef(
+        "redis_rejected_connections",
+        SignalFamily.DATABASE,
+        Unit.COUNT,
+        EntityKind.DATABASE,
+        REDIS,
+        q(
+            _redis_rate("redis_rejected_connections_total", "increase"),
+            "redis_rejected_connections_total",
+        ),
+        ("redis_rejected_connections_total",),
+        description="Connections rejected per step because maxclients was reached.",
+    ),
+    SignalDef(
+        "redis_memory_used_ratio",
+        SignalFamily.DATABASE,
+        Unit.RATIO,
+        EntityKind.DATABASE,
+        REDIS,
+        q(
+            "max by (job, instance) (redis_memory_used_bytes{{{s}}})"
+            " / max by (job, instance) (redis_memory_max_bytes{{{s}}} > 0)",
+            "redis_memory_used_bytes",
+            "redis_memory_max_bytes",
+        ),
+        ("redis_memory_used_bytes", "redis_memory_max_bytes"),
+        gates=(
+            Gate(
+                q("count(redis_memory_max_bytes{{{s}}} > 0)", "redis_memory_max_bytes"),
+                "maxmemory is not set (0) on any Redis server.",
+            ),
+        ),
+        description="used_memory vs maxmemory; servers without maxmemory are skipped.",
+    ),
+    SignalDef(
+        "redis_evictions",
+        SignalFamily.DATABASE,
+        Unit.PER_SECOND,
+        EntityKind.DATABASE,
+        REDIS,
+        q(_redis_rate("redis_evicted_keys_total"), "redis_evicted_keys_total"),
+        ("redis_evicted_keys_total",),
+        description="Keys evicted per second under the maxmemory policy.",
+    ),
+    SignalDef(
+        "redis_replica_link_down",
+        SignalFamily.DATABASE,
+        Unit.COUNT,
+        EntityKind.DATABASE,
+        REDIS,
+        q("1 - min by (job, instance) (redis_master_link_up{{{s}}})", "redis_master_link_up"),
+        ("redis_master_link_up",),
+        description="1 while a replica's link to its master is down; absent on masters.",
+    ),
+    SignalDef(
+        "redis_persistence_failed",
+        SignalFamily.DATABASE,
+        Unit.COUNT,
+        EntityKind.DATABASE,
+        REDIS,
+        q(
+            "1 - min by (job, instance) (redis_rdb_last_bgsave_status{{{s}}}"
+            " * redis_aof_last_write_status{{{s}}})",
+            "redis_rdb_last_bgsave_status",
+            "redis_aof_last_write_status",
+        ),
+        ("redis_rdb_last_bgsave_status", "redis_aof_last_write_status"),
+        description="1 while the last RDB snapshot or AOF write failed.",
+    ),
+    SignalDef(
+        REDIS_TRAFFIC,
+        SignalFamily.DATABASE,
+        Unit.PER_SECOND,
+        EntityKind.DATABASE,
+        REDIS,
+        q(_redis_rate("redis_commands_processed_total"), "redis_commands_processed_total"),
+        ("redis_commands_processed_total",),
+        direction=Direction.BOTH,
+        description="Commands processed per second.",
+    ),
+    SignalDef(
+        "redis_command_latency_mean",
+        SignalFamily.DATABASE,
+        Unit.SECONDS,
+        EntityKind.DATABASE,
+        REDIS,
+        q(
+            f"{_redis_rate(_REDIS_CALL_SECONDS)} / ({_redis_rate(_REDIS_CALLS)} > 0)",
+            _REDIS_CALL_SECONDS,
+            _REDIS_CALLS,
+        ),
+        (_REDIS_CALL_SECONDS, _REDIS_CALLS),
+        description="Mean server-side execution time over all commands (commandstats).",
+    ),
+    SignalDef(
+        REDIS_LOOKUPS,
+        SignalFamily.DATABASE,
+        Unit.PER_SECOND,
+        EntityKind.DATABASE,
+        REDIS,
+        q(f"{_redis_rate(_REDIS_HITS)} + {_redis_rate(_REDIS_MISSES)}", _REDIS_HITS, _REDIS_MISSES),
+        (_REDIS_HITS, _REDIS_MISSES),
+        role=Role.OPERAND,
+    ),
+    SignalDef(
+        "redis_keyspace_misses",
+        SignalFamily.DATABASE,
+        Unit.PER_SECOND,
+        EntityKind.DATABASE,
+        REDIS,
+        q(_redis_rate(_REDIS_MISSES), _REDIS_MISSES),
+        (_REDIS_MISSES,),
+        role=Role.OPERAND,
+    ),
+)
+
+CATALOG = CATALOG + PROXY_CATALOG + POSTGRES_CATALOG + MYSQL_CATALOG + REDIS_CATALOG
 TRAFFIC_SIGNALS = frozenset(d.traffic for d in CATALOG if d.traffic is not None)
 
 BY_SIGNAL = {d.signal: d for d in CATALOG}

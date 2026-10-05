@@ -10,7 +10,7 @@ from pydantic import Field
 
 from app.domain.common import STEP_SECONDS, Contract
 
-DETECTOR_VERSION = "detectors-2026.10.2"
+DETECTOR_VERSION = "detectors-2026.10.4"
 CONFIG_HASH_HEX_CHARS = 12
 
 
@@ -81,6 +81,14 @@ _DEFAULT_SIGNALS: dict[str, SignalThresholds] = {
     "database_rollback_ratio": _T(min_rel_factor=2.0, min_abs_effect=0.05, abs_floor=0.005),
     "database_temp_bytes": _T(min_rel_factor=2.0, min_abs_effect=_MIB, abs_floor=100 * 1024.0),
     "database_longest_transaction": _T(min_rel_factor=2.0, min_abs_effect=60.0, abs_floor=1.0),
+    "database_query_rate": _T(min_rel_factor=2.0, min_abs_effect=5.0, abs_floor=0.5),
+    "database_slow_query_ratio": _T(min_rel_factor=2.0, min_abs_effect=0.01, abs_floor=0.001),
+    "database_lock_waits": _T(min_rel_factor=2.0, min_abs_effect=1.0, abs_floor=0.1),
+    "database_tmp_disk_tables": _T(min_rel_factor=2.0, min_abs_effect=1.0, abs_floor=0.1),
+    "database_memory_ratio": _T(min_abs_effect=0.10, abs_floor=0.01),
+    "database_evictions": _T(min_rel_factor=2.0, min_abs_effect=1.0, abs_floor=0.1),
+    "database_command_latency": _T(min_rel_factor=2.0, min_abs_effect=0.0005, abs_floor=0.00001),
+    "database_cache_miss_ratio": _T(min_rel_factor=1.5, min_abs_effect=0.10, abs_floor=0.01),
 }
 
 

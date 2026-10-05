@@ -1,6 +1,9 @@
 import { ref, watch } from "vue";
 
 const MS_PER_SECOND = 1000;
+const US_PER_SECOND = 1_000_000;
+/** Below this, durations are shown in µs (Redis commands run in microseconds). */
+const SUB_MILLISECOND = 0.001;
 const SECONDS_PER_MINUTE = 60;
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_DAY = 24;
@@ -18,6 +21,7 @@ export function formatValue(value: number | null | undefined, unit: string): str
     case "ratio":
       return `${(value * 100).toFixed(value < SMALL_RATIO && value > 0 ? 2 : 1)} %`;
     case "seconds":
+      if (value > 0 && value < SUB_MILLISECOND) return `${(value * US_PER_SECOND).toFixed(0)} µs`;
       return value < 1 ? `${(value * MS_PER_SECOND).toFixed(0)} ms` : `${value.toFixed(2)} s`;
     case "bytes":
       return formatBytes(value);

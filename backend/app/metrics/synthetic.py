@@ -49,6 +49,10 @@ PROXY_SERVICE = {"job": PROXY_JOB, "service": "dispatcher-api@swarm"}
 PROXY_SERVER = {**PROXY_SERVICE, "url": "http://10.0.1.7:8080"}
 PG_SERVER = {"job": "postgres", "instance": "pg-primary:9187"}
 PG_DATABASE = {**PG_SERVER, "datname": "dispatcher"}
+MYSQL_PRIMARY = {"job": "mysql", "instance": "mysql-primary:9104"}
+MYSQL_REPLICA = {"job": "mysql", "instance": "mysql-replica:9104"}
+REDIS_MASTER = {"job": "redis", "instance": "redis://redis-master:6379"}
+REDIS_REPLICA = {"job": "redis", "instance": "redis://redis-replica:6379"}
 QUIET_ROUTE = {
     "job": SERVICE_JOB,
     "http_route": "/internal/task-sla",
@@ -86,6 +90,16 @@ class Scenario:
     database_pileup: bool = False
     """An idle-in-transaction session holds locks for 1 h, ending 150 min before T: the oldest
     transaction grows, connections pile up, and blocked writers deadlock and roll back."""
+    mysql: bool = True
+    """A MySQL primary and replica (mysqld_exporter)."""
+    mysql_contention: bool = False
+    """Row lock contention on the MySQL primary for 1 h, ending 5 h before T: lock waits and
+    slow queries climb, connections reach max_connections and new ones are refused."""
+    redis: bool = True
+    """A Redis master and replica (redis_exporter, multi-target)."""
+    redis_eviction_storm: bool = False
+    """The Redis master fills maxmemory for 1 h, ending 7 h before T: keys are evicted, the
+    keyspace miss share climbs and commands slow down."""
     recurring_404_days: tuple[int, ...] = ()
     """Trend buckets (1..13) with an extra 404 burst, for recurrence."""
     seed: int = 7
@@ -101,6 +115,8 @@ SCENARIOS: dict[str, Scenario] = {
         recurring_404_days=(3, 5, 9),
         proxy_outage=True,
         database_pileup=True,
+        mysql_contention=True,
+        redis_eviction_storm=True,
     ),
     "short-history": Scenario(history_days=5, cpu_load=True, histogram=False),
     "degraded": Scenario(
@@ -187,6 +203,10 @@ def build_series(
         _add_proxy_series(builder, gen)
     if scenario.databases:
         _add_database_series(builder, gen)
+    if scenario.mysql:
+        _add_mysql_series(builder, gen)
+    if scenario.redis:
+        _add_redis_series(builder, gen)
 
     mappings = [
         EntityMapping(
@@ -319,6 +339,62 @@ def _add_database_series(builder: _SeriesBuilder, gen: _Gen) -> None:
     builder.add("pg_longest_transaction", PG_DATABASE, gen.available(longest))
 
 
+def _add_mysql_series(builder: _SeriesBuilder, gen: _Gen) -> None:
+    contention = slice(N - 72, N - 60)
+    steps = contention.stop - contention.start
+    for server in (MYSQL_PRIMARY, MYSQL_REPLICA):
+        connections = np.clip(gen.base(0.3, 0.08, 0.01), 0, 1)
+        queries = np.clip(gen.base(400.0, 120.0, 12.0), 0, None)
+        slow = np.clip(queries * 0.001 + gen.rng.normal(0, 0.02, N), 0, None)
+        lock_waits = np.clip(gen.base(0.5, 0.2, 0.1), 0, None)
+        refused = np.zeros(N)
+        if gen.scenario.mysql_contention and server is MYSQL_PRIMARY:
+            connections[contention] = np.linspace(0.4, 1.0, steps)
+            slow[contention] = queries[contention] * 0.05
+            lock_waits[contention] = 25.0
+            refused[N - 64 : N - 61] = 40.0
+        tmp_disk = np.clip(gen.base(2.0, 0.5, 0.2), 0, None)
+        builder.add("mysql_down", server, gen.available(np.zeros(N)))
+        builder.add("mysql_connections_used_ratio", server, gen.available(connections))
+        builder.add("mysql_connections_refused", server, gen.available(refused))
+        builder.add("mysql_queries", server, gen.available(queries))
+        builder.add("mysql_slow_queries", server, gen.available(slow))
+        builder.add("mysql_row_lock_waits", server, gen.available(lock_waits))
+        builder.add("mysql_tmp_disk_tables", server, gen.available(tmp_disk))
+    lag = np.clip(gen.base(0.5, 0.2, 0.3), 0, None)
+    builder.add("mysql_slave_lag", MYSQL_REPLICA, gen.available(lag))
+    builder.add("mysql_slave_stopped", MYSQL_REPLICA, gen.available(np.zeros(N)))
+
+
+def _add_redis_series(builder: _SeriesBuilder, gen: _Gen) -> None:
+    storm = slice(N - 96, N - 84)
+    steps = storm.stop - storm.start
+    for server in (REDIS_MASTER, REDIS_REPLICA):
+        clients = np.clip(gen.base(0.05, 0.01, 0.003), 0, 1)
+        memory = np.clip(gen.base(0.6, 0.02, 0.005), 0, 1)
+        evictions = np.clip(gen.base(0.2, 0.1, 0.05), 0, None)
+        commands = np.clip(gen.base(2000.0, 600.0, 60.0), 0, None)
+        latency = np.clip(gen.base(5e-6, 1e-6, 3e-7), 1e-6, None)
+        lookups = commands * 0.6
+        misses = np.clip(lookups * 0.05 + gen.rng.normal(0, 2.0, N), 0, None)
+        if gen.scenario.redis_eviction_storm and server is REDIS_MASTER:
+            memory[storm] = np.linspace(0.8, 1.0, steps)
+            evictions[storm] = 200.0
+            misses[storm] = lookups[storm] * 0.4
+            latency[storm] = 0.002
+        builder.add("redis_down", server, gen.available(np.zeros(N)))
+        builder.add("redis_clients_used_ratio", server, gen.available(clients))
+        builder.add("redis_rejected_connections", server, gen.available(np.zeros(N)))
+        builder.add("redis_memory_used_ratio", server, gen.available(memory))
+        builder.add("redis_evictions", server, gen.available(evictions))
+        builder.add("redis_persistence_failed", server, gen.available(np.zeros(N)))
+        builder.add("redis_commands", server, gen.available(commands))
+        builder.add("redis_command_latency_mean", server, gen.available(latency))
+        builder.add("redis_keyspace_lookups", server, gen.available(lookups))
+        builder.add("redis_keyspace_misses", server, gen.available(misses))
+    builder.add("redis_replica_link_down", REDIS_REPLICA, gen.available(np.zeros(N)))
+
+
 class SyntheticMetricsSource:
     def __init__(self, scenario: Scenario | str = "incident") -> None:
         self.scenario = SCENARIOS[scenario] if isinstance(scenario, str) else scenario
@@ -359,8 +435,22 @@ class SyntheticMetricsSource:
                 else ()
             ),
             *(
-                (d.signal for d in CATALOG if d.family is SignalFamily.DATABASE)
+                (d.signal for d in CATALOG if d.signal.startswith("pg_"))
                 if scenario.databases
+                else ()
+            ),
+            *(
+                (
+                    d.signal
+                    for d in CATALOG
+                    if d.signal.startswith("mysql_") and not d.signal.startswith("mysql_replica_")
+                )
+                if scenario.mysql
+                else ()
+            ),
+            *(
+                (d.signal for d in CATALOG if d.signal.startswith("redis_"))
+                if scenario.redis
                 else ()
             ),
         }

@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.2` in `backend/app/metrics/catalog.py`. It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
+The catalog is `catalog-2026.10.4` in `backend/app/metrics/catalog.py`. It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
 
 ## Scope enforcement
 
@@ -94,6 +94,55 @@ Notes and limitations:
 
 - `numbackends` counts backends connected to a database (client sessions and autovacuum workers), not walsenders or other background processes, so the connection ratio is slightly below what PostgreSQL counts against `max_connections`.
 - Not covered: lock waits (`pg_locks_count` counts granted locks too), cache hit ratio, table bloat and transaction-ID wraparound (non-default collectors), and query latency (`pg_stat_statements` is not enabled by default).
+
+### MySQL
+
+Source: [prometheus/mysqld_exporter](https://github.com/prometheus/mysqld_exporter) with its default collectors (`global_status`, `global_variables`, `slave_status`). All series are kind `database` with identity `job, instance`; `instance` is the exporter target, i.e. one MySQL server (in multi-target mode, relabel `instance` to the target). Every signal is server-wide: SHOW GLOBAL STATUS has no per-schema breakdown.
+
+| Signal | Source metric(s) |
+| --- | --- |
+| `mysql_down` | `1 − mysql_up` |
+| `mysql_connections_used_ratio` | `mysql_global_status_threads_connected / mysql_global_variables_max_connections` |
+| `mysql_connections_refused` | `increase(mysql_global_status_connection_errors_total{error="max_connections"})` per step |
+| `mysql_slave_lag` / `mysql_replica_lag` | `mysql_slave_status_seconds_behind_master` / `…_seconds_behind_source` |
+| `mysql_slave_stopped` / `mysql_replica_stopped` | `1 − min(…_slave_sql_running × …_slave_io_running)` / the `replica_*` equivalents |
+| `mysql_queries` | `rate(mysql_global_status_questions)` |
+| `mysql_slow_queries` (operand) | `rate(mysql_global_status_slow_queries)` |
+| `mysql_row_lock_waits` | `rate(mysql_global_status_innodb_row_lock_waits)` |
+| `mysql_tmp_disk_tables` | `rate(mysql_global_status_created_tmp_disk_tables)` |
+
+Notes and limitations:
+
+- The exporter names replication metrics after the status columns. MySQL up to 8.0 and MariaDB answer `SHOW SLAVE STATUS` (`*_master`, `slave_*`); MySQL 8.4 only answers `SHOW REPLICA STATUS` (`*_source`, `replica_*`). Both variants map onto the same rules, and a server exports only one of them. Primaries export neither.
+- `Seconds_Behind_Master` is NULL while the SQL thread is stopped, and the exporter then skips it. The stopped-thread signal covers that case, so a broken replica is never reported as lag-free.
+- `Slow_queries` counts statements over `long_query_time` (default 10 s) whether or not the slow log is enabled.
+- Not covered: deadlocks (`Innodb_deadlocks` is MariaDB/Percona only; MySQL has it in `innodb_metrics`, a non-default collector), the longest transaction (`info_schema.innodb_trx`), per-schema workload, and statement latency (`perf_schema` collectors are off by default).
+
+### Redis
+
+Source: [oliver006/redis_exporter](https://github.com/oliver006/redis_exporter) with its defaults. All series are kind `database` with identity `job, instance`; `instance` is one Redis server — the exporter address in single-target mode, or the `redis://…` target after the usual relabelling in multi-target mode (`/scrape?target=…`). Every signal is server-wide; per-db keyspace metrics are not used.
+
+| Signal | Source metric(s) |
+| --- | --- |
+| `redis_down` | `1 − redis_up` |
+| `redis_clients_used_ratio` | `redis_connected_clients / (redis_max_clients or redis_config_maxclients)`; gated on either limit being exported |
+| `redis_rejected_connections` | `increase(redis_rejected_connections_total)` per step |
+| `redis_memory_used_ratio` | `redis_memory_used_bytes / redis_memory_max_bytes`; gated on `maxmemory > 0` |
+| `redis_evictions` | `rate(redis_evicted_keys_total)` |
+| `redis_replica_link_down` | `1 − min(redis_master_link_up)` (replicas only) |
+| `redis_persistence_failed` | `1 − min(redis_rdb_last_bgsave_status × redis_aof_last_write_status)` |
+| `redis_commands` | `rate(redis_commands_processed_total)` |
+| `redis_command_latency_mean` | `Σ rate(redis_commands_duration_seconds_total) / Σ rate(redis_commands_total)` over all `cmd` |
+| `redis_keyspace_lookups` (operand) | `rate(redis_keyspace_hits_total) + rate(redis_keyspace_misses_total)` |
+| `redis_keyspace_misses` (operand) | `rate(redis_keyspace_misses_total)` |
+
+Notes and limitations:
+
+- `maxclients` comes from INFO (Redis 7+, `redis_max_clients`) or, on older servers, from `CONFIG GET` (`redis_config_maxclients`); managed services that disable `CONFIG` and run Redis < 7 get no client ratio. `redis_memory_max_bytes` is 0 when `maxmemory` is unset, so the memory ratio exists only for capped servers.
+- An `allkeys-*` eviction policy keeps a cache at `maxmemory` by design, so memory has no absolute heuristic; evictions and the miss share show whether the cap hurts.
+- Command latency is server-side execution time only (no network, no time blocked in `BLPOP` and friends), averaged over all commands; a burst of slow commands (`KEYS`, large `SMEMBERS`) moves it. `CONFIG RESETSTAT` resets the counters, which `rate` handles.
+- The RDB/AOF status stays `err` until the next successful save or write, so a failing disk is reported for as long as it fails. With the default `stop-writes-on-bgsave-error yes`, the master also rejects writes meanwhile.
+- Not covered: replication offset lag (redis_exporter exports per-replica offsets on the master, not a lag in seconds), blocked clients (normal for queue consumers), Cluster and Sentinel state, slowlog, and per-command latency.
 
 ## Budgets and behaviour
 

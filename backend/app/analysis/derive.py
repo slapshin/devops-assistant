@@ -48,6 +48,22 @@ DIRECT: dict[str, str] = {
     "pg_deadlocks": "database_deadlocks",
     "pg_temp_bytes": "database_temp_bytes",
     "pg_longest_transaction": "database_longest_transaction",
+    "mysql_down": "database_down",
+    "mysql_connections_used_ratio": "database_connections_ratio",
+    "mysql_connections_refused": "database_connections_refused",
+    "mysql_slave_lag": "database_replication_lag",
+    "mysql_replica_lag": "database_replication_lag",
+    "mysql_slave_stopped": "database_replication_stopped",
+    "mysql_replica_stopped": "database_replication_stopped",
+    "mysql_row_lock_waits": "database_lock_waits",
+    "mysql_tmp_disk_tables": "database_tmp_disk_tables",
+    "redis_down": "database_down",
+    "redis_clients_used_ratio": "database_connections_ratio",
+    "redis_rejected_connections": "database_connections_refused",
+    "redis_memory_used_ratio": "database_memory_ratio",
+    "redis_evictions": "database_evictions",
+    "redis_replica_link_down": "database_replica_link_down",
+    "redis_persistence_failed": "database_persistence_failed",
 }
 """Collected signal -> rule for signals analysed as collected."""
 
@@ -61,7 +77,8 @@ class _TrafficSpec:
     """How one request-count signal fans out into analysable rate, ratio and latency series."""
 
     traffic_signal: str
-    rate_rule: str
+    rate_rule: str | None
+    """None when the count only guards ratios (Redis keyspace lookups)."""
     error_ratios: tuple[tuple[str, str], ...] = ()
     """(numerator signal, ratio rule) pairs divided by the request rate."""
     quantile_signal: str | None = None
@@ -116,6 +133,25 @@ _TRAFFIC_SPECS = (
         traffic_signal="pg_transactions",
         rate_rule="database_transaction_rate",
         error_ratios=(("pg_rollbacks", "database_rollback_ratio"),),
+    ),
+    # Share of statements slower than long_query_time.
+    _TrafficSpec(
+        traffic_signal="mysql_queries",
+        rate_rule="database_query_rate",
+        error_ratios=(("mysql_slow_queries", "database_slow_query_ratio"),),
+    ),
+    # Redis command rate with the commandstats mean latency, guarded by the command volume.
+    _TrafficSpec(
+        traffic_signal="redis_commands",
+        rate_rule="database_command_rate",
+        quantile_signal="redis_command_latency_mean",
+        quantile_rule="database_command_latency",
+    ),
+    # Share of key lookups that missed; the lookup count is not analysed on its own.
+    _TrafficSpec(
+        traffic_signal="redis_keyspace_lookups",
+        rate_rule=None,
+        error_ratios=(("redis_keyspace_misses", "database_cache_miss_ratio"),),
     ),
 )
 
@@ -208,16 +244,17 @@ def _traffic_series(
         requests = by_signal[spec.traffic_signal][key]
         rate = to_array(requests)
         volume = rate * step_seconds
-        out.append(
-            AnalysisSeries(
-                RULES[spec.rate_rule],
-                requests.entity,
-                requests.unit,
-                rate,
-                requests.query,
-                requests,
+        if spec.rate_rule is not None:
+            out.append(
+                AnalysisSeries(
+                    RULES[spec.rate_rule],
+                    requests.entity,
+                    requests.unit,
+                    rate,
+                    requests.query,
+                    requests,
+                )
             )
-        )
 
         guarded_rate = rate.copy()
         guarded_rate[volume < min_requests] = np.nan

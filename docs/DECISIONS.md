@@ -127,7 +127,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 
 **Report schema version:** `schema_version: "1.0"`. Minor bumps add optional fields; major bumps require a reader migration. Readers must open every saved major version they claim to support, or return `report_unavailable` with `code=schema_unsupported` — never a crash.
 
-## 5. Numerical policy (detector config `detectors-2026.10.2`)
+## 5. Numerical policy (detector config `detectors-2026.10.4`)
 
 All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
@@ -176,6 +176,20 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | PostgreSQL database | rollback share (rollback / all transactions, volume-guarded at ≥ 30 transactions per step). ORMs roll back routinely, so there is no absolute check. | up | ×2 and ≥ +5 pp | — |
 | PostgreSQL database | deadlocks | up | — | any deadlock in a step (event rule, 2 points) |
 | PostgreSQL database | temporary file bytes (work_mem spills; severity ≤ medium); longest open transaction, incl. idle in transaction | up | temp: ×2 and ≥ +1 MiB/s; longest: ×2 and ≥ +60 s | — |
+| MySQL server | unreachable (`mysql_up = 0`); connections (`Threads_connected / max_connections`); replication lag (`Seconds_Behind_Master`/`_Source`) | up | as PostgreSQL | as PostgreSQL |
+| MySQL server | refused connections (`Connection_errors_max_connections`) | up | — | any refusal in a step (event rule, 2 points) |
+| MySQL server | replication stopped (SQL or I/O thread not running, incl. Connecting) | up | — | value ≥ 1 for ≥ 15 min (shortfall rule, 3 points) |
+| MySQL server | query rate (`Questions`; severity ≤ medium) | both | ×2 or ÷2 and ≥ 5 q/s change | — |
+| MySQL server | slow-query share (`Slow_queries / Questions`, volume-guarded at ≥ 30 queries per step) | up | ×2 and ≥ +1 pp | — |
+| MySQL server | InnoDB row lock waits; on-disk temporary tables (severity ≤ medium) | up | ×2 and ≥ +1/s | — |
+| Redis server | unreachable (`redis_up = 0`); clients (`connected_clients / maxclients`) | up | as PostgreSQL | as PostgreSQL |
+| Redis server | rejected connections (`rejected_connections`, maxclients reached) | up | — | any rejection in a step (event rule, 2 points) |
+| Redis server | replica link to master down; persistence failing (last RDB bgsave or AOF write not `ok`) | up | — | value ≥ 1 for ≥ 15 min (shortfall rule, 3 points) |
+| Redis server | memory vs `maxmemory` (only where set). No absolute check: an LRU cache sits at maxmemory by design. | up | +10 pp | — |
+| Redis server | command rate (severity ≤ medium) | both | ×2 or ÷2 and ≥ 5 cmd/s change | — |
+| Redis server | evicted keys (severity ≤ medium) | up | ×2 and ≥ +1/s | — |
+| Redis server | keyspace miss share (`misses / (hits + misses)`, volume-guarded at ≥ 30 lookups per step; severity ≤ medium) | up | ×1.5 and ≥ +10 pp | — |
+| Redis server | mean command latency (commandstats `usec / calls`, volume-guarded at ≥ 30 commands per step) | up | ×2 and ≥ +0.5 ms | — |
 | Latency | p95/p99 from verified classic histograms (HTTP and RPC buckets 0.005–10 s; values at the top bucket are reported as "≥ 10 s"); mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
 
 - Rates are computed before aggregation; ratio numerator and denominator use the same selector scope (project, env, and entity labels).

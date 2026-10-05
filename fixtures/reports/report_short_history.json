@@ -28,8 +28,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.2",
-  "config_hash": "c4d4a0e8f5fb",
+  "detector_version": "detectors-2026.10.4",
+  "config_hash": "ea7664b7bf18",
   "source": {
     "base_url": "http://localhost:8428",
     "backend": null,
@@ -356,9 +356,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_1188a87afb817e1d",
+      "finding_id": "fnd_b3377f0ed18cf921",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.2",
+      "detector_version": "detectors-2026.10.4",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -400,7 +400,7 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_eafb6a85b7d69b3a"
+        "evd_95d908ff5365f247"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -429,8 +429,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_1188a87afb817e1d",
-          "finding_id": "fnd_1188a87afb817e1d",
+          "episode_id": "eps_b3377f0ed18cf921",
+          "finding_id": "fnd_b3377f0ed18cf921",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=paas-production",
@@ -684,8 +684,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_eafb6a85b7d69b3a",
-      "finding_id": "fnd_1188a87afb817e1d",
+      "evidence_id": "evd_95d908ff5365f247",
+      "finding_id": "fnd_b3377f0ed18cf921",
       "series": {
         "series_id": "ser_063ed23f9b327c5f",
         "family": "cpu",

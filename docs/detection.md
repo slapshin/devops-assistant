@@ -1,6 +1,6 @@
 # Detection engine (T005)
 
-`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.2`, identified by `config_hash`). Every threshold is a provisional diagnostic heuristic, not an SLO.
+`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.4`, identified by `config_hash`). Every threshold is a provisional diagnostic heuristic, not an SLO.
 
 ## Pipeline
 
@@ -10,6 +10,8 @@
    - `404 rate` and `other 4xx rate` (= 4xx − 404) are derived separately, so 404s are never counted twice.
    - Reverse proxies (Angie zones, Caddy server/handler, Traefik services) are derived the same way as HTTP routes and reuse the `request_rate`, `server_error_ratio`, `not_found_rate`, `client_error_rate` and `latency_p95` rules; their entities have kind `proxy`. nginx stub_status has no status codes or latency, so it yields only the request rate. Proxy connection signals map onto `proxy_connections_active`/`proxy_connections_dropped`, and upstream state (Angie peers, Caddy upstreams, Traefik servers; kind `upstream`) onto the `upstream_unavailable` shortfall rule; `nginx_up = 0` onto `proxy_down`.
    - PostgreSQL (postgres_exporter, kind `database`): server signals (`pg_up`, connections vs `max_connections`, replication lag) and per-database deadlocks, temp-file bytes and the longest open transaction pass through onto the `database_*` rules. The rollback share is `pg_rollbacks / pg_transactions` with the same volume guard as the 5xx ratio (≥ 30 transactions per step).
+   - MySQL (mysqld_exporter, kind `database`, server-wide only): `mysql_up`, connections vs `max_connections`, replication lag, row lock waits and on-disk temporary tables pass through; refused connections (`max_connections` reached) use the `database_connections_refused` event rule and stopped replication threads the `database_replication_stopped` shortfall rule. The slow-query share is `mysql_slow_queries / mysql_queries`, volume-guarded at ≥ 30 queries per step.
+   - Redis (redis_exporter, kind `database`, server-wide only): `redis_up`, clients vs `maxclients`, memory vs `maxmemory` and evicted keys pass through; rejected connections reuse the `database_connections_refused` event rule, and a replica's broken master link (`database_replica_link_down`) and failed RDB/AOF persistence (`database_persistence_failed`) are shortfall rules. The command rate carries the commandstats mean latency (volume-guarded at ≥ 30 commands per step); the keyspace miss share is `misses / (hits + misses)`, volume-guarded at ≥ 30 lookups per step, and the lookup count itself is not analysed.
    - Latency uses p95 (with p99 kept as evidence), or mean when histograms are absent. It carries the same volume guard.
    - Swarm failed-task counts become **positive deltas**: new failures.
 2. **Baseline** (`baseline.py`): computed for each trend bucket *b* from `[start_b − 14 d, start_b)` only.
@@ -21,7 +23,7 @@
    - `|z| ≥ 4` in the rule direction plus the minimum effect (absolute difference and/or relative factor);
    - the value is at or above the absolute heuristic;
    - an event count is > 0 (OOM, new task failures);
-   - a replica shortfall, an unavailable upstream, an unreadable proxy status or an unreachable database of ≥ 1 persists for ≥ 15 min.
+   - a replica shortfall, an unavailable upstream, an unreadable proxy status, an unreachable database, stopped replication, a broken replica link or failing persistence of ≥ 1 persists for ≥ 15 min.
 4. **Episodes**: flagged steps separated by ≤ 2 steps are merged. A level episode needs ≥ 3 relative steps, or an absolute run of at least the signal's minimum minutes. Episodes are built over the continuous 14-day range, so they can cross bucket boundaries. Trends clip them per bucket, while findings keep the whole episode.
 5. **Findings**: one per episode that reaches the latest day.
    - **Severity** is based on magnitude and duration only:
@@ -66,6 +68,8 @@ IDs are derived from `project|env|T|config_hash` plus entity, signal and start t
 - relations only through verified mappings; episode merging across the day boundary;
 - a Traefik backend outage (upstream unavailable) related to the proxy's 5xx burst; nginx signals mapped to the generic proxy rules; every catalog signal consumed by derivation;
 - a PostgreSQL lock pile-up (long transaction, connections, rollbacks, deadlocks) related within one server, and not across servers of the same job;
+- a MySQL lock contention (connections, refused connections, slow queries, lock waits) related within the primary only; both replication status syntaxes mapped onto the same rules;
+- a Redis eviction storm (memory, evictions, miss share, command latency) related within the master only; a broken replica link as a shortfall;
 - severity mapping; the inconclusive trend summary;
 - composing a valid `AnalysisReport`.
 

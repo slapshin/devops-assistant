@@ -77,7 +77,7 @@ Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-ap
 
 ## Schema versions
 
-`AnalysisReport.schema_version = "1.0"`. Adding an optional field is a minor bump. Removing, renaming, or changing the meaning of a field is a major bump and needs a reader migration in T007. `DetectorConfig.version` (`detectors-2026.10.2`) and `config_hash` (the first 12 hex characters of the SHA-256 of the canonical config JSON) identify the calculation.
+`AnalysisReport.schema_version = "1.0"`. Adding an optional field is a minor bump. Removing, renaming, or changing the meaning of a field is a major bump and needs a reader migration in T007. `DetectorConfig.version` (`detectors-2026.10.4`) and `config_hash` (the first 12 hex characters of the SHA-256 of the canonical config JSON) identify the calculation.
 
 ## Fixtures
 
