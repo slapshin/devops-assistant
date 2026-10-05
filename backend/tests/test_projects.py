@@ -186,6 +186,40 @@ async def test_omitted_secret_keeps_stored_value(tmp_path: Path, client: TestCli
     assert res.json()["errors"][0]["field"] == "body.sources.0.auth.token"
 
 
+async def test_clone_reuses_stored_secrets(client: TestClient) -> None:
+    source = create(client)
+    clone = body(
+        name="Shop / staging",
+        sources=[
+            {"kind": "prometheus", "url": "http://vm.example:8428", "auth": {"type": "bearer"}}
+        ],
+    )
+    res = client.post("/api/projects", params={"clone_of": source["project_id"]}, json=clone)
+    assert res.status_code == 201, res.text
+
+    repo = client.app.state.services.projects  # type: ignore[attr-defined]
+    conn = await repo.prometheus_connection(res.json()["project_id"])
+    assert conn.bearer_token.get_secret_value() == TOKEN
+
+    # The clone owns its copy: changing the original's secret does not affect it.
+    replaced = body(
+        sources=[
+            {
+                "kind": "prometheus",
+                "url": "http://vm.example",
+                "auth": {"type": "bearer", "token": "x"},
+            }
+        ]
+    )
+    assert client.put(f"/api/projects/{source['project_id']}", json=replaced).status_code == 200
+    conn = await repo.prometheus_connection(res.json()["project_id"])
+    assert conn.bearer_token.get_secret_value() == TOKEN
+
+    res = client.post("/api/projects", params={"clone_of": "missing"}, json=body(name="other"))
+    assert res.status_code == 404
+    assert res.json()["code"] == "project_not_found"
+
+
 def test_lost_key_degrades_only_affected_projects(tmp_path: Path) -> None:
     with make_client(tmp_path) as c:
         secret = create(c)

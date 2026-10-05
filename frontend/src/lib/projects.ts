@@ -122,6 +122,11 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
   };
 }
 
+/** A new project prefilled from ``project``; stored secrets are reused server-side (clone_of). */
+export function cloneDraft(project: ProjectSummary): ProjectDraft {
+  return { ...draftFrom(project), name: `${project.name} (copy)`.slice(0, MAX_NAME_CHARS) };
+}
+
 export function storedAuth(project: ProjectSummary | null | undefined): StoredAuth | null {
   const auth = project?.sources[0]?.auth;
   if (!auth) return null;

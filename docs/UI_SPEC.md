@@ -9,7 +9,7 @@ Interface language: English (default; strings are kept in one module so they can
 | URL | View |
 | --- | --- |
 | `/` | **Projects**: one card per project with health, latest report, 14-day trend and Run (T013) |
-| `/projects/new`, `/projects/:projectId/edit` | **Project form**: labels, source, Test connection, delete |
+| `/projects/new`, `/projects/new?from=:projectId`, `/projects/:projectId/edit` | **Project form**: labels, source, Test connection, clone, delete |
 | `/projects/:projectId` | **Project**: configuration, Run, analysis history |
 | `/analyses/:id` | **Job progress**; switches to the report route when a report exists |
 | `/reports/:id` | **Overview** (default report tab) |
@@ -51,11 +51,13 @@ Replaces the original start view (project/env selectors). Screenshots: `docs/scr
 
 **Project page (`/projects/:projectId`).** Name, description, matchers, source (host, auth type, TLS note, health), schedule with the next run ("On demand only" without one), saved report count (with "· latest N kept" when retention is set), Edit and Run. The analysis history pages through `GET /api/analyses?project_id=` (20 per page, *Load older analyses*); scheduled runs are marked "· scheduled". The report and job headers link back here.
 
-**Form (`/projects/new`, `/projects/:projectId/edit`).**
+**Form (`/projects/new`, `/projects/new?from=:projectId`, `/projects/:projectId/edit`).**
+
+- **Clone** (project page → *Clone*, `?from=`): the new-project form prefilled with every setting of the original (labels, source, schedule, retention) and the name "<name> (copy)". Stored secrets are reused like in edit mode — for Test connection and, via `POST /api/projects?clone_of=<id>`, copied into the new project. Reports are not copied.
 
 - Name, optional description, and **Labels**: rows of `name = value` (add/remove, 1–10). Client validation mirrors the server: label name syntax, reserved `__` prefix, duplicates, required values. Server `422` errors map back to the field.
 - **Sources → Prometheus-compatible metrics**: URL (no credentials, query or fragment; `synthetic://<scenario>` allowed; empty means no source), TLS verification, and authentication (none, bearer, basic). Secret inputs are write-only. When a secret of the chosen type is stored, the placeholder reads "Stored — leave empty to keep" and an empty input keeps it. Switching the type requires the new secret. Future source kinds get their own section here.
-- **Test connection** runs on the unsaved draft (stored secrets are reused in edit mode) and shows reachability/auth, matching series, history days, and a capability table per signal family. Editing labels or the source after a test marks the result stale. Saving is never blocked by the test, but a missing, stale or failed test (or no source at all) shows a warning next to Save.
+- **Test connection** runs on the unsaved draft (stored secrets are reused in edit and clone mode) and shows reachability/auth, matching series, history days, and a capability table per signal family. Editing labels or the source after a test marks the result stale. Saving is never blocked by the test, but a missing, stale or failed test (or no source at all) shows a warning next to Save.
 - **Schedule**: *Generate a report automatically* reveals a time (`HH:MM`), a time zone (IANA name with suggestions; defaults to the browser's zone) and weekday checkboxes (all checked by default; at least one required). Server `422` errors (e.g. an unknown time zone) map back to the field. Without a source a note says scheduled runs are skipped.
 - **Report retention**: *Keep only the latest reports* reveals *Reports to keep* (1–1000, default 30). Older analyses and their reports are deleted automatically after each analysis; saving a lower number deletes the excess right away.
 - **Delete** (edit only): states how many saved reports will be removed, is disabled while an analysis is queued or running, and requires typing the project name before *Delete permanently* is enabled.

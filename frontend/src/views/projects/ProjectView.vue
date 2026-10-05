@@ -37,6 +37,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
         <h1 id="project-title">{{ project.data.value.name }}</h1>
         <div class="row">
           <RouterLink :to="`/projects/${projectId}/edit`" class="button">Edit</RouterLink>
+          <RouterLink :to="{ path: '/projects/new', query: { from: projectId } }" class="button">Clone</RouterLink>
           <RunAnalysis :project="project.data.value" />
         </div>
       </div>

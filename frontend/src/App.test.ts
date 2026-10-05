@@ -281,6 +281,36 @@ describe("project form", () => {
     expect(calls.filter((c) => c.method === "PUT")).toHaveLength(1);
   });
 
+  it("clones a project with all settings and its stored secret", async () => {
+    const original = { ...base, schedule: { time: "07:30", timezone: "Europe/Berlin", weekdays: ["mon"] }, keep_reports: 5 } as Summary;
+    routes[`GET /api/projects/${PID}`] = () => json(original);
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    routes["POST /api/projects"] = () => json({ ...base, project_id: "clone-id" }, 201);
+    routes["GET /api/projects/clone-id"] = () => json({ ...base, project_id: "clone-id" });
+    routes["POST /api/projects/test-connection"] = () => json(connectionTest);
+
+    const router = await renderAt(`/projects/${PID}`);
+    await fireEvent.click(await screen.findByRole("link", { name: "Clone" }));
+    expect(await screen.findByRole("heading", { name: "Clone project" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("Name")).toHaveValue(`${base.name} (copy)`);
+    expect(screen.getByLabelText("Token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    expect(screen.queryByRole("heading", { name: "Delete project" })).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    await waitFor(() => expect(calls.some((c) => c.url === "/api/projects/test-connection")).toBe(true));
+    expect(JSON.parse(calls.find((c) => c.url === "/api/projects/test-connection")?.body ?? "{}").project_id).toBe(PID);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/clone-id"));
+    const post = calls.find((c) => c.method === "POST" && c.url.startsWith("/api/projects?"));
+    expect(post?.url).toBe(`/api/projects?clone_of=${PID}`);
+    const sent = JSON.parse(post?.body ?? "{}");
+    expect(sent.matchers).toEqual(base.matchers);
+    expect(sent.sources[0].auth).toEqual({ type: "bearer" });
+    expect(sent.schedule).toEqual(original.schedule);
+    expect(sent.keep_reports).toBe(5);
+  });
+
   it("tests the connection with the draft and marks the result stale after edits", async () => {
     routes["POST /api/projects/test-connection"] = () => json(connectionTest);
     await renderAt("/projects/new");

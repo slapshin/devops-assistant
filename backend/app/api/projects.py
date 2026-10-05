@@ -1,8 +1,9 @@
 """Project management routes (T011): CRUD, connection test, and cached per-project health."""
 
 import time
+from typing import Annotated
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Query, Response
 
 from app.api.problems import ProblemError, problem_responses
 from app.api.routes import ServicesDep
@@ -102,11 +103,22 @@ async def list_projects(services: ServicesDep) -> ProjectList:
     return ProjectList(items=await _summaries(services, await services.projects.list()))
 
 
-@router.post("", status_code=201, response_model=Project, responses=problem_responses(409, 422))
-async def create_project(data: ProjectInput, services: ServicesDep) -> Project:
+@router.post(
+    "", status_code=201, response_model=Project, responses=problem_responses(404, 409, 422)
+)
+async def create_project(
+    data: ProjectInput,
+    services: ServicesDep,
+    clone_of: Annotated[
+        str | None,
+        Query(description="Clone: reuse this project's stored secrets for omitted ones."),
+    ] = None,
+) -> Project:
     _validate(data)
+    if clone_of is not None and await services.projects.get(clone_of) is None:
+        raise _not_found(clone_of)
     try:
-        return await services.projects.create(data)
+        return await services.projects.create(data, secrets_from=clone_of)
     except (ProjectNameTaken, SecretRequired, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.sources.0") from None
 

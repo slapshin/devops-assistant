@@ -197,11 +197,18 @@ class SqliteProjectRepository:
         return config, secrets
 
     def _write_sources(
-        self, conn: sa.Connection, project_id: str, data: ProjectInput, now: str
+        self,
+        conn: sa.Connection,
+        project_id: str,
+        data: ProjectInput,
+        now: str,
+        secrets_from: str | None = None,
     ) -> None:
+        """Replace the project's sources; omitted secrets come from ``secrets_from`` or itself."""
         rows = []
         for source in data.sources:
-            config, secrets = self._split(source, self._stored(conn, project_id, source.kind))
+            stored = self._stored(conn, secrets_from or project_id, source.kind)
+            config, secrets = self._split(source, stored)
             rows.append(
                 {
                     "project_id": project_id,
@@ -232,7 +239,8 @@ class SqliteProjectRepository:
             stmt = stmt.where(projects.c.project_id != project_id)
         return conn.execute(stmt).first() is not None
 
-    async def create(self, data: ProjectInput) -> Project:
+    async def create(self, data: ProjectInput, secrets_from: str | None = None) -> Project:
+        """Create a project; omitted secrets are copied from project ``secrets_from`` (clone)."""
         project_id = new_project_id()
         now = format_utc(datetime.now(UTC))
 
@@ -248,7 +256,7 @@ class SqliteProjectRepository:
                     **self._values(data),
                 )
             )
-            self._write_sources(conn, project_id, data, now)
+            self._write_sources(conn, project_id, data, now, secrets_from)
             return self._load(conn, project_id)[0]
 
         return await self._run(q)

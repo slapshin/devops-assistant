@@ -1514,7 +1514,10 @@ export interface operations {
     };
     create_project_api_projects_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Clone: reuse this project's stored secrets for omitted ones. */
+                clone_of?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1532,6 +1535,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
                 };
             };
             /** @description Problem */

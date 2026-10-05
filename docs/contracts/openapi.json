@@ -3197,6 +3197,26 @@
       },
       "post": {
         "operationId": "create_project_api_projects_post",
+        "parameters": [
+          {
+            "description": "Clone: reuse this project's stored secrets for omitted ones.",
+            "in": "query",
+            "name": "clone_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Clone: reuse this project's stored secrets for omitted ones.",
+              "title": "Clone Of"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3217,6 +3237,17 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
           },
           "409": {
             "content": {

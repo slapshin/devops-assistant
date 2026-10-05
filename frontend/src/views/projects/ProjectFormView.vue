@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** Create (/projects/new) or edit (/projects/:projectId/edit) a project, test its source, delete it. */
+/** Create (/projects/new), clone (/projects/new?from=:projectId) or edit (/projects/:projectId/edit) a project, test its source, delete it. */
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ApiError, type ConnectionTest } from "../../api/client";
@@ -12,6 +12,7 @@ import {
   MAX_KEEP_REPORTS,
   MAX_MATCHERS,
   WEEKDAYS,
+  cloneDraft,
   draftFrom,
   emptyDraft,
   keepsStoredSecret,
@@ -27,14 +28,18 @@ import {
   validateSource,
 } from "../../lib/projects";
 
-const props = defineProps<{ projectId?: string }>();
+const props = defineProps<{ projectId?: string; cloneOf?: string }>();
 const TIMEZONES = timezoneOptions();
 
 const router = useRouter();
 const editing = computed(() => !!props.projectId);
-const existing = useProject(() => props.projectId ?? null);
+const cloning = computed(() => !editing.value && !!props.cloneOf);
+/** The stored project the form starts from: the one being edited, or the clone's original. */
+const sourceId = computed(() => props.projectId ?? props.cloneOf ?? null);
+const existing = useProject(sourceId);
+const title = computed(() => (editing.value ? "Edit project" : cloning.value ? "Clone project" : "New project"));
 const crumbs = computed<Crumb[]>(() => {
-  if (!props.projectId) return [{ label: "Projects", to: "/" }, { label: "New project" }];
+  if (!props.projectId) return [{ label: "Projects", to: "/" }, { label: title.value }];
   return [
     { label: "Projects", to: "/" },
     { label: existing.data.value?.name ?? "Project", to: `/projects/${props.projectId}` },
@@ -47,7 +52,7 @@ const remove = useDeleteProject();
 const tester = useTestConnection();
 
 const draft = ref(emptyDraft());
-const loaded = ref(!props.projectId);
+const loaded = ref(!sourceId.value);
 const submitted = ref(false);
 const serverErrors = ref<FieldErrors>({});
 const formError = ref<string | null>(null);
@@ -63,7 +68,7 @@ watch(
   () => existing.data.value,
   (project) => {
     if (!project || loaded.value) return;
-    draft.value = draftFrom(project);
+    draft.value = cloning.value ? cloneDraft(project) : draftFrom(project);
     loaded.value = true;
   },
   { immediate: true },
@@ -129,7 +134,7 @@ async function runTest() {
   const signature = sourceSignature.value;
   try {
     const result = await tester.mutateAsync({
-      project_id: props.projectId ?? null,
+      project_id: sourceId.value,
       matchers: matchersInput(draft.value),
       source: testRequestSource(draft.value),
     });
@@ -149,7 +154,9 @@ async function save() {
 
   try {
     const body = toInput(draft.value);
-    const saved = props.projectId ? await update.mutateAsync({ id: props.projectId, body }) : await create.mutateAsync(body);
+    const saved = props.projectId
+      ? await update.mutateAsync({ id: props.projectId, body })
+      : await create.mutateAsync({ body, cloneOf: props.cloneOf });
     await router.push(`/projects/${saved.project_id}`);
   } catch (error) {
     applyServerError(error);
@@ -170,12 +177,16 @@ async function confirmDelete() {
 <template>
   <AppTopbar :crumbs="crumbs" />
   <main class="page" aria-labelledby="form-title">
-    <h1 id="form-title">{{ editing ? "Edit project" : "New project" }}</h1>
+    <h1 id="form-title">{{ title }}</h1>
 
-    <div v-if="editing && existing.isPending.value" aria-busy="true"><div class="skeleton" /><div class="skeleton" /></div>
-    <div v-else-if="editing && existing.isError.value" role="alert" class="banner error">{{ existing.error.value?.message }}</div>
+    <div v-if="sourceId && existing.isPending.value" aria-busy="true"><div class="skeleton" /><div class="skeleton" /></div>
+    <div v-else-if="sourceId && existing.isError.value" role="alert" class="banner error">{{ existing.error.value?.message }}</div>
 
     <form v-else class="form stack" novalidate @submit.prevent="save">
+      <p v-if="cloning && existing.data.value" class="banner">
+        Copied from <RouterLink :to="`/projects/${cloneOf}`">{{ existing.data.value.name }}</RouterLink>, including its stored
+        credentials. Reports are not copied.
+      </p>
       <div class="field">
         <label for="project-name">Name</label>
         <input id="project-name" v-model="draft.name" maxlength="100" :aria-invalid="!!errors.name" :aria-describedby="describedBy('name')">
@@ -380,7 +391,7 @@ async function confirmDelete() {
       <p v-if="saveWarning" class="banner">{{ saveWarning }}</p>
       <div class="row">
         <button type="submit" class="primary" :disabled="saving">{{ saving ? "Saving…" : editing ? "Save changes" : "Create project" }}</button>
-        <RouterLink :to="projectId ? `/projects/${projectId}` : '/'">Cancel</RouterLink>
+        <RouterLink :to="sourceId ? `/projects/${sourceId}` : '/'">Cancel</RouterLink>
       </div>
     </form>
 

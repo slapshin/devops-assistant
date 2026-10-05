@@ -12,7 +12,12 @@ import ProjectView from "./views/projects/ProjectView.vue";
 /** Routes from docs/UI_SPEC.md §1. */
 export const routes: RouteRecordRaw[] = [
   { path: "/", name: "projects", component: ProjectsView },
-  { path: "/projects/new", name: "project-new", component: ProjectFormView },
+  {
+    path: "/projects/new",
+    name: "project-new",
+    component: ProjectFormView,
+    props: (route) => ({ cloneOf: typeof route.query.from === "string" ? route.query.from : undefined }),
+  },
   { path: "/projects/:projectId", name: "project", component: ProjectView, props: true },
   { path: "/projects/:projectId/edit", name: "project-edit", component: ProjectFormView, props: true },
   { path: "/analyses/:id", name: "job", component: JobView, props: true },
