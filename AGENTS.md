@@ -48,7 +48,7 @@ Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source 
 - `app/jobs.py` — bounded in-process runner (1 running, ≤4 queued, timeout, cancellation by task cancel). On startup, interrupted jobs are marked failed.
 - `app/metrics/` — `client.py` (HTTP Prometheus API, auth, preserves URL path prefix), `catalog.py` (scoped query catalog per signal family), `promql.py` (every selector carries all project matchers), `source.py` (capability discovery + bounded collection), `factory.py`, `probe.py` (connection test).
 - `app/api/projects.py` — project CRUD, `test-connection`, cached per-project health.
-- `app/analysis/` — `engine.py` (`RobustDetector`, trend summary), `baseline.py` (median/MAD), `detect.py`, `rules.py`, `derive.py`.
+- `app/analysis/` — `engine.py` (`RobustDetector`, trend summary), `baseline.py` (median/MAD), `detect.py`, `rules/` (`base.py` rule model + formatting; one module per category: `host`, `container`, `requests`, `proxy`, `database`), `derive.py`.
 - `app/ai/` — `providers.py` (provider selection, `fake`), `prompt.py`, `validation.py` (validates model output references real finding IDs), `openai_adapter.py`.
 - `app/storage/` — SQLAlchemy Core (no ORM) + Alembic migrations in `backend/migrations/`, run upgrade-only at startup. Reports are stored as versioned JSON snapshots (`REPORT_SCHEMA_VERSION`).
 - `app/api/` — routes under `/api`; errors are RFC 9457 `application/problem+json` with a stable `code` (`problems.py`).
