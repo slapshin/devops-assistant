@@ -26,6 +26,33 @@ Configuration, Docker networking, backups, budgets and troubleshooting are in **
 
 Layout: `devops/docker/Dockerfile` builds the image, `tools/compose/compose.yml` runs it locally (through `make up`/`make down`/`make stop`/`make logs`). Run `make help` for all targets.
 
+## Deploy with Docker Compose
+
+A standalone `compose.yml` for a host that runs the assistant from a checkout of this repository. Put it in the repository root (or adjust `build.context`), next to a `.env` holding `OPENAI_API_KEY`/`OPENAI_MODEL`, and start it with `docker compose up -d --build`.
+
+```yaml
+services:
+  assistant:
+    image: devops-ai-assistant:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      AI_PROVIDER: ${AI_PROVIDER:-openai} # openai | none | fake
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-} # needs Structured Outputs support
+      # Encrypts stored source credentials. Optional: by default a key is
+      # generated in /data/secret.key, so back up the volume with the database.
+      # SECRET_KEY: ${SECRET_KEY}
+    volumes:
+      - assistant-data:/data # SQLite database and secret.key
+
+volumes:
+  assistant-data:
+```
+
+The image has a built-in health check (`/api/health`); `docker compose ps` shows its state. Metrics sources are added per project in the UI. `docker compose down` keeps the `assistant-data` volume; `down -v` deletes all reports and projects. Backups and upgrades are in [docs/OPERATIONS.md](docs/OPERATIONS.md).
+
 ## Use
 
 1. Create a project: a name, the label matchers that select its series (e.g. `project="shop"`, `env="prod"`), and its Prometheus-compatible source (URL and credentials, stored encrypted). Then **Analyze** it. Progress is shown per stage, and you can cancel.
