@@ -33,7 +33,7 @@ A standalone `compose.yml` for a host that runs the assistant from a checkout of
 ```yaml
 services:
   assistant:
-    image: devops-ai-assistant:latest
+    image: ghcr.io/slapshin/devops-assistant:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:8000:8000"
