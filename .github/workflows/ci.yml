@@ -90,13 +90,16 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4.4.1
 
-      # main → :main, :sha-<short>; tag v1.2.3 → :1.2.3, :1.2, :latest.
+      # main → :latest, :main, :sha-<short>; tag v1.2.3 → :1.2.3, :1.2.
       - name: Image metadata
         id: meta
         uses: docker/metadata-action@v6.2.0
         with:
           images: ${{ env.IMAGE }}
+          # :latest follows main, not the newest version tag.
+          flavor: latest=false
           tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
