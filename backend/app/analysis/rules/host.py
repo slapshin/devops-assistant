@@ -9,7 +9,6 @@ HOST_RULES = (
     Rule("cpu_iowait", F.CPU, "CPU I/O wait", thresholds="cpu_iowait"),
     Rule("memory_utilization", F.MEMORY, "Memory utilisation", thresholds="memory_utilization"),
     Rule("memory_pressure", F.MEMORY, "Memory pressure (PSI)", thresholds="memory_pressure"),
-    Rule("swap_used_ratio", F.MEMORY, "Swap usage", thresholds="memory_utilization"),
     Rule(
         "node_oom_kills",
         F.MEMORY,

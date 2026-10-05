@@ -42,7 +42,7 @@ Additional packaged checks from T009: after `down` and `up --force-recreate` the
   - Every live report's evidence queries carry `project="paas", env="production"`.
 - **Baseline windows and comparability:** tampering tests show the baselines never use the evaluated day or later data. All 14 buckets use the same detector version and resolution, and every report records `detector_version` and `config_hash`.
 - **Honest gaps:**
-  - Unsupported signals carry reasons, e.g. swap (SwapTotal = 0), container limits (all 0), throttling (no CFS metrics), and `paas-production-4` (root cgroup only).
+  - Unsupported signals carry reasons, e.g. container limits (all 0), throttling (no CFS metrics), and `paas-production-4` (root cgroup only).
   - Missing data is never counted as healthy.
   - HTTP 404 and 5xx are separate findings.
   - Service-to-host relations come only from verified label mappings.

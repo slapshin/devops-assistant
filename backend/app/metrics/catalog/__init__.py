@@ -34,7 +34,7 @@ __all__ = [
     "SignalDef",
 ]
 
-CATALOG_VERSION = "catalog-2026.10.4"
+CATALOG_VERSION = "catalog-2026.10.5"
 
 CATALOG: tuple[SignalDef, ...] = (
     *HOST_CATALOG,

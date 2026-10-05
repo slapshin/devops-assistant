@@ -1,6 +1,6 @@
 # Detection engine (T005)
 
-`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.4`, identified by `config_hash`). Every threshold is a provisional diagnostic heuristic, not an SLO.
+`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.5`, identified by `config_hash`). Every threshold is a provisional diagnostic heuristic, not an SLO.
 
 ## Pipeline
 

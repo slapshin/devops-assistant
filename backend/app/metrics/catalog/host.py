@@ -3,12 +3,10 @@
 from app.domain.common import EntityKind, SignalFamily, Unit
 from app.metrics.catalog.base import (
     Direction,
-    Gate,
     SignalDef,
     aggregate,
     q,
     rate,
-    sel,
     sum_rate,
     used_ratio,
 )
@@ -67,27 +65,6 @@ HOST_CATALOG: tuple[SignalDef, ...] = (
             "node_pressure_memory_waiting_seconds_total",
         ),
         description="PSI: share of time tasks waited on memory.",
-    ),
-    SignalDef(
-        "swap_used_ratio",
-        SignalFamily.MEMORY,
-        Unit.RATIO,
-        EntityKind.NODE,
-        NODE,
-        q(
-            used_ratio("node_memory_SwapFree_bytes", "node_memory_SwapTotal_bytes", NODE),
-            "node_memory_SwapFree_bytes",
-            "node_memory_SwapTotal_bytes",
-        ),
-        gates=(
-            Gate(
-                q(
-                    f"count({sel('node_memory_SwapTotal_bytes')} > 0)",
-                    "node_memory_SwapTotal_bytes",
-                ),
-                "Swap is not configured (SwapTotal is 0 on every node).",
-            ),
-        ),
     ),
     SignalDef(
         "node_oom_kills",

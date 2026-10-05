@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.4` in `backend/app/metrics/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
+The catalog is `catalog-2026.10.5` in `backend/app/metrics/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
 
 ## Scope enforcement
 
@@ -42,7 +42,6 @@ The rules are constants in the `catalog/` source modules (`host.py`, `container.
 | --- | --- | --- | --- | --- |
 | cpu_utilization, cpu_iowait | cpu | ratio | node | — |
 | memory_utilization, memory_pressure (PSI) | memory | ratio | node | — |
-| swap_used_ratio | memory | ratio | node | SwapTotal > 0 |
 | node_oom_kills | memory | count/step | node | — |
 | io_pressure (PSI), disk_busy_ratio, disk_io_bytes | disk_io | ratio, B/s | node, disk | — |
 | filesystem_used_ratio, filesystem_inodes_used_ratio | filesystem | ratio | filesystem | — |
@@ -55,6 +54,8 @@ The rules are constants in the `catalog/` source modules (`host.py`, `container.
 | http_latency_p95, http_latency_p99 | latency | s | route | buckets present |
 | http_latency_mean | latency | s | route | fallback only |
 | rpc_requests, rpc_errors (operand, status ≠ OK), rpc_latency_p95 | request_* / latency | req/s, s | RPC method | buckets present |
+
+Swap usage is deliberately not collected. A filled swap is normal operation (the kernel moves cold pages out), so it says nothing on its own. Real memory distress shows up in `memory_pressure` (PSI) and `node_oom_kills`.
 
 ### Reverse proxies
 

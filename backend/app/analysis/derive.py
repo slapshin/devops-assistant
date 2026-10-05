@@ -17,7 +17,6 @@ DIRECT: dict[str, str] = {
     "cpu_iowait": "cpu_iowait",
     "memory_utilization": "memory_utilization",
     "memory_pressure": "memory_pressure",
-    "swap_used_ratio": "swap_used_ratio",
     "node_oom_kills": "node_oom_kills",
     "io_pressure": "io_pressure",
     "disk_busy_ratio": "disk_busy_ratio",
