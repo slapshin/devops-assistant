@@ -35,7 +35,7 @@ const source = computed(() => props.project.sources[0] ?? null);
     </div>
 
     <div class="latest">
-      <span class="label-caps">Latest report</span>
+      <span class="lbl">Latest report</span>
       <template v-if="latest && latestAt && latestLink">
         <RouterLink :to="latestLink" :title="utcTooltip(latestAt)">
           {{ JOB_STATES[latest.state] ?? latest.state }} · {{ formatAge(latestAt) }}
@@ -47,7 +47,7 @@ const source = computed(() => props.project.sources[0] ?? null);
     </div>
 
     <div class="trend">
-      <span class="label-caps">14-day anomalies</span>
+      <span class="lbl">14-day anomalies</span>
       <TrendSparkline v-if="latest?.daily_episodes" :days="latest.daily_episodes" />
       <span v-else class="muted">No trend yet</span>
     </div>
@@ -63,7 +63,7 @@ const source = computed(() => props.project.sources[0] ?? null);
   gap: calc(var(--space) * 2);
   align-items: start;
 }
-h2 { margin: 0 0 6px; font-size: 1.05rem; }
+h2 { margin: 0 0 6px; font-size: 15px; }
 .identity > * + * { margin-top: 6px; }
 .source { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 0; }
 .latest, .trend { display: flex; flex-direction: column; gap: 4px; }

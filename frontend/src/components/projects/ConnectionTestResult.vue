@@ -39,8 +39,8 @@ const info = computed(() => HEALTH_LABELS[key.value]);
 
 <style scoped>
 .result p { margin: 0 0 var(--space); }
-.h-ok, .cap-supported { color: var(--status-ok); }
-.h-unreachable, .h-auth, .h-error { color: var(--sev-critical); }
-.h-no_series, .cap-partial { color: var(--status-warn); }
-.cap-unsupported, .cap-unverified { color: var(--text-muted); }
+.h-ok, .cap-supported { color: var(--ok); }
+.h-unreachable, .h-auth, .h-error { color: var(--crit); }
+.h-no_series, .cap-partial { color: var(--med); }
+.cap-unsupported, .cap-unverified { color: var(--muted); }
 </style>

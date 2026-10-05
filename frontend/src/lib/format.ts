@@ -64,7 +64,8 @@ watch(timezone, (choice) => {
   }
 });
 
-export function formatTime(iso: string, withDate = true): string {
+/** `withZone` appends " UTC" in UTC mode; drop it where the zone is shown once for a group of times. */
+export function formatTime(iso: string, withDate = true, withZone = true): string {
   const isUtc = timezone.value === "utc";
   const options: Intl.DateTimeFormatOptions = {
     hour: "2-digit",
@@ -74,7 +75,7 @@ export function formatTime(iso: string, withDate = true): string {
     ...(isUtc ? { timeZone: "UTC" } : {}),
   };
 
-  return `${new Intl.DateTimeFormat("en-GB", options).format(new Date(iso))}${isUtc ? " UTC" : ""}`;
+  return `${new Intl.DateTimeFormat("en-GB", options).format(new Date(iso))}${isUtc && withZone ? " UTC" : ""}`;
 }
 
 /** Same RFC 3339 form as the API ("…:00Z"), without milliseconds. */

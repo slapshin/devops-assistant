@@ -50,8 +50,8 @@ const summary = computed(() => {
 
 <style scoped>
 .trend { display: block; width: 140px; height: 32px; }
-rect { fill: var(--bar-high); }
+rect { fill: var(--f-high); }
 rect.empty { fill: var(--border); }
-rect.missing { fill: none; stroke: var(--text-muted); stroke-dasharray: 2 2; stroke-width: 1; }
-rect.latest:not(.missing, .empty) { fill: var(--bar-critical); }
+rect.missing { fill: none; stroke: var(--muted); stroke-dasharray: 2 2; stroke-width: 1; }
+rect.latest:not(.missing, .empty) { fill: var(--f-crit); }
 </style>

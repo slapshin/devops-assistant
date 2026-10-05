@@ -336,7 +336,7 @@ describe("job progress", () => {
 describe("report", () => {
   it("overview separates numerical findings from unverified AI hypotheses", async () => {
     await renderAt(report(anomalies));
-    await screen.findByText("Top findings (latest 24 h)");
+    await screen.findByRole("button", { name: "Episodes" });
     expect(screen.getAllByText(/Hypothesis — unverified/)).toHaveLength(2);
     expect(screen.getByText(/Numerical findings are authoritative/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Coverage and limitations" })).toBeInTheDocument();
@@ -380,7 +380,7 @@ describe("report", () => {
 
   it("findings filter through the URL and open accessible evidence", async () => {
     const router = await renderAt(`${report(anomalies)}/findings`);
-    await screen.findByRole("heading", { name: "Findings in the latest 24 hours" });
+    await screen.findByRole("heading", { name: "Findings" });
     await fireEvent.update(screen.getByLabelText("Category"), "client_errors");
     await waitFor(() => expect(router.currentRoute.value.query.category).toBe("client_errors"));
     expect(screen.queryByText(/CPU utilisation above/)).not.toBeInTheDocument();
@@ -411,8 +411,8 @@ describe("report", () => {
     const buttons = within(days).getAllByRole("button");
     expect(buttons).toHaveLength(14);
     await fireEvent.click(buttons[buttons.length - 1]!);
-    expect(await screen.findByRole("heading", { name: /2 episode\(s\)/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Recurring/ }).parentElement).toHaveTextContent("client_error_rate");
+    expect(await screen.findByRole("heading", { name: /2 episodes/ })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Recurring problems" })).toHaveTextContent("client_error_rate");
   });
 
   it("explains unavailable and incompatible reports", async () => {
@@ -426,8 +426,9 @@ describe("report", () => {
     await renderAt(report(anomalies));
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("CPU on node · paas-production peaked at 96.3 % over 3 h");
     expect(screen.getByText(/4\.4× the usual 22\.0 %/)).toBeInTheDocument();
-    expect(screen.getByText("Blind spots").parentElement).toHaveTextContent("Containers (no metrics found) is not evaluated");
-    const timeline = screen.getByRole("region", { name: "When it happened" });
+    expect(screen.getByRole("region", { name: "Summary" })).toHaveTextContent("Containers (no metrics found) is not evaluated");
+    expect(screen.getByRole("region", { name: "Blind spots" })).toHaveTextContent("Containers");
+    const timeline = screen.getByRole("region", { name: "State timeline" });
     expect(within(timeline).getAllByRole("link")).toHaveLength(anomalies.findings.length);
   });
 
@@ -445,6 +446,23 @@ describe("report", () => {
     expect(await screen.findByRole("heading", { name: "Getting worse: more anomalies in the last 7 days" })).toBeInTheDocument();
     expect(screen.getByText("1.79 %")).toBeInTheDocument();
     expect(screen.getByText("The latest day is the worst of the 14.")).toBeInTheDocument();
+  });
+
+  it("trends open on the latest day", async () => {
+    await renderAt(`${report(anomalies)}/trends`);
+    const days = await screen.findByRole("group", { name: "Select a day" });
+    const buttons = within(days).getAllByRole("button");
+    expect(buttons[buttons.length - 1]).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: /^Latest day, .* · 2 episodes$/ })).toBeInTheDocument();
+  });
+
+  it("overview rows collapse and expand", async () => {
+    await renderAt(report(anomalies));
+    const toggle = await screen.findByRole("button", { name: "Episodes" });
+    expect(screen.getByRole("region", { name: "State timeline" })).toBeVisible();
+    await fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("region", { name: "State timeline", hidden: true })).not.toBeVisible();
   });
 
   it("tabs follow the arrow-key pattern", async () => {

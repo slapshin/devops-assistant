@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useProjects } from "../../api/queries";
 import ProjectCard from "../../components/projects/ProjectCard.vue";
+import AppTopbar from "../../components/shell/AppTopbar.vue";
 
 /** The text filter appears once the list is long enough to need one. */
 const FILTER_THRESHOLD = 10;
@@ -22,8 +23,9 @@ const visible = computed(() => {
 </script>
 
 <template>
-  <section aria-labelledby="projects-title" class="stack">
-    <div class="row heading">
+  <AppTopbar :crumbs="[{ label: 'Projects' }]" />
+  <main class="page" aria-labelledby="projects-title">
+    <div class="page-head">
       <h1 id="projects-title">Projects</h1>
       <RouterLink to="/projects/new" class="button primary">New project</RouterLink>
     </div>
@@ -37,7 +39,7 @@ const visible = computed(() => {
       {{ projects.error.value?.message }}
       <button type="button" @click="projects.refetch()">Retry</button>
     </div>
-    <div v-else-if="items.length === 0" class="card empty">
+    <div v-else-if="items.length === 0" class="card empty stack">
       <h2>No projects yet</h2>
       <p>
         A project selects its series with labels such as <code>project="shop"</code> and <code>env="prod"</code>, and reads them from
@@ -55,12 +57,10 @@ const visible = computed(() => {
         <li v-for="p in visible" :key="p.project_id"><ProjectCard :project="p" /></li>
       </ul>
     </template>
-  </section>
+  </main>
 </template>
 
 <style scoped>
-.heading { justify-content: space-between; }
-.heading h1 { margin: 0; }
 .projects { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space); }
 .filter input { width: min(100%, 360px); }
 .empty h2 { margin-top: 0; }

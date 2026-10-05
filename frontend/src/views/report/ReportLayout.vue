@@ -3,6 +3,9 @@ import { computed, nextTick, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ApiError, type AnalysisReport } from "../../api/client";
 import { useReport, useSubmit } from "../../api/queries";
+import AppTopbar from "../../components/shell/AppTopbar.vue";
+import type { Crumb } from "../../components/shell/crumbs";
+import { longestBaselineDays } from "../../lib/findings";
 import { formatTime, timezone, utcTooltip } from "../../lib/format";
 import { provideReport } from "./context";
 
@@ -31,13 +34,22 @@ provideReport({
 });
 
 const tabs = computed(() => [
-  { name: "overview", label: "Overview", to: `/reports/${props.id}` },
-  { name: "findings", label: `Findings (${query.data.value?.findings.length ?? 0})`, to: `/reports/${props.id}/findings` },
-  { name: "trends", label: "Trends", to: `/reports/${props.id}/trends` },
+  { name: "overview", label: "Overview", to: `/reports/${props.id}`, count: null },
+  { name: "findings", label: "Findings", to: `/reports/${props.id}/findings`, count: query.data.value?.findings.length ?? 0 },
+  { name: "trends", label: "Trends", to: `/reports/${props.id}/trends`, count: null },
 ]);
 const activeTab = computed(() => (route.name === "evidence" ? "findings" : String(route.name)));
 const error = computed(() => (query.error.value instanceof ApiError ? query.error.value.problem : null));
 const stepMinutes = computed(() => report.value.windows.step_seconds / SECONDS_PER_MINUTE);
+const baselineDays = computed(() => longestBaselineDays(report.value.coverage));
+const crumbs = computed<Crumb[]>(() => {
+  const scope = query.data.value?.scope;
+  return [
+    { label: "Projects", to: "/" },
+    ...(scope ? [{ label: scope.project_name, to: `/projects/${scope.project_id}`, mono: true }] : []),
+    { label: tabs.value.find((t) => t.name === activeTab.value)?.label ?? "Report" },
+  ];
+});
 
 async function onTabKey(event: KeyboardEvent, index: number) {
   const resolveTarget = TAB_KEY_TARGETS[event.key];
@@ -67,87 +79,92 @@ async function runAgain() {
 </script>
 
 <template>
-  <div v-if="query.isPending.value" aria-busy="true" class="stack">
-    <div class="skeleton" style="width: 60%" /><div class="skeleton" style="width: 40%" /><div class="skeleton" />
-  </div>
+  <AppTopbar :crumbs="crumbs">
+    <span v-if="report?.source.backend === 'synthetic'" class="badge">Synthetic data</span>
+  </AppTopbar>
 
-  <section v-else-if="error" role="alert" class="banner error">
-    <template v-if="error.code === 'schema_unsupported'">This report was saved by an incompatible version ({{ error.detail }}).</template>
-    <template v-else-if="error.code === 'report_not_ready'">
-      This analysis is still running. <RouterLink :to="`/analyses/${id}`">View progress</RouterLink>.
-    </template>
-    <template v-else-if="error.code === 'report_unavailable'">No report was saved for this analysis: {{ error.detail }}</template>
-    <template v-else-if="error.code === 'analysis_not_found'">This report does not exist.</template>
-    <template v-else>{{ error.title }}. <button type="button" @click="query.refetch()">Retry</button></template>
-    <p><RouterLink to="/">Projects</RouterLink></p>
-  </section>
+  <main v-if="query.isPending.value" aria-busy="true" class="page">
+    <div class="skeleton" style="width: 60%" /><div class="skeleton" style="width: 40%" /><div class="skeleton" />
+  </main>
+
+  <main v-else-if="error" class="page">
+    <section role="alert" class="banner error">
+      <template v-if="error.code === 'schema_unsupported'">This report was saved by an incompatible version ({{ error.detail }}).</template>
+      <template v-else-if="error.code === 'report_not_ready'">
+        This analysis is still running. <RouterLink :to="`/analyses/${id}`">View progress</RouterLink>.
+      </template>
+      <template v-else-if="error.code === 'report_unavailable'">No report was saved for this analysis: {{ error.detail }}</template>
+      <template v-else-if="error.code === 'analysis_not_found'">This report does not exist.</template>
+      <template v-else>{{ error.title }}. <button type="button" @click="query.refetch()">Retry</button></template>
+      <RouterLink to="/">Projects</RouterLink>
+    </section>
+  </main>
 
   <template v-else-if="report">
-    <header class="frame">
-      <div class="scope">
-        <RouterLink :to="`/projects/${report.scope.project_id}`" class="project-link"><strong>{{ report.scope.project_name }}</strong></RouterLink>
+    <div class="ctl">
+      <span v-for="m in report.scope.matchers" :key="m.name" class="var"><span>{{ m.name }}</span><span class="mono">{{ m.value }}</span></span>
+      <span v-if="baselineDays" class="var"><span>baseline</span><span>{{ baselineDays }} days</span></span>
+      <span class="grow" />
+      <span class="lbl meta">
+        {{ report.state === "partial" ? "Partial" : "Completed" }} ·
+        <span :title="`config ${report.config_hash}`">{{ report.detector_version }}</span> ·
+        saved <time :datetime="report.generated_at" :title="utcTooltip(report.generated_at)">{{ formatTime(report.generated_at) }}</time>
+      </span>
+      <div class="var" :title="`Latest 24 h, ${stepMinutes}-min steps`">
         <span>
-          Window:
-          <time :datetime="report.windows.latest_day.start" :title="utcTooltip(report.windows.latest_day.start)">{{ formatTime(report.windows.latest_day.start) }}</time>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5.5" /><path d="M7 4v3l2 1.5" /></svg>
+          <span class="sr-only">Window:</span>
+          <time :datetime="report.windows.latest_day.start" :title="utcTooltip(report.windows.latest_day.start)">{{ formatTime(report.windows.latest_day.start, true, false) }}</time>
           –
-          <time :datetime="report.windows.latest_day.end" :title="utcTooltip(report.windows.latest_day.end)">{{ formatTime(report.windows.latest_day.end) }}</time>
-          (latest 24 h, {{ stepMinutes }}-min steps)
+          <time :datetime="report.windows.latest_day.end" :title="utcTooltip(report.windows.latest_day.end)">{{ formatTime(report.windows.latest_day.end, true, false) }}</time>
         </span>
+        <select v-model="timezone" aria-label="Time zone" class="tz">
+          <option value="utc">UTC</option>
+          <option value="local">Local</option>
+        </select>
       </div>
-      <div class="meta row">
-        <span>Status: {{ report.state === "partial" ? "Partial" : "Completed" }}</span>
-        <span class="muted">Detector {{ report.detector_version }} ({{ report.config_hash }})</span>
-        <span class="muted">Saved {{ formatTime(report.generated_at) }}</span>
-        <span v-if="report.source.backend === 'synthetic'" class="synthetic">Synthetic data</span>
-        <label class="tz">
-          Times
-          <select v-model="timezone" aria-label="Time zone">
-            <option value="utc">UTC</option>
-            <option value="local">Local</option>
-          </select>
-        </label>
-        <button type="button" :disabled="submit.isPending.value" @click="runAgain">Run again</button>
-        <RouterLink :to="`/projects/${report.scope.project_id}`">Project</RouterLink>
-      </div>
+      <button type="button" class="primary" :disabled="submit.isPending.value" @click="runAgain">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M12 7a5 5 0 1 1-1.5-3.6" /><path d="M12 2v3H9" /></svg>
+        Run again
+      </button>
+    </div>
+    <div v-if="submit.error.value || report.state === 'partial'" class="notes">
       <p v-if="submit.error.value" role="alert" class="banner error">Could not start a new analysis: {{ submit.error.value.message }}</p>
       <p v-if="report.state === 'partial'" class="banner" role="status">
         Some signals could not be collected — see <RouterLink :to="{ path: `/reports/${id}`, hash: '#coverage' }">Coverage</RouterLink>.
       </p>
-      <nav>
-        <div role="tablist" aria-label="Report views" class="tabs">
-          <RouterLink
-            v-for="(tab, i) in tabs"
-            :key="tab.name"
-            :ref="(el: unknown) => { if (el) tabRefs[i] = (el as { $el: HTMLElement }).$el }"
-            :to="tab.to"
-            role="tab"
-            :aria-selected="activeTab === tab.name"
-            :tabindex="activeTab === tab.name ? 0 : -1"
-            class="tab"
-            @keydown="onTabKey($event, i)"
-          >
-            {{ tab.label }}
-          </RouterLink>
-        </div>
-      </nav>
-    </header>
-    <div role="tabpanel" :aria-label="tabs.find((t) => t.name === activeTab)?.label">
-      <RouterView />
     </div>
+    <nav class="tabs-bar" aria-label="Report">
+      <div role="tablist" aria-label="Report views" class="tabs">
+        <RouterLink
+          v-for="(tab, i) in tabs"
+          :key="tab.name"
+          :ref="(el: unknown) => { if (el) tabRefs[i] = (el as { $el: HTMLElement }).$el }"
+          :to="tab.to"
+          role="tab"
+          :aria-selected="activeTab === tab.name"
+          :tabindex="activeTab === tab.name ? 0 : -1"
+          class="tab"
+          @keydown="onTabKey($event, i)"
+        >
+          {{ tab.label }} <span v-if="tab.count !== null" class="count">{{ tab.count }}</span>
+        </RouterLink>
+      </div>
+    </nav>
+    <main role="tabpanel" :aria-label="tabs.find((t) => t.name === activeTab)?.label">
+      <RouterView />
+    </main>
   </template>
 </template>
 
 <style scoped>
-.frame { margin-bottom: calc(var(--space) * 3); padding: calc(var(--space) * 2) calc(var(--space) * 2.5) 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
-.scope { display: flex; gap: calc(var(--space) * 1.5); flex-wrap: wrap; align-items: baseline; }
-.project-link { color: inherit; }
-.scope strong { font-family: var(--font-mono); font-size: 1.05rem; }
-.scope span { color: var(--text-muted); font-size: 0.9rem; }
-.meta { margin: var(--space) 0; font-size: 0.85rem; }
-.tabs { display: flex; gap: calc(var(--space) * 3); }
-.tab { padding: 12px 4px; text-decoration: none; color: var(--text-muted); border-bottom: 2px solid transparent; }
-.tab:hover { color: var(--text); }
-.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--focus); font-weight: 600; }
-.synthetic { background: var(--sev-medium-bg); color: var(--sev-medium); border-radius: 999px; padding: 0 10px; font-weight: 500; }
-.tz { display: inline-flex; gap: 4px; align-items: center; }
+.ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; background: var(--canvas); }
+.meta { white-space: nowrap; }
+.var .tz { min-width: 72px; }
+.notes { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 10px; background: var(--canvas); }
+.tabs-bar { padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--canvas); overflow-x: auto; }
+.tabs { display: flex; gap: 4px; }
+.tab { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; font-size: 14px; text-decoration: none; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tab:hover { color: var(--strong); }
+.tab[aria-selected="true"] { color: var(--strong); font-weight: 500; border-bottom-color: var(--primary); }
 </style>

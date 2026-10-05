@@ -3,23 +3,17 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import type { RouteLocationRaw } from "vue-router";
 import type { Finding } from "../../api/client";
 import ChartBox from "../../components/ChartBox.vue";
-import ConfidenceBadge from "../../components/ConfidenceBadge.vue";
 import DataTable from "../../components/DataTable.vue";
 import ExplanationPanel from "../../components/ExplanationPanel.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
 import { evidenceOption, timestamps } from "../../lib/charts";
-import { recurrenceText, timeOverlaps } from "../../lib/findings";
-import {
-  formatDuration,
-  formatTime,
-  formatValue,
-  isLatencyMean,
-  utcTooltip,
-} from "../../lib/format";
+import { headline, recurrenceText, timeOverlaps } from "../../lib/findings";
+import { capitalize, formatDuration, formatTime, formatValue, isLatencyMean, timezone, utcTooltip } from "../../lib/format";
 import { chartPalette } from "../../lib/theme";
 import { useReportContext } from "./context";
 
 const EVIDENCE_COLUMNS = ["Time", "Observed", "Expected", "Lower", "Upper", "Gap"];
+const SECONDS_PER_MINUTE = 60;
 
 const props = defineProps<{ finding: Finding; closeTo: RouteLocationRaw }>();
 
@@ -34,6 +28,7 @@ const evidence = computed(() =>
     .filter((e) => !!e),
 );
 const primaryEvidence = computed(() => evidence.value[0] ?? null);
+const stepMinutes = computed(() => Math.round((primaryEvidence.value?.series.step_seconds ?? 0) / SECONDS_PER_MINUTE));
 const related = computed(() =>
   (f.value.related_finding_ids ?? [])
     .map((id) => findingById.value.get(id))
@@ -86,175 +81,173 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="panel card" aria-labelledby="evidence-title">
-    <RouterLink :to="closeTo" class="back">← Findings</RouterLink>
-    <div class="row">
-      <SeverityChip :severity="f.severity" />
-      <span class="tag" :class="f.recurrence === 'new' ? 'new' : 'seen'">{{ recurrenceText(f) }}</span>
-      <ConfidenceBadge :confidence="f.confidence" />
-    </div>
-    <h2 id="evidence-title" ref="heading" tabindex="-1">{{ f.title }}</h2>
-    <p class="entity">
-      {{ f.entity.display_name }} ·
-      <span :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</span> –
-      <span :title="utcTooltip(f.end)">{{ formatTime(f.end) }}</span> ·
-      {{ f.state === "ongoing" ? "ongoing" : "resolved" }}
-    </p>
-
-    <dl class="stats">
-      <div><dt class="label-caps">Peak</dt><dd :class="`sev-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</dd></div>
-      <div v-if="f.expected">
-        <dt class="label-caps">Usual</dt>
-        <dd>{{ formatValue(f.expected.lower, f.expected.unit) }}–{{ formatValue(f.expected.upper, f.expected.unit) }}</dd>
+  <section class="dash-sub" aria-labelledby="evidence-title">
+    <section class="panel s16" aria-label="Evidence chart">
+      <div class="ph">
+        <SeverityChip :severity="f.severity" />
+        <h2 id="evidence-title" ref="heading" tabindex="-1">{{ f.title }}</h2>
+        <span class="sub mono">· {{ f.entity.display_name }}</span>
+        <RouterLink :to="closeTo" class="close" aria-label="Close evidence" title="Close (Esc)">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+        </RouterLink>
       </div>
-      <div v-else-if="f.threshold !== null">
-        <dt class="label-caps">Heuristic</dt>
-        <dd>{{ formatValue(f.threshold, f.observed.unit) }}</dd>
+      <div class="pb">
+        <template v-if="primaryEvidence">
+          <ChartBox :option="evidenceOption(primaryEvidence, f, chartPalette)" :label="`Evidence chart for ${f.title}`" height="380px" />
+          <div class="caption">
+            <span class="lbl">
+              {{ timezone === "utc" ? "UTC" : "Local time" }} · {{ stepMinutes }}-min steps
+              <template v-if="f.expected"> · usual = median ± scaled MAD, {{ f.baseline_days }}-day baseline</template>
+            </span>
+          </div>
+          <DataTable :caption="`Evidence values for ${f.title}`" :columns="EVIDENCE_COLUMNS" :rows="rows" />
+        </template>
+        <p v-else class="banner">Evidence for this finding was not stored (see report exclusions).</p>
       </div>
-      <div><dt class="label-caps">Duration</dt><dd>{{ formatDuration(f.duration_seconds) }}</dd></div>
-    </dl>
-    <p class="muted small">
-      Peak at {{ formatTime(f.peak_at) }}
-      <template v-if="f.expected"> · expected median {{ formatValue(f.expected.median, f.expected.unit) }}</template>
-      <template v-if="f.threshold !== null"> · diagnostic heuristic {{ formatValue(f.threshold, f.observed.unit) }} (not an SLO)</template>
-    </p>
-    <p v-if="isLatencyMean(f.signal)" class="banner">
-      Mean latency from <code>_sum/_count</code>: histogram buckets are not
-      available, so percentiles cannot be shown.
-    </p>
-    <p v-if="f.attributes?.latency_bound" class="banner">
-      Latency at the top histogram bucket: the true value may be higher ({{
-        f.attributes.latency_bound
-      }}).
-    </p>
-    <div v-if="f.confidence_reasons.length" class="small">
-      Confidence lowered by:
-      <ul>
-        <li v-for="r in f.confidence_reasons" :key="r.code">{{ r.message }}</li>
-      </ul>
-    </div>
+    </section>
 
-    <template v-if="primaryEvidence">
-      <ChartBox
-        :option="evidenceOption(primaryEvidence, f, chartPalette)"
-        :label="`Evidence chart for ${f.title}`"
-      />
-      <DataTable
-        :caption="`Evidence values for ${f.title}`"
-        :columns="EVIDENCE_COLUMNS"
-        :rows="rows"
-      />
-    </template>
-    <p v-else class="banner">
-      Evidence for this finding was not stored (see report exclusions).
-    </p>
-
-    <div v-if="related.length || coincident.length" class="also">
-      <h3 class="label-caps">Also happening</h3>
-      <RouterLink v-for="r in related" :key="r.finding_id" :to="findingLink(r.finding_id)" class="other">
-        <SeverityChip :severity="r.severity" />
-        <span>{{ r.title }} — {{ r.entity.display_name }}</span>
-        <span class="muted small">Related: shares identity labels</span>
-      </RouterLink>
-      <RouterLink v-for="r in coincident" :key="r.finding_id" :to="findingLink(r.finding_id)" class="other dashed">
-        <SeverityChip :severity="r.severity" />
-        <span>{{ r.title }} — {{ r.entity.display_name }}</span>
-        <span class="muted small">Coincides in time (not established as related)</span>
-      </RouterLink>
-    </div>
-    <p v-else class="muted small">
-      No related findings: none share an identity label or verified host mapping, and none overlap in time.
-    </p>
-
-    <ExplanationPanel
-      :report="report"
-      :finding-link="findingLink"
-      :only="f.finding_id"
-    />
-
-    <details class="more">
-      <summary>Query, labels and detector</summary>
-      <div v-for="e in evidence" :key="e.evidence_id" class="stack">
-        <p class="small muted">
-          {{ e.series.signal }} · step {{ e.series.step_seconds }} s ·
-          {{ formatTime(e.series.start) }} onward
+    <section class="panel s8" aria-labelledby="details-title">
+      <div class="ph"><h2 id="details-title">Finding details</h2></div>
+      <div class="pb details">
+        <div class="row">
+          <span class="tag" :class="{ new: f.recurrence === 'new' }">{{ recurrenceText(f) }}</span>
+          <span class="tag">Confidence: {{ f.confidence }}</span>
+          <span class="tag">{{ f.state === "ongoing" ? "Ongoing" : "Resolved" }}</span>
+        </div>
+        <h3 class="headline">{{ headline(f) }}</h3>
+        <dl class="stats">
+          <div><dt class="lbl">Peak</dt><dd :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</dd></div>
+          <div v-if="f.expected">
+            <dt class="lbl">Usual</dt>
+            <dd class="small">{{ formatValue(f.expected.lower, f.expected.unit) }}–{{ formatValue(f.expected.upper, f.expected.unit) }}</dd>
+          </div>
+          <div v-else-if="f.threshold !== null">
+            <dt class="lbl">Heuristic</dt>
+            <dd class="small">{{ formatValue(f.threshold, f.observed.unit) }}</dd>
+          </div>
+          <div><dt class="lbl">Duration</dt><dd>{{ formatDuration(f.duration_seconds) }}</dd></div>
+        </dl>
+        <dl class="kv">
+          <dt>Window</dt>
+          <dd><span :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</span> – <span :title="utcTooltip(f.end)">{{ formatTime(f.end) }}</span></dd>
+          <dt>Peak at</dt>
+          <dd :title="utcTooltip(f.peak_at)">{{ formatTime(f.peak_at) }}</dd>
+          <template v-if="f.expected">
+            <dt>Expected</dt>
+            <dd>median {{ formatValue(f.expected.median, f.expected.unit) }}</dd>
+          </template>
+          <template v-if="f.threshold !== null">
+            <dt>Heuristic</dt>
+            <dd>{{ formatValue(f.threshold, f.observed.unit) }} (diagnostic, not an SLO)</dd>
+          </template>
+          <dt>Detector</dt>
+          <dd class="mono small">{{ f.detector_version }}</dd>
+          <dt>Baseline</dt>
+          <dd>
+            <template v-if="f.baseline_days !== null">{{ f.baseline_days }} days{{ f.baseline_mode === "time_of_day" ? ", time-of-day" : "" }}</template>
+            <template v-else>none (absolute check)</template>
+          </dd>
+        </dl>
+        <p v-if="isLatencyMean(f.signal)" class="banner">
+          Mean latency from <code>_sum/_count</code>: histogram buckets are not available, so percentiles cannot be shown.
         </p>
-        <pre>{{ e.series.query }}</pre>
-        <button type="button" @click="copyQuery(e.series.query)">
-          Copy query
-        </button>
+        <p v-if="f.attributes?.latency_bound" class="banner">
+          Latency at the top histogram bucket: the true value may be higher ({{ f.attributes.latency_bound }}).
+        </p>
+        <div v-if="f.confidence_reasons.length" class="small">
+          Confidence lowered by:
+          <ul class="reasons">
+            <li v-for="r in f.confidence_reasons" :key="r.code">{{ r.message }}</li>
+          </ul>
+        </div>
+
+        <div v-if="related.length || coincident.length" class="also">
+          <h3 class="lbl strong">Also happening</h3>
+          <RouterLink v-for="r in related" :key="r.finding_id" :to="findingLink(r.finding_id)" class="other">
+            <SeverityChip :severity="r.severity" />
+            <span class="grow">{{ r.title }} — <span class="mono">{{ r.entity.display_name }}</span></span>
+            <span class="lbl">Related: shares identity labels</span>
+          </RouterLink>
+          <RouterLink v-for="r in coincident" :key="r.finding_id" :to="findingLink(r.finding_id)" class="other dashed">
+            <SeverityChip :severity="r.severity" />
+            <span class="grow">{{ r.title }} — <span class="mono">{{ r.entity.display_name }}</span></span>
+            <span class="lbl">Coincides in time (not established as related)</span>
+          </RouterLink>
+        </div>
+        <p v-else class="lbl">
+          No related findings: none share an identity label or verified host mapping, and none overlap in time.
+        </p>
+
+        <ExplanationPanel class="ai" :report="report" :finding-link="findingLink" :only="f.finding_id" />
       </div>
-      <p v-if="copied" role="status" class="small">Query copied.</p>
-      <dl class="labels">
-        <template v-for="(v, k) in f.entity.labels" :key="k">
-          <dt>{{ k }}</dt>
-          <dd>{{ v }}</dd>
-        </template>
-        <template v-for="(v, k) in f.attributes ?? {}" :key="`a-${k}`">
-          <dt>{{ k }}</dt>
-          <dd>{{ v }}</dd>
-        </template>
-      </dl>
-      <p class="muted small">
-        Detector {{ f.detector }} ({{ f.detector_version }}) ·
-        <template v-if="f.baseline_days !== null">
-          baseline {{ f.baseline_days }} days{{
-            f.baseline_mode === "time_of_day" ? ", time-of-day" : ""
-          }}
-        </template>
-        <template v-else>no baseline (absolute check)</template>
-        <template v-if="f.peak_score !== null">
-          · robust z {{ f.peak_score.toFixed(1) }}
-        </template>
-      </p>
-    </details>
+    </section>
+
+    <section class="panel s24" aria-labelledby="query-title">
+      <div class="ph">
+        <h2 id="query-title">Query inspector</h2>
+        <span v-if="primaryEvidence" class="sub">· step {{ stepMinutes }}m · from {{ formatTime(primaryEvidence.series.start) }}</span>
+      </div>
+      <div class="pb">
+        <details open>
+          <summary>Query</summary>
+          <div v-for="e in evidence" :key="e.evidence_id" class="query">
+            <p class="lbl mono">{{ e.series.signal }} · step {{ e.series.step_seconds }} s</p>
+            <pre class="code">{{ e.series.query }}</pre>
+            <div class="row">
+              <button type="button" @click="copyQuery(e.series.query)">Copy query</button>
+              <span v-if="copied" role="status" class="lbl">Query copied.</span>
+            </div>
+          </div>
+        </details>
+        <details>
+          <summary>Labels and detector</summary>
+          <dl class="kv labels">
+            <template v-for="(v, k) in f.entity.labels" :key="k">
+              <dt class="mono">{{ k }}</dt>
+              <dd class="mono">{{ v }}</dd>
+            </template>
+            <template v-for="(v, k) in f.attributes ?? {}" :key="`a-${k}`">
+              <dt class="mono">{{ k }}</dt>
+              <dd class="mono">{{ v }}</dd>
+            </template>
+          </dl>
+          <p class="lbl">
+            Detector {{ f.detector }} ({{ f.detector_version }})
+            <template v-if="f.peak_score !== null"> · robust z {{ f.peak_score.toFixed(1) }}</template>
+            · method {{ capitalize(f.method) }}
+          </p>
+        </details>
+      </div>
+    </section>
   </section>
 </template>
 
 <style scoped>
-.panel { display: flex; flex-direction: column; gap: 14px; }
-.panel p { margin: 0; }
-.back { font-size: 0.9rem; }
-h2 { margin: 0; font-size: 1.4rem; line-height: 1.2; }
-.entity { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 0; }
-.stats div { background: var(--surface); border-radius: var(--radius); padding: 10px 12px; }
-.stats dd { margin: 0; font-size: 1.25rem; font-weight: 700; }
-.stats .sev-critical { color: var(--sev-critical); }
-.stats .sev-high { color: var(--sev-high); }
-.stats .sev-medium { color: var(--sev-medium); }
+h2:focus { outline: none; }
+h2:focus-visible { outline: 2px solid var(--primary); }
+.close { margin-left: auto; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); color: var(--muted); }
+.close:hover { background: var(--hover); color: var(--strong); }
+.caption { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.details { gap: 14px; }
+.headline { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0; }
+.stats div { background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; }
+.stats dd { margin: 0; font-size: 20px; font-weight: 600; color: var(--strong); line-height: 30px; }
+.stats dd.small { font-size: 15px; }
+.stats dd.v-critical { color: var(--crit); }
+.stats dd.v-high { color: var(--high); }
+.stats dd.v-medium { color: var(--med); }
+.small { font-size: 12px; }
+.reasons { margin: 4px 0 0; padding-left: 20px; }
 .also { display: flex; flex-direction: column; gap: 6px; }
 .also h3 { margin: 0; }
-.other {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 12px;
-  border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); text-decoration: none; font-size: 0.9rem;
-}
-.other:hover { background: var(--surface); }
+.strong { font-weight: 500; }
+.other { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); text-decoration: none; font-size: 13px; }
+.other:hover { background: var(--hover); color: var(--text); }
 .other.dashed { border-style: dashed; }
-.more { border-top: 1px solid var(--subtle); padding-top: 12px; }
-.more summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
-.more > * + * { margin-top: 10px; }
-.labels {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 2px var(--space);
-  font-size: 0.85rem;
-}
-.labels dt {
-  color: var(--text-muted);
-}
-.labels dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  word-break: break-all;
-}
-.small {
-  font-size: 0.85rem;
-}
-h2:focus {
-  outline: none;
-}
-h2:focus-visible {
-  outline: 2px solid var(--focus);
-}
+.ai { padding-top: 10px; border-top: 1px solid var(--border); }
+details summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--strong); }
+details > * + * { margin-top: 8px; }
+.query { display: flex; flex-direction: column; gap: 6px; }
+.labels { margin-top: 8px; }
 </style>

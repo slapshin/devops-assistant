@@ -1,53 +1,56 @@
 <script setup lang="ts">
+/** One finding as a dashboard panel that opens its evidence: peak against the usual range, mini chart, time and state. */
 import { computed } from "vue";
 import type { Evidence, Finding } from "../api/client";
 import { recurrenceText, usualText } from "../lib/findings";
 import { formatDuration, formatTime, formatValue, isLatencyMean, utcTooltip } from "../lib/format";
-import ConfidenceBadge from "./ConfidenceBadge.vue";
-import SeverityChip from "./SeverityChip.vue";
 import EvidenceSparkline from "./EvidenceSparkline.vue";
+import SeverityChip from "./SeverityChip.vue";
 
 const props = defineProps<{ finding: Finding; to: string; evidence?: Evidence | null }>();
 
 const f = computed(() => props.finding);
+const threshold = computed(() => props.evidence?.threshold ?? f.value.threshold);
 </script>
 
 <template>
-  <article class="card finding" :class="`sev-${f.severity}`">
-    <div class="row">
+  <RouterLink :to="to" class="panel finding">
+    <div class="ph">
       <SeverityChip :severity="f.severity" />
-      <span class="tag" :class="f.recurrence === 'new' ? 'new' : 'seen'">{{ recurrenceText(f) }}</span>
+      <h3>{{ f.title }}</h3>
+      <span class="tag" :class="{ new: f.recurrence === 'new' }">{{ recurrenceText(f) }}</span>
     </div>
-    <RouterLink :to="to" class="title">{{ f.title }}</RouterLink>
-    <div class="entity">{{ f.entity.display_name }}</div>
-    <div class="value">
-      <strong>{{ formatValue(f.observed.value, f.observed.unit) }}</strong>
-      <span class="muted">{{ usualText(f) }}</span>
+    <div class="pb">
+      <div class="value">
+        <strong :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</strong>
+        <span class="lbl">peak · {{ usualText(f) || "no usual range" }}</span>
+      </div>
+      <span v-if="isLatencyMean(f.signal)" class="lbl">Mean latency (no histogram)</span>
+      <EvidenceSparkline v-if="evidence" :evidence="evidence" :finding="f" />
+      <div class="legend">
+        <span><span class="sw" style="background: var(--s1)" /><span class="mono">{{ f.entity.display_name }}</span></span>
+        <span v-if="threshold !== null && threshold !== undefined">
+          <span class="sw current" :class="`v-${f.severity}`" />
+          {{ formatValue(threshold, f.observed.unit) }} heuristic
+        </span>
+        <span v-else-if="evidence?.lower"><span class="sw box band" />usual range</span>
+      </div>
+      <div class="lbl">
+        <span :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</span>
+        · {{ formatDuration(f.duration_seconds) }} · {{ f.state === "ongoing" ? "ongoing" : "resolved" }} · confidence {{ f.confidence }}
+      </div>
     </div>
-    <span v-if="isLatencyMean(f.signal)" class="muted small">Mean latency (no histogram)</span>
-    <EvidenceSparkline v-if="evidence" :evidence="evidence" :finding="f" />
-    <div class="row small muted">
-      <span :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</span>
-      <span>· {{ formatDuration(f.duration_seconds) }}</span>
-      <span>· {{ f.state === "ongoing" ? "Ongoing" : "Resolved" }}</span>
-      <ConfidenceBadge :confidence="f.confidence" />
-    </div>
-  </article>
+  </RouterLink>
 </template>
 
 <style scoped>
-.finding { display: flex; flex-direction: column; gap: 8px; border-top-width: 4px; }
-.sev-critical { border-top-color: var(--bar-critical); }
-.sev-high { border-top-color: var(--bar-high); }
-.sev-medium { border-top-color: var(--bar-medium); }
-.sev-low { border-top-color: var(--bar-low); }
-.title { font-weight: 600; font-size: 1rem; color: var(--text); text-decoration: none; }
-.title:hover { text-decoration: underline; }
-.entity { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); }
-.value { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.value strong { font-size: 1.9rem; line-height: 1.1; }
-.sev-critical .value strong { color: var(--sev-critical); }
-.sev-high .value strong { color: var(--sev-high); }
-.sev-medium .value strong { color: var(--sev-medium); }
-.small { font-size: 0.8rem; gap: 4px; }
+.finding { text-decoration: none; color: var(--text); }
+.finding:hover { border-color: var(--border2); background: var(--hover); color: var(--text); }
+.finding h3 { flex: 1 1 auto; min-width: 0; white-space: nowrap; }
+.finding .ph { padding-top: 6px; }
+.finding .pb { gap: 6px; }
+.value { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.value strong { font-size: 26px; font-weight: 600; line-height: 1.15; }
+.band { background: var(--info); opacity: 0.35; }
+.current { background: currentColor; }
 </style>

@@ -69,9 +69,9 @@ async function run() {
 <style scoped>
 .run { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; }
 .progress { margin: 0; }
-.spinner { display: inline-block; margin-right: 4px; color: var(--focus); }
+.spinner { display: inline-block; margin-right: 4px; color: var(--primary); }
 .hint, .error-text { margin: 0; font-size: 0.85rem; max-width: 22em; }
-.error-text { color: var(--sev-critical); }
+.error-text { color: var(--crit); }
 @media (max-width: 720px) {
   .run { align-items: flex-start; text-align: left; }
 }

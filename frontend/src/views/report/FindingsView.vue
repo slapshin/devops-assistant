@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { Finding } from "../../api/client";
-import ConfidenceBadge from "../../components/ConfidenceBadge.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
-import { recurrenceText, usualText } from "../../lib/findings";
-import { FAMILY_LABELS, SEVERITIES, formatDuration, formatTime, formatValue, utcTooltip } from "../../lib/format";
+import { recurrenceText } from "../../lib/findings";
+import { FAMILY_LABELS, SEVERITIES, capitalize, formatDuration, formatTime, formatValue, utcTooltip } from "../../lib/format";
 import { useReportContext } from "./context";
 import EvidencePanel from "./EvidencePanel.vue";
 
@@ -18,7 +17,6 @@ const props = defineProps<{ id: string; findingId?: string }>();
 const route = useRoute();
 const router = useRouter();
 const { report, findingById } = useReportContext();
-const showHelp = ref(false);
 const rowRefs = new Map<string, HTMLElement>();
 let lastOpenedId: string | null = null;
 
@@ -41,6 +39,13 @@ const recurrenceOptions = computed(() => {
   ];
 });
 
+/** The usual range, or the heuristic for absolute-only findings. */
+function usualCell(f: Finding): string {
+  if (f.expected) return `${formatValue(f.expected.lower, f.expected.unit)}–${formatValue(f.expected.upper, f.expected.unit)}`;
+  if (f.threshold !== null) return `heuristic ${formatValue(f.threshold, f.observed.unit)}`;
+  return "—";
+}
+
 function matchesFilters(f: Finding): boolean {
   return (
     (!category.value || f.family === category.value) &&
@@ -56,6 +61,7 @@ function setFilter(key: string, value: string) {
 }
 
 const detailLink = (targetId: string) => ({ path: `/reports/${props.id}/findings/${targetId}`, query: route.query });
+const open = (targetId: string) => void router.push(detailLink(targetId));
 
 /** j/k move through the filtered list, clamped at both ends. */
 function stepSelection(step: number) {
@@ -72,10 +78,6 @@ function onKey(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null;
   if (target && TYPING_TAGS.has(target.tagName)) return;
 
-  if (event.key === "?") {
-    showHelp.value = !showHelp.value;
-    return;
-  }
   if (event.key === "Escape" && selected.value) {
     event.preventDefault();
     void router.push(listLink.value);
@@ -102,115 +104,102 @@ watch(
 </script>
 
 <template>
-  <div class="findings" :class="{ 'has-detail': !!selected }">
-    <section class="list" aria-labelledby="findings-title">
-      <h2 id="findings-title">Findings in the latest 24 hours</h2>
-      <div class="pills" role="group" aria-label="Recurrence">
-        <button
-          v-for="o in recurrenceOptions"
-          :key="o.value"
-          type="button"
-          :aria-pressed="recurrence === o.value"
-          @click="setFilter('recurrence', o.value)"
-        >
-          {{ o.label }}
-        </button>
+  <div class="dash">
+    <section class="panel s24" aria-labelledby="findings-title">
+      <div class="ph">
+        <h2 id="findings-title">Findings</h2>
+        <span class="sub">· latest 24 hours · sorted by severity, then peak time</span>
       </div>
-      <div class="row filters">
-        <label>Category
-          <select :value="category" @change="setFilter('category', ($event.target as HTMLSelectElement).value)">
+      <div class="controls">
+        <div class="tg" role="group" aria-label="Recurrence">
+          <button
+            v-for="o in recurrenceOptions"
+            :key="o.value"
+            type="button"
+            :aria-pressed="recurrence === o.value"
+            @click="setFilter('recurrence', o.value)"
+          >
+            {{ o.label }}
+          </button>
+        </div>
+        <span class="grow" />
+        <div class="var">
+          <label for="f-category">Category</label>
+          <select id="f-category" :value="category" @change="setFilter('category', ($event.target as HTMLSelectElement).value)">
             <option value="">All</option>
             <option v-for="fam in families" :key="fam" :value="fam">{{ FAMILY_LABELS[fam] ?? fam }}</option>
           </select>
-        </label>
-        <label>Severity
-          <select :value="severity" @change="setFilter('severity', ($event.target as HTMLSelectElement).value)">
+        </div>
+        <div class="var">
+          <label for="f-severity">Severity</label>
+          <select id="f-severity" :value="severity" @change="setFilter('severity', ($event.target as HTMLSelectElement).value)">
             <option value="">All</option>
-            <option v-for="s in SEVERITIES" :key="s" :value="s">{{ s }}</option>
+            <option v-for="s in SEVERITIES" :key="s" :value="s">{{ capitalize(s) }}</option>
           </select>
-        </label>
-        <label>Entity
-          <input type="search" :value="entity" placeholder="filter by name" @input="setFilter('entity', ($event.target as HTMLInputElement).value)">
-        </label>
-        <button type="button" class="link" :aria-expanded="showHelp" @click="showHelp = !showHelp">Keyboard shortcuts</button>
+        </div>
+        <div class="var">
+          <label for="f-entity">Entity</label>
+          <input id="f-entity" type="search" :value="entity" placeholder="filter by name" @input="setFilter('entity', ($event.target as HTMLInputElement).value)">
+        </div>
       </div>
-      <p v-if="showHelp" class="card small" role="note">
-        <kbd>j</kbd>/<kbd>k</kbd> next/previous finding · <kbd>Esc</kbd> close detail · <kbd>?</kbd> toggle this help. Shortcuts are ignored while typing.
-      </p>
 
-      <p v-if="report.findings.length === 0" class="card">No findings in the latest 24 hours. Check the Overview coverage table for signals that could not be evaluated.</p>
-      <div v-else-if="filtered.length === 0" class="card">
+      <p v-if="report.findings.length === 0" class="empty">No findings in the latest 24 hours. Check the Overview coverage table for signals that could not be evaluated.</p>
+      <div v-else-if="filtered.length === 0" class="empty row">
         No findings match these filters.
         <button type="button" @click="router.replace(`/reports/${id}/findings`)">Clear filters</button>
       </div>
-      <ul v-else class="rows">
-        <li v-for="f in filtered" :key="f.finding_id">
-          <RouterLink
-            :ref="(el: unknown) => { if (el) rowRefs.set(f.finding_id, (el as { $el: HTMLElement }).$el) }"
-            :to="detailLink(f.finding_id)"
-            class="frow"
-            :aria-current="f.finding_id === findingId ? 'true' : undefined"
-          >
-            <SeverityChip :severity="f.severity" class="sev" />
-            <span class="main">
-              <span class="t">{{ f.title }}</span>
-              <span class="e">{{ f.entity.display_name }}</span>
-              <span class="w" :title="utcTooltip(f.start)">{{ formatTime(f.start) }} · {{ formatDuration(f.duration_seconds) }} · {{ recurrenceText(f) }}</span>
-            </span>
-            <span class="v" :class="`sev-${f.severity}`">
-              <strong>{{ formatValue(f.observed.value, f.observed.unit) }}</strong>
-              <span class="u">{{ usualText(f) || "—" }}</span>
-              <ConfidenceBadge :confidence="f.confidence" />
-            </span>
-          </RouterLink>
-        </li>
-      </ul>
+      <div v-else class="table-wrap">
+        <table class="gt">
+          <thead>
+            <tr>
+              <th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Entity</th><th scope="col">Started</th>
+              <th scope="col" class="num">Duration</th><th scope="col" class="num">Peak</th><th scope="col" class="num">Usual</th>
+              <th scope="col">Confidence</th><th scope="col">State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="f in filtered" :key="f.finding_id" :class="{ sel: f.finding_id === findingId }" @click="open(f.finding_id)">
+              <td class="first"><SeverityChip :severity="f.severity" /></td>
+              <td>
+                <RouterLink
+                  :ref="(el: unknown) => { if (el) rowRefs.set(f.finding_id, (el as { $el: HTMLElement }).$el) }"
+                  :to="detailLink(f.finding_id)"
+                  :aria-current="f.finding_id === findingId ? 'true' : undefined"
+                  @click.stop
+                >
+                  {{ f.title }}
+                </RouterLink>
+              </td>
+              <td class="mono muted">{{ f.entity.display_name }}</td>
+              <td :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</td>
+              <td class="num">{{ formatDuration(f.duration_seconds) }}</td>
+              <td class="num peak" :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</td>
+              <td class="num muted">{{ usualCell(f) }}</td>
+              <td>{{ capitalize(f.confidence) }}</td>
+              <td><span class="tag" :class="{ new: f.recurrence === 'new' }">{{ recurrenceText(f) }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lbl keys">
+        Keyboard: <kbd>j</kbd> / <kbd>k</kbd> next / previous finding · <kbd>Esc</kbd> close the evidence. Shortcuts are ignored while typing.
+      </p>
     </section>
 
-    <section v-if="findingId && !selected" class="detail card" role="alert">
+    <section v-if="findingId && !selected" class="card s24" role="alert">
       This finding is not part of the report. <RouterLink :to="listLink">Back to findings</RouterLink>
     </section>
-    <EvidencePanel v-if="selected" :key="selected.finding_id" class="detail" :finding="selected" :close-to="listLink" />
+    <EvidencePanel v-if="selected" :key="selected.finding_id" class="s24" :finding="selected" :close-to="listLink" />
   </div>
 </template>
 
 <style scoped>
-.findings { display: grid; grid-template-columns: minmax(0, 1fr); gap: calc(var(--space) * 2.5); position: relative; align-items: start; }
-.list h2 { margin-top: 0; }
-.pills { display: flex; gap: var(--space); flex-wrap: wrap; margin-bottom: var(--space); }
-.pills button { border-radius: 999px; background: var(--bg); font-size: 0.85rem; min-height: 34px; }
-.pills button[aria-pressed="true"] { background: var(--inv-bg); color: var(--inv-fg); border-color: var(--inv-bg); }
-.filters label { display: flex; flex-direction: column; font-size: 0.85rem; color: var(--text-muted); }
-.filters { align-items: flex-end; margin-bottom: calc(var(--space) * 1.5); }
-.rows { list-style: none; padding: 0; margin: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.rows li + li { border-top: 1px solid var(--subtle); }
-.frow {
-  display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 14px;
-  padding: 14px 16px; color: inherit; text-decoration: none; align-items: center;
-}
-.frow:hover { background: var(--surface); }
-.frow[aria-current="true"] { background: var(--info-bg); box-shadow: inset 3px 0 0 var(--focus); }
-.sev { justify-self: start; }
-.main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.t { font-weight: 600; }
-.e { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); }
-.w { font-size: 0.8rem; color: var(--text-muted); }
-.v { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
-.v strong { font-size: 1.2rem; }
-.v.sev-critical strong { color: var(--sev-critical); }
-.v.sev-high strong { color: var(--sev-high); }
-.v.sev-medium strong { color: var(--sev-medium); }
-.u { font-size: 0.8rem; color: var(--text-muted); }
-.small { font-size: 0.85rem; }
-@media (min-width: 1200px) {
-  .findings.has-detail { grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); }
-}
-@media (min-width: 900px) and (max-width: 1199px) {
-  .findings.has-detail .detail { position: absolute; top: 0; right: 0; width: 70%; box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25); z-index: 2; }
-}
-@media (max-width: 899px) {
-  .findings.has-detail .list { display: none; }
-  .frow { grid-template-columns: minmax(0, 1fr); }
-  .v { align-items: flex-start; text-align: left; }
-}
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 0 12px 8px; }
+.var input { min-width: 160px; }
+.empty { margin: 0; padding: 8px 12px 12px; }
+.gt tbody tr { cursor: pointer; }
+.gt tr.sel .first { box-shadow: inset 3px 0 0 var(--primary); }
+.peak { font-weight: 600; }
+.keys { margin: 0; padding: 8px 12px; }
+kbd { font-size: 11px; padding: 0 4px; border: 1px solid var(--border2); border-radius: var(--radius-sm); }
 </style>

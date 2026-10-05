@@ -15,7 +15,7 @@ MONITORING_HOST := art-monitoring
 
 .PHONY: help config install check check-backend check-frontend contracts fixtures \
 	dev-backend dev-frontend build serve \
-	docker-build run up demo down stop restart status ps logs shell health backup docker-backup
+	docker-build run up demo down stop restart status ps logs shell health backup docker-backup tunnels
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^# -- / {h = $$0; gsub(/^# -- | --$$/, "", h); printf "\n\033[1m%s\033[0m\n", h} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -106,8 +106,8 @@ docker-backup: ## Back up the container database to ./backups
 	${COMPOSE} cp ${SERVICE}:/data/backup.sqlite3 ./backups/assistant-docker-$$(date +%Y%m%d-%H%M%S).sqlite3
 	${COMPOSE} exec ${SERVICE} rm -f /data/backup.sqlite3
 
-tunnels:
-	@ssh -N -L $(MONITORING_FORWARD) $(MONITORING_HOST) & mon=$$!;
-	trap 'kill $$mon $$ch 2>/dev/null' EXIT INT TERM; \
+tunnels: ## Forward VictoriaMetrics (8428) via SSH until Ctrl-C
+	@ssh -N -o ExitOnForwardFailure=yes -L $(MONITORING_FORWARD) $(MONITORING_HOST) & mon=$$!; \
+	trap 'kill $$mon 2>/dev/null' EXIT INT TERM; \
 	echo "forwarding $(MONITORING_FORWARD) via $(MONITORING_HOST); Ctrl-C to close"; \
-	wait
+	wait $$mon

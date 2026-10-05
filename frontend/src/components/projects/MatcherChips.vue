@@ -12,6 +12,6 @@ defineProps<{ matchers: LabelMatcher[] }>();
 
 <style scoped>
 .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.chip { padding: 0 8px; border-radius: 999px; background: var(--subtle); color: var(--text-2); font-size: 0.8rem; line-height: 22px; }
+.chip { padding: 0 8px; border-radius: 999px; background: var(--grid); color: var(--text); font-size: 0.8rem; line-height: 22px; }
 .value { color: var(--text); }
 </style>

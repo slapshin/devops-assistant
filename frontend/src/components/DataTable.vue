@@ -25,8 +25,9 @@ const open = ref(false);
 </template>
 
 <style scoped>
-.scroll { max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); }
-table { border-collapse: collapse; width: 100%; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-th, td { padding: 2px 8px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
-th { position: sticky; top: 0; background: var(--surface); }
+.data { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.scroll { align-self: stretch; max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+th, td { padding: 4px 10px; text-align: left; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--panel); color: var(--strong); font-weight: 500; border-bottom-color: var(--border); }
 </style>

@@ -9,6 +9,9 @@ import { FAMILY_LABELS, formatTime, formatValue, utcTooltip } from "../../lib/fo
 import { useReportContext } from "./context";
 
 const MS_PER_MINUTE = 60_000;
+/** Week-over-week direction from the sign of the difference. */
+const CHANGE_KIND: Record<number, string> = { 1: "up", [-1]: "down", 0: "same" };
+const CHANGE_ARROW: Record<string, string> = { up: "▲", down: "▼", same: "=" };
 /** An entity/signal pair counts as recurring once it has episodes on this many days. */
 const MIN_RECURRING_DAYS = 3;
 /** Below this, a day's coverage strip is shown in amber. */
@@ -18,6 +21,8 @@ const BAR_MAX_PX = 160;
 const BAR_MIN_PX = 4;
 const BAR_ZERO_PX = 2;
 const NO_VALUE = "—";
+const LATEST_BUCKET = 0;
+const TREND_DAYS = 14;
 
 const STATUS_TEXT: Record<string, string> = {
   ok: "",
@@ -34,14 +39,15 @@ const HEADLINES: Record<string, string> = {
 
 type EpisodeLike = { family: string; entity: { key: string; display_name: string } };
 
-const { report } = useReportContext();
+const { report, findingById } = useReportContext();
 const route = useRoute();
 const router = useRouter();
 const measure = ref<Measure>("anomalous_share");
 
 const category = computed(() => (route.query.category as string) || "");
 const entity = computed(() => (route.query.entity as string) || "");
-const day = computed(() => (route.query.day !== undefined ? Number(route.query.day) : null));
+/** The latest day (bucket 0) is selected until the viewer picks another. */
+const day = computed(() => (route.query.day !== undefined ? Number(route.query.day) : LATEST_BUCKET));
 
 /** Filtering recomputes episode counts per day from the stored episode list. */
 const trends = computed<DailyTrend[]>(() =>
@@ -97,10 +103,26 @@ const bars = computed(() => {
     return {
       t,
       height: barHeight(t, value, max),
-      kind: barKind(t, value, worstBucket),
+      kind: barKind(t, value),
+      worst: t.bucket_index === worstBucket,
       covered: t.coverage >= FULL_COVERAGE_RATIO,
     };
   });
+});
+const lowCoverageDays = computed(() => report.value.trends.filter((t) => t.coverage < FULL_COVERAGE_RATIO).length);
+const selectedTitle = computed(() => {
+  const t = selectedDay.value;
+  if (!t) return "";
+  const label = t.bucket_index === LATEST_BUCKET ? `Latest day, ${dayLabel(t)}` : dayLabel(t);
+  return `${label} · ${t.episode_count} ${t.episode_count === 1 ? "episode" : "episodes"}`;
+});
+const okBuckets = computed(() => new Set(report.value.trends.filter((t) => t.status === "ok").map((t) => t.bucket_index)));
+const weekChange = computed(() => {
+  const summary = report.value.trend_summary;
+  if (!summary) return null;
+  const share = Math.sign((summary.recent_share ?? 0) - (summary.previous_share ?? 0));
+  const episodes = Math.sign(summary.recent_episodes - summary.previous_episodes);
+  return { share: CHANGE_KIND[share] ?? "same", episodes: CHANGE_KIND[episodes] ?? "same" };
 });
 
 const latestIsWorst = computed(() => {
@@ -142,66 +164,80 @@ function barHeight(t: DailyTrend, value: number, max: number): string {
   return `${Math.max(BAR_MIN_PX, Math.round((value / max) * BAR_MAX_PX))}px`;
 }
 
-function barKind(t: DailyTrend, value: number, worstBucket: number | undefined): string {
+/** The latest day is drawn in the critical fill, earlier days in amber (UI design "Today / Earlier days"). */
+function barKind(t: DailyTrend, value: number): string {
   if (t.status !== "ok") return "incomplete";
   if (value === 0) return "zero";
-  return t.bucket_index === worstBucket ? "worst" : "some";
+  return t.bucket_index === LATEST_BUCKET ? "latest" : "earlier";
 }
+
+/** A recurring-strip cell: episode on the latest day, an earlier day, an evaluated quiet day, or a day without data. */
+function stripKind(bucket: number, days: Set<number>): string {
+  if (days.has(bucket)) return bucket === LATEST_BUCKET ? "latest" : "earlier";
+  return okBuckets.value.has(bucket) ? "quiet" : "unknown";
+}
+
+const episodeTitle = (e: { finding_id?: string | null; signal: string }) =>
+  (e.finding_id ? findingById.value.get(e.finding_id)?.title : undefined) ?? e.signal;
 
 const findingLink = (id: string) => `/reports/${report.value.analysis_id}/findings/${id}`;
 </script>
 
 <template>
-  <div class="trends">
-    <section class="hero" aria-label="Trend summary">
-      <div class="verdict">
+  <div class="dash">
+    <section class="panel s12" aria-labelledby="trend-summary-title">
+      <div class="ph"><h2 id="trend-summary-title">Summary</h2><span class="sub">· 14 days</span></div>
+      <div class="pb summary">
         <h1 v-if="report.trend_summary">{{ HEADLINES[report.trend_summary.direction] ?? report.trend_summary.direction }}</h1>
+        <h1 v-else>No trend summary in this report</h1>
         <p v-if="latestIsWorst" class="lede">The latest day is the worst of the 14.</p>
-        <p v-if="report.trend_summary" class="muted small">
+        <p v-if="report.trend_summary" class="lbl">
           Detector: <strong>{{ report.trend_summary.direction }}</strong> ({{ report.trend_summary.confidence }} confidence) —
           {{ report.trend_summary.reason }}
         </p>
       </div>
-      <template v-if="report.trend_summary">
-        <div class="card stat">
-          <span class="label-caps">Anomalous share</span>
-          <span><strong>{{ formatShare(report.trend_summary.recent_share) }}</strong> <span class="muted">last 7 d</span></span>
-          <span class="muted small">vs {{ formatShare(report.trend_summary.previous_share) }} the 7 days before</span>
-        </div>
-        <div class="card stat">
-          <span class="label-caps">Episodes</span>
-          <span><strong>{{ report.trend_summary.recent_episodes }}</strong> <span class="muted">last 7 d</span></span>
-          <span class="muted small">vs {{ report.trend_summary.previous_episodes }} the 7 days before</span>
-        </div>
-      </template>
     </section>
-
-    <div class="columns">
-      <section class="card chart" aria-labelledby="per-day-title">
-        <div class="chart-head">
-          <h2 id="per-day-title">{{ MEASURES[measure].label }} per day</h2>
-          <div class="seg" role="group" aria-label="Measure">
-            <button
-              v-for="(m, k) in MEASURES"
-              :key="k"
-              type="button"
-              :aria-pressed="measure === k"
-              @click="measure = k"
-            >
-              {{ m.label }}
-            </button>
+    <template v-if="report.trend_summary && weekChange">
+      <section class="panel s6" aria-label="Anomalous share">
+        <div class="ph"><h2>Anomalous share · 7 d</h2></div>
+        <div class="stat">
+          <div class="v" :class="`c-${weekChange.share}`">{{ formatShare(report.trend_summary.recent_share) }}</div>
+          <div class="d" :class="`c-${weekChange.share}`">
+            <span aria-hidden="true">{{ CHANGE_ARROW[weekChange.share] }}</span> vs {{ formatShare(report.trend_summary.previous_share) }} the 7 days before
           </div>
         </div>
-        <div class="row filters">
-          <label>Category
-            <select :value="category" @change="setQuery('category', ($event.target as HTMLSelectElement).value)">
+      </section>
+      <section class="panel s6" aria-label="Episodes">
+        <div class="ph"><h2>Episodes · 7 d</h2></div>
+        <div class="stat">
+          <div class="v" :class="`c-${weekChange.episodes}`">{{ report.trend_summary.recent_episodes }}</div>
+          <div class="d" :class="`c-${weekChange.episodes}`">
+            <span aria-hidden="true">{{ CHANGE_ARROW[weekChange.episodes] }}</span> vs {{ report.trend_summary.previous_episodes }} the 7 days before
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <section class="panel s16" aria-labelledby="per-day-title">
+      <div class="ph">
+        <h2 id="per-day-title">{{ MEASURES[measure].label }} per day</h2>
+        <div class="tg end" role="group" aria-label="Measure">
+          <button v-for="(m, k) in MEASURES" :key="k" type="button" :aria-pressed="measure === k" @click="measure = k">{{ m.label }}</button>
+        </div>
+      </div>
+      <div class="pb">
+        <div class="row">
+          <div class="var">
+            <label for="t-category">Category</label>
+            <select id="t-category" :value="category" @change="setQuery('category', ($event.target as HTMLSelectElement).value)">
               <option value="">All</option>
               <option v-for="fam in families" :key="fam" :value="fam">{{ FAMILY_LABELS[fam] ?? fam }}</option>
             </select>
-          </label>
-          <label>Entity
-            <input type="search" :value="entity" placeholder="filter by name" @input="setQuery('entity', ($event.target as HTMLInputElement).value)">
-          </label>
+          </div>
+          <div class="var">
+            <label for="t-entity">Entity</label>
+            <input id="t-entity" type="search" :value="entity" placeholder="filter by name" @input="setQuery('entity', ($event.target as HTMLInputElement).value)">
+          </div>
         </div>
         <div class="days" role="group" aria-label="Select a day">
           <button
@@ -210,8 +246,8 @@ const findingLink = (id: string) => `/reports/${report.value.analysis_id}/findin
             type="button"
             :aria-pressed="day === b.t.bucket_index"
             :title="`Coverage ${formatCoverage(b.t.coverage)} · baseline ${b.t.baseline_days_used} days`"
-            :class="b.kind"
-            @click="setQuery('day', day === b.t.bucket_index ? null : b.t.bucket_index)"
+            :class="[b.kind, { worst: b.worst }]"
+            @click="setQuery('day', b.t.bucket_index === LATEST_BUCKET ? null : b.t.bucket_index)"
           >
             <span class="v">{{ measureValue(b.t) }}</span>
             <span class="bar" :style="{ height: b.height }" aria-hidden="true" />
@@ -219,120 +255,138 @@ const findingLink = (id: string) => `/reports/${report.value.analysis_id}/findin
             <span class="d">{{ dayLabel(b.t) }}</span>
           </button>
         </div>
-        <p class="muted small">
-          Select a day to see its episodes. The thin strip is coverage (amber below 95 %); hatched days lack a baseline or data.
-          Anomalous share is normalised by observed entity-time, so added hosts and gaps do not look like deterioration.
+        <p class="lbl">
+          {{ lowCoverageDays ? `Coverage below 95 % on ${lowCoverageDays} of ${report.trends.length} days (amber strip).` : `Coverage: full on all ${report.trends.length} days.` }}
+          Hatched days lack a baseline or data and are not quiet days. Anomalous share is normalised by observed entity-time, so added hosts and gaps do not look like deterioration.
         </p>
-        <DataTable
-          caption="Daily trend values"
-          :columns="['Day', 'Status', 'Episodes', 'Anomalous min', 'Share', 'Entities', 'Observed entity-min', 'Coverage', 'Baseline days']"
-          :rows="tableRows"
-        />
-      </section>
+        <div class="foot">
+          <span class="legend">
+            <span><span class="sw box latest" />Latest day</span>
+            <span><span class="sw box earlier" />Earlier days</span>
+            <span><span class="sw box incomplete" />No baseline or data</span>
+          </span>
+          <DataTable
+            caption="Daily trend values"
+            :columns="['Day', 'Status', 'Episodes', 'Anomalous min', 'Share', 'Entities', 'Observed entity-min', 'Coverage', 'Baseline days']"
+            :rows="tableRows"
+          />
+        </div>
+      </div>
+    </section>
 
-      <section class="card day" aria-live="polite" aria-labelledby="day-title">
+    <section class="panel s8" aria-labelledby="day-title">
+      <div class="ph"><h2 id="day-title">{{ selectedDay ? selectedTitle : "Pick a day" }}</h2></div>
+      <div class="pb day" aria-live="polite">
         <template v-if="selectedDay">
-          <h2 id="day-title">
-            {{ dayLabel(selectedDay) }}:
-            {{ selectedDay.episode_count }} episode(s)
-            <span v-if="selectedDay.status !== 'ok'" class="muted">— {{ STATUS_TEXT[selectedDay.status] }}</span>
-          </h2>
-          <p class="muted small">
+          <p class="lbl">
             <span :title="utcTooltip(selectedDay.window.start)">{{ formatTime(selectedDay.window.start) }}</span> –
             {{ formatTime(selectedDay.window.end) }} · baseline {{ selectedDay.baseline_days_used }} days · coverage {{ formatCoverage(selectedDay.coverage) }}
+            <template v-if="selectedDay.status !== 'ok'"> · {{ STATUS_TEXT[selectedDay.status] }}</template>
           </p>
-          <p v-if="selectedDay.episodes.length === 0" class="muted">No episodes on this day.</p>
+          <p v-if="selectedDay.episodes.length === 0" class="muted">
+            No episodes on this day.<template v-if="selectedDay.status === 'ok'"> Signals were evaluated with {{ formatCoverage(selectedDay.coverage) }} coverage.</template>
+          </p>
           <ul v-else class="episodes">
             <li v-for="e in selectedDay.episodes" :key="e.episode_id">
               <div class="row">
                 <SeverityChip :severity="e.severity" />
-                <RouterLink v-if="e.finding_id" :to="findingLink(e.finding_id)">{{ e.signal }}</RouterLink>
-                <strong v-else>{{ e.signal }}</strong>
+                <RouterLink v-if="e.finding_id" :to="findingLink(e.finding_id)" class="t">{{ episodeTitle(e) }}</RouterLink>
+                <strong v-else class="t">{{ episodeTitle(e) }}</strong>
               </div>
-              <span class="mono small muted">{{ e.entity.display_name }}</span>
-              <span class="small muted">
+              <span class="mono e">{{ e.entity.display_name }}</span>
+              <span class="lbl">
                 {{ formatTime(e.start, false) }}–{{ formatTime(e.end, false) }} · peak {{ formatValue(e.peak_observed, e.unit) }}<template v-if="e.expected_median !== null"> vs {{ formatValue(e.expected_median, e.unit) }}</template>
               </span>
             </li>
           </ul>
-          <p v-if="!selectedDay.episodes.some((e) => e.finding_id) && selectedDay.bucket_index > 0" class="muted small">
-            Earlier days keep episode summaries only; full evidence charts exist for latest-day findings.
-          </p>
+          <RouterLink v-if="selectedDay.bucket_index === LATEST_BUCKET && selectedDay.episodes.length" :to="`/reports/${report.analysis_id}/findings`" class="more">
+            Open evidence for the latest day's findings →
+          </RouterLink>
+          <p v-else-if="selectedDay.episodes.length" class="lbl">Earlier days keep stored summaries only, not raw series.</p>
         </template>
-        <template v-else>
-          <h2 id="day-title">Pick a day</h2>
-          <p class="muted">Select a bar to list that day's episodes.</p>
-        </template>
-        <p v-if="truncated" class="muted small">Some days list only part of their episodes (counts are complete).</p>
-      </section>
-    </div>
+        <p v-else class="muted">Select a bar to list that day's episodes.</p>
+        <p v-if="truncated" class="lbl">Some days list only part of their episodes (counts are complete).</p>
+      </div>
+    </section>
 
-    <section class="card" aria-labelledby="recurring-title">
-      <h2 id="recurring-title">Recurring (episodes on ≥ 3 of 14 days)</h2>
-      <p v-if="recurring.length === 0" class="muted">Nothing recurred on three or more days.</p>
-      <ul v-else class="recurring">
-        <li v-for="r in recurring" :key="`${r.name}|${r.signal}`">
-          <span class="who">
-            <strong>{{ r.signal }}</strong>
-            <span class="mono small muted">{{ r.name }}</span>
-          </span>
-          <span><strong>{{ r.days.size }}</strong> of 14 days</span>
-          <span class="strip" :aria-label="`Days with episodes: ${r.days.size} of 14`">
-            <span v-for="d in stripDays" :key="d" :class="{ on: r.days.has(d) }" />
-          </span>
-        </li>
-      </ul>
+    <section class="panel s24" aria-labelledby="recurring-title">
+      <div class="ph">
+        <h2 id="recurring-title">Recurring problems</h2>
+        <span class="sub">· status history · episodes on {{ MIN_RECURRING_DAYS }} or more of the {{ TREND_DAYS }} days</span>
+      </div>
+      <div class="pb">
+        <p v-if="recurring.length === 0" class="muted">Nothing recurred on three or more days.</p>
+        <div v-else class="recurring">
+          <template v-for="r in recurring" :key="`${r.name}|${r.signal}`">
+            <div class="who">
+              <strong>{{ r.signal }}</strong>
+              <span class="mono e">{{ r.name }}</span>
+            </div>
+            <div class="strip" role="img" :aria-label="`Days with episodes: ${r.days.size} of ${TREND_DAYS}`">
+              <span v-for="d in stripDays" :key="d" :class="stripKind(d, r.days)" />
+            </div>
+            <div class="num"><strong>{{ r.days.size }}</strong> / {{ TREND_DAYS }} days</div>
+          </template>
+          <div />
+          <div class="strip labels" aria-hidden="true">
+            <span v-for="t in ordered" :key="t.bucket_index">{{ dayLabel(t).split(" ")[0] }}</span>
+          </div>
+          <div />
+        </div>
+        <div class="legend">
+          <span><span class="sw box latest" />Episode on the latest day</span>
+          <span><span class="sw box earlier" />Episode on an earlier day</span>
+          <span><span class="sw box quiet" />Evaluated, no episode</span>
+          <span><span class="sw box unknown" />No baseline or data</span>
+        </div>
+      </div>
     </section>
   </div>
 </template>
 
 <style scoped>
-.trends { display: flex; flex-direction: column; gap: calc(var(--space) * 3); }
-.trends h2 { margin: 0; }
-.hero { display: flex; flex-wrap: wrap; gap: calc(var(--space) * 2); align-items: stretch; }
-.verdict { flex: 2 1 min(480px, 100%); display: flex; flex-direction: column; gap: 8px; justify-content: center; }
-.verdict h1 { margin: 0; font-size: 2rem; line-height: 1.15; letter-spacing: -0.01em; text-wrap: pretty; }
-.verdict p { margin: 0; }
-.lede { font-size: 1.05rem; color: var(--text-2); }
-.stat { flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px; }
-.stat strong { font-size: 1.75rem; }
-.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(520px, 100%), 1fr)); gap: calc(var(--space) * 2); align-items: start; }
-@media (min-width: 1100px) { .columns { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
-.chart, .day { display: flex; flex-direction: column; gap: 12px; }
-.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-.seg { display: flex; flex-wrap: wrap; }
-.seg button { border-radius: 0; border-left-width: 0; background: var(--bg); font-size: 0.8rem; }
-.seg button:first-child { border-left-width: 1px; border-radius: var(--radius) 0 0 var(--radius); }
-.seg button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
-.seg button[aria-pressed="true"] { background: var(--inv-bg); color: var(--inv-fg); border-color: var(--inv-bg); }
-.filters label { display: flex; flex-direction: column; font-size: 0.85rem; color: var(--text-muted); }
-.filters { align-items: flex-end; }
-.days { display: flex; gap: 4px; align-items: stretch; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.summary { gap: 8px; padding: 8px 20px 16px; justify-content: center; }
+.summary h1 { margin: 0; text-wrap: pretty; }
+.lede { font-size: 15px; }
+.stat .c-up { color: var(--crit); }
+.stat .c-down { color: var(--ok); }
+.days { display: flex; gap: 2px; align-items: stretch; border-bottom: 1px solid var(--border2); overflow-x: auto; }
 .days button {
-  flex: 1 1 0; min-width: 34px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
-  height: 230px; padding: 4px 2px 6px; border: none; border-radius: var(--radius); background: transparent; color: var(--text-muted); font-size: 0.7rem;
+  flex: 1 1 0; min-width: 34px; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
+  height: 230px; padding: 0 1px 4px; border: none; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: 11px; font-weight: 400;
 }
-.days button:hover { background: var(--surface); }
-.days button[aria-pressed="true"] { background: var(--info-bg); color: var(--link-strong); font-weight: 600; outline: 2px solid var(--focus); }
-.days .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.days .bar { display: block; width: 70%; max-width: 40px; border-radius: 3px 3px 0 0; background: var(--bar-medium); }
-.days .zero .bar { background: var(--border); }
-.days .worst .bar { background: var(--bar-critical); }
-.days .incomplete .bar { background: repeating-linear-gradient(45deg, transparent 0 6px, var(--border) 6px 7px); border: 1px dashed var(--border); }
-.days .cov { display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--status-ok); }
-.days .cov.low { background: var(--status-warn); }
+.days button:hover { background: var(--hover); }
+.days button[aria-pressed="true"] { background: var(--sel); color: var(--strong); font-weight: 600; }
+.days .v { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.days .bar { display: block; width: 72%; max-width: 44px; border-radius: 1px 1px 0 0; }
+.days .zero .bar { background: var(--border2); }
+.days .cov { display: block; width: 100%; height: 4px; border-radius: 1px; background: var(--f-ok); }
+.days .cov.low { background: var(--f-med); }
 .days .d { white-space: nowrap; }
+.latest .bar, .sw.latest, .strip .latest { background: var(--f-crit); }
+.earlier .bar, .sw.earlier, .strip .earlier { background: var(--f-med); }
+.incomplete .bar, .sw.incomplete, .strip .unknown, .sw.unknown {
+  background: repeating-linear-gradient(45deg, transparent 0 5px, var(--border2) 5px 6px); box-shadow: inset 0 0 0 1px var(--border2);
+}
+.sw.quiet, .strip .quiet { background: var(--f-ok-dim); }
+.days .worst .v { color: var(--strong); font-weight: 600; }
+.foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.day { gap: 0; }
+.day > p { padding: 4px 0; }
 .episodes { list-style: none; margin: 0; padding: 0; }
-.episodes li { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; border-top: 1px solid var(--subtle); }
-.recurring { list-style: none; margin: 12px 0 0; padding: 0; }
-.recurring li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: center; padding: 12px 0; border-top: 1px solid var(--subtle); }
-.who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.strip { display: flex; gap: 3px; }
-.strip span { flex: 1 1 0; height: 18px; border-radius: 3px; background: var(--subtle); }
-.strip .on { background: var(--bar-medium); }
-.mono { font-family: var(--font-mono); }
-.small { font-size: 0.8rem; }
+.episodes li { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+.episodes .t { font-size: 13px; font-weight: 500; color: var(--strong); }
+.e { font-size: 12px; color: var(--muted); }
+.more { font-size: 13px; padding-top: 10px; }
+.recurring { display: grid; grid-template-columns: minmax(160px, 260px) minmax(0, 1fr) 90px; gap: 6px 12px; align-items: center; }
+.who { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+.who strong { font-weight: 500; color: var(--strong); }
+.strip { display: flex; gap: 2px; }
+.strip span { display: block; flex: 1 1 0; height: 24px; border-radius: 1px; }
+.strip.labels span { height: auto; text-align: center; font-size: 10px; color: var(--muted); }
+.recurring .num { font-size: 13px; }
 @media (max-width: 700px) {
-  .recurring li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .recurring { grid-template-columns: minmax(0, 1fr); }
+  .strip.labels { display: none; }
 }
 </style>

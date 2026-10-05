@@ -5,6 +5,8 @@ import { useRouter } from "vue-router";
 import { ApiError, type ConnectionTest } from "../../api/client";
 import { useCreateProject, useDeleteProject, useProject, useTestConnection, useUpdateProject } from "../../api/queries";
 import ConnectionTestResult from "../../components/projects/ConnectionTestResult.vue";
+import AppTopbar from "../../components/shell/AppTopbar.vue";
+import type { Crumb } from "../../components/shell/crumbs";
 import {
   type FieldErrors,
   MAX_MATCHERS,
@@ -27,6 +29,14 @@ const props = defineProps<{ projectId?: string }>();
 const router = useRouter();
 const editing = computed(() => !!props.projectId);
 const existing = useProject(() => props.projectId ?? null);
+const crumbs = computed<Crumb[]>(() => {
+  if (!props.projectId) return [{ label: "Projects", to: "/" }, { label: "New project" }];
+  return [
+    { label: "Projects", to: "/" },
+    { label: existing.data.value?.name ?? "Project", to: `/projects/${props.projectId}` },
+    { label: "Edit" },
+  ];
+});
 const create = useCreateProject();
 const update = useUpdateProject();
 const remove = useDeleteProject();
@@ -154,8 +164,8 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <section class="stack" aria-labelledby="form-title">
-    <p><RouterLink :to="projectId ? `/projects/${projectId}` : '/'">← {{ projectId ? "Project" : "Projects" }}</RouterLink></p>
+  <AppTopbar :crumbs="crumbs" />
+  <main class="page" aria-labelledby="form-title">
     <h1 id="form-title">{{ editing ? "Edit project" : "New project" }}</h1>
 
     <div v-if="editing && existing.isPending.value" aria-busy="true"><div class="skeleton" /><div class="skeleton" /></div>
@@ -320,22 +330,21 @@ async function confirmDelete() {
         </div>
       </div>
     </section>
-  </section>
+  </main>
 </template>
 
 <style scoped>
 .form { max-width: 720px; }
 .field { display: flex; flex-direction: column; gap: 2px; }
 .field label { font-weight: 500; }
-textarea { font: inherit; padding: calc(var(--space) * 0.5); border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-fieldset { border: 1px solid var(--border); border-radius: 8px; padding: calc(var(--space) * 2); background: var(--bg); }
+fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: calc(var(--space) * 2); background: var(--panel); }
 fieldset > * + * { margin-top: var(--space); }
-legend { font-weight: 600; padding: 0 4px; }
+legend { font-weight: 500; color: var(--strong); padding: 0 4px; }
 .hint { font-size: 0.85rem; margin: 0; }
 .matcher { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.4fr) auto; gap: var(--space); align-items: start; }
 .eq { padding-top: 6px; }
 .source-title { margin: 0; font-size: 0.95rem; }
 .check { display: flex; gap: 6px; align-items: center; }
-.danger-zone { max-width: 720px; border-color: var(--sev-critical); }
+.danger-zone { max-width: 720px; border-color: var(--crit); }
 .danger-zone h2 { margin-top: 0; }
 </style>

@@ -33,12 +33,15 @@ function bandSeries(evidence: Evidence, palette: ChartPalette): Record<string, u
   ];
 }
 
-function thresholdMarkLine(threshold: number | null | undefined, palette: ChartPalette) {
+/** Episode tint over the plot; the line and the heuristic stay readable on top of it. */
+const EPISODE_OPACITY = 0.12;
+
+function thresholdMarkLine(threshold: number | null | undefined, color: string) {
   if (threshold === null || threshold === undefined) return undefined;
   return {
     symbol: "none",
-    label: { formatter: "heuristic (not an SLO)", position: "insideEndTop", color: palette.threshold },
-    lineStyle: { type: "dashed", color: palette.threshold },
+    label: { formatter: "heuristic (not an SLO)", position: "insideStartTop", color },
+    lineStyle: { type: "dashed", color },
     data: [{ yAxis: threshold }],
   };
 }
@@ -55,6 +58,7 @@ function ariaDescription(evidence: Evidence, finding: Finding): string {
 export function evidenceOption(evidence: Evidence, finding: Finding, palette: ChartPalette): Record<string, unknown> {
   const unit = evidence.series.unit;
   const categories = timestamps(evidence);
+  const severityColor = palette.severity[finding.severity] ?? palette.muted;
 
   const series: Record<string, unknown>[] = bandSeries(evidence, palette);
   if (evidence.expected) {
@@ -67,25 +71,26 @@ export function evidenceOption(evidence: Evidence, finding: Finding, palette: Ch
     symbol: "none",
     connectNulls: false,
     itemStyle: { color: palette.observed },
-    lineStyle: { width: 2, color: palette.observed },
+    lineStyle: { width: 1.8, color: palette.observed },
+    areaStyle: { color: palette.observed, opacity: 0.08 },
     markArea: {
       silent: true,
-      itemStyle: { color: palette.episode, opacity: 1 },
+      itemStyle: { color: severityColor, opacity: EPISODE_OPACITY },
       label: { show: false },
       data: [[
         { name: "Episode", xAxis: nearestCategoryAtOrBefore(categories, finding.start) },
         { xAxis: nearestCategoryAtOrBefore(categories, finding.end) },
       ]],
     },
-    markLine: thresholdMarkLine(evidence.threshold, palette),
+    markLine: thresholdMarkLine(evidence.threshold, severityColor),
   });
 
   return {
     aria: { enabled: true, label: { description: ariaDescription(evidence, finding) } },
     animation: false,
-    grid: { left: 70, right: 20, top: 30, bottom: 60 },
-    textStyle: { color: palette.muted },
-    legend: { top: 0, data: ["Observed", "Expected (median)", "Expected range"], textStyle: { color: palette.text } },
+    grid: { left: 64, right: 16, top: 28, bottom: 56 },
+    textStyle: { color: palette.muted, fontFamily: palette.font },
+    legend: { top: 0, left: 0, icon: "roundRect", itemWidth: 14, itemHeight: 3, data: ["Observed", "Expected (median)", "Expected range"], textStyle: { color: palette.text } },
     tooltip: {
       trigger: "axis",
       backgroundColor: palette.bg,
@@ -96,14 +101,16 @@ export function evidenceOption(evidence: Evidence, finding: Finding, palette: Ch
     xAxis: {
       type: "category", data: categories,
       axisLine: { lineStyle: { color: palette.border } },
-      axisLabel: { color: palette.muted, formatter: (v: string) => formatTime(v, false) },
+      axisTick: { show: false },
+      splitLine: { show: true, lineStyle: { color: palette.grid } },
+      axisLabel: { color: palette.muted, formatter: (v: string) => formatTime(v, false, false) },
     },
     yAxis: {
       type: "value", scale: true,
-      splitLine: { lineStyle: { color: palette.border, opacity: 0.6 } },
+      splitLine: { lineStyle: { color: palette.grid } },
       axisLabel: { color: palette.muted, formatter: (v: number) => formatValue(v, unit) },
     },
-    dataZoom: [{ type: "inside" }, { type: "slider", height: 18, bottom: 8, borderColor: palette.border, textStyle: { color: palette.muted } }],
+    dataZoom: [{ type: "inside" }, { type: "slider", height: 18, bottom: 8, borderColor: palette.border, fillerColor: palette.band, textStyle: { color: palette.muted } }],
     series,
   };
 }

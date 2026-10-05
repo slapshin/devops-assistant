@@ -19,18 +19,21 @@ Interface language: English (default; strings are kept in one module so they can
 
 Every report URL can be shared and reloaded and works after a process restart, because it is read from the saved snapshot. The browser Back button moves between the list and the detail view without losing filters.
 
-## 2. Persistent report frame
+## 2. App shell and persistent report frame
 
-A header appears on every report route:
+Visual design: the "DevOps Assistant UI" canvas in Claude Design (Overview, Findings + evidence, Trends boards). It is a dense, Grafana-like dashboard: IBM Plex Sans/Mono (self-hosted via `@fontsource`, no external font requests), panels on a 24-column grid, 4 px radii, solid severity fills for stat panels and chips.
+
+Every page has a left **icon rail** (home, Projects, and Overview / Findings / Trends while a report is open; a top row below 700 px) and a **top bar** with breadcrumbs (`Projects › <project> › <page>`), page badges such as *Synthetic data*, and the theme switch.
+
+Report routes add a toolbar and tabs under the top bar:
 
 ```
-[Assistant]  paas / production   Window: 29 Sep 10:05 – 30 Sep 10:05 UTC (latest 24 h, 5-min steps)
-             Status: Completed · Detector detectors-2026.09.1 · Report saved 30 Sep 10:07   [Run again] [New analysis]
-Tabs:  Overview | Findings (12) | Trends
+[env | production] [project | paas] [baseline | 14 days]   Completed · detectors-2026.09.1 · saved 30 Sep 10:07 UTC   [◷ 29 Sep 10:05 – 30 Sep 10:05 | UTC ▾] [Run again]
+Tabs:  Overview | Findings 12 | Trends
 ```
 
-- The scope and the frozen end time `T` are always visible. Times are shown in UTC by default, with a toggle for local time; tooltips always include UTC.
-- The project name links to its project page. *Run again* uses the same project with `T = now`. *Project* returns to the project page.
+- The project's label matchers, the longest baseline used, and the frozen latest-day window are always visible. Times are shown in UTC by default, with a UTC/Local select next to the window; tooltips always include UTC.
+- The project name in the breadcrumbs links to its project page. *Run again* uses the same project with `T = now`.
 - A `partial` report shows a persistent amber banner ("Some signals could not be collected — see Coverage"), with a link to the coverage section.
 
 ## 3. Projects (T013)
@@ -66,16 +69,17 @@ Replaces the original start view (project/env selectors). Screenshots: `docs/scr
 
 Order (top to bottom). The page answers "what is wrong, how bad, and what is new" before any detail:
 
-1. **Verdict**: severity counts, a one-line headline of the most severe finding ("CPU on node · paas-production peaked at 95.4 % over 3 h"), its ratio to the usual value, how many findings are new today versus seen before, a link to the most severe finding, and the 14-day trend line. Beside it, a **Blind spots** card names the families that were not evaluated (unsupported, insufficient data, source error) and says that problems there would not show up.
-2. **When it happened**: one lane per finding (at most 8) on the latest-day axis. Findings that overlap in time are listed as "coincide in time (not established as related)".
-3. **Top findings**: the 5 most severe, as cards: severity, New today / Recurring tag, title, entity, the observed peak with the usual range (or the heuristic), an evidence sparkline, time, duration, state, and confidence. A "View all findings" link.
-4. **Check first** (AI explanation panel) beside a **Coverage** tile grid (one tile per family, coloured by status, with text and icon):
+1. **Stat panels**: one per severity (Critical, High, Medium always; Low when present), filled with the severity colour when the count is above zero, with the family and new/seen-before note; *New today*; *Signal coverage* (evaluated of total families, with a bar); *Blind spots* (count and family names).
+2. **Summary**: a one-line headline of the most severe finding ("CPU on node · paas-production peaked at 95.4 % over 3 h"), its ratio to the usual value, how many findings are new today versus seen before, a link to the most severe finding, the 14-day trend line, and a warning box naming the families that were not evaluated (unsupported, insufficient data, source error) and saying that problems there would not show up. Beside it, **Check first** (the AI explanation panel, below).
+3. **Episodes** (a collapsible row): a **State timeline** with one lane per finding (at most 8) on the latest-day axis; the lane background is neutral ("No episode"), never "normal", because it does not prove the entity was healthy. Findings that overlap in time are listed as "coincide in time (not established as related)". Below it, the 6 most severe findings as panels: severity, title, New today / Recurring tag, the observed peak with the usual range (or the heuristic), a mini evidence chart with axes, episode span, heuristic line and usual band, the series legend, then time, duration, state and confidence. A "View all findings" link.
+4. **Coverage** (a collapsible row): a **Signal families** tile grid (one solid tile per family: red anomalous, amber not evaluated, green no anomaly; each with text and icon), then the coverage table (5).
+5. **Check first** contents:
    - `succeeded`: the summary. Hypotheses are labelled **"Hypothesis — unverified"** with their likelihood, and each links to its referenced finding chips. Investigation steps follow, then the uncertainty note and "Generated by <provider>/<model>".
    - `disabled` / `not_configured`: "AI explanations are off. The numerical report is complete." (For `not_configured`, a hint names the missing variable.)
    - `failed`: "The explanation could not be generated (<reason>). Findings and evidence below are unaffected."
    - `skipped_no_findings`: no panel. The summary strip already says so.
-5. **Coverage and limitations**: a table per signal family (CPU, Memory, Filesystem, Disk I/O, Network, Containers, HTTP/RPC traffic, Failures, Client errors, Latency). Each row has a status, a reason, and the baseline days used. The report's `exclusions` (budget truncation, dropped evidence) are listed here.
-6. **Healthy report**: "No anomalies detected in evaluated signals" is shown **only together with** the coverage table, never on its own. If nothing could be evaluated, it says "No signals could be evaluated" instead of claiming health.
+6. **Coverage and limitations**: a table per signal family (CPU, Memory, Filesystem, Disk I/O, Network, Containers, HTTP/RPC traffic, Failures, Client errors, Latency). Each row has a status, a reason, and the baseline days used. The report's `exclusions` (budget truncation, dropped evidence) are listed here.
+7. **Healthy report**: "No anomalies detected in evaluated signals" is shown **only together with** the coverage table, never on its own. If nothing could be evaluated, it says "No signals could be evaluated" instead of claiming health.
 
 ### Status vocabulary (text + icon + colour; colour never used alone)
 
@@ -88,53 +92,52 @@ Order (top to bottom). The page answers "what is wrong, how bad, and what is new
 | Source error | Query failed, timed out, or was truncated | exclamation |
 | Not evaluated | Out of scope for this detector version | dash |
 
-Severity chips: Critical / High / Medium / Low, each with a text label. Confidence is shown as a separate text badge ("Confidence: medium") so it is never merged with severity. Thresholds are described as "diagnostic heuristic", never "SLO".
+Severity chips: Critical / High / Medium / Low, each with a text label (solid fills; Low is outlined). Confidence is shown as a separate text badge ("Confidence: medium") so it is never merged with severity. Thresholds are described as "diagnostic heuristic", never "SLO".
 
 ## 6. Findings
 
-- List (desktop: table; narrow: cards). Columns: severity, entity (e.g. `node · paas-production` or `dispatcher-api · GET /api/v3/tasks/:task`), category, time span with duration, observed vs expected (e.g. "5xx 7.8 % vs expected 0.3 % (±0.4)"), and confidence.
-- Default sort is severity, then peak time. Sort and filters are controls with labels, and filter state lives in the URL. A **Recurrence** toggle (All / New today / Happened before, `?recurrence=new|seen`) sits above the other filters.
+- A grid table in one panel (it scrolls horizontally inside its container on narrow screens). Columns: severity, finding, entity (e.g. `node · paas-production` or `dispatcher-api · GET /api/v3/tasks/:task`), started, duration, peak, usual range (or heuristic), confidence, and recurrence state. The open finding's row is highlighted.
+- Default sort is severity, then peak time. Filters are labelled controls (Category, Severity, Entity), and filter state lives in the URL. A **Recurrence** toggle (All / New today / Happened before, `?recurrence=new|seen`) sits on the left of the filter row.
 - 4xx findings are titled "Client error increase (4xx)" or "404 increase". 5xx findings are titled "Server error rate (5xx)". The two never share a label.
 - An empty list after filtering shows "No findings match these filters" and a Clear filters button.
 
 ## 7. Evidence detail
 
-On desktop, a right-hand panel at 45 % width. At widths below 900 px it is a full-width page with a "← Findings" back link. Contents:
+Opening a finding adds three panels below the table: the evidence chart (16 of 24 columns, with a close button), *Finding details* (8 columns) and a full-width *Query inspector*. Below 1100 px they stack. Contents:
 
-1. Title, severity, confidence with its **reasons** (e.g. "4 baseline days (< 7)", "coverage 82 %"), and detector name/version.
+1. Title, severity, recurrence, confidence with its **reasons** (e.g. "4 baseline days (< 7)", "coverage 82 %"), state, peak / usual / duration stats, window, detector version and baseline.
 2. **Chart** (ECharts, SVG renderer):
    - The observed series and the expected band (median ± scaled MAD, or the absolute threshold line labelled as a heuristic).
    - The shaded episode span. Gaps are drawn as breaks, and a "gap" marker appears in the tooltip.
    - A y-axis with a unit (%, req/s, bytes/s, s) and a UTC time axis.
    - Keyboard-accessible dataZoom, plus a generated `aria` description.
 3. A **"Show data" toggle** that renders the same points as a table (time, observed, expected, lower, upper, gap flag). This is the chart alternative.
-4. **Query**: the exact PromQL/MetricsQL, step, and range in a copyable code block. Credentials are never shown.
-5. **Entity labels**: the relevant labels only (job, instance, route, method, status, device, mountpoint).
-6. **Related findings**: only those sharing identity labels. Time-overlap links are labelled "Coincides in time (not established as related)".
-7. **AI hypotheses referencing this finding**, if any, each labelled unverified.
+4. **Related findings** ("Also happening"): only those sharing identity labels. Time-overlap links are dashed and labelled "Coincides in time (not established as related)".
+5. **AI hypotheses referencing this finding**, if any, each labelled unverified.
+6. **Query inspector**: the exact PromQL/MetricsQL, step, and range in a copyable code block (credentials are never shown), and a collapsed *Labels and detector* section with the relevant entity labels (job, instance, route, method, status, device, mountpoint).
 
 Unsupported or insufficient signals have no chart. They show a text block explaining what metric or label is missing, or how much history exists.
 
 ## 8. Trends
 
-- **Daily measures** over 14 consecutive buckets (labelled by bucket end date, UTC), with a series selector: episodes, anomalous minutes, **anomalous share** (the default, since it normalises for added hosts and gaps), peak severity, and affected entities.
-- The day bars are the day buttons (height relative to the busiest day; the busiest day is highlighted). A headline states the detector's direction, with the last-7-days vs previous-7-days share and episode counts beside it.
+- **Daily measures** over 14 consecutive buckets (labelled by bucket end date, UTC), with a series selector: **anomalous share** (the default, since it normalises for added hosts and gaps), episodes, anomalous entity-minutes, and affected entities.
+- The day bars are the day buttons (height relative to the busiest day). The latest day is drawn in the critical fill and earlier days in amber; the busiest day's value is bold. A Summary panel states the detector's direction, with stat panels for the last-7-days vs previous-7-days share and episode counts (▲ red when higher, ▼ green when lower).
 - Each bucket also shows coverage as a thin strip under the axis. A bucket without enough baseline is hatched and labelled "insufficient baseline" instead of being drawn as zero.
-- Clicking a bucket (or pressing Enter on it) lists that day's episodes. Each episode links to its evidence detail if it lies in the latest day, and otherwise shows a stored summary (trend episodes from earlier days keep summaries, not raw series; see DECISIONS §6).
+- The latest day is selected by default (`?day=` selects another). Clicking a bucket (or pressing Enter on it) lists that day's episodes. Each episode links to its evidence detail if it lies in the latest day, and otherwise shows a stored summary (trend episodes from earlier days keep summaries, not raw series; see DECISIONS §6).
 - Filters: entity, category.
-- A **Recurring** table lists entities/categories with episodes on ≥ 3 of the 14 days.
+- **Recurring problems** lists entity/signal pairs with episodes on ≥ 3 of the 14 days as a 14-cell status history: latest-day episode (red), earlier episode (amber), evaluated without an episode (dim green), no baseline or data (hatched).
 - Every chart has a "Show data" table alternative.
 
 ## 9. Responsive and keyboard behaviour
 
-- Breakpoints: ≥ 1200 px shows the list and the detail side by side. At 900–1199 px the detail panel overlays the list. Below 900 px the detail is a full-width route. Nothing scrolls horizontally except the data tables, which have their own scroll container.
+- Breakpoints: the 24-column grid keeps its layout above 1100 px. At 700–1100 px quarter-width stat panels go to a third and wider panels to full width. Below 700 px every panel is full width and the rail becomes a top row. Nothing scrolls horizontally except the data tables, which have their own scroll container.
 - Keyboard:
   - Tab order runs header, then tabs, then filters, then content.
   - Tabs follow the WAI-ARIA tabs pattern (arrow keys).
-  - Finding rows are links. `j`/`k` move between findings and `Esc` closes the detail on desktop. Shortcuts are listed under `?`, and none of them fire inside inputs.
+  - Finding rows are links (the whole row is clickable). `j`/`k` move between findings and `Esc` closes the evidence. The shortcuts are listed under the table, and none of them fire inside inputs.
   - Focus moves to the detail heading when the panel opens and returns to the row when it closes.
 - Visible focus rings, colour contrast ≥ 4.5:1 for text, and support for `prefers-reduced-motion` and `prefers-color-scheme`.
-- **Theme**: an Auto / Light / Dark switch in the app header. Auto follows `prefers-color-scheme`; an explicit choice is stored per viewer (`localStorage`, key `assistant.theme`) and applied as `data-theme` on `<html>`. Colours are tokens in `frontend/src/styles/tokens.css`; charts use the matching palette from `frontend/src/lib/theme.ts`.
+- **Theme**: an Auto / Light / Dark switch in the top bar. Auto follows `prefers-color-scheme`; an explicit choice is stored per viewer (`localStorage`, key `assistant.theme`) and applied as `data-theme` on `<html>`. Colours are tokens in `frontend/src/styles/tokens.css`; charts use the matching palette from `frontend/src/lib/theme.ts`.
 
 ## 10. Global loading, error, and partial states
 

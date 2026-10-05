@@ -16,8 +16,8 @@ defineProps<{ counts: Partial<Record<string, number>> | null | undefined }>();
 
 <style scoped>
 .sev-counts { display: inline-flex; flex-wrap: wrap; gap: 0 0.75em; }
-.sev-text-critical { color: var(--sev-critical); }
-.sev-text-high { color: var(--sev-high); }
-.sev-text-medium { color: var(--sev-medium); }
-.sev-text-low { color: var(--sev-low); }
+.sev-text-critical { color: var(--crit); }
+.sev-text-high { color: var(--high); }
+.sev-text-medium { color: var(--med); }
+.sev-text-low { color: var(--low); }
 </style>

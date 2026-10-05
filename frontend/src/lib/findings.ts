@@ -1,4 +1,4 @@
-import type { Finding } from "../api/client";
+import type { Finding, SignalCoverage } from "../api/client";
 import { FAMILY_LABELS, formatDuration, formatValue } from "./format";
 
 /** The 14-day trend window minus the latest day. */
@@ -43,6 +43,9 @@ export function ratioText(finding: Finding): string {
   if (threshold !== null) return `Above the ${formatValue(threshold, observed.unit)} diagnostic heuristic (not an SLO).`;
   return "";
 }
+
+/** The longest baseline any signal family used (0 without one); families with less history say so in Coverage. */
+export const longestBaselineDays = (coverage: SignalCoverage[]) => Math.max(0, ...coverage.map((c) => c.baseline_days ?? 0));
 
 /** Pairs of findings whose episodes overlap in time; overlap alone does not make them related. */
 export function timeOverlaps(findings: Finding[]): [Finding, Finding][] {

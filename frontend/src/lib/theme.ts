@@ -53,24 +53,29 @@ watch(
 );
 
 export interface ChartPalette {
+  font: string;
   bg: string;
   text: string;
   muted: string;
   border: string;
+  grid: string;
   observed: string;
   expected: string;
   band: string;
-  episode: string;
-  threshold: string;
+  /** Text-strength severity colours: episode tints (at low opacity) and heuristic lines. */
+  severity: Record<string, string>;
 }
 
+const CHART_FONT = '"IBM Plex Sans", system-ui, sans-serif';
 const LIGHT_PALETTE: ChartPalette = {
-  bg: "#ffffff", text: "#1b1f24", muted: "#57606a", border: "#d0d7de", observed: "#1b1f24", expected: "#0550ae",
-  band: "#ddf4ff", episode: "#ffebe9", threshold: "#a40e26",
+  font: CHART_FONT, bg: "#ffffff", text: "#24292e", muted: "#5d6168", border: "#c7cad0", grid: "#eceef1",
+  observed: "#1f62e0", expected: "#1f62e0", band: "rgba(31, 98, 224, 0.12)",
+  severity: { critical: "#c4162a", high: "#b84c00", medium: "#8a6d00", low: "#5d6168" },
 };
 const DARK_PALETTE: ChartPalette = {
-  bg: "#161b22", text: "#e6edf3", muted: "#9198a1", border: "#30363d", observed: "#e6edf3", expected: "#79c0ff",
-  band: "#132339", episode: "#3b1a1d", threshold: "#ff7b72",
+  font: CHART_FONT, bg: "#181b1f", text: "#ccccdc", muted: "#8e8e9e", border: "#3a3e45", grid: "#23262c",
+  observed: "#5794f2", expected: "#5794f2", band: "rgba(87, 148, 242, 0.12)",
+  severity: { critical: "#ff5c6f", high: "#ff9830", medium: "#fade2a", low: "#8e8e9e" },
 };
 
 /** ECharts cannot read CSS variables, so charts take the palette of the active theme (mirrors tokens.css). */

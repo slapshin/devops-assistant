@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { STATUS_LABELS } from "../lib/format";
+import StatusIcon from "./StatusIcon.vue";
 
 const props = defineProps<{ status: string }>();
-const info = computed(() => STATUS_LABELS[props.status] ?? { label: props.status, icon: "?" });
+const label = computed(() => STATUS_LABELS[props.status]?.label ?? props.status);
 </script>
 
 <template>
-  <span class="status" :class="`st-${status}`"><span aria-hidden="true">{{ info.icon }}</span> {{ info.label }}</span>
+  <span class="status" :class="`st-${status}`"><StatusIcon :status="status" /> {{ label }}</span>
 </template>
 
 <style scoped>
-.status { white-space: nowrap; font-weight: 500; }
-.st-anomalous { color: var(--sev-high); }
-.st-no_anomaly { color: var(--status-ok); }
-.st-insufficient_data, .st-source_error { color: var(--status-warn); }
-.st-unsupported, .st-not_evaluated { color: var(--text-muted); }
+.status { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; }
+.st-anomalous { color: var(--crit); }
+.st-no_anomaly { color: var(--ok); }
+.st-insufficient_data, .st-source_error, .st-unsupported { color: var(--med); }
+.st-not_evaluated { color: var(--muted); }
 </style>

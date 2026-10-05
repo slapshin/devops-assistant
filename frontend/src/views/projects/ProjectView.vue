@@ -6,6 +6,7 @@ import AnalysesTable from "../../components/AnalysesTable.vue";
 import HealthBadge from "../../components/projects/HealthBadge.vue";
 import MatcherChips from "../../components/projects/MatcherChips.vue";
 import RunAnalysis from "../../components/projects/RunAnalysis.vue";
+import AppTopbar from "../../components/shell/AppTopbar.vue";
 import { sourceHost } from "../../lib/projects";
 
 const HISTORY_PAGE_SIZE = 20;
@@ -22,8 +23,8 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
 </script>
 
 <template>
-  <section class="stack" aria-labelledby="project-title">
-    <p><RouterLink to="/">← Projects</RouterLink></p>
+  <AppTopbar :crumbs="[{ label: 'Projects', to: '/' }, { label: project.data.value?.name ?? 'Project' }]" />
+  <main class="page" aria-labelledby="project-title">
     <div v-if="project.isPending.value" aria-busy="true"><div class="skeleton" style="width: 40%" /><div class="skeleton" /></div>
     <div v-else-if="notFound" role="alert" class="banner error">This project does not exist (it may have been deleted).</div>
     <div v-else-if="project.isError.value" role="alert" class="banner error">
@@ -31,7 +32,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
     </div>
 
     <template v-else-if="project.data.value">
-      <div class="row heading">
+      <div class="page-head">
         <h1 id="project-title">{{ project.data.value.name }}</h1>
         <div class="row">
           <RouterLink :to="`/projects/${projectId}/edit`" class="button">Edit</RouterLink>
@@ -54,7 +55,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
         <dd>{{ project.data.value.report_count }}</dd>
       </dl>
 
-      <h2>Analyses</h2>
+      <h2 class="section-title">Analyses</h2>
       <div v-if="history.isPending.value" aria-busy="true"><div class="skeleton" /><div class="skeleton" /></div>
       <p v-else-if="history.isError.value" role="alert" class="banner error">History could not be loaded: {{ history.error.value?.message }}</p>
       <p v-else-if="jobs.length === 0" class="muted">No analyses yet.</p>
@@ -65,14 +66,13 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
         </button>
       </template>
     </template>
-  </section>
+  </main>
 </template>
 
 <style scoped>
-.heading { justify-content: space-between; align-items: flex-start; margin-bottom: var(--space); }
-.heading h1 { margin: 0; }
+.section-title { margin: 8px 0 0; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px calc(var(--space) * 2); margin: 0; }
-.facts dt { font-weight: 600; color: var(--text-muted); }
+.facts dt { font-weight: 600; color: var(--muted); }
 .facts dd { margin: 0; }
 @media (max-width: 600px) {
   .facts { grid-template-columns: minmax(0, 1fr); }

@@ -30,8 +30,8 @@ const detail = computed(() => {
 
 <style scoped>
 .health { white-space: nowrap; font-weight: 500; font-size: 0.9rem; }
-.h-ok { color: var(--status-ok); }
-.h-unreachable, .h-auth, .h-unreadable, .h-error { color: var(--sev-critical); }
-.h-no_series { color: var(--status-warn); }
-.h-checking, .h-not_configured { color: var(--text-muted); }
+.h-ok { color: var(--ok); }
+.h-unreachable, .h-auth, .h-unreadable, .h-error { color: var(--crit); }
+.h-no_series { color: var(--med); }
+.h-checking, .h-not_configured { color: var(--muted); }
 </style>
