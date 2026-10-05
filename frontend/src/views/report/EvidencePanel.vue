@@ -7,7 +7,7 @@ import DataTable from "../../components/DataTable.vue";
 import ExplanationPanel from "../../components/ExplanationPanel.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
 import { evidenceOption, timestamps } from "../../lib/charts";
-import { headline, recurrenceText, timeOverlaps } from "../../lib/findings";
+import { headline, recurrenceText } from "../../lib/findings";
 import { capitalize, formatDuration, formatTime, formatValue, isLatencyMean, timezone, utcTooltip } from "../../lib/format";
 import { chartPalette } from "../../lib/theme";
 import { useReportContext } from "./context";
@@ -17,7 +17,7 @@ const SECONDS_PER_MINUTE = 60;
 
 const props = defineProps<{ finding: Finding; closeTo: RouteLocationRaw }>();
 
-const { report, evidenceById, findingById } = useReportContext();
+const { report, evidenceById } = useReportContext();
 const heading = ref<HTMLElement | null>(null);
 const copied = ref(false);
 
@@ -29,18 +29,6 @@ const evidence = computed(() =>
 );
 const primaryEvidence = computed(() => evidence.value[0] ?? null);
 const stepMinutes = computed(() => Math.round((primaryEvidence.value?.series.step_seconds ?? 0) / SECONDS_PER_MINUTE));
-const related = computed(() =>
-  (f.value.related_finding_ids ?? [])
-    .map((id) => findingById.value.get(id))
-    .filter((x) => !!x),
-);
-/** Time overlap only: shown apart from related findings and never presented as a relation. */
-const coincident = computed(() => {
-  const relatedIds = new Set(f.value.related_finding_ids ?? []);
-  return timeOverlaps(report.value.findings)
-    .flatMap((pair) => otherInPair(pair, f.value.finding_id))
-    .filter((other) => !relatedIds.has(other.finding_id));
-});
 const rows = computed(() => {
   const e = primaryEvidence.value;
   if (!e) return [];
@@ -55,13 +43,6 @@ const rows = computed(() => {
     e.series.values[i] === null ? "gap" : "",
   ]);
 });
-
-/** The partner of `findingId` in an overlapping pair, or nothing when it is not part of the pair. */
-function otherInPair([a, b]: [Finding, Finding], findingId: string): Finding[] {
-  if (a.finding_id === findingId) return [b];
-  if (b.finding_id === findingId) return [a];
-  return [];
-}
 
 const findingLink = (id: string) => `/reports/${report.value.analysis_id}/findings/${id}`;
 
@@ -161,23 +142,6 @@ onMounted(async () => {
           </ul>
         </div>
 
-        <div v-if="related.length || coincident.length" class="also">
-          <h3 class="lbl strong">Also happening</h3>
-          <RouterLink v-for="r in related" :key="r.finding_id" :to="findingLink(r.finding_id)" class="other">
-            <SeverityChip :severity="r.severity" />
-            <span class="grow">{{ r.title }} — <span class="mono">{{ r.entity.display_name }}</span></span>
-            <span class="lbl">Related: shares identity labels</span>
-          </RouterLink>
-          <RouterLink v-for="r in coincident" :key="r.finding_id" :to="findingLink(r.finding_id)" class="other dashed">
-            <SeverityChip :severity="r.severity" />
-            <span class="grow">{{ r.title }} — <span class="mono">{{ r.entity.display_name }}</span></span>
-            <span class="lbl">Coincides in time (not established as related)</span>
-          </RouterLink>
-        </div>
-        <p v-else class="lbl">
-          No related findings: none share an identity label or verified host mapping, and none overlap in time.
-        </p>
-
         <ExplanationPanel class="ai" :report="report" :finding-link="findingLink" :only="f.finding_id" />
       </div>
     </section>
@@ -239,12 +203,6 @@ h2:focus-visible { outline: 2px solid var(--primary); }
 .stats dd.v-medium { color: var(--med); }
 .small { font-size: 12px; }
 .reasons { margin: 4px 0 0; padding-left: 20px; }
-.also { display: flex; flex-direction: column; gap: 6px; }
-.also h3 { margin: 0; }
-.strong { font-weight: 500; }
-.other { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); text-decoration: none; font-size: 13px; }
-.other:hover { background: var(--hover); color: var(--text); }
-.other.dashed { border-style: dashed; }
 .ai { padding-top: 10px; border-top: 1px solid var(--border); }
 details summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--strong); }
 details > * + * { margin-top: 8px; }

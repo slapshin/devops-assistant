@@ -198,12 +198,13 @@ main { overflow-wrap: anywhere; }
 /* Grid table. Tables scroll inside their own container; the page never scrolls horizontally. */
 .table-wrap { overflow-x: auto; max-width: 100%; }
 table.gt, .table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.gt th, .table th { text-align: left; font-weight: 500; color: var(--strong); padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-.gt td, .table td { padding: 0 10px; height: 38px; border-bottom: 1px solid var(--grid); }
+/* Grid-table rules match only the table's own cells, so content expanded inside a row keeps its styling. */
+.gt > * > tr > th, .table th { text-align: left; font-weight: 500; color: var(--strong); padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.gt > * > tr > td, .table td { padding: 0 10px; height: 38px; border-bottom: 1px solid var(--grid); }
 .table td, .table tbody th { padding: 8px 10px; height: auto; vertical-align: top; }
-.gt td { white-space: nowrap; }
-.gt tbody tr:hover td { background: var(--hover); }
-.gt tr.sel td { background: var(--sel); }
-.gt a { color: var(--strong); text-decoration: none; font-weight: 500; }
-.gt a:hover { color: var(--link); text-decoration: underline; }
+.gt > * > tr > td { white-space: nowrap; }
+.gt > tbody > tr:hover > td { background: var(--hover); }
+.gt > * > tr.sel > td { background: var(--sel); }
+.gt > * > tr > td > a { color: var(--strong); text-decoration: none; font-weight: 500; }
+.gt > * > tr > td > a:hover { color: var(--link); text-decoration: underline; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }

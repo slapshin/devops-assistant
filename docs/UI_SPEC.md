@@ -104,7 +104,7 @@ Severity chips: Critical / High / Medium / Low, each with a text label (solid fi
 
 ## 7. Evidence detail
 
-Opening a finding adds three panels below the table: the evidence chart (16 of 24 columns, with a close button), *Finding details* (8 columns) and a full-width *Query inspector*. Below 1100 px they stack. Contents:
+Opening a finding expands it in place, accordion-style: a detail row directly below the finding's row holds three panels, and clicking the row (or its title) again collapses it. Only one finding is open at a time. The panels are the evidence chart (16 of 24 columns, with a close button), *Finding details* (8 columns) and a full-width *Query inspector*. Below 1100 px they stack. Contents:
 
 1. Title, severity, recurrence, confidence with its **reasons** (e.g. "4 baseline days (< 7)", "coverage 82 %"), state, peak / usual / duration stats, window, detector version and baseline.
 2. **Chart** (ECharts, SVG renderer):
@@ -113,9 +113,8 @@ Opening a finding adds three panels below the table: the evidence chart (16 of 2
    - A y-axis with a unit (%, req/s, bytes/s, s) and a UTC time axis.
    - Keyboard-accessible dataZoom, plus a generated `aria` description.
 3. A **"Show data" toggle** that renders the same points as a table (time, observed, expected, lower, upper, gap flag). This is the chart alternative.
-4. **Related findings** ("Also happening"): only those sharing identity labels. Time-overlap links are dashed and labelled "Coincides in time (not established as related)".
-5. **AI hypotheses referencing this finding**, if any, each labelled unverified.
-6. **Query inspector**: the exact PromQL/MetricsQL, step, and range in a copyable code block (credentials are never shown), and a collapsed *Labels and detector* section with the relevant entity labels (job, instance, route, method, status, device, mountpoint).
+4. **AI hypotheses referencing this finding**, if any, each labelled unverified.
+5. **Query inspector**: the exact PromQL/MetricsQL, step, and range in a copyable code block (credentials are never shown), and a collapsed *Labels and detector* section with the relevant entity labels (job, instance, route, method, status, device, mountpoint).
 
 Unsupported or insufficient signals have no chart. They show a text block explaining what metric or label is missing, or how much history exists.
 
@@ -135,7 +134,7 @@ Unsupported or insufficient signals have no chart. They show a text block explai
 - Keyboard:
   - Tab order runs header, then tabs, then filters, then content.
   - Tabs follow the WAI-ARIA tabs pattern (arrow keys).
-  - Finding rows are links (the whole row is clickable). `j`/`k` move between findings and `Esc` closes the evidence. The shortcuts are listed under the table, and none of them fire inside inputs.
+  - Finding rows are links (the whole row is clickable) that toggle the expanded detail and expose `aria-expanded`. `j`/`k` move between findings and `Esc` closes the evidence. The shortcuts are listed under the table, and none of them fire inside inputs.
   - Focus moves to the detail heading when the panel opens and returns to the row when it closes.
 - Visible focus rings, colour contrast ≥ 4.5:1 for text, and support for `prefers-reduced-motion` and `prefers-color-scheme`.
 - **Theme**: an Auto / Light / Dark switch in the top bar. Auto follows `prefers-color-scheme`; an explicit choice is stored per viewer (`localStorage`, key `assistant.theme`) and applied as `data-theme` on `<html>`. Colours are tokens in `frontend/src/styles/tokens.css`; charts use the matching palette from `frontend/src/lib/theme.ts`.

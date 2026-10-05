@@ -433,6 +433,20 @@ describe("report", () => {
     expect(router.currentRoute.value.query.category).toBe("client_errors");
   });
 
+  it("findings expand in place like an accordion and collapse on a second click", async () => {
+    const router = await renderAt(`${report(anomalies)}/findings`);
+    const link = await screen.findByRole("link", { name: /404 increase/ });
+    expect(link).toHaveAttribute("aria-expanded", "false");
+    await fireEvent.click(link);
+    const panel = await screen.findByRole("region", { name: "404 increase" });
+    expect(link).toHaveAttribute("aria-expanded", "true");
+    expect(link.closest("tr")!.nextElementSibling).toContainElement(panel);
+    await fireEvent.click(link);
+    await waitFor(() => expect(router.currentRoute.value.name).toBe("findings"));
+    expect(screen.queryByRole("region", { name: "404 increase" })).not.toBeInTheDocument();
+    expect(link).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("j/k move between findings and shortcuts are ignored in inputs", async () => {
     const first = anomalies.findings[0]!.finding_id;
     const router = await renderAt(`${report(anomalies)}/findings/${first}`);

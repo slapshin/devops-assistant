@@ -61,7 +61,9 @@ function setFilter(key: string, value: string) {
 }
 
 const detailLink = (targetId: string) => ({ path: `/reports/${props.id}/findings/${targetId}`, query: route.query });
-const open = (targetId: string) => void router.push(detailLink(targetId));
+/** Rows work as an accordion: the open finding's link collapses it again. */
+const toggleLink = (targetId: string) => (targetId === props.findingId ? listLink.value : detailLink(targetId));
+const toggle = (targetId: string) => void router.push(toggleLink(targetId));
 
 /** j/k move through the filtered list, clamped at both ends. */
 function stepSelection(step: number) {
@@ -158,26 +160,38 @@ watch(
             </tr>
           </thead>
           <tbody>
-            <tr v-for="f in filtered" :key="f.finding_id" :class="{ sel: f.finding_id === findingId }" @click="open(f.finding_id)">
-              <td class="first"><SeverityChip :severity="f.severity" /></td>
-              <td>
-                <RouterLink
-                  :ref="(el: unknown) => { if (el) rowRefs.set(f.finding_id, (el as { $el: HTMLElement }).$el) }"
-                  :to="detailLink(f.finding_id)"
-                  :aria-current="f.finding_id === findingId ? 'true' : undefined"
-                  @click.stop
-                >
-                  {{ f.title }}
-                </RouterLink>
-              </td>
-              <td class="mono muted">{{ f.entity.display_name }}</td>
-              <td :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</td>
-              <td class="num">{{ formatDuration(f.duration_seconds) }}</td>
-              <td class="num peak" :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</td>
-              <td class="num muted">{{ usualCell(f) }}</td>
-              <td>{{ capitalize(f.confidence) }}</td>
-              <td><span class="tag" :class="{ new: f.recurrence === 'new' }">{{ recurrenceText(f) }}</span></td>
-            </tr>
+            <template v-for="f in filtered" :key="f.finding_id">
+              <tr :class="{ sel: f.finding_id === findingId }" @click="toggle(f.finding_id)">
+                <td class="first"><SeverityChip :severity="f.severity" /></td>
+                <td>
+                  <RouterLink
+                    :ref="(el: unknown) => { if (el) rowRefs.set(f.finding_id, (el as { $el: HTMLElement }).$el) }"
+                    :to="toggleLink(f.finding_id)"
+                    :aria-expanded="f.finding_id === findingId"
+                    :aria-current="f.finding_id === findingId ? 'true' : undefined"
+                    class="toggle"
+                    @click.stop
+                  >
+                    <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 2l3 3-3 3" /></svg>
+                    {{ f.title }}
+                  </RouterLink>
+                </td>
+                <td class="mono muted">{{ f.entity.display_name }}</td>
+                <td :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</td>
+                <td class="num">{{ formatDuration(f.duration_seconds) }}</td>
+                <td class="num peak" :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</td>
+                <td class="num muted">{{ usualCell(f) }}</td>
+                <td>{{ capitalize(f.confidence) }}</td>
+                <td><span class="tag" :class="{ new: f.recurrence === 'new' }">{{ recurrenceText(f) }}</span></td>
+              </tr>
+              <tr v-if="selected && f.finding_id === selected.finding_id" class="detail">
+                <td colspan="9">
+                  <div class="detail-body">
+                    <EvidencePanel :key="selected.finding_id" :finding="selected" :close-to="listLink" />
+                  </div>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -189,7 +203,9 @@ watch(
     <section v-if="findingId && !selected" class="card s24" role="alert">
       This finding is not part of the report. <RouterLink :to="listLink">Back to findings</RouterLink>
     </section>
-    <EvidencePanel v-if="selected" :key="selected.finding_id" class="s24" :finding="selected" :close-to="listLink" />
+    <section v-else-if="selected && !filtered.some((f) => f.finding_id === selected?.finding_id)" class="card s24" role="status">
+      This finding is hidden by the current filters. <RouterLink :to="listLink">Close it</RouterLink>
+    </section>
   </div>
 </template>
 
@@ -197,8 +213,17 @@ watch(
 .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 0 12px 8px; }
 .var input { min-width: 160px; }
 .empty { margin: 0; padding: 8px 12px 12px; }
-.gt tbody tr { cursor: pointer; }
-.gt tr.sel .first { box-shadow: inset 3px 0 0 var(--primary); }
+.gt > tbody > tr { cursor: pointer; }
+.gt > tbody > tr.sel > .first { box-shadow: inset 3px 0 0 var(--primary); }
+.toggle { display: inline-flex; align-items: center; gap: 6px; }
+.chevron { flex: none; color: var(--muted); transition: transform 0.15s ease; }
+.toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); color: var(--primary); }
+.gt > tbody > tr.detail { cursor: default; }
+.gt > tbody > tr.detail > td { height: auto; padding: 8px; white-space: normal; background: var(--canvas); box-shadow: inset 3px 0 0 var(--primary); }
+/* The detail matches the visible scroll area, not the (possibly wider) table, and stays put on horizontal scroll. */
+.table-wrap { container-type: inline-size; }
+.detail-body { position: sticky; left: 8px; width: calc(100cqw - 16px); }
+@media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 .peak { font-weight: 600; }
 .keys { margin: 0; padding: 8px 12px; }
 kbd { font-size: 11px; padding: 0 4px; border: 1px solid var(--border2); border-radius: var(--radius-sm); }
