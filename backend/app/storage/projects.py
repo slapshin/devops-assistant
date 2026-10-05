@@ -25,6 +25,7 @@ from app.domain.projects import (
     PrometheusSourceInput,
     SourceKind,
 )
+from app.domain.schedule import ReportSchedule
 from app.storage.db import app_meta, project_sources, projects
 from app.storage.secrets import SecretBox, SecretsUnreadable
 
@@ -74,9 +75,12 @@ class SqliteProjectRepository:
         sources: dict[str, list[Any]] = {}
         for row in conn.execute(src_stmt.order_by(project_sources.c.kind)):
             sources.setdefault(row.project_id, []).append(row)
-        return [self._project(row, sources.get(row.project_id, [])) for row in conn.execute(stmt)]
+        now = datetime.now(UTC)
+        return [
+            self._project(row, sources.get(row.project_id, []), now) for row in conn.execute(stmt)
+        ]
 
-    def _project(self, row: Any, source_rows: list[Any]) -> Project:
+    def _project(self, row: Any, source_rows: list[Any], now: datetime) -> Project:
         readable = True
         for src in source_rows:
             if src.secrets is not None:
@@ -84,6 +88,7 @@ class SqliteProjectRepository:
                     self.box.decrypt(src.secrets)
                 except SecretsUnreadable:
                     readable = False
+        schedule = _schedule(row.schedule)
         return Project(
             project_id=row.project_id,
             name=row.name,
@@ -91,9 +96,40 @@ class SqliteProjectRepository:
             matchers=[LabelMatcher.model_validate(m) for m in json.loads(row.matchers)],
             sources=[_source_view(src) for src in source_rows],
             credentials_readable=readable,
+            schedule=schedule,
+            next_scheduled_run=schedule.next_after(now) if schedule else None,
             created_at=datetime.fromisoformat(row.created_at),
             updated_at=datetime.fromisoformat(row.updated_at),
         )
+
+    async def scheduled(self) -> list[tuple[Project, datetime]]:
+        """Projects with a schedule, each with the instant its runs are handled up to."""
+
+        def q(conn: sa.Connection) -> list[tuple[Project, datetime]]:
+            rows = conn.execute(
+                sa.select(projects.c.project_id, projects.c.schedule_anchor).where(
+                    projects.c.schedule.is_not(None)
+                )
+            )
+            anchors = {project_id: anchor for project_id, anchor in rows}
+            found = [p for p in self._load(conn, None) if p.project_id in anchors]
+            return [(p, datetime.fromisoformat(anchors[p.project_id])) for p in found]
+
+        return await self._run(q)
+
+    async def advance_schedule(self, project_id: str, handled_until: datetime) -> None:
+        """Mark scheduled runs up to ``handled_until`` handled; never moves the anchor back."""
+        at = format_utc(handled_until)
+
+        def q(conn: sa.Connection) -> None:
+            conn.execute(
+                projects.update()
+                .where(projects.c.project_id == project_id)
+                .where(projects.c.schedule_anchor < at)
+                .values(schedule_anchor=at)
+            )
+
+        await self._run(q)
 
     async def list(self) -> list[Project]:
         return await self._run(lambda c: self._load(c, None))
@@ -184,6 +220,7 @@ class SqliteProjectRepository:
             "name": data.name,
             "description": data.description,
             "matchers": json.dumps([m.model_dump() for m in data.matchers]),
+            "schedule": data.schedule.model_dump_json() if data.schedule else None,
         }
 
     @staticmethod
@@ -202,7 +239,11 @@ class SqliteProjectRepository:
                 raise ProjectNameTaken(data.name)
             conn.execute(
                 projects.insert().values(
-                    project_id=project_id, created_at=now, updated_at=now, **self._values(data)
+                    project_id=project_id,
+                    created_at=now,
+                    updated_at=now,
+                    schedule_anchor=now if data.schedule else None,
+                    **self._values(data),
                 )
             )
             self._write_sources(conn, project_id, data, now)
@@ -214,17 +255,21 @@ class SqliteProjectRepository:
         now = format_utc(datetime.now(UTC))
 
         def q(conn: sa.Connection) -> Project | None:
-            exists = conn.execute(
-                sa.select(projects.c.project_id).where(projects.c.project_id == project_id)
+            stored = conn.execute(
+                sa.select(projects.c.schedule).where(projects.c.project_id == project_id)
             ).first()
-            if exists is None:
+            if stored is None:
                 return None
             if self._name_taken(conn, data.name, project_id):
                 raise ProjectNameTaken(data.name)
+            values = self._values(data)
+            if _schedule(stored.schedule) != data.schedule:
+                # A changed schedule starts now: it never fires for earlier times.
+                values["schedule_anchor"] = now if data.schedule else None
             conn.execute(
                 projects.update()
                 .where(projects.c.project_id == project_id)
-                .values(updated_at=now, **self._values(data))
+                .values(updated_at=now, **values)
             )
             self._write_sources(conn, project_id, data, now)
             return self._load(conn, project_id)[0]
@@ -307,6 +352,10 @@ def _auth_input(conn: PrometheusConnection) -> NoAuth | BearerAuthInput | BasicA
     if conn.basic_auth_user and conn.basic_auth_password is not None:
         return BasicAuthInput(username=conn.basic_auth_user, password=conn.basic_auth_password)
     return NoAuth()
+
+
+def _schedule(raw: str | None) -> ReportSchedule | None:
+    return ReportSchedule.model_validate_json(raw) if raw else None
 
 
 def _source_view(row: Any) -> PrometheusSource:

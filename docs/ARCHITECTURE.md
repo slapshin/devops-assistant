@@ -20,6 +20,7 @@ A **project** is the unit of analysis: a name, 1–10 equality label matchers th
 - `Scope` is `{project_id, project_name, matchers}`. `promql.render` requires every matcher in every selector block, so no query (including ratio operands) can leave the project.
 - `ProjectSources` (`app/metrics/factory.py`) opens the project's source for each analysis or connection test and closes it afterwards; editing a project never affects a running job.
 - Every job and report belongs to one project (`analysis_jobs.project_id`, cascading to reports). Deleting a project deletes its analyses; it is refused while one is queued or running.
+- A project may have a **report schedule** (`ReportSchedule`, `app/domain/schedule.py`): a local `HH:MM` time, an IANA time zone and weekdays (all by default). `ReportScheduler` (`app/scheduler.py`) checks every 30 s and submits due runs to the `JobRunner` with `trigger: scheduled`. Each run analyses the 24 h ending at the scheduled instant (floored to the step). `projects.schedule_anchor` records the instant runs are handled up to: saving a changed schedule resets it to the save time (it never fires for earlier times), runs missed by more than 6 h are skipped, a full queue is retried on the next tick, and projects without a metrics source are skipped.
 - Migration 0003 turned each distinct pre-project `(project, env)` into a project and rewrote saved snapshots to report schema 2.0; the deprecated `METRICS_*` settings are imported once into those projects at startup.
 
 ## Version policy

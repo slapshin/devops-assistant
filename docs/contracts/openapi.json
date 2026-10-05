@@ -115,6 +115,11 @@
           },
           "state": {
             "$ref": "#/components/schemas/JobState"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/JobTrigger",
+            "default": "manual",
+            "description": "Submitted by a user or by the project schedule."
           }
         },
         "required": [
@@ -1490,6 +1495,14 @@
         "title": "JobState",
         "type": "string"
       },
+      "JobTrigger": {
+        "enum": [
+          "manual",
+          "scheduled"
+        ],
+        "title": "JobTrigger",
+        "type": "string"
+      },
       "LabelMatcher": {
         "additionalProperties": false,
         "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
@@ -1846,9 +1859,31 @@
             "title": "Name",
             "type": "string"
           },
+          "next_scheduled_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next automatic analysis; null without a schedule.",
+            "title": "Next Scheduled Run"
+          },
           "project_id": {
             "title": "Project Id",
             "type": "string"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportSchedule"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sources": {
             "items": {
@@ -1903,6 +1938,17 @@
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportSchedule"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Automatic analyses; null runs analyses on demand only."
           },
           "sources": {
             "items": {
@@ -1995,6 +2041,18 @@
             "title": "Name",
             "type": "string"
           },
+          "next_scheduled_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next automatic analysis; null without a schedule.",
+            "title": "Next Scheduled Run"
+          },
           "project_id": {
             "title": "Project Id",
             "type": "string"
@@ -2005,6 +2063,16 @@
             "minimum": 0.0,
             "title": "Report Count",
             "type": "integer"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportSchedule"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sources": {
             "items": {
@@ -2153,6 +2221,43 @@
         ],
         "title": "Recurrence",
         "type": "string"
+      },
+      "ReportSchedule": {
+        "additionalProperties": false,
+        "description": "Run an analysis automatically at ``time`` (local to ``timezone``) on ``weekdays``.\n\nEach run analyses the 24 h ending at the scheduled instant.",
+        "properties": {
+          "time": {
+            "description": "Local time of day, HH:MM (24 h).",
+            "examples": [
+              "08:00"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "title": "Time",
+            "type": "string"
+          },
+          "timezone": {
+            "default": "UTC",
+            "description": "IANA time zone, e.g. Europe/Berlin.",
+            "maxLength": 64,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "weekdays": {
+            "description": "Days to run on; all days by default.",
+            "items": {
+              "$ref": "#/components/schemas/Weekday"
+            },
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Weekdays",
+            "type": "array"
+          }
+        },
+        "required": [
+          "time"
+        ],
+        "title": "ReportSchedule",
+        "type": "object"
       },
       "ReportState": {
         "enum": [
@@ -2649,6 +2754,19 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "Weekday": {
+        "enum": [
+          "mon",
+          "tue",
+          "wed",
+          "thu",
+          "fri",
+          "sat",
+          "sun"
+        ],
+        "title": "Weekday",
+        "type": "string"
       }
     }
   },

@@ -17,6 +17,7 @@ from app.domain.jobs import (
     ErrorCode,
     JobError,
     JobState,
+    JobTrigger,
     StageName,
     StageProgress,
     StageStatus,
@@ -99,7 +100,9 @@ class JobRunner:
             config_hash=self.config.config_hash,
         )
 
-    async def submit(self, request: AnalysisRequest) -> tuple[AnalysisJob, bool]:
+    async def submit(
+        self, request: AnalysisRequest, trigger: JobTrigger = JobTrigger.MANUAL
+    ) -> tuple[AnalysisJob, bool]:
         """Return (job, duplicate). Raises QueueFull when the queue limit is reached."""
         async with self._submit_lock:
             if (existing := await self.repo.find_active(request)) is not None:
@@ -114,6 +117,7 @@ class JobRunner:
                 end_time=request.end_time,
                 detector_version=request.detector_version,
                 config_hash=request.config_hash,
+                trigger=trigger,
                 state=JobState.QUEUED,
                 stages=[StageProgress(stage=s, status=StageStatus.PENDING) for s in StageName],
                 explanation_status=self.explanation_status,

@@ -18,6 +18,7 @@ const link = (job: AnalysisJob) => (job.report_available ? `/reports/${job.analy
         <tr v-for="job in jobs" :key="job.analysis_id">
           <td>
             <RouterLink :to="link(job)" :title="utcTooltip(job.end_time)">{{ formatTime(job.end_time) }}</RouterLink>
+            <span v-if="job.trigger === 'scheduled'" class="muted"> · scheduled</span>
           </td>
           <td>{{ JOB_STATES[job.state] ?? job.state }}<span v-if="job.error" class="muted"> · {{ job.error.code }}</span></td>
           <td><SeverityCounts :counts="job.finding_counts" /></td>

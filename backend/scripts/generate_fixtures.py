@@ -85,6 +85,7 @@ from app.domain.report import (
     ReportState,
     SourceInfo,
 )
+from app.domain.schedule import ReportSchedule, Weekday
 from app.jobs import daily_episodes
 
 ROOT = Path(__file__).resolve().parents[2] / "fixtures"
@@ -99,6 +100,9 @@ SCOPE = Scope(
 )
 SCOPE_LABELS = {m.name: m.value for m in SCOPE.matchers}
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
+SCHEDULE = ReportSchedule(
+    time="08:00", timezone="Europe/Berlin", weekdays=[Weekday.MON, Weekday.WED, Weekday.FRI]
+)
 STEP = timedelta(seconds=STEP_SECONDS)
 CONFIG = DetectorConfig()
 WINDOWS = AnalysisWindows.for_end(T)
@@ -1071,6 +1075,8 @@ def build() -> dict[str, BaseModel]:
                             auth=BearerAuth(token_set=True),
                         )
                     ],
+                    schedule=SCHEDULE,
+                    next_scheduled_run=SCHEDULE.next_after(T),
                     created_at=T,
                     updated_at=T,
                     latest_analysis=completed,

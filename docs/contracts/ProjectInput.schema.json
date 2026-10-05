@@ -149,6 +149,56 @@
       ],
       "title": "PrometheusSourceInput",
       "type": "object"
+    },
+    "ReportSchedule": {
+      "additionalProperties": false,
+      "description": "Run an analysis automatically at ``time`` (local to ``timezone``) on ``weekdays``.\n\nEach run analyses the 24 h ending at the scheduled instant.",
+      "properties": {
+        "time": {
+          "description": "Local time of day, HH:MM (24 h).",
+          "examples": [
+            "08:00"
+          ],
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "title": "Time",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "UTC",
+          "description": "IANA time zone, e.g. Europe/Berlin.",
+          "maxLength": 64,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "weekdays": {
+          "description": "Days to run on; all days by default.",
+          "items": {
+            "$ref": "#/$defs/Weekday"
+          },
+          "maxItems": 7,
+          "minItems": 1,
+          "title": "Weekdays",
+          "type": "array"
+        }
+      },
+      "required": [
+        "time"
+      ],
+      "title": "ReportSchedule",
+      "type": "object"
+    },
+    "Weekday": {
+      "enum": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat",
+        "sun"
+      ],
+      "title": "Weekday",
+      "type": "string"
     }
   },
   "additionalProperties": false,
@@ -181,6 +231,18 @@
       "minLength": 1,
       "title": "Name",
       "type": "string"
+    },
+    "schedule": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReportSchedule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Automatic analyses; null runs analyses on demand only."
     },
     "sources": {
       "items": {

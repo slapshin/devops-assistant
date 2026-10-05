@@ -21,6 +21,7 @@ from app.domain.detector_config import DetectorConfig
 from app.domain.interfaces import ExplanationProvider, MetricsSource
 from app.jobs import JobRunner, RunnerLimits
 from app.metrics.factory import ProjectSources
+from app.scheduler import ReportScheduler
 from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
 from app.static import mount_ui
@@ -74,7 +75,8 @@ def build_services(
     sources = ProjectSources(projects, override=source)
     pipeline = AnalysisPipeline(sources, RobustDetector(), config, provider, unavailable, reason)
     runner = JobRunner(repo, pipeline, config, settings.explanation_status, limits)
-    return Services(settings, config, sources, repo, runner, projects)
+    scheduler = ReportScheduler(projects, runner)
+    return Services(settings, config, sources, repo, runner, projects, scheduler)
 
 
 def create_app(
@@ -101,6 +103,7 @@ def create_app(
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await bootstrap_projects(settings, services.projects)
         recovered = await services.runner.start()
+        services.scheduler.start()
         log.info(
             "started version=%s ai=%s db=%s interrupted_jobs_failed=%d",
             __version__,
@@ -111,6 +114,7 @@ def create_app(
         try:
             yield
         finally:
+            await services.scheduler.stop()
             await services.runner.stop()
             services.repo.close()
 

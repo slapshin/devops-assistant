@@ -66,6 +66,14 @@
       "title": "JobState",
       "type": "string"
     },
+    "JobTrigger": {
+      "enum": [
+        "manual",
+        "scheduled"
+      ],
+      "title": "JobTrigger",
+      "type": "string"
+    },
     "LabelMatcher": {
       "additionalProperties": false,
       "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
@@ -351,6 +359,11 @@
     },
     "state": {
       "$ref": "#/$defs/JobState"
+    },
+    "trigger": {
+      "$ref": "#/$defs/JobTrigger",
+      "default": "manual",
+      "description": "Submitted by a user or by the project schedule."
     }
   },
   "required": [

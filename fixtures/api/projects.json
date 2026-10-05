@@ -26,6 +26,16 @@
         }
       ],
       "credentials_readable": true,
+      "schedule": {
+        "time": "08:00",
+        "timezone": "Europe/Berlin",
+        "weekdays": [
+          "mon",
+          "wed",
+          "fri"
+        ]
+      },
+      "next_scheduled_run": "2026-10-02T06:00:00Z",
       "created_at": "2026-09-30T10:05:00Z",
       "updated_at": "2026-09-30T10:05:00Z",
       "latest_analysis": {
@@ -47,6 +57,7 @@
         "end_time": "2026-09-30T10:05:00Z",
         "detector_version": "detectors-2026.10.5",
         "config_hash": "4fb87b42b943",
+        "trigger": "manual",
         "state": "completed",
         "stages": [
           {

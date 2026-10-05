@@ -119,6 +119,11 @@
         },
         "state": {
           "$ref": "#/$defs/JobState"
+        },
+        "trigger": {
+          "$ref": "#/$defs/JobTrigger",
+          "default": "manual",
+          "description": "Submitted by a user or by the project schedule."
         }
       },
       "required": [
@@ -200,6 +205,14 @@
         "cancelled"
       ],
       "title": "JobState",
+      "type": "string"
+    },
+    "JobTrigger": {
+      "enum": [
+        "manual",
+        "scheduled"
+      ],
+      "title": "JobTrigger",
       "type": "string"
     },
     "LabelMatcher": {

@@ -21,6 +21,11 @@ class JobState(StrEnum):
         return self in (JobState.QUEUED, JobState.RUNNING)
 
 
+class JobTrigger(StrEnum):
+    MANUAL = "manual"
+    SCHEDULED = "scheduled"
+
+
 class StageName(StrEnum):
     DISCOVERY = "discovery"
     COLLECTION = "collection"
@@ -81,6 +86,9 @@ class AnalysisJob(Contract):
     end_time: UtcDatetime
     detector_version: str
     config_hash: str
+    trigger: JobTrigger = Field(
+        default=JobTrigger.MANUAL, description="Submitted by a user or by the project schedule."
+    )
     state: JobState
     stages: list[StageProgress]
     explanation_status: ExplanationStatus

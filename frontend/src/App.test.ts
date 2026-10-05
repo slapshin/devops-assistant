@@ -196,7 +196,44 @@ describe("project form", () => {
         { name: "env", value: "prod" },
       ],
       sources: [{ kind: "prometheus", url: "http://vm:8428/prom", tls_verify: true, auth: { type: "bearer", token: "tok" } }],
+      schedule: null,
     });
+  });
+
+  it("configures a report schedule and shows server time zone errors", async () => {
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, schedule: null, next_scheduled_run: null });
+    let attempt = 0;
+    routes[`PUT /api/projects/${PID}`] = () =>
+      ++attempt === 1
+        ? json({ type: "about:blank", title: "Request validation failed", status: 422, code: "validation_error", errors: [{ field: "body.schedule.timezone", message: "unknown time zone" }] }, 422)
+        : json(base);
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt(`/projects/${PID}/edit`);
+    await fireEvent.click(await screen.findByLabelText("Generate a report automatically"));
+    expect(screen.getByLabelText("Time")).toHaveValue("08:00");
+
+    for (const day of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) await fireEvent.click(screen.getByLabelText(day));
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText("Choose at least one day")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+
+    await fireEvent.click(screen.getByLabelText("Fri"));
+    await fireEvent.click(screen.getByLabelText("Mon"));
+    await fireEvent.update(screen.getByLabelText("Time"), "07:30");
+    await fireEvent.update(screen.getByLabelText("Time zone"), "Mars/Olympus");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("unknown time zone")).toBeInTheDocument();
+    expect(screen.getByLabelText("Time zone")).toHaveAttribute("aria-invalid", "true");
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").schedule).toEqual({
+      time: "07:30",
+      timezone: "Mars/Olympus",
+      weekdays: ["mon", "fri"],
+    });
+
+    await fireEvent.update(screen.getByLabelText("Time zone"), "Europe/Berlin");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(router.currentRoute.value.path).toBe(`/projects/${PID}`));
+    expect(JSON.parse(calls.filter((c) => c.method === "PUT")[1]?.body ?? "{}").schedule.timezone).toBe("Europe/Berlin");
   });
 
   it("keeps a stored secret when the field is left empty and shows server errors", async () => {
@@ -290,6 +327,7 @@ describe("project page", () => {
     expect(await screen.findByRole("heading", { name: base.name })).toBeInTheDocument();
     expect(screen.getByText("victoriametrics.example:8428")).toBeInTheDocument();
     expect(screen.getByText(/Bearer token/)).toBeInTheDocument();
+    expect(screen.getByText(/Mon, Wed, Fri at 08:00 \(Europe\/Berlin\)/)).toBeInTheDocument();
     expect(await screen.findAllByRole("row")).toHaveLength(2);
     await fireEvent.click(screen.getByRole("button", { name: "Load older analyses" }));
     await waitFor(() => expect(screen.getAllByRole("row")).toHaveLength(3));

@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { ProjectSummary } from "../../api/client";
 import { JOB_STATES, formatAge, utcTooltip } from "../../lib/format";
-import { sourceHost } from "../../lib/projects";
+import { scheduleSummary, sourceHost } from "../../lib/projects";
 import SeverityCounts from "../SeverityCounts.vue";
 import HealthBadge from "./HealthBadge.vue";
 import MatcherChips from "./MatcherChips.vue";
@@ -32,6 +32,7 @@ const source = computed(() => props.project.sources[0] ?? null);
         <span class="mono muted">{{ source ? sourceHost(source.url) : "No metrics source" }}</span>
         <HealthBadge :project="project" />
       </p>
+      <p v-if="project.schedule" class="muted schedule">Scheduled: {{ scheduleSummary(project.schedule) }}</p>
     </div>
 
     <div class="latest">
@@ -65,6 +66,7 @@ const source = computed(() => props.project.sources[0] ?? null);
 }
 h2 { margin: 0 0 6px; font-size: 15px; }
 .identity > * + * { margin-top: 6px; }
+.schedule { margin: 0; font-size: 12px; }
 .source { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 0; }
 .latest, .trend { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 960px) {

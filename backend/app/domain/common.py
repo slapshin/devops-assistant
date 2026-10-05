@@ -31,6 +31,11 @@ def format_utc(value: datetime) -> str:
     return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def floor_to_step(moment: datetime) -> datetime:
+    """Floor to the step grid so equal requests within one step share a job."""
+    return datetime.fromtimestamp(int(moment.timestamp()) // STEP_SECONDS * STEP_SECONDS, UTC)
+
+
 UtcDatetime = Annotated[
     AwareDatetime,
     AfterValidator(_to_utc),

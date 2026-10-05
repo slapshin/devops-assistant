@@ -21,6 +21,7 @@ from app.domain.common import (
 )
 from app.domain.jobs import AnalysisJob
 from app.domain.metrics import CapabilityStatus
+from app.domain.schedule import ReportSchedule
 
 MAX_PROJECT_NAME_CHARS = 100
 MAX_DESCRIPTION_CHARS = 1000
@@ -100,6 +101,9 @@ class ProjectInput(Contract):
     description: str | None = Field(default=None, max_length=MAX_DESCRIPTION_CHARS)
     matchers: Matchers
     sources: list[SourceInput] = Field(default_factory=list, max_length=len(SourceKind))
+    schedule: ReportSchedule | None = Field(
+        default=None, description="Automatic analyses; null runs analyses on demand only."
+    )
 
     @field_validator("name")
     @classmethod
@@ -157,6 +161,10 @@ class Project(Contract):
     credentials_readable: bool = Field(
         default=True,
         description="False when stored secrets cannot be decrypted (lost or changed key).",
+    )
+    schedule: ReportSchedule | None = None
+    next_scheduled_run: UtcDatetime | None = Field(
+        default=None, description="Next automatic analysis; null without a schedule."
     )
     created_at: UtcDatetime
     updated_at: UtcDatetime

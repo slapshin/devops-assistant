@@ -1,4 +1,4 @@
-import type { ConnectionTest, Problem, ProjectInput, ProjectSummary } from "../api/client";
+import type { ConnectionTest, Problem, ProjectInput, ProjectSummary, ReportSchedule, Weekday } from "../api/client";
 
 /** Mirrors backend/app/domain/common.py and projects.py so most mistakes never reach the server. */
 const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -9,6 +9,39 @@ const MAX_LABEL_VALUE_CHARS = 256;
 const SOURCE_PATH = "sources.0";
 
 export type AuthType = "none" | "bearer" | "basic";
+
+/** Mirrors backend/app/domain/schedule.py. */
+const LOCAL_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const WEEKDAYS: { day: Weekday; label: string }[] = [
+  { day: "mon", label: "Mon" },
+  { day: "tue", label: "Tue" },
+  { day: "wed", label: "Wed" },
+  { day: "thu", label: "Thu" },
+  { day: "fri", label: "Fri" },
+  { day: "sat", label: "Sat" },
+  { day: "sun", label: "Sun" },
+];
+const ALL_DAYS = WEEKDAYS.map((w) => w.day);
+const WORK_DAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
+const DEFAULT_SCHEDULE_TIME = "08:00";
+
+/** The viewer's IANA zone, so "08:00" means their morning by default. */
+export function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+/** IANA zones the browser knows, for suggestions; the server validates the final value. */
+export function timezoneOptions(): string[] {
+  try {
+    return ["UTC", ...Intl.supportedValuesOf("timeZone").filter((z) => z !== "UTC")];
+  } catch {
+    return ["UTC"];
+  }
+}
 
 export interface MatcherDraft {
   name: string;
@@ -25,6 +58,10 @@ export interface ProjectDraft {
   token: string;
   username: string;
   password: string;
+  scheduled: boolean;
+  scheduleTime: string;
+  scheduleTimezone: string;
+  scheduleWeekdays: Weekday[];
 }
 
 /** Which secret is already stored server-side, so an empty secret input keeps it. */
@@ -49,6 +86,10 @@ export function emptyDraft(): ProjectDraft {
     token: "",
     username: "",
     password: "",
+    scheduled: false,
+    scheduleTime: DEFAULT_SCHEDULE_TIME,
+    scheduleTimezone: browserTimezone(),
+    scheduleWeekdays: [...ALL_DAYS],
   };
 }
 
@@ -65,6 +106,10 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     token: "",
     username: auth?.type === "basic" ? auth.username : "",
     password: "",
+    scheduled: !!project.schedule,
+    scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
+    scheduleTimezone: project.schedule?.timezone ?? browserTimezone(),
+    scheduleWeekdays: [...(project.schedule?.weekdays ?? ALL_DAYS)],
   };
 }
 
@@ -132,12 +177,21 @@ export function validateSource(draft: ProjectDraft, stored: StoredAuth | null, r
   return errors;
 }
 
+export function validateSchedule(draft: ProjectDraft): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!draft.scheduled) return errors;
+  if (!LOCAL_TIME.test(draft.scheduleTime)) errors["schedule.time"] = "Expected a time such as 08:00";
+  if (!draft.scheduleTimezone.trim()) errors["schedule.timezone"] = "Required";
+  if (draft.scheduleWeekdays.length === 0) errors["schedule.weekdays"] = "Choose at least one day";
+  return errors;
+}
+
 export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null): FieldErrors {
   const errors: FieldErrors = {};
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
-  return { ...errors, ...validateMatchers(draft.matchers), ...validateSource(draft, stored) };
+  return { ...errors, ...validateMatchers(draft.matchers), ...validateSource(draft, stored), ...validateSchedule(draft) };
 }
 
 function sourceInput(draft: ProjectDraft): NonNullable<ProjectInput["sources"]>[number] {
@@ -158,7 +212,28 @@ export function toInput(draft: ProjectDraft): ProjectInput {
     description: draft.description.trim() || null,
     matchers: matchersInput(draft),
     sources: draft.url.trim() ? [sourceInput(draft)] : [],
+    schedule: draft.scheduled
+      ? {
+          time: draft.scheduleTime,
+          timezone: draft.scheduleTimezone.trim(),
+          weekdays: ALL_DAYS.filter((d) => draft.scheduleWeekdays.includes(d)),
+        }
+      : null,
   };
+}
+
+/** "Daily at 08:00 (Europe/Berlin)", "Weekdays at …", "Mon, Wed at …". */
+export function scheduleSummary(schedule: ReportSchedule): string {
+  const days = schedule.weekdays ?? ALL_DAYS;
+  const when =
+    days.length === ALL_DAYS.length
+      ? "Daily"
+      : days.length === WORK_DAYS.length && WORK_DAYS.every((d) => days.includes(d))
+        ? "Weekdays"
+        : WEEKDAYS.filter((w) => days.includes(w.day))
+            .map((w) => w.label)
+            .join(", ");
+  return `${when} at ${schedule.time} (${schedule.timezone})`;
 }
 
 export const testRequestSource = sourceInput;

@@ -10,6 +10,7 @@ import type { Crumb } from "../../components/shell/crumbs";
 import {
   type FieldErrors,
   MAX_MATCHERS,
+  WEEKDAYS,
   draftFrom,
   emptyDraft,
   keepsStoredSecret,
@@ -18,6 +19,7 @@ import {
   storedAuth,
   testKey,
   testRequestSource,
+  timezoneOptions,
   toInput,
   validateDraft,
   validateMatchers,
@@ -25,6 +27,7 @@ import {
 } from "../../lib/projects";
 
 const props = defineProps<{ projectId?: string }>();
+const TIMEZONES = timezoneOptions();
 
 const router = useRouter();
 const editing = computed(() => !!props.projectId);
@@ -302,6 +305,52 @@ async function confirmDelete() {
         <ConnectionTestResult v-if="lastTest" :test="lastTest.result" :stale="testStale" />
       </fieldset>
 
+      <fieldset>
+        <legend>Schedule</legend>
+        <label class="check"><input v-model="draft.scheduled" type="checkbox"> Generate a report automatically</label>
+        <template v-if="draft.scheduled">
+          <p class="muted hint">
+            Each run analyses the 24 hours up to the scheduled time. A run missed by more than 6 hours (for example while the app was
+            stopped) is skipped.
+          </p>
+          <div class="schedule">
+            <div class="field">
+              <label for="schedule-time">Time</label>
+              <input
+                id="schedule-time"
+                v-model="draft.scheduleTime"
+                type="time"
+                step="60"
+                :aria-invalid="!!errors['schedule.time']"
+                :aria-describedby="describedBy('schedule.time')"
+              >
+              <p v-if="errors['schedule.time']" :id="errorId('schedule.time')" class="field-error">{{ errors["schedule.time"] }}</p>
+            </div>
+            <div class="field">
+              <label for="schedule-timezone">Time zone</label>
+              <input
+                id="schedule-timezone"
+                v-model="draft.scheduleTimezone"
+                list="schedule-timezones"
+                autocomplete="off"
+                :aria-invalid="!!errors['schedule.timezone']"
+                :aria-describedby="describedBy('schedule.timezone')"
+              >
+              <datalist id="schedule-timezones"><option v-for="zone in TIMEZONES" :key="zone" :value="zone" /></datalist>
+              <p v-if="errors['schedule.timezone']" :id="errorId('schedule.timezone')" class="field-error">{{ errors["schedule.timezone"] }}</p>
+            </div>
+          </div>
+          <div class="field" role="group" aria-labelledby="schedule-days-label" :aria-describedby="describedBy('schedule.weekdays')">
+            <span id="schedule-days-label" class="field-label">Days</span>
+            <div class="days">
+              <label v-for="w in WEEKDAYS" :key="w.day" class="check"><input v-model="draft.scheduleWeekdays" type="checkbox" :value="w.day"> {{ w.label }}</label>
+            </div>
+            <p v-if="errors['schedule.weekdays']" :id="errorId('schedule.weekdays')" class="field-error">{{ errors["schedule.weekdays"] }}</p>
+          </div>
+          <p v-if="!draft.url.trim()" class="muted hint">Scheduled runs are skipped until a metrics source is configured.</p>
+        </template>
+      </fieldset>
+
       <p v-if="formError" role="alert" class="banner error">{{ formError }}</p>
       <p v-if="saveWarning" class="banner">{{ saveWarning }}</p>
       <div class="row">
@@ -336,7 +385,7 @@ async function confirmDelete() {
 <style scoped>
 .form { max-width: 720px; }
 .field { display: flex; flex-direction: column; gap: 2px; }
-.field label { font-weight: 500; }
+.field label, .field-label { font-weight: 500; }
 fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: calc(var(--space) * 2); background: var(--panel); }
 fieldset > * + * { margin-top: var(--space); }
 legend { font-weight: 500; color: var(--strong); padding: 0 4px; }
@@ -345,6 +394,12 @@ legend { font-weight: 500; color: var(--strong); padding: 0 4px; }
 .eq { padding-top: 6px; }
 .source-title { margin: 0; font-size: 0.95rem; }
 .check { display: flex; gap: 6px; align-items: center; }
+.field .check { font-weight: 400; }
+.schedule { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: var(--space); align-items: start; }
+.days { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+@media (max-width: 600px) {
+  .schedule { grid-template-columns: minmax(0, 1fr); }
+}
 .danger-zone { max-width: 720px; border-color: var(--crit); }
 .danger-zone h2 { margin-top: 0; }
 </style>

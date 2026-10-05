@@ -208,6 +208,11 @@ export interface components {
             /** Started At */
             started_at?: string | null;
             state: components["schemas"]["JobState"];
+            /**
+             * @description Submitted by a user or by the project schedule.
+             * @default manual
+             */
+            trigger: components["schemas"]["JobTrigger"];
         };
         /** AnalysisList */
         AnalysisList: {
@@ -693,6 +698,11 @@ export interface components {
          */
         JobState: "queued" | "running" | "completed" | "partial" | "failed" | "cancelled";
         /**
+         * JobTrigger
+         * @enum {string}
+         */
+        JobTrigger: "manual" | "scheduled";
+        /**
          * LabelMatcher
          * @description Exact ``name="value"`` matcher added to every selector of a project's queries.
          */
@@ -843,8 +853,14 @@ export interface components {
             matchers: components["schemas"]["LabelMatcher"][];
             /** Name */
             name: string;
+            /**
+             * Next Scheduled Run
+             * @description Next automatic analysis; null without a schedule.
+             */
+            next_scheduled_run?: string | null;
             /** Project Id */
             project_id: string;
+            schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
             sources: components["schemas"]["PrometheusSource"][];
             /** Updated At */
@@ -861,6 +877,8 @@ export interface components {
             matchers: components["schemas"]["LabelMatcher"][];
             /** Name */
             name: string;
+            /** @description Automatic analyses; null runs analyses on demand only. */
+            schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
             sources?: components["schemas"]["PrometheusSourceInput"][];
         };
@@ -892,6 +910,11 @@ export interface components {
             matchers: components["schemas"]["LabelMatcher"][];
             /** Name */
             name: string;
+            /**
+             * Next Scheduled Run
+             * @description Next automatic analysis; null without a schedule.
+             */
+            next_scheduled_run?: string | null;
             /** Project Id */
             project_id: string;
             /**
@@ -900,6 +923,7 @@ export interface components {
              * @default 0
              */
             report_count: number;
+            schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
             sources: components["schemas"]["PrometheusSource"][];
             /** Updated At */
@@ -953,6 +977,31 @@ export interface components {
          * @enum {string}
          */
         Recurrence: "new" | "repeated" | "recurring";
+        /**
+         * ReportSchedule
+         * @description Run an analysis automatically at ``time`` (local to ``timezone``) on ``weekdays``.
+         *
+         *     Each run analyses the 24 h ending at the scheduled instant.
+         */
+        ReportSchedule: {
+            /**
+             * Time
+             * @description Local time of day, HH:MM (24 h).
+             * @example 08:00
+             */
+            time: string;
+            /**
+             * Timezone
+             * @description IANA time zone, e.g. Europe/Berlin.
+             * @default UTC
+             */
+            timezone: string;
+            /**
+             * Weekdays
+             * @description Days to run on; all days by default.
+             */
+            weekdays?: components["schemas"]["Weekday"][];
+        };
         /**
          * ReportState
          * @enum {string}
@@ -1124,6 +1173,11 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * Weekday
+         * @enum {string}
+         */
+        Weekday: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
     };
     responses: never;
     parameters: never;

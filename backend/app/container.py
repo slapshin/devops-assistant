@@ -6,6 +6,7 @@ from app.domain.detector_config import DetectorConfig
 from app.domain.projects import ConnectionTest
 from app.jobs import JobRunner
 from app.metrics.factory import ProjectSources
+from app.scheduler import ReportScheduler
 from app.settings import Settings
 from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository
@@ -19,5 +20,6 @@ class Services:
     repo: SqliteReportRepository
     runner: JobRunner
     projects: SqliteProjectRepository
+    scheduler: ReportScheduler
     health_cache: dict[str, tuple[float, str, ConnectionTest]] = field(default_factory=dict)
     """project_id -> (monotonic time, project updated_at, last connection test)."""

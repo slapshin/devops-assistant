@@ -22,6 +22,13 @@ projects = sa.Table(
     sa.Column("matchers", sa.Text, nullable=False),
     sa.Column("created_at", sa.String(20), nullable=False),
     sa.Column("updated_at", sa.String(20), nullable=False),
+    sa.Column("schedule", sa.Text, nullable=True, comment="JSON ReportSchedule"),
+    sa.Column(
+        "schedule_anchor",
+        sa.String(20),
+        nullable=True,
+        comment="Scheduled runs at or before this instant are handled",
+    ),
 )
 
 project_sources = sa.Table(

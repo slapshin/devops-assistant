@@ -9,7 +9,7 @@ from app import __version__
 from app.ai.providers import FAKE_MODEL
 from app.api.problems import ProblemError, problem_responses
 from app.container import Services
-from app.domain.common import STEP_SECONDS, Scope
+from app.domain.common import Scope, floor_to_step
 from app.domain.detector_config import DetectorConfig
 from app.domain.jobs import (
     AnalysisJob,
@@ -155,7 +155,7 @@ async def submit_analysis(
         )
 
     scope = await project_scope(services, submission.project_id)
-    request = services.runner.request_for(scope, _align_to_step(min(requested, now)))
+    request = services.runner.request_for(scope, floor_to_step(min(requested, now)))
 
     try:
         job, duplicate = await services.runner.submit(request)
@@ -172,11 +172,6 @@ async def submit_analysis(
     if duplicate:
         response.status_code = 200
     return AnalysisSubmitted(analysis=job, duplicate_of_active=duplicate)
-
-
-def _align_to_step(moment: datetime) -> datetime:
-    """Floor to the step grid so equal requests within one step share a job."""
-    return datetime.fromtimestamp(int(moment.timestamp()) // STEP_SECONDS * STEP_SECONDS, UTC)
 
 
 @router.get("/analyses", response_model=AnalysisList, responses=problem_responses(422))

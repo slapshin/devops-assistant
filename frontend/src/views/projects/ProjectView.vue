@@ -7,7 +7,8 @@ import HealthBadge from "../../components/projects/HealthBadge.vue";
 import MatcherChips from "../../components/projects/MatcherChips.vue";
 import RunAnalysis from "../../components/projects/RunAnalysis.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
-import { sourceHost } from "../../lib/projects";
+import { formatTime, utcTooltip } from "../../lib/format";
+import { scheduleSummary, sourceHost } from "../../lib/projects";
 
 const HISTORY_PAGE_SIZE = 20;
 const AUTH_LABELS: Record<string, string> = { none: "No authentication", bearer: "Bearer token", basic: "Basic auth" };
@@ -51,6 +52,14 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
           · <HealthBadge :project="project.data.value" />
         </dd>
         <dd v-else class="muted">Not configured</dd>
+        <dt>Schedule</dt>
+        <dd v-if="project.data.value.schedule">
+          {{ scheduleSummary(project.data.value.schedule) }}
+          <template v-if="project.data.value.next_scheduled_run">
+            · next <span :title="utcTooltip(project.data.value.next_scheduled_run)">{{ formatTime(project.data.value.next_scheduled_run) }}</span>
+          </template>
+        </dd>
+        <dd v-else class="muted">On demand only</dd>
         <dt>Saved reports</dt>
         <dd>{{ project.data.value.report_count }}</dd>
       </dl>
