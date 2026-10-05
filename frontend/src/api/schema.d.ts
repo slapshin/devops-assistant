@@ -849,6 +849,11 @@ export interface components {
             credentials_readable: boolean;
             /** Description */
             description?: string | null;
+            /**
+             * Keep Reports
+             * @description Newest reports kept; null keeps all.
+             */
+            keep_reports?: number | null;
             /** Matchers */
             matchers: components["schemas"]["LabelMatcher"][];
             /** Name */
@@ -873,6 +878,11 @@ export interface components {
         ProjectInput: {
             /** Description */
             description?: string | null;
+            /**
+             * Keep Reports
+             * @description Keep only this many newest reports; older analyses are deleted automatically. Null keeps all.
+             */
+            keep_reports?: number | null;
             /** Matchers */
             matchers: components["schemas"]["LabelMatcher"][];
             /** Name */
@@ -904,6 +914,11 @@ export interface components {
             credentials_readable: boolean;
             /** Description */
             description?: string | null;
+            /**
+             * Keep Reports
+             * @description Newest reports kept; null keeps all.
+             */
+            keep_reports?: number | null;
             /** @description Newest finished job. */
             latest_analysis?: components["schemas"]["AnalysisJob"] | null;
             /** Matchers */

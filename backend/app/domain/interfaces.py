@@ -198,6 +198,10 @@ class ReportRepository(Protocol):
 
     async def get_report(self, analysis_id: str) -> AnalysisReport | None: ...
 
+    async def prune_reports(self, project_id: str) -> int:
+        """Delete finished analyses beyond the project's ``keep_reports``; return the count."""
+        ...
+
     async def fail_interrupted(self) -> int:
         """Mark queued/running jobs failed with interrupted_by_restart; return the count."""
         ...

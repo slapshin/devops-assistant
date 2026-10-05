@@ -107,6 +107,7 @@ Typical measured figures on a real deployment (paas/production, 360 series): ≈
 - On startup, jobs that were queued or running when the process stopped are marked `failed` with `interrupted_by_restart`. They are **not** resumed; use *Run again*.
 - Shutdown (`make down` or Ctrl-C) cancels running work. The next start records it as interrupted.
 - Scheduled reports (a project's *Schedule* setting) run inside the app process, so they only run while it is up. A run missed by up to 6 hours (for example after a restart) still happens, analysing the 24 h up to its scheduled time; older missed runs are skipped and logged (`app.scheduler`). The scheduler never runs more than the job queue allows: with a full queue the run is retried every 30 s.
+- Report retention (a project's *Report retention* setting) keeps only the newest N reports: after each analysis, and when the project is saved, older analyses of that project (including failed or cancelled ones older than the oldest kept report) are deleted with their reports. Deleted rows free space inside SQLite for reuse; the file itself only shrinks after `VACUUM`. Take a backup (`make backup`) before lowering N if old reports matter.
 - Reports are **never** deleted automatically. Deleting a project deletes its analyses and reports (after confirmation in the UI).
 
 ### Upgrading from a pre-project release

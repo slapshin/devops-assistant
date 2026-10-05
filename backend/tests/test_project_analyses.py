@@ -106,6 +106,34 @@ def test_hard_delete_cascades_and_is_refused_while_active(tmp_path: Path) -> Non
         assert report.status_code == 200
 
 
+def test_keep_reports_deletes_older_analyses(tmp_path: Path) -> None:
+    def listed(client: TestClient, pid: str) -> list[str]:
+        items = client.get("/api/analyses", params={"project_id": pid}).json()["items"]
+        return [j["analysis_id"] for j in items]
+
+    with make_client(tmp_path) as client:
+        pid = create_project(client, "retained", "synthetic://healthy")
+        other = create_project(client, "other", "synthetic://healthy")
+        body = client.get(f"/api/projects/{pid}").json()
+        body = {k: body[k] for k in ("name", "matchers", "sources")}
+        res = client.put(f"/api/projects/{pid}", json={**body, "keep_reports": 2})
+        assert res.status_code == 200 and res.json()["keep_reports"] == 2
+
+        other_job = run(client, other)
+        jobs = [run(client, pid)["analysis_id"] for _ in range(3)]
+        assert listed(client, pid) == jobs[:0:-1]
+        assert client.get(f"/api/analyses/{jobs[0]}/report").status_code == 404
+        assert client.get(f"/api/projects/{pid}").json()["report_count"] == 2
+
+        # Lowering the limit applies on save; other projects are untouched.
+        client.put(f"/api/projects/{pid}", json={**body, "keep_reports": 1})
+        assert listed(client, pid) == [jobs[2]]
+        assert listed(client, other) == [other_job["analysis_id"]]
+
+        res = client.put(f"/api/projects/{pid}", json={**body, "keep_reports": 0})
+        assert res.status_code == 422
+
+
 def test_demo_projects_are_seeded_once(tmp_path: Path) -> None:
     with make_client(tmp_path, demo_projects=True) as client:
         names = [p["name"] for p in client.get("/api/projects").json()["items"]]

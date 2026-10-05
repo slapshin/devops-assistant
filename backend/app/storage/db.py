@@ -29,6 +29,7 @@ projects = sa.Table(
         nullable=True,
         comment="Scheduled runs at or before this instant are handled",
     ),
+    sa.Column("keep_reports", sa.Integer, nullable=True, comment="Newest reports kept"),
 )
 
 project_sources = sa.Table(

@@ -13,7 +13,7 @@ from app.domain.explanation import ExplanationStatus
 from app.domain.interfaces import ProjectActivity
 from app.domain.jobs import AnalysisJob, ErrorCode, JobError, JobState, StageProgress, StageStatus
 from app.domain.report import AnalysisReport, AnalysisRequest
-from app.storage.db import analysis_jobs, make_engine, migrate, reports
+from app.storage.db import analysis_jobs, make_engine, migrate, projects, reports
 
 ACTIVE = (JobState.QUEUED.value, JobState.RUNNING.value)
 MAX_REPORT_BYTES = 20 * 1024 * 1024
@@ -273,6 +273,44 @@ class SqliteReportRepository:
         if version.split(".")[0] != REPORT_SCHEMA_VERSION.split(".")[0]:
             raise SchemaUnsupported(version)
         return AnalysisReport.model_validate_json(zlib.decompress(body))
+
+    async def prune_reports(self, project_id: str) -> int:
+        """Apply the project's ``keep_reports``: delete finished analyses older than its newest
+        N reports (reports cascade). Active jobs are never touched. Returns reports deleted."""
+
+        def q(conn: sa.Connection) -> int:
+            keep = conn.execute(
+                sa.select(projects.c.keep_reports).where(projects.c.project_id == project_id)
+            ).scalar()
+            if keep is None:
+                return 0
+            with_report = (
+                sa.select(analysis_jobs.c.analysis_id)
+                .select_from(reports.join(analysis_jobs))
+                .where(analysis_jobs.c.project_id == project_id)
+                .order_by(analysis_jobs.c.analysis_id.desc())
+            )
+            # UUIDv7 IDs sort by creation time: the oldest kept report is the cutoff.
+            cutoff = conn.execute(with_report.offset(keep - 1).limit(1)).scalar()
+            if cutoff is None:
+                return 0
+            older = (
+                sa.select(analysis_jobs.c.analysis_id)
+                .where(analysis_jobs.c.project_id == project_id)
+                .where(analysis_jobs.c.analysis_id < cutoff)
+                .where(analysis_jobs.c.state.not_in(ACTIVE))
+            )
+            deleted = int(
+                conn.execute(
+                    sa.select(sa.func.count())
+                    .select_from(reports)
+                    .where(reports.c.analysis_id.in_(older))
+                ).scalar_one()
+            )
+            conn.execute(analysis_jobs.delete().where(analysis_jobs.c.analysis_id.in_(older)))
+            return deleted
+
+        return await self._run(q)
 
     async def fail_interrupted(self) -> int:
         """Mark queued/running jobs failed with interrupted_by_restart; return the count."""

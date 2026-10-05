@@ -61,7 +61,10 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
         </dd>
         <dd v-else class="muted">On demand only</dd>
         <dt>Saved reports</dt>
-        <dd>{{ project.data.value.report_count }}</dd>
+        <dd>
+          {{ project.data.value.report_count }}
+          <span v-if="project.data.value.keep_reports != null" class="muted">· latest {{ project.data.value.keep_reports }} kept</span>
+        </dd>
       </dl>
 
       <h2 class="section-title">Analyses</h2>

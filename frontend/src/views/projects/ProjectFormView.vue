@@ -9,6 +9,7 @@ import AppTopbar from "../../components/shell/AppTopbar.vue";
 import type { Crumb } from "../../components/shell/crumbs";
 import {
   type FieldErrors,
+  MAX_KEEP_REPORTS,
   MAX_MATCHERS,
   WEEKDAYS,
   draftFrom,
@@ -351,6 +352,30 @@ async function confirmDelete() {
         </template>
       </fieldset>
 
+      <fieldset>
+        <legend>Report retention</legend>
+        <label class="check"><input v-model="draft.limitReports" type="checkbox"> Keep only the latest reports</label>
+        <div v-if="draft.limitReports" class="field">
+          <label for="keep-reports">Reports to keep</label>
+          <input
+            id="keep-reports"
+            v-model.number="draft.keepReports"
+            class="keep"
+            type="number"
+            min="1"
+            :max="MAX_KEEP_REPORTS"
+            step="1"
+            :aria-invalid="!!errors.keep_reports"
+            :aria-describedby="describedBy('keep_reports') ?? 'keep-reports-hint'"
+          >
+          <p id="keep-reports-hint" class="muted hint">
+            After each analysis, older analyses and their reports are deleted automatically. Saving a lower number deletes the excess
+            right away.
+          </p>
+          <p v-if="errors.keep_reports" :id="errorId('keep_reports')" class="field-error">{{ errors.keep_reports }}</p>
+        </div>
+      </fieldset>
+
       <p v-if="formError" role="alert" class="banner error">{{ formError }}</p>
       <p v-if="saveWarning" class="banner">{{ saveWarning }}</p>
       <div class="row">
@@ -396,6 +421,7 @@ legend { font-weight: 500; color: var(--strong); padding: 0 4px; }
 .check { display: flex; gap: 6px; align-items: center; }
 .field .check { font-weight: 400; }
 .schedule { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: var(--space); align-items: start; }
+.keep { max-width: 10rem; }
 .days { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 @media (max-width: 600px) {
   .schedule { grid-template-columns: minmax(0, 1fr); }

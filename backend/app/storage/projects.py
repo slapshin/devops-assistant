@@ -97,6 +97,7 @@ class SqliteProjectRepository:
             sources=[_source_view(src) for src in source_rows],
             credentials_readable=readable,
             schedule=schedule,
+            keep_reports=row.keep_reports,
             next_scheduled_run=schedule.next_after(now) if schedule else None,
             created_at=datetime.fromisoformat(row.created_at),
             updated_at=datetime.fromisoformat(row.updated_at),
@@ -221,6 +222,7 @@ class SqliteProjectRepository:
             "description": data.description,
             "matchers": json.dumps([m.model_dump() for m in data.matchers]),
             "schedule": data.schedule.model_dump_json() if data.schedule else None,
+            "keep_reports": data.keep_reports,
         }
 
     @staticmethod

@@ -335,6 +335,19 @@
           "default": null,
           "title": "Description"
         },
+        "keep_reports": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Newest reports kept; null keeps all.",
+          "title": "Keep Reports"
+        },
         "latest_analysis": {
           "anyOf": [
             {

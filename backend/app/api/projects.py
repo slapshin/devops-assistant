@@ -129,6 +129,7 @@ async def update_project(project_id: str, data: ProjectInput, services: Services
     if project is None:
         raise _not_found(project_id)
     services.health_cache.pop(project_id, None)
+    await services.repo.prune_reports(project_id)
     return project
 
 

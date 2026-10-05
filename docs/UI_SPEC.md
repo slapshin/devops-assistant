@@ -49,7 +49,7 @@ Replaces the original start view (project/env selectors). Screenshots: `docs/scr
 - **Run analysis**: posts `{project_id}`. While a job is queued or running, the card shows "Running · <stage> (done/total)" linked to the job instead of the button, and the list polls every 2 s. `queue_full` shows the Retry-After time inline. Without a source, or with unreadable credentials, the button is disabled with a reason and an Edit link.
 - Empty state: an explanation and a *Create project* call to action. Load errors show a Retry button. A text filter (name or `label=value`) appears once there are more than 10 projects.
 
-**Project page (`/projects/:projectId`).** Name, description, matchers, source (host, auth type, TLS note, health), schedule with the next run ("On demand only" without one), saved report count, Edit and Run. The analysis history pages through `GET /api/analyses?project_id=` (20 per page, *Load older analyses*); scheduled runs are marked "· scheduled". The report and job headers link back here.
+**Project page (`/projects/:projectId`).** Name, description, matchers, source (host, auth type, TLS note, health), schedule with the next run ("On demand only" without one), saved report count (with "· latest N kept" when retention is set), Edit and Run. The analysis history pages through `GET /api/analyses?project_id=` (20 per page, *Load older analyses*); scheduled runs are marked "· scheduled". The report and job headers link back here.
 
 **Form (`/projects/new`, `/projects/:projectId/edit`).**
 
@@ -57,6 +57,7 @@ Replaces the original start view (project/env selectors). Screenshots: `docs/scr
 - **Sources → Prometheus-compatible metrics**: URL (no credentials, query or fragment; `synthetic://<scenario>` allowed; empty means no source), TLS verification, and authentication (none, bearer, basic). Secret inputs are write-only. When a secret of the chosen type is stored, the placeholder reads "Stored — leave empty to keep" and an empty input keeps it. Switching the type requires the new secret. Future source kinds get their own section here.
 - **Test connection** runs on the unsaved draft (stored secrets are reused in edit mode) and shows reachability/auth, matching series, history days, and a capability table per signal family. Editing labels or the source after a test marks the result stale. Saving is never blocked by the test, but a missing, stale or failed test (or no source at all) shows a warning next to Save.
 - **Schedule**: *Generate a report automatically* reveals a time (`HH:MM`), a time zone (IANA name with suggestions; defaults to the browser's zone) and weekday checkboxes (all checked by default; at least one required). Server `422` errors (e.g. an unknown time zone) map back to the field. Without a source a note says scheduled runs are skipped.
+- **Report retention**: *Keep only the latest reports* reveals *Reports to keep* (1–1000, default 30). Older analyses and their reports are deleted automatically after each analysis; saving a lower number deletes the excess right away.
 - **Delete** (edit only): states how many saved reports will be removed, is disabled while an analysis is queued or running, and requires typing the project name before *Delete permanently* is enabled.
 
 ## 4. Job progress view

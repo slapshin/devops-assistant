@@ -24,6 +24,9 @@ export const WEEKDAYS: { day: Weekday; label: string }[] = [
 const ALL_DAYS = WEEKDAYS.map((w) => w.day);
 const WORK_DAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
 const DEFAULT_SCHEDULE_TIME = "08:00";
+/** Mirrors MAX_KEEP_REPORTS in backend/app/domain/projects.py. */
+export const MAX_KEEP_REPORTS = 1000;
+const DEFAULT_KEEP_REPORTS = 30;
 
 /** The viewer's IANA zone, so "08:00" means their morning by default. */
 export function browserTimezone(): string {
@@ -62,6 +65,8 @@ export interface ProjectDraft {
   scheduleTime: string;
   scheduleTimezone: string;
   scheduleWeekdays: Weekday[];
+  limitReports: boolean;
+  keepReports: number;
 }
 
 /** Which secret is already stored server-side, so an empty secret input keeps it. */
@@ -90,6 +95,8 @@ export function emptyDraft(): ProjectDraft {
     scheduleTime: DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: browserTimezone(),
     scheduleWeekdays: [...ALL_DAYS],
+    limitReports: false,
+    keepReports: DEFAULT_KEEP_REPORTS,
   };
 }
 
@@ -110,6 +117,8 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: project.schedule?.timezone ?? browserTimezone(),
     scheduleWeekdays: [...(project.schedule?.weekdays ?? ALL_DAYS)],
+    limitReports: project.keep_reports != null,
+    keepReports: project.keep_reports ?? DEFAULT_KEEP_REPORTS,
   };
 }
 
@@ -186,12 +195,19 @@ export function validateSchedule(draft: ProjectDraft): FieldErrors {
   return errors;
 }
 
+export function validateRetention(draft: ProjectDraft): FieldErrors {
+  if (!draft.limitReports) return {};
+  const n = draft.keepReports;
+  if (!Number.isInteger(n) || n < 1 || n > MAX_KEEP_REPORTS) return { keep_reports: `A whole number from 1 to ${MAX_KEEP_REPORTS}` };
+  return {};
+}
+
 export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null): FieldErrors {
   const errors: FieldErrors = {};
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
-  return { ...errors, ...validateMatchers(draft.matchers), ...validateSource(draft, stored), ...validateSchedule(draft) };
+  return { ...errors, ...validateMatchers(draft.matchers), ...validateSource(draft, stored), ...validateSchedule(draft), ...validateRetention(draft) };
 }
 
 function sourceInput(draft: ProjectDraft): NonNullable<ProjectInput["sources"]>[number] {
@@ -219,6 +235,7 @@ export function toInput(draft: ProjectDraft): ProjectInput {
           weekdays: ALL_DAYS.filter((d) => draft.scheduleWeekdays.includes(d)),
         }
       : null,
+    keep_reports: draft.limitReports ? draft.keepReports : null,
   };
 }
 

@@ -197,7 +197,27 @@ describe("project form", () => {
       ],
       sources: [{ kind: "prometheus", url: "http://vm:8428/prom", tls_verify: true, auth: { type: "bearer", token: "tok" } }],
       schedule: null,
+      keep_reports: null,
     });
+  });
+
+  it("limits how many reports a project keeps", async () => {
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, keep_reports: null });
+    routes[`PUT /api/projects/${PID}`] = () => json(base);
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt(`/projects/${PID}/edit`);
+    await fireEvent.click(await screen.findByLabelText("Keep only the latest reports"));
+    expect(screen.getByLabelText("Reports to keep")).toHaveValue(30);
+
+    await fireEvent.update(screen.getByLabelText("Reports to keep"), "0");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText("A whole number from 1 to 1000")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+
+    await fireEvent.update(screen.getByLabelText("Reports to keep"), "5");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(router.currentRoute.value.path).toBe(`/projects/${PID}`));
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").keep_reports).toBe(5);
   });
 
   it("configures a report schedule and shows server time zone errors", async () => {

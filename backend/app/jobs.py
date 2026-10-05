@@ -181,6 +181,7 @@ class JobRunner:
             )
             await self._save(analysis_id, report)
             await self._finish_with_report(analysis_id, report)
+            await self._prune(request.scope.project_id)
         except Cancelled, asyncio.CancelledError:
             if analysis_id in self._user_cancelled:
                 await self._finish_cancelled(analysis_id)
@@ -219,6 +220,14 @@ class JobRunner:
                 finished_at=datetime.now(UTC),
             ),
         )
+
+    async def _prune(self, project_id: str) -> None:
+        """Retention never affects the finished job's outcome."""
+        try:
+            if deleted := await self.repo.prune_reports(project_id):
+                log.info("deleted %d old report(s) of project %s", deleted, project_id)
+        except Exception:
+            log.exception("pruning reports of project %s failed", project_id)
 
     async def _finish_with_report(self, analysis_id: str, report: AnalysisReport) -> None:
         is_partial = report.state is ReportState.PARTIAL

@@ -25,6 +25,7 @@ from app.domain.schedule import ReportSchedule
 
 MAX_PROJECT_NAME_CHARS = 100
 MAX_DESCRIPTION_CHARS = 1000
+MAX_KEEP_REPORTS = 1000
 
 
 def validate_source_url(value: str) -> str:
@@ -104,6 +105,13 @@ class ProjectInput(Contract):
     schedule: ReportSchedule | None = Field(
         default=None, description="Automatic analyses; null runs analyses on demand only."
     )
+    keep_reports: int | None = Field(
+        default=None,
+        ge=1,
+        le=MAX_KEEP_REPORTS,
+        description="Keep only this many newest reports; older analyses are deleted "
+        "automatically. Null keeps all.",
+    )
 
     @field_validator("name")
     @classmethod
@@ -163,6 +171,9 @@ class Project(Contract):
         description="False when stored secrets cannot be decrypted (lost or changed key).",
     )
     schedule: ReportSchedule | None = None
+    keep_reports: int | None = Field(
+        default=None, description="Newest reports kept; null keeps all."
+    )
     next_scheduled_run: UtcDatetime | None = Field(
         default=None, description="Next automatic analysis; null without a schedule."
     )

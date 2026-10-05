@@ -217,6 +217,21 @@
       "default": null,
       "title": "Description"
     },
+    "keep_reports": {
+      "anyOf": [
+        {
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Keep only this many newest reports; older analyses are deleted automatically. Null keeps all.",
+      "title": "Keep Reports"
+    },
     "matchers": {
       "items": {
         "$ref": "#/$defs/LabelMatcher"

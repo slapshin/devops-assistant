@@ -1848,6 +1848,18 @@
             ],
             "title": "Description"
           },
+          "keep_reports": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Newest reports kept; null keeps all.",
+            "title": "Keep Reports"
+          },
           "matchers": {
             "items": {
               "$ref": "#/components/schemas/LabelMatcher"
@@ -1923,6 +1935,20 @@
               }
             ],
             "title": "Description"
+          },
+          "keep_reports": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Keep only this many newest reports; older analyses are deleted automatically. Null keeps all.",
+            "title": "Keep Reports"
           },
           "matchers": {
             "items": {
@@ -2018,6 +2044,18 @@
               }
             ],
             "title": "Description"
+          },
+          "keep_reports": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Newest reports kept; null keeps all.",
+            "title": "Keep Reports"
           },
           "latest_analysis": {
             "anyOf": [
