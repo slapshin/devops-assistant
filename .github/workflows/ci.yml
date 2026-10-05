@@ -18,6 +18,9 @@ jobs:
     name: Backend checks
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v7
 
@@ -29,10 +32,26 @@ jobs:
           cache-dependency-glob: backend/uv.lock
 
       - name: Install
-        run: cd backend && uv sync --locked
+        run: uv sync --locked
 
-      - name: Check (ruff, mypy, contract/fixture drift, pytest)
-        run: make check-backend
+      # Same steps as `make check-backend`, split so each shows separately.
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Mypy
+        run: uv run mypy
+
+      - name: Contract drift
+        run: uv run python -m scripts.export_schemas --check
+
+      - name: Fixture drift
+        run: uv run python -m scripts.generate_fixtures --check
+
+      - name: Pytest
+        run: uv run pytest -q
 
   frontend:
     name: Frontend checks
