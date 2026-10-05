@@ -80,7 +80,7 @@ Additional packaged checks from T009: after `down` and `up --force-recreate` the
   - tuning via `DETECTOR_CONFIG_FILE` is expected after owner review.
 - Large scopes produce large reports (12.8 MB for paas-gpu), which are slower to load in the browser. The 20 MB budget applies and trimming is disclosed.
 - Mappings are instant snapshots at T. Weekly seasonality is not modelled (14-day baselines).
-- There is no authentication (local exposure only), no CI pipeline file, and no published image. Browser checks were run interactively (Playwright MCP), not as a committed e2e suite. Screen readers were not tested with real assistive technology.
+- There is no authentication (local exposure only) and no published image; CI (`.github/workflows/ci.yml`) runs the checks and builds the image without pushing it. Browser checks were run interactively (Playwright MCP), not as a committed e2e suite. Screen readers were not tested with real assistive technology.
 - Only paas/production was inventoried in depth. Other scopes rely on runtime capability discovery (paas-gpu/production worked).
 
 ## Setup and use
