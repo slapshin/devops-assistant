@@ -127,7 +127,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 
 **Report schema version:** `schema_version: "1.0"`. Minor bumps add optional fields; major bumps require a reader migration. Readers must open every saved major version they claim to support, or return `report_unavailable` with `code=schema_unsupported` — never a crash.
 
-## 5. Numerical policy (detector config `detectors-2026.09.1`)
+## 5. Numerical policy (detector config `detectors-2026.10.1`)
 
 All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
@@ -166,6 +166,9 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | HTTP/RPC traffic | request rate (service, route, method) | both | ×2 or ÷2 and ≥ 0.2 req/s change | — |
 | HTTP/RPC failure | 5xx ratio (`http_response_status_code=~"5.."` / all); RPC failure ratio (`rpc_response_status_code!="OK"` / all). Baselines are ≈ 0 in practice (T003), so the absolute check is the main detector. | up | +2 pp | ≥ 5 % over a step window with ≥ 30 requests |
 | HTTP client errors | 404 rate and other-4xx rate (4xx − 404), each ×2 and ≥ +0.1 req/s (T005: rates replace the 4xx ratio to avoid double counting) | up | ×2 | — (never a failure) |
+| Reverse proxies | nginx (stub_status exporter), Angie (`prometheus_all.conf`), Caddy, Traefik (per server zone / server+handler / service): request rate, 5xx ratio, 404 and other-4xx rates, and p95/p99 where the proxy exports histograms (Caddy, Traefik). These reuse the HTTP rules above. | as HTTP | as HTTP | as HTTP |
+| Proxy health | open connections (nginx, Angie, Traefik entrypoints); dropped connections (nginx accepted − handled, Angie `dropped`) | up | open: ×2 and ≥ +20; dropped: ≥ +0.1/s | — |
+| Proxy health | upstream unavailable (Angie peer state unavailable/unhealthy, Caddy upstream unhealthy, Traefik server down); nginx status unreadable (`nginx_up = 0`) | up | — | value ≥ 1 for ≥ 15 min (shortfall rule, 3 points) |
 | Latency | p95/p99 from verified classic histograms (HTTP and RPC buckets 0.005–10 s; values at the top bucket are reported as "≥ 10 s"); mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
 
 - Rates are computed before aggregation; ratio numerator and denominator use the same selector scope (project, env, and entity labels).

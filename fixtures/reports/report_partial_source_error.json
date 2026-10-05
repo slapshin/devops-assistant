@@ -28,8 +28,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.09.1",
-  "config_hash": "b177dc4ac897",
+  "detector_version": "detectors-2026.10.1",
+  "config_hash": "16e089195895",
   "source": {
     "base_url": "http://localhost:8428",
     "backend": null,
@@ -328,6 +328,15 @@
     },
     {
       "family": "latency",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "proxy",
       "status": "no_anomaly",
       "capability": "unverified",
       "evaluated_series": 2,

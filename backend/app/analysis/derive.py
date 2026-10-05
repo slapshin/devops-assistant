@@ -12,32 +12,40 @@ from app.domain.metrics import MetricSeries
 
 Array = NDArray[np.float64]
 
-DIRECT = {
-    "cpu_utilization",
-    "cpu_iowait",
-    "memory_utilization",
-    "memory_pressure",
-    "swap_used_ratio",
-    "node_oom_kills",
-    "io_pressure",
-    "disk_busy_ratio",
-    "disk_io_bytes",
-    "filesystem_used_ratio",
-    "filesystem_inodes_used_ratio",
-    "network_receive_bytes",
-    "network_transmit_bytes",
-    "network_errors",
-    "container_cpu",
-    "container_memory_working_set",
-    "container_memory_limit_ratio",
-    "container_throttling_ratio",
-    "container_oom",
-    "swarm_replica_shortfall",
+DIRECT: dict[str, str] = {
+    "cpu_utilization": "cpu_utilization",
+    "cpu_iowait": "cpu_iowait",
+    "memory_utilization": "memory_utilization",
+    "memory_pressure": "memory_pressure",
+    "swap_used_ratio": "swap_used_ratio",
+    "node_oom_kills": "node_oom_kills",
+    "io_pressure": "io_pressure",
+    "disk_busy_ratio": "disk_busy_ratio",
+    "disk_io_bytes": "disk_io_bytes",
+    "filesystem_used_ratio": "filesystem_used_ratio",
+    "filesystem_inodes_used_ratio": "filesystem_inodes_used_ratio",
+    "network_receive_bytes": "network_receive_bytes",
+    "network_transmit_bytes": "network_transmit_bytes",
+    "network_errors": "network_errors",
+    "container_cpu": "container_cpu",
+    "container_memory_working_set": "container_memory_working_set",
+    "container_memory_limit_ratio": "container_memory_limit_ratio",
+    "container_throttling_ratio": "container_throttling_ratio",
+    "container_oom": "container_oom",
+    "swarm_replica_shortfall": "swarm_replica_shortfall",
+    "nginx_connections_active": "proxy_connections_active",
+    "angie_connections_active": "proxy_connections_active",
+    "traefik_connections_active": "proxy_connections_active",
+    "nginx_connections_dropped": "proxy_connections_dropped",
+    "angie_connections_dropped": "proxy_connections_dropped",
+    "nginx_down": "proxy_down",
+    "angie_peer_unavailable": "upstream_unavailable",
+    "caddy_upstream_unhealthy": "upstream_unavailable",
+    "traefik_server_down": "upstream_unavailable",
 }
+"""Collected signal -> rule for signals analysed as collected."""
 
 SWARM_FAILED_TASKS = "swarm_failed_tasks"
-HTTP_404 = "http_404"
-HTTP_4XX = "http_4xx"
 MEAN_LATENCY_RULE = "latency_mean"
 STATUS_CODE_ATTRIBUTE = "http_response_status_code"
 
@@ -48,16 +56,16 @@ class _TrafficSpec:
 
     traffic_signal: str
     rate_rule: str
-    error_ratios: tuple[tuple[str, str], ...]
+    error_ratios: tuple[tuple[str, str], ...] = ()
     """(numerator signal, ratio rule) pairs divided by the request rate."""
-    quantile_signal: str
-    quantile_rule: str
+    quantile_signal: str | None = None
+    quantile_rule: str = "latency_p95"
     mean_signal: str | None = None
     """Latency fallback when no histogram quantile is collected."""
     tail_signal: str | None = None
     """Higher quantile attached as extra evidence."""
-    client_errors: bool = False
-    """Whether 404 and other 4xx rates are derived (HTTP only)."""
+    client_errors: tuple[str, str] | None = None
+    """(404 signal, 4xx signal) from which 404 and other 4xx rates are derived."""
 
 
 _TRAFFIC_SPECS = (
@@ -69,7 +77,7 @@ _TRAFFIC_SPECS = (
         quantile_rule="latency_p95",
         mean_signal="http_latency_mean",
         tail_signal="http_latency_p99",
-        client_errors=True,
+        client_errors=("http_404", "http_4xx"),
     ),
     _TrafficSpec(
         traffic_signal="rpc_requests",
@@ -77,6 +85,25 @@ _TRAFFIC_SPECS = (
         error_ratios=(("rpc_errors", "rpc_error_ratio"),),
         quantile_signal="rpc_latency_p95",
         quantile_rule="rpc_latency_p95",
+    ),
+    # Reverse proxies reuse the HTTP rules; their entities say which proxy and zone/service.
+    _TrafficSpec(traffic_signal="nginx_requests", rate_rule="request_rate"),
+    _TrafficSpec(
+        traffic_signal="angie_requests",
+        rate_rule="request_rate",
+        error_ratios=(("angie_5xx", "server_error_ratio"),),
+        client_errors=("angie_404", "angie_4xx"),
+    ),
+    *(
+        _TrafficSpec(
+            traffic_signal=f"{proxy}_requests",
+            rate_rule="request_rate",
+            error_ratios=((f"{proxy}_5xx", "server_error_ratio"),),
+            quantile_signal=f"{proxy}_latency_p95",
+            tail_signal=f"{proxy}_latency_p99",
+            client_errors=(f"{proxy}_404", f"{proxy}_4xx"),
+        )
+        for proxy in ("caddy", "traefik")
     ),
 )
 
@@ -128,10 +155,11 @@ def derive(
 
 def _direct_series(by_signal: dict[str, dict[str, MetricSeries]]) -> list[AnalysisSeries]:
     out: list[AnalysisSeries] = []
-    for name in sorted(DIRECT & set(by_signal)):
+    for name in sorted(DIRECT.keys() & by_signal.keys()):
         for key in sorted(by_signal[name]):
             s = by_signal[name][key]
-            out.append(AnalysisSeries(RULES[name], s.entity, s.unit, to_array(s), s.query, s))
+            rule = RULES[DIRECT[name]]
+            out.append(AnalysisSeries(rule, s.entity, s.unit, to_array(s), s.query, s))
     return out
 
 
@@ -189,8 +217,8 @@ def _traffic_series(
                 )
             )
 
-        if spec.client_errors:
-            out += _client_error_series(by_signal, key, requests, rate)
+        if spec.client_errors is not None:
+            out += _client_error_series(by_signal, spec.client_errors, key, requests, rate)
 
         latency = _latency_series(by_signal, spec, key, requests, volume, min_requests)
         if latency is not None:
@@ -226,13 +254,15 @@ def _error_ratio(
 
 def _client_error_series(
     by_signal: dict[str, dict[str, MetricSeries]],
+    signals: tuple[str, str],
     key: str,
     requests: MetricSeries,
     rate: Array,
 ) -> list[AnalysisSeries]:
     """404s on their own, and other 4xx with the 404s subtracted so neither is counted twice."""
-    not_found_series = by_signal.get(HTTP_404, {}).get(key)
-    client_error_series = by_signal.get(HTTP_4XX, {}).get(key)
+    not_found_signal, client_error_signal = signals
+    not_found_series = by_signal.get(not_found_signal, {}).get(key)
+    client_error_series = by_signal.get(client_error_signal, {}).get(key)
     not_found = _zero_where_observed(
         to_array(not_found_series) if not_found_series is not None else None, rate
     )
@@ -275,7 +305,7 @@ def _latency_series(
     min_requests: int,
 ) -> AnalysisSeries | None:
     """Prefer the histogram quantile; fall back to the mean where no histogram exists."""
-    latency = by_signal.get(spec.quantile_signal, {}).get(key)
+    latency = by_signal.get(spec.quantile_signal, {}).get(key) if spec.quantile_signal else None
     rule_name = spec.quantile_rule
     if latency is None and spec.mean_signal is not None:
         latency = by_signal.get(spec.mean_signal, {}).get(key)

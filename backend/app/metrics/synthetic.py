@@ -44,6 +44,9 @@ TASK_ROUTE = {
     "http_route": "/api/v3/tasks/:task",
     "http_request_method": "GET",
 }
+PROXY_JOB = "traefik"
+PROXY_SERVICE = {"job": PROXY_JOB, "service": "dispatcher-api@swarm"}
+PROXY_SERVER = {**PROXY_SERVICE, "url": "http://10.0.1.7:8080"}
 QUIET_ROUTE = {
     "job": SERVICE_JOB,
     "http_route": "/internal/task-sla",
@@ -72,6 +75,10 @@ class Scenario:
     """paas-production-4 appears this many days before T (changing population)."""
     histogram: bool = True
     containers: bool = True
+    proxies: bool = True
+    """Traefik in front of dispatcher-api."""
+    proxy_outage: bool = False
+    """One Traefik backend server down for 45 min with a 5xx burst, ending 4 h before T."""
     recurring_404_days: tuple[int, ...] = ()
     """Trend buckets (1..13) with an extra 404 burst, for recurrence."""
     seed: int = 7
@@ -81,7 +88,11 @@ class Scenario:
 SCENARIOS: dict[str, Scenario] = {
     "healthy": Scenario(),
     "incident": Scenario(
-        cpu_load=True, not_found_burst=True, server_error_burst=True, recurring_404_days=(3, 5, 9)
+        cpu_load=True,
+        not_found_burst=True,
+        server_error_burst=True,
+        recurring_404_days=(3, 5, 9),
+        proxy_outage=True,
     ),
     "short-history": Scenario(history_days=5, cpu_load=True, histogram=False),
     "degraded": Scenario(
@@ -164,6 +175,9 @@ def build_series(
                 gen.available(np.clip(gen.base(0.3, 0.05, 0.01), 0, None)),
             )
 
+    if scenario.proxies:
+        _add_proxy_series(builder, gen)
+
     mappings = [
         EntityMapping(
             kind=MappingKind.OTEL_SERVICE,
@@ -241,6 +255,34 @@ def _add_route_series(
         builder.add("http_latency_mean", labels, gen.available(mean))
 
 
+def _add_proxy_series(builder: _SeriesBuilder, gen: _Gen) -> None:
+    """Traefik service traffic (mirroring the task route) and its backend server state."""
+    scenario = gen.scenario
+    outage = slice(N - 57, N - 48)
+
+    req = np.clip(gen.base(25.0, 7.5, 0.75), 0, None)
+    server_errors = np.clip(req * 0.001 + gen.rng.normal(0, 0.005, N), 0, None)
+    down = np.zeros(N)
+    if scenario.proxy_outage:
+        server_errors[outage] = req[outage] * 0.25
+        down[outage] = 1.0
+    builder.add("traefik_requests", PROXY_SERVICE, gen.available(req))
+    builder.add("traefik_5xx", PROXY_SERVICE, gen.available(server_errors))
+    not_found = np.clip(req * 0.02 + gen.rng.normal(0, 0.05, N), 0, None)
+    builder.add("traefik_404", PROXY_SERVICE, gen.available(not_found))
+    builder.add("traefik_4xx", PROXY_SERVICE, gen.available(not_found + 0.005 * req))
+    builder.add("traefik_server_down", PROXY_SERVER, gen.available(down))
+    if scenario.histogram:
+        p95 = np.clip(gen.base(0.09, 0.01, 0.004), 0.001, None)
+        builder.add("traefik_latency_p95", PROXY_SERVICE, gen.available(p95))
+        builder.add("traefik_latency_p99", PROXY_SERVICE, gen.available(p95 * 1.5))
+    builder.add(
+        "traefik_connections_active",
+        {"job": PROXY_JOB, "entrypoint": "websecure"},
+        gen.available(np.clip(gen.base(120.0, 30.0, 4.0), 0, None)),
+    )
+
+
 class SyntheticMetricsSource:
     def __init__(self, scenario: Scenario | str = "incident") -> None:
         self.scenario = SCENARIOS[scenario] if isinstance(scenario, str) else scenario
@@ -267,6 +309,19 @@ class SyntheticMetricsSource:
                 else ("http_latency_mean",)
             ),
             *(("container_cpu",) if scenario.containers else ()),
+            *(
+                (
+                    "traefik_requests",
+                    "traefik_5xx",
+                    "traefik_404",
+                    "traefik_4xx",
+                    "traefik_server_down",
+                    "traefik_connections_active",
+                    *(("traefik_latency_p95", "traefik_latency_p99") if scenario.histogram else ()),
+                )
+                if scenario.proxies
+                else ()
+            ),
         }
         caps = []
         for defn in CATALOG:
@@ -274,7 +329,8 @@ class SyntheticMetricsSource:
             reason = None
             if not supported:
                 reason = (
-                    "No histogram buckets for http_server_request_duration_seconds; "
+                    f"No histogram buckets for "
+                    f"{defn.required_metrics[0].removesuffix('_bucket')}; "
                     "count-only data does not support percentiles."
                     if defn.family is SignalFamily.LATENCY and not scenario.histogram
                     else "Not present in the synthetic scenario."

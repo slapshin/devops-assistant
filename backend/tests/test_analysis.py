@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 
 from app.analysis.baseline import STEPS_PER_DAY, bucket_baseline
-from app.analysis.derive import AnalysisSeries, derive
+from app.analysis.derive import _TRAFFIC_SPECS, DIRECT, SWARM_FAILED_TASKS, AnalysisSeries, derive
 from app.analysis.detect import TREND_STEPS, evaluate
 from app.analysis.engine import RobustDetector, severity_from_points, trend_summary
 from app.analysis.rules import RULES
-from app.domain.common import Entity, EntityKind, Severity, SignalFamily, Unit
+from app.domain.common import STEP_SECONDS, Entity, EntityKind, Severity, SignalFamily, Unit
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import ExplanationResult, ExplanationStatus
 from app.domain.findings import (
@@ -25,7 +25,8 @@ from app.domain.interfaces import CancellationToken, CollectionResult, Detection
 from app.domain.jobs import StageProgress
 from app.domain.metrics import MetricCapability, MetricSeries
 from app.domain.report import AnalysisReport, AnalysisRequest, AnalysisWindows, ReportState
-from app.metrics.synthetic import N, Scenario, SyntheticMetricsSource
+from app.metrics.catalog import CATALOG
+from app.metrics.synthetic import N, Scenario, SyntheticMetricsSource, _SeriesBuilder
 from tests.helpers import make_scope
 
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
@@ -314,6 +315,43 @@ async def test_cross_layer_relations_need_verified_mapping() -> None:
     (fs,) = by_signal(degraded, "filesystem_used_ratio")  # on paas-production-2
     (lat,) = by_signal(degraded, "latency_p95")
     assert lat.finding_id in fs.related_finding_ids  # verified service -> host mapping
+
+
+async def test_proxy_upstream_outage_relates_to_proxy_server_errors() -> None:
+    result = await detect(Scenario(proxy_outage=True))
+    (down,) = by_signal(result, "upstream_unavailable")
+    (err,) = by_signal(result, "server_error_ratio")
+    assert down.family is SignalFamily.PROXY and down.entity.kind is EntityKind.UPSTREAM
+    assert err.entity.kind is EntityKind.PROXY
+    assert err.entity.labels == {"job": "traefik", "service": "dispatcher-api@swarm"}
+    assert err.finding_id in down.related_finding_ids  # same proxy job, overlapping
+    assert "host" not in err.attributes  # no verified proxy -> host mapping
+    coverage = {c.family: c.status for c in result.coverage}
+    assert coverage[SignalFamily.PROXY] is SignalStatus.ANOMALOUS
+    healthy = await detect("healthy")
+    assert {c.family: c.status for c in healthy.coverage}[SignalFamily.PROXY] is (
+        SignalStatus.NO_ANOMALY
+    )
+
+
+def test_every_catalog_signal_is_consumed_by_derivation() -> None:
+    consumed: set[str | None] = {*DIRECT, SWARM_FAILED_TASKS}
+    for spec in _TRAFFIC_SPECS:
+        consumed |= {spec.traffic_signal, spec.quantile_signal, spec.mean_signal, spec.tail_signal}
+        consumed |= {numerator for numerator, _ in spec.error_ratios}
+        consumed |= set(spec.client_errors or ())
+    assert {d.signal for d in CATALOG} <= consumed
+    assert set(DIRECT.values()) <= set(RULES)
+
+
+def test_nginx_signals_map_to_generic_proxy_rules() -> None:
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    nginx = {"job": "nginx", "instance": "10.0.0.5:9113"}
+    builder.add("nginx_requests", nginx, np.full(N, 50.0))
+    builder.add("nginx_connections_dropped", nginx, np.zeros(N))
+    builder.add("nginx_down", nginx, np.zeros(N))
+    rules = sorted(s.rule.name for s in derive(builder.series, STEP_SECONDS, 30))
+    assert rules == ["proxy_connections_dropped", "proxy_down", "request_rate"]  # no status codes
 
 
 def test_episode_merging_and_boundary_split() -> None:

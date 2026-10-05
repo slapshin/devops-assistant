@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.09.1` in `backend/app/metrics/catalog.py`. It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
+The catalog is `catalog-2026.10.1` in `backend/app/metrics/catalog.py`. It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
 
 ## Scope enforcement
 
@@ -13,7 +13,7 @@ String literals are masked before the check, so label values cannot fake a selec
 
 ## Semantics
 
-- **Rates before aggregation:** every counter (`*_total`, `*_count`, `*_sum`, `*_bucket`) is wrapped directly in `rate()`/`increase()` before `sum`/`avg`/`max`. Counter resets are therefore handled per series by the source (a test enforces this).
+- **Rates before aggregation:** every counter (`*_total`, `*_count`, `*_sum`, `*_bucket`, plus the unsuffixed proxy counters `angie_http_server_zones_responses`, `angie_connections_dropped`, `nginx_connections_accepted`/`_handled`) is wrapped directly in `rate()`/`increase()` before `sum`/`avg`/`max`. Counter resets are therefore handled per series by the source (a test enforces this).
 - **Window and grid:** the rate window is 5 m (scrape interval 10 s, per T003). Collection covers 28 days on a 300 s grid. `values[i]` is the value evaluated at `start + (i+1)·300 s`, meaning the interval `[start + i·300 s, start + (i+1)·300 s)`. Trend buckets therefore contain whole intervals. `null` is a gap.
 - **Ratios:** node ratios such as memory and filesystem put `> 0` on the denominator, so a zero denominator is a gap rather than infinity. HTTP/RPC failure ratios are **not** computed in PromQL. `http_5xx`, `http_4xx`, `http_404` and `rpc_errors` are returned beside `http_requests`/`rpc_requests` with the same identity. The analysis treats a missing numerator as 0 **only where the denominator was observed**, and applies the minimum-volume rule.
 - **Histograms:** p95/p99 use `histogram_quantile(φ, sum by (…, le) (rate(bucket)))`, gated on bucket presence. With buckets up to 10 s, a quantile at the top bound means "≥ 10 s". Mean latency (`_sum/_count`) is collected only when buckets are absent, and is always labelled as mean.
@@ -55,6 +55,25 @@ The rules are constants in `catalog.py`. Changing them requires a new `CATALOG_V
 | http_latency_p95, http_latency_p99 | latency | s | route | buckets present |
 | http_latency_mean | latency | s | route | fallback only |
 | rpc_requests, rpc_errors (operand, status ≠ OK), rpc_latency_p95 | request_* / latency | req/s, s | RPC method | buckets present |
+
+### Reverse proxies
+
+All proxy series are kind `proxy` (or `upstream` for backend servers) and carry the proxy's scrape `job` in their identity. Status operands are collected beside the request rate with the same identity, like `http_5xx`. Proxies with route-level request signals rank their zones/services per `job` by their own request signal and keep the top 20.
+
+| Proxy | Exporter | Entity (identity) | Signals | Gate |
+| --- | --- | --- | --- | --- |
+| nginx | nginx-prometheus-exporter (stub_status) | `job, instance` | `nginx_requests`, `nginx_connections_active`, `nginx_connections_dropped` (accepted − handled), `nginx_down` (`1 − nginx_up`) | — |
+| Angie | built-in `prometheus` module, stock `prometheus_all.conf` | server zone `job, zone`; process `job, instance`; peer `job, upstream, peer` | `angie_requests`, `angie_5xx`, `angie_4xx`, `angie_404` (from `angie_http_server_zones_responses{code}`), `angie_connections_active`, `angie_connections_dropped`, `angie_peer_unavailable` (state 3 unavailable or 5 unhealthy) | — |
+| Caddy | built-in metrics | `job, server, handler`; upstream `job, upstream` | `caddy_requests`, `caddy_5xx`, `caddy_4xx`, `caddy_404` (all from `caddy_http_request_duration_seconds_count{code}`), `caddy_latency_p95/p99`, `caddy_upstream_unhealthy` | buckets present |
+| Traefik | built-in Prometheus exporter (service labels, the default) | service `job, service`; entrypoint `job, entrypoint`; server `job, service, url` | `traefik_requests`, `traefik_5xx`, `traefik_4xx`, `traefik_404`, `traefik_latency_p95/p99`, `traefik_connections_active` (`traefik_open_connections`), `traefik_server_down` | buckets present |
+
+Notes and limitations:
+
+- nginx stub_status exposes no status codes or latency, so nginx yields no failure ratio or latency signal. NGINX Plus (`nginxplus_*`) and the VTS module are not covered.
+- Angie latency is exported only as peer response-time averages, not histograms, so no Angie latency signal is collected (latency requires buckets). Angie `down` (state 2) is operator-configured and is not counted as unavailable.
+- Caddy counts each handler in a chain, so the `handler` label is part of the identity rather than summed.
+- Caddy and Traefik upstream/server state uses `min` across proxy instances: one instance seeing a backend down is enough.
+- The "≥ 10 s" top-bucket annotation assumes the OTel bucket layout. Traefik's default top bucket is 5 s, so a Traefik p95 at 5 s is also only a lower bound.
 
 ## Budgets and behaviour
 

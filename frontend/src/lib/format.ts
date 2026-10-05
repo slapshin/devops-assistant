@@ -107,6 +107,7 @@ export const FAMILY_LABELS: Record<string, string> = {
   request_failures: "Failures",
   client_errors: "Client errors",
   latency: "Latency",
+  proxy: "Reverse proxies",
 };
 
 export const STATUS_LABELS: Record<string, { label: string; icon: string }> = {

@@ -28,8 +28,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.09.1",
-  "config_hash": "b177dc4ac897",
+  "detector_version": "detectors-2026.10.1",
+  "config_hash": "16e089195895",
   "source": {
     "base_url": "http://localhost:8428",
     "backend": null,
@@ -334,13 +334,22 @@
           "message": "No histogram buckets for http_server_request_duration_seconds."
         }
       ]
+    },
+    {
+      "family": "proxy",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 4,
+      "reasons": []
     }
   ],
   "findings": [
     {
-      "finding_id": "fnd_f25dd6627490c7c6",
+      "finding_id": "fnd_17bf48bde95f4fc4",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.09.1",
+      "detector_version": "detectors-2026.10.1",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -382,7 +391,7 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_6588bbb4e587343c"
+        "evd_7c0c32a079646233"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -411,8 +420,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_f25dd6627490c7c6",
-          "finding_id": "fnd_f25dd6627490c7c6",
+          "episode_id": "eps_17bf48bde95f4fc4",
+          "finding_id": "fnd_17bf48bde95f4fc4",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=paas-production",
@@ -666,8 +675,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_6588bbb4e587343c",
-      "finding_id": "fnd_f25dd6627490c7c6",
+      "evidence_id": "evd_7c0c32a079646233",
+      "finding_id": "fnd_17bf48bde95f4fc4",
       "series": {
         "series_id": "ser_063ed23f9b327c5f",
         "family": "cpu",

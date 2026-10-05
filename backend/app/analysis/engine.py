@@ -80,6 +80,8 @@ LOW_CONFIDENCE_SUFFIX = "_low"
 RECURRING_MIN_PRIOR_DAYS = 3
 LATENCY_HISTOGRAM_TOP_SECONDS = 10.0
 """Top finite histogram bucket: p95 at or above it is only a lower bound."""
+_PROXY_KINDS = {EntityKind.PROXY, EntityKind.UPSTREAM}
+"""A proxy's zones, services and upstreams share its scrape job; overlaps there are related."""
 
 # Trend summary: last 7 buckets vs the 7 before.
 RECENT_BUCKETS = range(7)
@@ -626,8 +628,8 @@ def _related_finding_ids(
             same_entity = a.entity.key == b.entity.key
             same_service = (
                 a.entity.kind is b.entity.kind is EntityKind.ROUTE
-                and a.entity.labels.get(JOB_LABEL) == b.entity.labels.get(JOB_LABEL)
-            )
+                or {a.entity.kind, b.entity.kind} <= _PROXY_KINDS
+            ) and a.entity.labels.get(JOB_LABEL) == b.entity.labels.get(JOB_LABEL)
             shared_host = bool(hosts[a.finding_id] & hosts[b.finding_id])
             if same_entity or same_service or shared_host:
                 related[a.finding_id].add(b.finding_id)

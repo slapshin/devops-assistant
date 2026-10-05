@@ -24,7 +24,7 @@ from app.metrics.promql import (
     escape_label_value,
     scope_matchers,
 )
-from app.metrics.source import CollectionBudget, PrometheusMetricsSource, _to_grid
+from app.metrics.source import CollectionBudget, PrometheusMetricsSource, _to_grid, entity_for
 from tests.helpers import make_scope
 
 SCOPE = make_scope()
@@ -165,6 +165,36 @@ def test_counters_are_rated_before_aggregation(defn: Any) -> None:
         assert head.endswith(("rate(", "increase(")), f"{m.group(1)} not rated first: {query}"
     for m in re.finditer(r'\{__name__=~"[^"]*_total"', query):
         assert query[: m.start()].rstrip().endswith(("rate(", "increase(")), query
+
+
+# Proxy counters exported without a conventional suffix.
+UNSUFFIXED_COUNTERS = (
+    "angie_http_server_zones_responses",
+    "angie_connections_dropped",
+    "nginx_connections_accepted",
+    "nginx_connections_handled",
+)
+
+
+@pytest.mark.parametrize("defn", CATALOG, ids=lambda d: d.signal)
+def test_unsuffixed_proxy_counters_are_rated_before_aggregation(defn: Any) -> None:
+    query = defn.query.render(SCOPE)
+    for name in UNSUFFIXED_COUNTERS:
+        for m in re.finditer(rf"\b{name}\{{", query):
+            assert query[: m.start()].rstrip().endswith("rate("), f"{name} not rated: {query}"
+
+
+def test_proxy_entity_names() -> None:
+    peer = entity_for(
+        BY_SIGNAL["angie_peer_unavailable"],
+        {"job": "angie", "upstream": "backend", "peer": "10.0.0.2:80"},
+    )
+    assert peer.display_name == "angie · backend → 10.0.0.2:80"
+    caddy = entity_for(
+        BY_SIGNAL["caddy_requests"], {"job": "caddy", "server": "srv0", "handler": "reverse_proxy"}
+    )
+    assert caddy.display_name == "caddy · srv0 · reverse_proxy"
+    assert caddy.key != entity_for(BY_SIGNAL["traefik_requests"], {"job": "caddy"}).key
 
 
 def test_histogram_quantiles_keep_le_and_are_gated() -> None:
@@ -371,6 +401,38 @@ async def test_collect_limits_routes_and_aggregates_the_rest() -> None:
     assert other.values[-1] == 0 + 1 + 2
     assert all(s.labels["project"] == "paas" for s in result.series)
     assert all(len(s.values) == 28 * 288 for s in result.series)
+
+
+async def test_proxy_services_are_ranked_by_their_own_traffic() -> None:
+    t0 = int(T.timestamp()) - 28 * 86400 + STEP_SECONDS
+    services = matrix(
+        *[
+            (
+                {"job": "traefik", "service": f"s{i}@docker"},
+                [(t0, str(i)), (int(T.timestamp()), str(i))],
+            )
+            for i in range(5)
+        ]
+    )
+    handler = present_handler(
+        NODE_ONLY | {"traefik_service_requests_total"},
+        {"traefik_service_requests_total": services},
+    )
+    source = PrometheusMetricsSource(
+        FakeProm(handler).client(), CollectionBudget(top_routes_per_service=2), now=lambda: T
+    )
+    caps = await source.capabilities(SCOPE, WINDOWS)
+    result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+    for signal in ("traefik_requests", "traefik_5xx", "traefik_404"):
+        kept = sorted(s.entity.labels["service"] for s in result.series if s.signal == signal)
+        assert kept == ["(other routes)", "s3@docker", "s4@docker"], signal
+    other = next(
+        s
+        for s in result.series
+        if s.signal == "traefik_requests" and s.entity.labels["service"] == "(other routes)"
+    )
+    assert other.values[-1] == 0 + 1 + 2
+    assert other.entity.display_name == "traefik · (other routes)"
 
 
 async def test_failing_signal_becomes_exclusion_not_crash() -> None:

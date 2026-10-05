@@ -17,7 +17,7 @@ from enum import StrEnum
 from app.domain.common import EntityKind, SignalFamily, Unit
 from app.metrics.promql import QueryTemplate
 
-CATALOG_VERSION = "catalog-2026.09.1"
+CATALOG_VERSION = "catalog-2026.10.1"
 
 FS_FILTER = 'fstype=~"ext[234]|xfs|btrfs|zfs", mountpoint!~"/(run|dev|sys|proc)($|/).*"'
 DISK_FILTER = 'device!~"(sr|loop|ram|fd)[0-9]+"'
@@ -65,9 +65,14 @@ class SignalDef:
     direction: Direction = Direction.UP
     role: Role = Role.SIGNAL
     gates: tuple[Gate, ...] = ()
-    route_level: bool = False
+    traffic: str | None = None
+    """Request-count signal that ranks this signal's routes (top N kept, the rest summed)."""
     description: str = ""
     labels_required: tuple[str, ...] = field(default=())
+
+    @property
+    def route_level(self) -> bool:
+        return self.traffic is not None
 
 
 def q(template: str, *metrics: str) -> QueryTemplate:
@@ -81,6 +86,9 @@ CONT = ("instance", "container")
 SWARM = ("service_name",)
 HTTP = ("job", "http_route", "http_request_method")
 RPC = ("job", "rpc_method")
+
+HTTP_TRAFFIC = "http_requests"
+RPC_TRAFFIC = "rpc_requests"
 
 _HTTP_COUNT = "http_server_request_duration_seconds_count"
 _HTTP_BUCKET = "http_server_request_duration_seconds_bucket"
@@ -467,7 +475,7 @@ CATALOG: tuple[SignalDef, ...] = (
         q(_http_rate(), _HTTP_COUNT),
         (_HTTP_COUNT,),
         direction=Direction.BOTH,
-        route_level=True,
+        traffic=HTTP_TRAFFIC,
     ),
     SignalDef(
         "http_5xx",
@@ -478,7 +486,7 @@ CATALOG: tuple[SignalDef, ...] = (
         q(_http_rate('http_response_status_code=~"5.."'), _HTTP_COUNT),
         (_HTTP_COUNT,),
         role=Role.OPERAND,
-        route_level=True,
+        traffic=HTTP_TRAFFIC,
     ),
     SignalDef(
         "http_4xx",
@@ -488,7 +496,7 @@ CATALOG: tuple[SignalDef, ...] = (
         HTTP,
         q(_http_rate('http_response_status_code=~"4.."'), _HTTP_COUNT),
         (_HTTP_COUNT,),
-        route_level=True,
+        traffic=HTTP_TRAFFIC,
     ),
     SignalDef(
         "http_404",
@@ -498,7 +506,7 @@ CATALOG: tuple[SignalDef, ...] = (
         HTTP,
         q(_http_rate('http_response_status_code="404"'), _HTTP_COUNT),
         (_HTTP_COUNT,),
-        route_level=True,
+        traffic=HTTP_TRAFFIC,
     ),
     SignalDef(
         "http_latency_p95",
@@ -509,7 +517,7 @@ CATALOG: tuple[SignalDef, ...] = (
         q(_quantile(0.95, _HTTP_BUCKET, "job, http_route, http_request_method"), _HTTP_BUCKET),
         (_HTTP_BUCKET,),
         gates=(_HTTP_BUCKET_GATE,),
-        route_level=True,
+        traffic=HTTP_TRAFFIC,
     ),
     SignalDef(
         "http_latency_p99",
@@ -520,7 +528,7 @@ CATALOG: tuple[SignalDef, ...] = (
         q(_quantile(0.99, _HTTP_BUCKET, "job, http_route, http_request_method"), _HTTP_BUCKET),
         (_HTTP_BUCKET,),
         gates=(_HTTP_BUCKET_GATE,),
-        route_level=True,
+        traffic=HTTP_TRAFFIC,
     ),
     SignalDef(
         "http_latency_mean",
@@ -537,7 +545,7 @@ CATALOG: tuple[SignalDef, ...] = (
             _HTTP_COUNT,
         ),
         (_HTTP_SUM, _HTTP_COUNT),
-        route_level=True,
+        traffic=HTTP_TRAFFIC,
         description="Mean latency; used only when histogram buckets are absent.",
     ),
     # --- RPC -------------------------------------------------------------------------------
@@ -550,7 +558,7 @@ CATALOG: tuple[SignalDef, ...] = (
         q(f"sum by (job, rpc_method) (rate({_RPC_COUNT}{{{{{{s}}}}}}[{{w}}]))", _RPC_COUNT),
         (_RPC_COUNT,),
         direction=Direction.BOTH,
-        route_level=True,
+        traffic=RPC_TRAFFIC,
     ),
     SignalDef(
         "rpc_errors",
@@ -565,7 +573,7 @@ CATALOG: tuple[SignalDef, ...] = (
         ),
         (_RPC_COUNT,),
         role=Role.OPERAND,
-        route_level=True,
+        traffic=RPC_TRAFFIC,
     ),
     SignalDef(
         "rpc_latency_p95",
@@ -576,9 +584,242 @@ CATALOG: tuple[SignalDef, ...] = (
         q(_quantile(0.95, _RPC_BUCKET, "job, rpc_method"), _RPC_BUCKET),
         (_RPC_BUCKET,),
         gates=(_RPC_BUCKET_GATE,),
-        route_level=True,
+        traffic=RPC_TRAFFIC,
     ),
 )
+
+
+# --- reverse proxies -----------------------------------------------------------------------
+# nginx: nginx-prometheus-exporter over stub_status (no status codes, no latency).
+# Angie: the built-in prometheus module with the stock prometheus_all.conf template.
+# Caddy: the built-in metrics endpoint; request counts come from the duration histogram, which
+#   is the only request metric carrying `code`.
+# Traefik: the built-in Prometheus exporter with service labels (the default).
+NGINX = ("job", "instance")
+ANGIE = ("job", "instance")
+ANGIE_ZONE = ("job", "zone")
+ANGIE_PEER = ("job", "upstream", "peer")
+CADDY = ("job", "server", "handler")
+CADDY_UPSTREAM = ("job", "upstream")
+TRAEFIK = ("job", "service")
+TRAEFIK_ENTRYPOINT = ("job", "entrypoint")
+TRAEFIK_SERVER = ("job", "service", "url")
+
+ANGIE_TRAFFIC = "angie_requests"
+CADDY_TRAFFIC = "caddy_requests"
+TRAEFIK_TRAFFIC = "traefik_requests"
+
+_ANGIE_REQUESTS = "angie_http_server_zones_requests_total"
+_ANGIE_RESPONSES = "angie_http_server_zones_responses"
+_CADDY_COUNT = "caddy_http_request_duration_seconds_count"
+_CADDY_BUCKET = "caddy_http_request_duration_seconds_bucket"
+_TRAEFIK_COUNT = "traefik_service_requests_total"
+_TRAEFIK_BUCKET = "traefik_service_request_duration_seconds_bucket"
+
+# Angie peer states (prometheus_all.conf): 3 = unavailable (max_fails reached), 5 = unhealthy
+# (failed active health check). down (2) is configured by the operator, so it is not a failure.
+_ANGIE_PEER_FAILED_STATES = (3, 5)
+
+_CADDY_BUCKET_GATE = Gate(
+    q(f"count({_CADDY_BUCKET}{{{{{{s}}}}}})", _CADDY_BUCKET),
+    "No histogram buckets for caddy_http_request_duration_seconds; percentiles unavailable.",
+)
+_TRAEFIK_BUCKET_GATE = Gate(
+    q(f"count({_TRAEFIK_BUCKET}{{{{{{s}}}}}})", _TRAEFIK_BUCKET),
+    "No histogram buckets for traefik_service_request_duration_seconds; percentiles unavailable.",
+)
+
+
+def _rate_by(metric: str, by: tuple[str, ...], matcher: str = "") -> str:
+    extra = f", {matcher}" if matcher else ""
+    return f"sum by ({', '.join(by)}) (rate({metric}{{{{{{s}}{extra}}}}}[{{w}}]))"
+
+
+def _proxy_request_signals(
+    prefix: str,
+    traffic: str,
+    identity: tuple[str, ...],
+    total: str,
+    responses: str,
+    code_label: str,
+) -> tuple[SignalDef, ...]:
+    """Request rate plus 5xx/4xx/404 operands for one proxy, all on the same identity."""
+
+    def status(signal: str, family: SignalFamily, matcher: str, role: Role) -> SignalDef:
+        return SignalDef(
+            f"{prefix}_{signal}",
+            family,
+            Unit.REQUESTS_PER_SECOND,
+            EntityKind.PROXY,
+            identity,
+            q(_rate_by(responses, identity, matcher), responses),
+            (responses,),
+            role=role,
+            traffic=traffic,
+        )
+
+    return (
+        SignalDef(
+            traffic,
+            SignalFamily.REQUEST_TRAFFIC,
+            Unit.REQUESTS_PER_SECOND,
+            EntityKind.PROXY,
+            identity,
+            q(_rate_by(total, identity), total),
+            (total,),
+            direction=Direction.BOTH,
+            traffic=traffic,
+        ),
+        status("5xx", SignalFamily.REQUEST_FAILURES, f'{code_label}=~"5.."', Role.OPERAND),
+        status("4xx", SignalFamily.CLIENT_ERRORS, f'{code_label}=~"4.."', Role.SIGNAL),
+        status("404", SignalFamily.CLIENT_ERRORS, f'{code_label}="404"', Role.SIGNAL),
+    )
+
+
+def _proxy_quantiles(
+    prefix: str, traffic: str, identity: tuple[str, ...], bucket: str, gate: Gate
+) -> tuple[SignalDef, ...]:
+    by = ", ".join(identity)
+    return tuple(
+        SignalDef(
+            f"{prefix}_latency_p{int(phi * 100)}",
+            SignalFamily.LATENCY,
+            Unit.SECONDS,
+            EntityKind.PROXY,
+            identity,
+            q(_quantile(phi, bucket, by), bucket),
+            (bucket,),
+            gates=(gate,),
+            traffic=traffic,
+        )
+        for phi in (0.95, 0.99)
+    )
+
+
+def _active_connections(prefix: str, metric: str, identity: tuple[str, ...]) -> SignalDef:
+    return SignalDef(
+        f"{prefix}_connections_active",
+        SignalFamily.PROXY,
+        Unit.COUNT,
+        EntityKind.PROXY,
+        identity,
+        q(f"sum by ({', '.join(identity)}) ({metric}{{{{{{s}}}}}})", metric),
+        (metric,),
+        description="Open client connections.",
+    )
+
+
+PROXY_CATALOG: tuple[SignalDef, ...] = (
+    # --- nginx (stub_status) --------------------------------------------------------------
+    SignalDef(
+        "nginx_requests",
+        SignalFamily.REQUEST_TRAFFIC,
+        Unit.REQUESTS_PER_SECOND,
+        EntityKind.PROXY,
+        NGINX,
+        q(_rate_by("nginx_http_requests_total", NGINX), "nginx_http_requests_total"),
+        ("nginx_http_requests_total",),
+        direction=Direction.BOTH,
+        description="All requests; stub_status has no status codes or latency.",
+    ),
+    _active_connections("nginx", "nginx_connections_active", NGINX),
+    SignalDef(
+        "nginx_connections_dropped",
+        SignalFamily.PROXY,
+        Unit.PER_SECOND,
+        EntityKind.PROXY,
+        NGINX,
+        q(
+            _rate_by("nginx_connections_accepted", NGINX)
+            + " - "
+            + _rate_by("nginx_connections_handled", NGINX),
+            "nginx_connections_accepted",
+            "nginx_connections_handled",
+        ),
+        ("nginx_connections_accepted", "nginx_connections_handled"),
+        description="Accepted minus handled connections (worker_connections or fd limits).",
+    ),
+    SignalDef(
+        "nginx_down",
+        SignalFamily.PROXY,
+        Unit.COUNT,
+        EntityKind.PROXY,
+        NGINX,
+        q("1 - max by (job, instance) (nginx_up{{{s}}})", "nginx_up"),
+        ("nginx_up",),
+        description="1 while the exporter cannot read stub_status.",
+    ),
+    # --- Angie (prometheus_all.conf) ------------------------------------------------------
+    *_proxy_request_signals(
+        "angie", ANGIE_TRAFFIC, ANGIE_ZONE, _ANGIE_REQUESTS, _ANGIE_RESPONSES, "code"
+    ),
+    _active_connections("angie", "angie_connections_active", ANGIE),
+    SignalDef(
+        "angie_connections_dropped",
+        SignalFamily.PROXY,
+        Unit.PER_SECOND,
+        EntityKind.PROXY,
+        ANGIE,
+        q(_rate_by("angie_connections_dropped", ANGIE), "angie_connections_dropped"),
+        ("angie_connections_dropped",),
+    ),
+    SignalDef(
+        "angie_peer_unavailable",
+        SignalFamily.PROXY,
+        Unit.COUNT,
+        EntityKind.UPSTREAM,
+        ANGIE_PEER,
+        q(
+            "max by (job, upstream, peer) ("
+            + " + ".join(
+                f"(angie_http_upstreams_peers_state{{{{{{s}}}}}} == bool {state})"
+                for state in _ANGIE_PEER_FAILED_STATES
+            )
+            + ")",
+            "angie_http_upstreams_peers_state",
+        ),
+        ("angie_http_upstreams_peers_state",),
+        description="1 while the peer is unavailable or unhealthy.",
+    ),
+    # --- Caddy ----------------------------------------------------------------------------
+    *_proxy_request_signals("caddy", CADDY_TRAFFIC, CADDY, _CADDY_COUNT, _CADDY_COUNT, "code"),
+    *_proxy_quantiles("caddy", CADDY_TRAFFIC, CADDY, _CADDY_BUCKET, _CADDY_BUCKET_GATE),
+    SignalDef(
+        "caddy_upstream_unhealthy",
+        SignalFamily.PROXY,
+        Unit.COUNT,
+        EntityKind.UPSTREAM,
+        CADDY_UPSTREAM,
+        q(
+            "1 - min by (job, upstream) (caddy_reverse_proxy_upstreams_healthy{{{s}}})",
+            "caddy_reverse_proxy_upstreams_healthy",
+        ),
+        ("caddy_reverse_proxy_upstreams_healthy",),
+        description="1 while any Caddy instance reports the upstream unhealthy.",
+    ),
+    # --- Traefik --------------------------------------------------------------------------
+    *_proxy_request_signals(
+        "traefik", TRAEFIK_TRAFFIC, TRAEFIK, _TRAEFIK_COUNT, _TRAEFIK_COUNT, "code"
+    ),
+    *_proxy_quantiles("traefik", TRAEFIK_TRAFFIC, TRAEFIK, _TRAEFIK_BUCKET, _TRAEFIK_BUCKET_GATE),
+    _active_connections("traefik", "traefik_open_connections", TRAEFIK_ENTRYPOINT),
+    SignalDef(
+        "traefik_server_down",
+        SignalFamily.PROXY,
+        Unit.COUNT,
+        EntityKind.UPSTREAM,
+        TRAEFIK_SERVER,
+        q(
+            "1 - min by (job, service, url) (traefik_service_server_up{{{s}}})",
+            "traefik_service_server_up",
+        ),
+        ("traefik_service_server_up",),
+        description="1 while any Traefik instance reports the server down.",
+    ),
+)
+
+CATALOG = CATALOG + PROXY_CATALOG
+TRAFFIC_SIGNALS = frozenset(d.traffic for d in CATALOG if d.traffic is not None)
 
 BY_SIGNAL = {d.signal: d for d in CATALOG}
 ALL_REQUIRED_METRICS = sorted({m for d in CATALOG for m in d.required_metrics})

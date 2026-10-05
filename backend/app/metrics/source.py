@@ -24,6 +24,7 @@ from app.metrics.catalog import (
     BY_SIGNAL,
     CATALOG,
     CATALOG_VERSION,
+    TRAFFIC_SIGNALS,
     SignalDef,
 )
 from app.metrics.client import PrometheusClient, RangeResult, SourceError, SourceErrorKind
@@ -37,8 +38,6 @@ SECONDS_PER_DAY = 86400
 HISTORY_PROBE_DAYS = 30
 HISTORY_PROBE_STEP_SECONDS = 3600
 
-HTTP_TRAFFIC_SIGNAL = "http_requests"
-RPC_TRAFFIC_SIGNAL = "rpc_requests"
 MEAN_LATENCY_SIGNAL = "http_latency_mean"
 _FALLBACK_REASON_PREFIX = "Fallback"
 _MEAN_LATENCY_FALLBACK_REASON = f"{_FALLBACK_REASON_PREFIX} only; percentiles are available."
@@ -71,6 +70,10 @@ def entity_for(defn: SignalDef, labels: dict[str, str]) -> Entity:
             name = f"{ident['container']} @ {ident['instance']}"
         case EntityKind.SERVICE:
             name = ident["service_name"]
+        case EntityKind.PROXY:
+            name = " · ".join(v for v in ident.values() if v)
+        case EntityKind.UPSTREAM:
+            name = f"{ident['job']} · " + " → ".join(v for k, v in ident.items() if k != "job")
         case EntityKind.ROUTE if "rpc_method" in ident:
             name = f"{ident['job']} · {ident['rpc_method']}"
         case _:
@@ -364,7 +367,7 @@ class PrometheusMetricsSource:
     ) -> list[tuple[dict[str, str], list[float | None]]]:
         """Keep the top routes per service by 14-day volume; sum the rest (rates only)."""
         route_labels = defn.identity[1:]
-        traffic = RPC_TRAFFIC_SIGNAL if "rpc_method" in defn.identity else HTTP_TRAFFIC_SIGNAL
+        traffic = defn.traffic or defn.signal
         # The traffic signal is collected first, so it decides the routes for its operands.
         if defn.signal == traffic:
             top_routes.update(self._rank_top_routes(traffic, grids, route_labels, n))
@@ -499,7 +502,7 @@ def _collection_plan(capabilities: Sequence[MetricCapability]) -> list[SignalDef
     ]
     plan.sort(
         key=lambda d: (
-            d.signal not in (HTTP_TRAFFIC_SIGNAL, RPC_TRAFFIC_SIGNAL),
+            d.signal not in TRAFFIC_SIGNALS,
             CATALOG.index(d),
         )
     )

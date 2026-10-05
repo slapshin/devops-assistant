@@ -115,6 +115,8 @@ class SignalFamily(StrEnum):
     REQUEST_FAILURES = "request_failures"
     CLIENT_ERRORS = "client_errors"
     LATENCY = "latency"
+    PROXY = "proxy"
+    """Reverse-proxy connections and upstream health (nginx, Angie, Caddy, Traefik)."""
 
 
 class Unit(StrEnum):
@@ -149,6 +151,10 @@ class EntityKind(StrEnum):
     CONTAINER = "container"
     SERVICE = "service"
     ROUTE = "route"
+    PROXY = "proxy"
+    """A reverse proxy instance, server zone, server, or service (nginx/Angie/Caddy/Traefik)."""
+    UPSTREAM = "upstream"
+    """A backend server behind a reverse proxy."""
 
 
 class Entity(Contract):

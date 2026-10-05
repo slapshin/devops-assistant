@@ -43,7 +43,9 @@
         "network_interface",
         "container",
         "service",
-        "route"
+        "route",
+        "proxy",
+        "upstream"
       ],
       "title": "EntityKind",
       "type": "string"
@@ -59,7 +61,8 @@
         "request_traffic",
         "request_failures",
         "client_errors",
-        "latency"
+        "latency",
+        "proxy"
       ],
       "title": "SignalFamily",
       "type": "string"
