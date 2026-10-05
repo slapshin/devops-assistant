@@ -51,7 +51,8 @@
         "request_failures",
         "client_errors",
         "latency",
-        "proxy"
+        "proxy",
+        "database"
       ],
       "title": "SignalFamily",
       "type": "string"

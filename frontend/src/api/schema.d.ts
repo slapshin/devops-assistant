@@ -450,7 +450,7 @@ export interface components {
          * EntityKind
          * @enum {string}
          */
-        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream";
+        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database";
         /** EpisodeSummary */
         EpisodeSummary: {
             /** End */
@@ -1019,7 +1019,7 @@ export interface components {
          * SignalFamily
          * @enum {string}
          */
-        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy";
+        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database";
         /**
          * SignalStatus
          * @enum {string}

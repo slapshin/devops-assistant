@@ -42,6 +42,12 @@ DIRECT: dict[str, str] = {
     "angie_peer_unavailable": "upstream_unavailable",
     "caddy_upstream_unhealthy": "upstream_unavailable",
     "traefik_server_down": "upstream_unavailable",
+    "pg_down": "database_down",
+    "pg_connections_used_ratio": "database_connections_ratio",
+    "pg_replication_lag": "database_replication_lag",
+    "pg_deadlocks": "database_deadlocks",
+    "pg_temp_bytes": "database_temp_bytes",
+    "pg_longest_transaction": "database_longest_transaction",
 }
 """Collected signal -> rule for signals analysed as collected."""
 
@@ -104,6 +110,12 @@ _TRAFFIC_SPECS = (
             client_errors=(f"{proxy}_404", f"{proxy}_4xx"),
         )
         for proxy in ("caddy", "traefik")
+    ),
+    # Rolled-back share of all transactions, volume-guarded like the 5xx ratio.
+    _TrafficSpec(
+        traffic_signal="pg_transactions",
+        rate_rule="database_transaction_rate",
+        error_ratios=(("pg_rollbacks", "database_rollback_ratio"),),
     ),
 )
 

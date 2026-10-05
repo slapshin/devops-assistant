@@ -9,7 +9,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from app.domain.common import STEP_SECONDS, LabelMatcher, Scope
+from app.domain.common import STEP_SECONDS, EntityKind, LabelMatcher, Scope
 from app.domain.interfaces import CancellationToken, Cancelled
 from app.domain.jobs import StageProgress
 from app.domain.metrics import CapabilityStatus
@@ -167,21 +167,44 @@ def test_counters_are_rated_before_aggregation(defn: Any) -> None:
         assert query[: m.start()].rstrip().endswith(("rate(", "increase(")), query
 
 
-# Proxy counters exported without a conventional suffix.
+# Proxy and PostgreSQL counters exported without a conventional suffix.
 UNSUFFIXED_COUNTERS = (
     "angie_http_server_zones_responses",
     "angie_connections_dropped",
     "nginx_connections_accepted",
     "nginx_connections_handled",
+    "pg_stat_database_xact_commit",
+    "pg_stat_database_xact_rollback",
+    "pg_stat_database_deadlocks",
+    "pg_stat_database_temp_bytes",
 )
 
 
 @pytest.mark.parametrize("defn", CATALOG, ids=lambda d: d.signal)
-def test_unsuffixed_proxy_counters_are_rated_before_aggregation(defn: Any) -> None:
+def test_unsuffixed_counters_are_rated_before_aggregation(defn: Any) -> None:
     query = defn.query.render(SCOPE)
     for name in UNSUFFIXED_COUNTERS:
         for m in re.finditer(rf"\b{name}\{{", query):
-            assert query[: m.start()].rstrip().endswith("rate("), f"{name} not rated: {query}"
+            prefix = query[: m.start()].rstrip()
+            assert prefix.endswith(("rate(", "increase(")), f"{name} not rated: {query}"
+
+
+def test_postgres_database_signals_skip_template_databases() -> None:
+    for defn in CATALOG:
+        if "datname" in defn.identity:
+            query = defn.query.render(SCOPE)
+            selectors = re.findall(r"pg_\w+\{[^}]*\}", query)
+            assert selectors and all('datname!~"|template[01]"' in s for s in selectors), query
+
+
+def test_postgres_entity_names() -> None:
+    server = entity_for(BY_SIGNAL["pg_down"], {"job": "postgres", "instance": "db1:9187"})
+    database = entity_for(
+        BY_SIGNAL["pg_transactions"], {"job": "postgres", "instance": "db1:9187", "datname": "app"}
+    )
+    assert server.display_name == "postgres · db1:9187"
+    assert database.display_name == "postgres · db1:9187 · app"
+    assert server.kind is database.kind is EntityKind.DATABASE
 
 
 def test_proxy_entity_names() -> None:

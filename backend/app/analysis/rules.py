@@ -30,6 +30,8 @@ class Rule:
     thresholds: str | None = None
     direction: Dir = Dir.UP
     volume_guard: bool = False
+    volume_noun: str = "requests"
+    """What the guarded volume counts, for confidence reasons."""
     severity_cap: Severity | None = None
     event_points: int = 0
     title_up: str | None = None
@@ -267,6 +269,68 @@ RULES: dict[str, Rule] = {
             kind=RuleKind.SHORTFALL,
             event_points=3,
             title_up="Upstream server unavailable or unhealthy",
+        ),
+        Rule(
+            "database_down",
+            F.DATABASE,
+            "Database unreachable",
+            kind=RuleKind.SHORTFALL,
+            event_points=3,
+            title_up="Database unreachable by its exporter",
+        ),
+        Rule(
+            "database_connections_ratio",
+            F.DATABASE,
+            "Connections vs max_connections",
+            thresholds="database_connections_ratio",
+        ),
+        Rule(
+            "database_replication_lag",
+            F.DATABASE,
+            "Replication lag",
+            thresholds="database_replication_lag",
+        ),
+        Rule(
+            "database_transaction_rate",
+            F.DATABASE,
+            "Transaction rate",
+            thresholds="database_transaction_rate",
+            direction=Dir.BOTH,
+            severity_cap=Severity.MEDIUM,
+            title_up="Transaction rate increase",
+            title_down="Transaction rate drop",
+        ),
+        Rule(
+            "database_rollback_ratio",
+            F.DATABASE,
+            "Rolled-back transactions",
+            thresholds="database_rollback_ratio",
+            volume_guard=True,
+            volume_noun="transactions",
+            title_up="Rollback share above expected range",
+        ),
+        Rule(
+            "database_deadlocks",
+            F.DATABASE,
+            "Deadlocks",
+            kind=RuleKind.EVENT,
+            event_points=2,
+            title_up="Deadlock detected",
+        ),
+        Rule(
+            "database_temp_bytes",
+            F.DATABASE,
+            "Temporary file writes",
+            thresholds="database_temp_bytes",
+            severity_cap=Severity.MEDIUM,
+            title_up="Temporary file writes above expected range (work_mem spills)",
+        ),
+        Rule(
+            "database_longest_transaction",
+            F.DATABASE,
+            "Longest open transaction",
+            thresholds="database_longest_transaction",
+            title_up="Long-running transaction",
         ),
     )
 }

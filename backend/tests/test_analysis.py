@@ -334,6 +334,41 @@ async def test_proxy_upstream_outage_relates_to_proxy_server_errors() -> None:
     )
 
 
+async def test_database_pileup_findings_relate_within_the_server() -> None:
+    result = await detect(Scenario(database_pileup=True))
+    database = {f.signal: f for f in result.findings if f.family is SignalFamily.DATABASE}
+    assert set(database) == {
+        "database_longest_transaction",
+        "database_connections_ratio",
+        "database_rollback_ratio",
+        "database_deadlocks",
+    }
+    connections = database["database_connections_ratio"]
+    assert connections.entity.labels == {"job": "postgres", "instance": "pg-primary:9187"}
+    assert database["database_deadlocks"].entity.labels["datname"] == "dispatcher"
+    others = {f.finding_id for s, f in database.items() if s != "database_connections_ratio"}
+    assert others <= set(connections.related_finding_ids)  # server and its database
+    assert "host" not in connections.attributes  # no verified exporter -> host mapping
+    healthy = await detect("healthy")
+    assert {c.family: c.status for c in healthy.coverage}[SignalFamily.DATABASE] is (
+        SignalStatus.NO_ANOMALY
+    )
+
+
+async def test_database_relations_need_the_same_server() -> None:
+    caps, col = await collect("healthy")
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    down = np.zeros(N)
+    down[N - 40 : N - 30] = 1.0
+    for instance in ("db1:9187", "db2:9187"):
+        builder.add("pg_down", {"job": "postgres", "instance": instance}, down)
+    col = col.model_copy(update={"series": [*col.series, *builder.series]})
+    result = RobustDetector().detect(REQUEST, WINDOWS, caps, col, CONFIG)
+    findings = by_signal(result, "database_down")
+    assert len(findings) == 2
+    assert not any(f.related_finding_ids for f in findings)  # same job, different servers
+
+
 def test_every_catalog_signal_is_consumed_by_derivation() -> None:
     consumed: set[str | None] = {*DIRECT, SWARM_FAILED_TASKS}
     for spec in _TRAFFIC_SPECS:

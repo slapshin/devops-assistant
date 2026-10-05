@@ -70,7 +70,7 @@ def entity_for(defn: SignalDef, labels: dict[str, str]) -> Entity:
             name = f"{ident['container']} @ {ident['instance']}"
         case EntityKind.SERVICE:
             name = ident["service_name"]
-        case EntityKind.PROXY:
+        case EntityKind.PROXY | EntityKind.DATABASE:
             name = " · ".join(v for v in ident.values() if v)
         case EntityKind.UPSTREAM:
             name = f"{ident['job']} · " + " → ".join(v for k, v in ident.items() if k != "job")

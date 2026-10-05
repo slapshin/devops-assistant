@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.1` in `backend/app/metrics/catalog.py`. It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
+The catalog is `catalog-2026.10.2` in `backend/app/metrics/catalog.py`. It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
 
 ## Scope enforcement
 
@@ -74,6 +74,26 @@ Notes and limitations:
 - Caddy counts each handler in a chain, so the `handler` label is part of the identity rather than summed.
 - Caddy and Traefik upstream/server state uses `min` across proxy instances: one instance seeing a backend down is enough.
 - The "≥ 10 s" top-bucket annotation assumes the OTel bucket layout. Traefik's default top bucket is 5 s, so a Traefik p95 at 5 s is also only a lower bound.
+
+### PostgreSQL
+
+Source: [prometheus-community/postgres_exporter](https://github.com/prometheus-community/postgres_exporter) with its default collectors. All series are kind `database`. `instance` is the exporter target, i.e. one PostgreSQL server; in multi-target mode, relabel `instance` to the target. Per-database signals exclude `template0`/`template1` (`datname!~"|template[01]"`). Databases are not ranked or capped beyond the per-query series budget.
+
+| Entity (identity) | Signal | Source metric(s) |
+| --- | --- | --- |
+| server `job, instance` | `pg_down` | `1 − pg_up` |
+| server | `pg_connections_used_ratio` | `Σ pg_stat_database_numbackends / pg_settings_max_connections` |
+| server | `pg_replication_lag` | `pg_replication_lag_seconds` (0 on a primary, or when the standby has replayed everything it received) |
+| database `job, instance, datname` | `pg_transactions` | `rate(xact_commit) + rate(xact_rollback)` |
+| database | `pg_rollbacks` (operand) | `rate(pg_stat_database_xact_rollback)` |
+| database | `pg_deadlocks` | `increase(pg_stat_database_deadlocks)` per step |
+| database | `pg_temp_bytes` | `rate(pg_stat_database_temp_bytes)` |
+| database | `pg_longest_transaction` | `max(pg_stat_activity_max_tx_duration)` over states and users |
+
+Notes and limitations:
+
+- `numbackends` counts backends connected to a database (client sessions and autovacuum workers), not walsenders or other background processes, so the connection ratio is slightly below what PostgreSQL counts against `max_connections`.
+- Not covered: lock waits (`pg_locks_count` counts granted locks too), cache hit ratio, table bloat and transaction-ID wraparound (non-default collectors), and query latency (`pg_stat_statements` is not enabled by default).
 
 ## Budgets and behaviour
 

@@ -47,6 +47,8 @@ TASK_ROUTE = {
 PROXY_JOB = "traefik"
 PROXY_SERVICE = {"job": PROXY_JOB, "service": "dispatcher-api@swarm"}
 PROXY_SERVER = {**PROXY_SERVICE, "url": "http://10.0.1.7:8080"}
+PG_SERVER = {"job": "postgres", "instance": "pg-primary:9187"}
+PG_DATABASE = {**PG_SERVER, "datname": "dispatcher"}
 QUIET_ROUTE = {
     "job": SERVICE_JOB,
     "http_route": "/internal/task-sla",
@@ -79,6 +81,11 @@ class Scenario:
     """Traefik in front of dispatcher-api."""
     proxy_outage: bool = False
     """One Traefik backend server down for 45 min with a 5xx burst, ending 4 h before T."""
+    databases: bool = True
+    """A PostgreSQL primary (postgres_exporter) with the dispatcher database."""
+    database_pileup: bool = False
+    """An idle-in-transaction session holds locks for 1 h, ending 150 min before T: the oldest
+    transaction grows, connections pile up, and blocked writers deadlock and roll back."""
     recurring_404_days: tuple[int, ...] = ()
     """Trend buckets (1..13) with an extra 404 burst, for recurrence."""
     seed: int = 7
@@ -93,6 +100,7 @@ SCENARIOS: dict[str, Scenario] = {
         server_error_burst=True,
         recurring_404_days=(3, 5, 9),
         proxy_outage=True,
+        database_pileup=True,
     ),
     "short-history": Scenario(history_days=5, cpu_load=True, histogram=False),
     "degraded": Scenario(
@@ -177,6 +185,8 @@ def build_series(
 
     if scenario.proxies:
         _add_proxy_series(builder, gen)
+    if scenario.databases:
+        _add_database_series(builder, gen)
 
     mappings = [
         EntityMapping(
@@ -283,6 +293,32 @@ def _add_proxy_series(builder: _SeriesBuilder, gen: _Gen) -> None:
     )
 
 
+def _add_database_series(builder: _SeriesBuilder, gen: _Gen) -> None:
+    scenario = gen.scenario
+    pileup = slice(N - 42, N - 30)
+    steps = pileup.stop - pileup.start
+
+    connections = np.clip(gen.base(0.25, 0.05, 0.01), 0, 1)
+    transactions = np.clip(gen.base(150.0, 45.0, 4.5), 0, None)
+    rollbacks = np.clip(transactions * 0.005 + gen.rng.normal(0, 0.05, N), 0, None)
+    deadlocks = np.zeros(N)
+    longest = np.clip(gen.base(2.0, 0.5, 0.5), 0, None)
+    if scenario.database_pileup:
+        connections[pileup] = np.linspace(0.3, 0.9, steps)
+        rollbacks[pileup] = transactions[pileup] * 0.2
+        deadlocks[N - 36 : N - 33] = 2.0
+        longest[pileup] = np.arange(1, steps + 1) * STEP_SECONDS
+    builder.add("pg_down", PG_SERVER, gen.available(np.zeros(N)))
+    builder.add("pg_connections_used_ratio", PG_SERVER, gen.available(connections))
+    builder.add("pg_replication_lag", PG_SERVER, gen.available(np.zeros(N)))
+    builder.add("pg_transactions", PG_DATABASE, gen.available(transactions))
+    builder.add("pg_rollbacks", PG_DATABASE, gen.available(rollbacks))
+    builder.add("pg_deadlocks", PG_DATABASE, gen.available(deadlocks))
+    temp_bytes = np.clip(gen.base(200 * 1024.0, 50 * 1024.0, 10 * 1024.0), 0, None)
+    builder.add("pg_temp_bytes", PG_DATABASE, gen.available(temp_bytes))
+    builder.add("pg_longest_transaction", PG_DATABASE, gen.available(longest))
+
+
 class SyntheticMetricsSource:
     def __init__(self, scenario: Scenario | str = "incident") -> None:
         self.scenario = SCENARIOS[scenario] if isinstance(scenario, str) else scenario
@@ -320,6 +356,11 @@ class SyntheticMetricsSource:
                     *(("traefik_latency_p95", "traefik_latency_p99") if scenario.histogram else ()),
                 )
                 if scenario.proxies
+                else ()
+            ),
+            *(
+                (d.signal for d in CATALOG if d.family is SignalFamily.DATABASE)
+                if scenario.databases
                 else ()
             ),
         }

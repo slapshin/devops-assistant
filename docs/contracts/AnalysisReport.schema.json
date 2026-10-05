@@ -208,7 +208,8 @@
         "service",
         "route",
         "proxy",
-        "upstream"
+        "upstream",
+        "database"
       ],
       "title": "EntityKind",
       "type": "string"
@@ -1197,7 +1198,8 @@
         "request_failures",
         "client_errors",
         "latency",
-        "proxy"
+        "proxy",
+        "database"
       ],
       "title": "SignalFamily",
       "type": "string"

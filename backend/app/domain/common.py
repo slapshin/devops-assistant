@@ -117,6 +117,8 @@ class SignalFamily(StrEnum):
     LATENCY = "latency"
     PROXY = "proxy"
     """Reverse-proxy connections and upstream health (nginx, Angie, Caddy, Traefik)."""
+    DATABASE = "database"
+    """Database server health and per-database workload (PostgreSQL via postgres_exporter)."""
 
 
 class Unit(StrEnum):
@@ -155,6 +157,8 @@ class EntityKind(StrEnum):
     """A reverse proxy instance, server zone, server, or service (nginx/Angie/Caddy/Traefik)."""
     UPSTREAM = "upstream"
     """A backend server behind a reverse proxy."""
+    DATABASE = "database"
+    """A database server (exporter target) or one database on it (PostgreSQL)."""
 
 
 class Entity(Contract):

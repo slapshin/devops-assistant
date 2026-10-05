@@ -82,6 +82,7 @@ LATENCY_HISTOGRAM_TOP_SECONDS = 10.0
 """Top finite histogram bucket: p95 at or above it is only a lower bound."""
 _PROXY_KINDS = {EntityKind.PROXY, EntityKind.UPSTREAM}
 """A proxy's zones, services and upstreams share its scrape job; overlaps there are related."""
+INSTANCE_LABEL = "instance"
 
 # Trend summary: last 7 buckets vs the 7 before.
 RECENT_BUCKETS = range(7)
@@ -335,7 +336,8 @@ class RobustDetector:
                 reasons.append(
                     Reason(
                         code="request_volume",
-                        message=f"As few as {observed_volume.min():.0f} requests per 5-min step "
+                        message=f"As few as {observed_volume.min():.0f} "
+                        f"{ev.series.rule.volume_noun} per 5-min step "
                         f"(< {LOW_VOLUME_REQUESTS_PER_STEP}).",
                     )
                 )
@@ -616,7 +618,7 @@ def _finding_state(ep: Episode, config: DetectorConfig) -> FindingState:
 def _related_finding_ids(
     findings: list[Finding], hosts: dict[str, set[str]], config: DetectorConfig
 ) -> dict[str, set[str]]:
-    """Overlapping findings on the same entity, the same service, or a shared host."""
+    """Overlapping findings on the same entity, service or database server, or a shared host."""
     slack = timedelta(minutes=config.relation_slack_minutes)
     related: dict[str, set[str]] = defaultdict(set)
     for i, a in enumerate(findings):
@@ -630,8 +632,12 @@ def _related_finding_ids(
                 a.entity.kind is b.entity.kind is EntityKind.ROUTE
                 or {a.entity.kind, b.entity.kind} <= _PROXY_KINDS
             ) and a.entity.labels.get(JOB_LABEL) == b.entity.labels.get(JOB_LABEL)
+            same_database_server = a.entity.kind is b.entity.kind is EntityKind.DATABASE and all(
+                a.entity.labels.get(k) == b.entity.labels.get(k)
+                for k in (JOB_LABEL, INSTANCE_LABEL)
+            )
             shared_host = bool(hosts[a.finding_id] & hosts[b.finding_id])
-            if same_entity or same_service or shared_host:
+            if same_entity or same_service or same_database_server or shared_host:
                 related[a.finding_id].add(b.finding_id)
                 related[b.finding_id].add(a.finding_id)
     return related
