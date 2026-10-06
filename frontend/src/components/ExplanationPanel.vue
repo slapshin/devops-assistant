@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { AnalysisReport } from "../api/client";
 
 /** `only` narrows the panel to the hypotheses that cite one finding (evidence detail view). */
@@ -7,6 +7,7 @@ const props = defineProps<{ report: AnalysisReport; findingLink: (id: string) =>
 
 const explanationResult = computed(() => props.report.explanation);
 const findingTitles = computed(() => new Map(props.report.findings.map((f) => [f.finding_id, f.title])));
+const open = ref(true);
 const hypotheses = computed(() =>
   (explanationResult.value.explanation?.hypotheses ?? []).filter((h) => !props.only || h.finding_ids.includes(props.only)),
 );
@@ -15,10 +16,15 @@ const hypotheses = computed(() =>
 <template>
   <section :class="only ? 'inline' : 'panel'" :aria-labelledby="only ? undefined : 'ai-title'" :aria-label="only ? 'AI hypotheses' : undefined">
     <div v-if="!only" class="ph">
-      <h2 id="ai-title">Check first</h2>
+      <h2 id="ai-title">
+        <button type="button" class="toggle" :aria-expanded="open" aria-controls="ai-body" @click="open = !open">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" /></svg>
+          Check first
+        </button>
+      </h2>
       <span class="sub">· AI suggestion, hypotheses unverified</span>
     </div>
-    <div :class="{ pb: !only }">
+    <div v-show="only || open" id="ai-body" :class="{ pb: !only }">
       <div v-if="only" class="lbl strong">AI hypotheses · unverified</div>
       <template v-if="explanationResult.status === 'succeeded' && explanationResult.explanation">
         <ol v-if="!only" class="steps">
@@ -64,4 +70,8 @@ p { margin: 0; }
 .ref { margin-right: var(--space); }
 .refs { font-size: 12px; }
 .foot { margin-top: auto; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px 0 2px; margin-left: -4px; border: none; background: none; font: inherit; color: inherit; }
+.toggle:hover { background: var(--hover); }
+.toggle svg { transition: transform 120ms; }
+.toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
 </style>

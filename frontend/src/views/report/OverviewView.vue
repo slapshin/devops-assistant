@@ -117,7 +117,7 @@ function listSeparator(index: number, length: number): string {
       </div>
     </section>
 
-    <section class="panel s14" aria-labelledby="summary-title">
+    <section class="panel s24" aria-labelledby="summary-title">
       <div class="ph"><h2 id="summary-title">Summary</h2><span class="sub">· latest 24 h</span></div>
       <div class="pb summary">
         <template v-if="worst">
@@ -145,7 +145,7 @@ function listSeparator(index: number, length: number): string {
         </div>
       </div>
     </section>
-    <ExplanationPanel class="s10" :report="report" :finding-link="link" />
+    <ExplanationPanel class="s24" :report="report" :finding-link="link" />
 
     <template v-if="report.findings.length">
       <h2 class="row-h">
