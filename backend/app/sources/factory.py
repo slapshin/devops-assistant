@@ -14,6 +14,7 @@ from app.domain.projects import (
     PrometheusConnection,
     SentryConnection,
     SourceConnection,
+    WazuhConnection,
     synthetic_url,
 )
 from app.sources.cloudflare.connect import connect_cloudflare
@@ -21,6 +22,7 @@ from app.sources.prometheus.client import PrometheusClient
 from app.sources.prometheus.source import PrometheusMetricsSource
 from app.sources.prometheus.synthetic import SyntheticMetricsSource
 from app.sources.sentry.connect import connect_sentry
+from app.sources.wazuh.connect import connect_wazuh
 from app.storage.projects import SqliteProjectRepository
 
 
@@ -57,6 +59,9 @@ async def open_source(conn: SourceConnection) -> AsyncIterator[MetricsSource]:
         case SentryConnection():
             async with connect_sentry(conn) as sentry:
                 yield sentry
+        case WazuhConnection():
+            async with connect_wazuh(conn) as wazuh:
+                yield wazuh
 
 
 class ProjectSources:

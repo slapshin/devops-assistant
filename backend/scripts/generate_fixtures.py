@@ -83,6 +83,7 @@ from app.domain.projects import (
     ProjectSummary,
     PrometheusSource,
     SentryTag,
+    WazuhLabel,
 )
 from app.domain.report import (
     TREND_DAYS,
@@ -100,6 +101,8 @@ from app.sources.cloudflare.source import CloudflareMetricsSource
 from app.sources.cloudflare.synthetic import SyntheticCloudflareApi
 from app.sources.sentry.source import SentryMetricsSource
 from app.sources.sentry.synthetic import SyntheticSentryApi
+from app.sources.wazuh.source import WazuhMetricsSource
+from app.sources.wazuh.synthetic import SyntheticWazuhApi
 
 ROOT = Path(__file__).resolve().parents[2] / "fixtures"
 PROJECT_ID = "01999a3c-0000-7000-8000-000000000001"
@@ -1042,6 +1045,7 @@ def build() -> dict[str, BaseModel]:
         "reports/report_partial_source_error.json": partial,
         "reports/report_cloudflare.json": cloudflare_report(),
         "reports/report_sentry.json": sentry_report(),
+        "reports/report_wazuh.json": wazuh_report(),
         "jobs/job_running.json": job(
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
@@ -1116,6 +1120,7 @@ def build() -> dict[str, BaseModel]:
         ),
         "api/connection_test_cloudflare.json": cloudflare_connection_test(),
         "api/connection_test_sentry.json": sentry_connection_test(),
+        "api/connection_test_wazuh.json": wazuh_connection_test(),
         "api/problem_queue_full.json": Problem(
             title="Analysis queue is full",
             status=429,
@@ -1176,6 +1181,20 @@ def sentry_report() -> AnalysisReport:
     return pipeline_report(OpenedSource(SourceKind.SENTRY, source), project, SENTRY_ANALYSIS_ID)
 
 
+WAZUH_ANALYSIS_ID = "01999a3c-0000-7000-8000-0000000000e6"
+
+
+def wazuh_report() -> AnalysisReport:
+    """A Wazuh-only project analysed from the synthetic incident scenario (T018)."""
+    labels = [WazuhLabel(key="project", value="shop")]
+    api = SyntheticWazuhApi("incident", "wazuh-alerts-4.x-*", [], labels)
+    source = WazuhMetricsSource(api, "wazuh-alerts-4.x-*", [], labels)
+    project = Scope(
+        project_id="01999a3c-0000-7000-8000-0000000000e1", project_name="Shop hosts", matchers=[]
+    )
+    return pipeline_report(OpenedSource(SourceKind.WAZUH, source), project, WAZUH_ANALYSIS_ID)
+
+
 def pipeline_report(opened: OpenedSource, scope: Scope, analysis_id: str) -> AnalysisReport:
     """A report produced by the real pipeline from one source, with pinned timestamps."""
     config = DetectorConfig()
@@ -1231,6 +1250,22 @@ def sentry_connection_test() -> ConnectionTest:
         ],
         message="1,842 error events and 1,282,468 transactions in 2 projects (production) "
         "in the last 24 h.",
+        checked_at=T,
+    )
+
+
+def wazuh_connection_test() -> ConnectionTest:
+    return ConnectionTest(
+        kind=SourceKind.WAZUH,
+        reachable=True,
+        auth_ok=True,
+        matched_series=8_412,
+        history_days=28.0,
+        families=[
+            FamilyCapability(family=SignalFamily.HOST_SECURITY, status=CapabilityStatus.SUPPORTED),
+            FamilyCapability(family=SignalFamily.FILE_INTEGRITY, status=CapabilityStatus.SUPPORTED),
+        ],
+        message="8,412 alerts from 3 agents in the last 24 h.",
         checked_at=T,
     )
 

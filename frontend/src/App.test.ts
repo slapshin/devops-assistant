@@ -9,11 +9,13 @@ import jobRunning from "../../fixtures/jobs/job_running.json";
 import connectionTest from "../../fixtures/api/connection_test.json";
 import cloudflareTest from "../../fixtures/api/connection_test_cloudflare.json";
 import sentryTest from "../../fixtures/api/connection_test_sentry.json";
+import wazuhTest from "../../fixtures/api/connection_test_wazuh.json";
 import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
 import cloudflareReport from "../../fixtures/reports/report_cloudflare.json";
 import sentryReport from "../../fixtures/reports/report_sentry.json";
+import wazuhReport from "../../fixtures/reports/report_wazuh.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
@@ -473,6 +475,108 @@ describe("project form", () => {
     expect(put.sources[1]).toEqual({ kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false });
   });
 
+  it("creates a Wazuh source selected by labels and tests it", async () => {
+    routes["POST /api/projects/test-connection"] = () => json(wazuhTest);
+    routes["POST /api/projects"] = () => json({ ...base, project_id: "wazuh-id" }, 201);
+    routes["GET /api/projects/wazuh-id"] = () => json({ ...base, project_id: "wazuh-id" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt("/projects/new");
+    await fireEvent.update(await screen.findByLabelText("Name"), "Shop hosts");
+    await fireEvent.click(screen.getByLabelText("Analyse Wazuh agents"));
+    const group = screen.getByRole("group", { name: "Wazuh" });
+
+    await fireEvent.update(within(group).getByLabelText(/^Agents/), "web 1!");
+    await fireEvent.update(within(group).getByLabelText("Username"), "reader");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    expect(within(group).getByLabelText("Indexer URL")).toHaveAttribute("aria-invalid", "true");
+    expect(within(group).getByText("Invalid agent names: 1!")).toBeInTheDocument();
+    expect(within(group).getByLabelText("Password")).toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(within(group).getByLabelText(/^Agents/), "");
+    await fireEvent.update(within(group).getByLabelText("Indexer URL"), "https://wazuh-indexer:9200/");
+    await fireEvent.click(within(group).getByRole("button", { name: "Add label" }));
+    await fireEvent.update(within(group).getByLabelText("Label key 1"), "project");
+    await fireEvent.update(within(group).getByLabelText("Label value 1"), "shop");
+    await fireEvent.update(within(group).getByLabelText("Password"), "s3cret");
+    await fireEvent.click(within(group).getByLabelText("Verify TLS certificates"));
+    await fireEvent.click(screen.getByRole("button", { name: "Test Wazuh connection" }));
+    const result = await screen.findByRole("region", { name: "Connection test result" });
+    expect(result).toHaveTextContent("Reachable · 8,412 alerts in 24 h · 28 days of history");
+    expect(within(result).getByRole("row", { name: /File integrity \(Wazuh\).*Supported/ })).toBeInTheDocument();
+    const source = {
+      kind: "wazuh",
+      api_url: "https://wazuh-indexer:9200/",
+      index_pattern: "wazuh-alerts-4.x-*",
+      agents: [],
+      groups: [],
+      monitoring_index_pattern: "wazuh-monitoring-*",
+      labels: [{ key: "project", value: "shop" }],
+      username: "reader",
+      tls_verify: false,
+      password: "s3cret",
+    };
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/wazuh-id"));
+    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/projects")?.body ?? "{}");
+    expect(sent.sources).toEqual([source]);
+  });
+
+  it("selects Wazuh agents by group and validates group names", async () => {
+    routes["POST /api/projects"] = () => json({ ...base, project_id: "wazuh-id" }, 201);
+    routes["GET /api/projects/wazuh-id"] = () => json({ ...base, project_id: "wazuh-id" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt("/projects/new");
+    await fireEvent.update(await screen.findByLabelText("Name"), "Shop hosts");
+    await fireEvent.click(screen.getByLabelText("Analyse Wazuh agents"));
+    const group = screen.getByRole("group", { name: "Wazuh" });
+    await fireEvent.update(within(group).getByLabelText("Indexer URL"), "synthetic://incident");
+    expect(within(group).queryByLabelText("Monitoring index pattern")).not.toBeInTheDocument();
+
+    await fireEvent.update(within(group).getByLabelText(/^Agent groups/), "shop-web, web/servers");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    expect(within(group).getByText("Invalid group names: web/servers")).toBeInTheDocument();
+    expect(within(group).getByLabelText(/^Agents/)).not.toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(within(group).getByLabelText(/^Agent groups/), "shop-web shop-db");
+    expect(within(group).getByLabelText("Monitoring index pattern")).toHaveValue("wazuh-monitoring-*");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/wazuh-id"));
+    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/projects")?.body ?? "{}");
+    expect(sent.sources[0]).toMatchObject({ kind: "wazuh", agents: [], groups: ["shop-db", "shop-web"], labels: [] });
+  });
+
+  it("edits a Wazuh source and keeps its stored password", async () => {
+    const wazuh = {
+      kind: "wazuh",
+      api_url: "https://wazuh-indexer:9200",
+      index_pattern: "wazuh-alerts-4.x-*",
+      agents: ["shop-db-1", "shop-web-1"],
+      groups: ["ops"],
+      monitoring_index_pattern: "wazuh-monitoring-*",
+      labels: [],
+      username: "reader",
+      tls_verify: true,
+      password_set: true,
+    };
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, wazuh] } as Summary);
+    routes[`PUT /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, wazuh] });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    await renderAt(`/projects/${PID}/edit`);
+    const group = await screen.findByRole("group", { name: "Wazuh" });
+    expect(within(group).getByLabelText("Password")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    expect(within(group).getByLabelText(/^Agents/)).toHaveValue("shop-db-1, shop-web-1");
+    expect(within(group).getByLabelText(/^Agent groups/)).toHaveValue("ops");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
+    const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
+    expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "wazuh"]);
+    expect(put.sources[1]).toEqual({ ...wazuh, password_set: undefined });
+    expect(put.sources[1]).not.toHaveProperty("password");
+  });
+
   it("deletes only after the name is typed and never while an analysis runs", async () => {
     let current: Summary = { ...base, report_count: 3, active_analysis: running };
     routes[`GET /api/projects/${PID}`] = () => json(current);
@@ -661,6 +765,13 @@ describe("report", () => {
     expect((await screen.findAllByText("Sentry")).length).toBeGreaterThan(0);
     const link = await screen.findByRole("link", { name: /Error spike/ });
     expect(link.closest("tr")).toHaveTextContent("Sentry");
+  });
+
+  it("renders a Wazuh report with agent findings", async () => {
+    await renderAt(`${report(wazuhReport)}/findings`);
+    const link = await screen.findByRole("link", { name: /Surge of authentication failures/ });
+    expect(link.closest("tr")).toHaveTextContent("Wazuh");
+    expect(link.closest("tr")).toHaveTextContent("shop-db-1");
   });
 
   it("findings show the source each one came from", async () => {

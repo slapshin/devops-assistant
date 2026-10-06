@@ -28,8 +28,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.8",
-  "config_hash": "e8c76aa9bf2c",
+  "detector_version": "detectors-2026.10.9",
+  "config_hash": "7ebd2dc56c02",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -395,13 +395,31 @@
       "total_series": 2,
       "baseline_days": 14,
       "reasons": []
+    },
+    {
+      "family": "host_security",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "file_integrity",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
     }
   ],
   "findings": [
     {
-      "finding_id": "fnd_22cfdc46479d4545",
+      "finding_id": "fnd_0c5950c95547f900",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.8",
+      "detector_version": "detectors-2026.10.9",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -438,7 +456,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_2d88122c94cba803"
+        "evd_ec36fcf231a694b5"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -447,9 +465,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_57a5b807ea935c69",
+      "finding_id": "fnd_6e362617990ed078",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.8",
+      "detector_version": "detectors-2026.10.9",
       "method": "relative",
       "family": "client_errors",
       "signal": "client_error_rate",
@@ -496,7 +514,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_764e437dd946843d"
+        "evd_ca372bc3adcb2a02"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -529,8 +547,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_22cfdc46479d4545",
-          "finding_id": "fnd_22cfdc46479d4545",
+          "episode_id": "eps_0c5950c95547f900",
+          "finding_id": "fnd_0c5950c95547f900",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=shop-production",
@@ -550,8 +568,8 @@
           "unit": "ratio"
         },
         {
-          "episode_id": "eps_57a5b807ea935c69",
-          "finding_id": "fnd_57a5b807ea935c69",
+          "episode_id": "eps_6e362617990ed078",
+          "finding_id": "fnd_6e362617990ed078",
           "entity": {
             "kind": "route",
             "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
@@ -626,7 +644,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_847c8805b4302a93",
+          "episode_id": "eps_931432819d79d2c2",
           "finding_id": null,
           "entity": {
             "kind": "route",
@@ -685,7 +703,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_bfc01e4c872169f3",
+          "episode_id": "eps_3f9d728f0a671fac",
           "finding_id": null,
           "entity": {
             "kind": "route",
@@ -778,7 +796,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_8140d4659b82e9ff",
+          "episode_id": "eps_8df5a8082bf01883",
           "finding_id": null,
           "entity": {
             "kind": "route",
@@ -881,8 +899,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_2d88122c94cba803",
-      "finding_id": "fnd_22cfdc46479d4545",
+      "evidence_id": "evd_ec36fcf231a694b5",
+      "finding_id": "fnd_0c5950c95547f900",
       "series": {
         "series_id": "ser_6d64ca1e1032319f",
         "family": "cpu",
@@ -1449,8 +1467,8 @@
       "threshold_label": "Diagnostic heuristic: 90 % for ≥ 15 min (not an SLO)"
     },
     {
-      "evidence_id": "evd_764e437dd946843d",
-      "finding_id": "fnd_57a5b807ea935c69",
+      "evidence_id": "evd_ca372bc3adcb2a02",
+      "finding_id": "fnd_6e362617990ed078",
       "series": {
         "series_id": "ser_70283fa5b0565bd7",
         "family": "client_errors",
@@ -2149,14 +2167,14 @@
         {
           "text": "A batch or runaway process saturated CPU on shop-production.",
           "finding_ids": [
-            "fnd_22cfdc46479d4545"
+            "fnd_0c5950c95547f900"
           ],
           "likelihood": "plausible"
         },
         {
           "text": "A client is polling for task IDs that no longer exist.",
           "finding_ids": [
-            "fnd_57a5b807ea935c69"
+            "fnd_6e362617990ed078"
           ],
           "likelihood": "possible"
         }
@@ -2165,13 +2183,13 @@
         {
           "text": "List top CPU consumers on shop-production for 05:05-08:05 UTC.",
           "finding_ids": [
-            "fnd_22cfdc46479d4545"
+            "fnd_0c5950c95547f900"
           ]
         },
         {
           "text": "Group 404 requests on /api/v1/orders/:order by client.",
           "finding_ids": [
-            "fnd_57a5b807ea935c69"
+            "fnd_6e362617990ed078"
           ]
         }
       ],

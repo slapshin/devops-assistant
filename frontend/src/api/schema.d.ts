@@ -424,7 +424,7 @@ export interface components {
             kind: components["schemas"]["SourceKind"];
             /**
              * Matched Series
-             * @description Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h.
+             * @description Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h. Wazuh: alerts of the selected agents in the last 24 h.
              */
             matched_series?: number | null;
             /** Message */
@@ -448,7 +448,7 @@ export interface components {
              */
             project_id?: string | null;
             /** Source */
-            source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"];
+            source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"];
         };
         /**
          * DailyTrend
@@ -516,7 +516,7 @@ export interface components {
          * EntityKind
          * @enum {string}
          */
-        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone" | "application";
+        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone" | "application" | "agent";
         /** EpisodeSummary */
         EpisodeSummary: {
             /** End */
@@ -935,7 +935,7 @@ export interface components {
             project_id: string;
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"])[];
+            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"] | components["schemas"]["WazuhSource"])[];
             /** Updated At */
             updated_at: string;
         };
@@ -961,7 +961,7 @@ export interface components {
             /** @description Automatic analyses; null runs analyses on demand only. */
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources?: (components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"])[];
+            sources?: (components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"])[];
         };
         /** ProjectList */
         ProjectList: {
@@ -1011,7 +1011,7 @@ export interface components {
             report_count: number;
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"])[];
+            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"] | components["schemas"]["WazuhSource"])[];
             /** Updated At */
             updated_at: string;
         };
@@ -1243,7 +1243,7 @@ export interface components {
          * SignalFamily
          * @enum {string}
          */
-        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security" | "app_errors" | "app_performance";
+        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity";
         /**
          * SignalStatus
          * @enum {string}
@@ -1273,7 +1273,7 @@ export interface components {
          * SourceKind
          * @enum {string}
          */
-        SourceKind: "prometheus" | "cloudflare" | "sentry";
+        SourceKind: "prometheus" | "cloudflare" | "sentry" | "wazuh";
         /**
          * StageName
          * @enum {string}
@@ -1354,6 +1354,117 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * WazuhLabel
+         * @description Exact ``agent.labels.<key> = value`` filter (an agent's ``<labels>`` setting).
+         */
+        WazuhLabel: {
+            /**
+             * Key
+             * @description Label key as set in the agent's <labels> block, e.g. project.
+             */
+            key: string;
+            /** Value */
+            value: string;
+        };
+        /** WazuhSource */
+        WazuhSource: {
+            /** Agents */
+            agents?: string[];
+            /** Api Url */
+            api_url: string;
+            /** Groups */
+            groups?: string[];
+            /**
+             * Index Pattern
+             * @default wazuh-alerts-4.x-*
+             */
+            index_pattern: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "wazuh";
+            /** Labels */
+            labels?: components["schemas"]["WazuhLabel"][];
+            /**
+             * Monitoring Index Pattern
+             * @default wazuh-monitoring-*
+             */
+            monitoring_index_pattern: string;
+            /** Password Set */
+            password_set: boolean;
+            /**
+             * Tls Verify
+             * @default true
+             */
+            tls_verify: boolean;
+            /** Username */
+            username?: string | null;
+        };
+        /**
+         * WazuhSourceInput
+         * @description Wazuh agents selected by name, group and/or agent labels, read from the Wazuh indexer.
+         *
+         *     The named agents and the groups' members together form the selection; label filters
+         *     narrow it (or alone select every agent that has those labels).
+         */
+        WazuhSourceInput: {
+            /**
+             * Agents
+             * @description Agent names (agent.name); each is analysed as its own entity.
+             */
+            agents?: string[];
+            /**
+             * Api Url
+             * @description Wazuh indexer URL, e.g. https://wazuh-indexer:9200 (path prefixes are kept); synthetic://<scenario> for demo data.
+             */
+            api_url: string;
+            /**
+             * Groups
+             * @description Agent groups; their current members (from the monitoring index) are analysed together with the named agents.
+             */
+            groups?: string[];
+            /**
+             * Index Pattern
+             * @description Alerts index pattern of the indexer.
+             * @default wazuh-alerts-4.x-*
+             */
+            index_pattern: string;
+            /**
+             * Kind
+             * @default wazuh
+             * @constant
+             */
+            kind: "wazuh";
+            /**
+             * Labels
+             * @description Agent label filters (agent.labels.<key>), all of which must match.
+             */
+            labels?: components["schemas"]["WazuhLabel"][];
+            /**
+             * Monitoring Index Pattern
+             * @description Index of the agent snapshots the Wazuh dashboard writes; used to resolve groups.
+             * @default wazuh-monitoring-*
+             */
+            monitoring_index_pattern: string;
+            /**
+             * Password
+             * @description Omit to keep the stored password (update only); not needed for synthetic://.
+             */
+            password?: string | null;
+            /**
+             * Tls Verify
+             * @description Verify the indexer's TLS certificate; turn off only for a self-signed or internal certificate (the Wazuh default).
+             * @default true
+             */
+            tls_verify: boolean;
+            /**
+             * Username
+             * @description Indexer user with read access to the alerts indices; not needed for synthetic://.
+             */
+            username?: string | null;
         };
         /**
          * Weekday

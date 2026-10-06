@@ -9,7 +9,7 @@ import SourceHealth from "../../components/projects/SourceHealth.vue";
 import SourceIcon from "../../components/projects/SourceIcon.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import { formatTime, utcTooltip } from "../../lib/format";
-import { cloudflareSource, prometheusSource, scheduleSummary, sentrySource, sourceHost } from "../../lib/projects";
+import { WAZUH_INDEX_PATTERN, cloudflareSource, prometheusSource, scheduleSummary, sentrySource, sourceHost, wazuhSource } from "../../lib/projects";
 
 const HISTORY_PAGE_SIZE = 20;
 const AUTH_LABELS: Record<string, string> = { none: "No authentication", bearer: "Bearer token", basic: "Basic auth" };
@@ -23,6 +23,7 @@ const notFound = computed(() => project.error.value instanceof ApiError && proje
 const prometheus = computed(() => prometheusSource(project.data.value));
 const cloudflare = computed(() => cloudflareSource(project.data.value));
 const sentry = computed(() => sentrySource(project.data.value));
+const wazuh = computed(() => wazuhSource(project.data.value));
 const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ?? []);
 </script>
 
@@ -76,6 +77,21 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
               class="chips"
               label="Sentry tag filters"
               :matchers="sentry.tags.map((t) => ({ name: t.key, value: t.value }))"
+            />
+          </dd>
+          <dd v-else class="muted">Not configured</dd>
+          <dt class="source-kind"><SourceIcon kind="wazuh" />Wazuh</dt>
+          <dd v-if="wazuh">
+            <SourceHealth :project="project.data.value" kind="wazuh" />
+            <span class="mono">{{ sourceHost(wazuh.api_url) }}</span>
+            · {{ [...(wazuh.agents ?? []), ...(wazuh.groups ?? []).map((g) => `group ${g}`)].join(", ") || "agents by label" }}
+            <template v-if="wazuh.index_pattern !== WAZUH_INDEX_PATTERN"> · <span class="mono">{{ wazuh.index_pattern }}</span></template>
+            <template v-if="wazuh.tls_verify === false"> · TLS not verified</template>
+            <MatcherChips
+              v-if="wazuh.labels?.length"
+              class="chips"
+              label="Wazuh agent labels"
+              :matchers="wazuh.labels.map((l) => ({ name: l.key, value: l.value }))"
             />
           </dd>
           <dd v-else class="muted">Not configured</dd>

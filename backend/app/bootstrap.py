@@ -8,6 +8,7 @@ from app.domain.projects import (
     ProjectInput,
     PrometheusSourceInput,
     SentrySourceInput,
+    WazuhSourceInput,
 )
 from app.settings import Settings
 from app.sources.cloudflare.synthetic import SYNTHETIC_ZONE_ID
@@ -28,7 +29,7 @@ def demo_projects() -> list[ProjectInput]:
         ProjectInput(
             name=f"Demo: {scenario}",
             description=f"Synthetic data, scenario {scenario!r}. No real metrics, Cloudflare "
-            "analytics or Sentry events are queried.",
+            "analytics, Sentry events or Wazuh alerts are queried.",
             matchers=DEMO_MATCHERS,
             sources=[
                 PrometheusSourceInput(url=f"synthetic://{scenario}"),
@@ -43,6 +44,7 @@ def demo_projects() -> list[ProjectInput]:
                     environment="production",
                     api_url=f"synthetic://{scenario}",
                 ),
+                WazuhSourceInput(api_url=f"synthetic://{scenario}", groups=["shop-db", "shop-web"]),
             ],
         )
         for scenario in SCENARIOS

@@ -13,7 +13,12 @@ import {
   MAX_MATCHERS,
   MAX_SENTRY_PROJECTS,
   MAX_SENTRY_TAGS,
+  MAX_WAZUH_AGENTS,
+  MAX_WAZUH_GROUPS,
+  MAX_WAZUH_LABELS,
   SENTRY_URL,
+  WAZUH_INDEX_PATTERN,
+  WAZUH_MONITORING_INDEX_PATTERN,
   WEEKDAYS,
   cloneDraft,
   cloudflareInput,
@@ -30,6 +35,7 @@ import {
   storedAuth,
   storedCloudflareToken,
   storedSentryToken,
+  storedWazuhPassword,
   testKey,
   timezoneOptions,
   toInput,
@@ -38,6 +44,8 @@ import {
   validateMatchers,
   validateSentry,
   validateSource,
+  validateWazuh,
+  wazuhInput,
 } from "../../lib/projects";
 
 const props = defineProps<{ projectId?: string; cloneOf?: string }>();
@@ -77,6 +85,7 @@ const stored = computed(() => storedAuth(existing.data.value));
 const keeps = computed(() => keepsStoredSecret(draft.value, stored.value));
 const cfTokenStored = computed(() => storedCloudflareToken(existing.data.value));
 const sentryTokenStored = computed(() => storedSentryToken(existing.data.value));
+const wazuhPasswordStored = computed(() => storedWazuhPassword(existing.data.value));
 
 // Fill the form once from the stored project; later refetches must not overwrite edits.
 watch(
@@ -89,7 +98,8 @@ watch(
   { immediate: true },
 );
 
-const clientErrors = computed(() => validateDraft(draft.value, stored.value, cfTokenStored.value, sentryTokenStored.value));
+const clientErrors = computed(() => validateDraft(draft.value, stored.value, cfTokenStored.value, sentryTokenStored.value, wazuhPasswordStored.value),
+);
 const errors = computed<FieldErrors>(() => ({ ...(submitted.value ? clientErrors.value : {}), ...serverErrors.value }));
 
 // A server error belongs to the value it was about; editing anything clears them.
@@ -99,6 +109,7 @@ const signatures = computed<Record<SourceKind, string>>(() => ({
   prometheus: JSON.stringify([matchersInput(draft.value), draft.value.url.trim() ? prometheusInput(draft.value) : null]),
   cloudflare: JSON.stringify(draft.value.cloudflare ? cloudflareInput(draft.value) : null),
   sentry: JSON.stringify(draft.value.sentry ? sentryInput(draft.value) : null),
+  wazuh: JSON.stringify(draft.value.wazuh ? wazuhInput(draft.value) : null),
 }));
 const isStale = (kind: SourceKind) => {
   const last = lastTests.value[kind];
@@ -151,12 +162,13 @@ function applyServerError(error: unknown, tested?: SourceKind) {
 
 async function runTest(kind: SourceKind) {
   formError.value = null;
-  const problems =
-    kind === "prometheus"
-      ? { ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, stored.value, true) }
-      : kind === "cloudflare"
-        ? validateCloudflare(draft.value, cfTokenStored.value)
-        : validateSentry(draft.value, sentryTokenStored.value);
+  const validators: Record<SourceKind, () => FieldErrors> = {
+    prometheus: () => ({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, stored.value, true) }),
+    cloudflare: () => validateCloudflare(draft.value, cfTokenStored.value),
+    sentry: () => validateSentry(draft.value, sentryTokenStored.value),
+    wazuh: () => validateWazuh(draft.value, wazuhPasswordStored.value),
+  };
+  const problems = validators[kind]();
   if (Object.keys(problems).length) {
     serverErrors.value = problems;
     return;
@@ -567,6 +579,168 @@ async function confirmDelete() {
             </button>
           </div>
           <ConnectionTestResult v-if="lastTests.sentry" :test="lastTests.sentry.result" :stale="isStale('sentry')" />
+        </template>
+      </fieldset>
+
+      <fieldset>
+        <legend>Wazuh</legend>
+        <label class="check"><input v-model="draft.wazuh" type="checkbox"> Analyse Wazuh agents</label>
+        <template v-if="draft.wazuh">
+          <p class="muted hint">
+            Security alerts per agent from the Wazuh indexer: all alerts, high-level alerts (rule level 12+), authentication failures
+            and file integrity changes.
+          </p>
+          <div class="field">
+            <label for="wazuh-url">Indexer URL</label>
+            <input
+              id="wazuh-url"
+              v-model="draft.wazuhUrl"
+              class="mono"
+              placeholder="https://wazuh-indexer:9200"
+              autocomplete="off"
+              :aria-invalid="!!errors['wazuh.api_url']"
+              :aria-describedby="describedBy('wazuh.api_url') ?? 'wazuh-url-hint'"
+            >
+            <p id="wazuh-url-hint" class="muted hint">The Wazuh indexer (OpenSearch API, port 9200 by default), not the Wazuh server API.</p>
+            <p v-if="errors['wazuh.api_url']" :id="errorId('wazuh.api_url')" class="field-error">{{ errors["wazuh.api_url"] }}</p>
+          </div>
+          <label class="check"><input v-model="draft.wazuhTlsVerify" type="checkbox"> Verify TLS certificates</label>
+          <p v-if="!draft.wazuhTlsVerify" class="muted hint">Wazuh installs a self-signed certificate by default; prefer adding its CA.</p>
+          <div class="field">
+            <label for="wazuh-agents">Agents <span class="muted">(optional with groups or labels)</span></label>
+            <input
+              id="wazuh-agents"
+              v-model="draft.wazuhAgents"
+              class="mono"
+              placeholder="shop-web-1, shop-db-1"
+              autocomplete="off"
+              :aria-invalid="!!errors['wazuh.agents']"
+              :aria-describedby="describedBy('wazuh.agents') ?? 'wazuh-agents-hint'"
+            >
+            <p id="wazuh-agents-hint" class="muted hint">
+              Up to {{ MAX_WAZUH_AGENTS }} agent names, separated with commas or spaces. Each agent is analysed separately.
+            </p>
+            <p v-if="errors['wazuh.agents']" :id="errorId('wazuh.agents')" class="field-error">{{ errors["wazuh.agents"] }}</p>
+          </div>
+          <div class="field">
+            <label for="wazuh-groups">Agent groups <span class="muted">(optional)</span></label>
+            <input
+              id="wazuh-groups"
+              v-model="draft.wazuhGroups"
+              class="mono"
+              placeholder="shop-web, shop-db"
+              autocomplete="off"
+              :aria-invalid="!!errors['wazuh.groups']"
+              :aria-describedby="describedBy('wazuh.groups') ?? 'wazuh-groups-hint'"
+            >
+            <p id="wazuh-groups-hint" class="muted hint">
+              Up to {{ MAX_WAZUH_GROUPS }} groups; their current members are analysed together with the agents above. Members are read
+              from the agent snapshots the Wazuh dashboard writes every 15 minutes (<code>wazuh.monitoring.enabled</code>).
+            </p>
+            <p v-if="errors['wazuh.groups']" :id="errorId('wazuh.groups')" class="field-error">{{ errors["wazuh.groups"] }}</p>
+          </div>
+          <div class="field" role="group" aria-labelledby="wazuh-labels-label" aria-describedby="wazuh-labels-hint">
+            <span id="wazuh-labels-label" class="field-label">Agent labels <span class="muted">(optional)</span></span>
+            <p id="wazuh-labels-hint" class="muted hint">
+              Only agents whose <code>&lt;labels&gt;</code> (agent or group <code>agent.conf</code>) have all of these values, e.g.
+              <code>project = shop</code>. Alone, they select every agent with these labels.
+            </p>
+            <div v-for="(l, i) in draft.wazuhLabels" :key="i" class="matcher">
+              <div class="field">
+                <label :for="`wazuh-label-key-${i}`" class="sr-only">Label key {{ i + 1 }}</label>
+                <input
+                  :id="`wazuh-label-key-${i}`"
+                  v-model="l.key"
+                  class="mono"
+                  placeholder="label"
+                  autocomplete="off"
+                  :aria-invalid="!!errors[`wazuh.labels.${i}.key`]"
+                  :aria-describedby="describedBy(`wazuh.labels.${i}.key`)"
+                >
+                <p v-if="errors[`wazuh.labels.${i}.key`]" :id="errorId(`wazuh.labels.${i}.key`)" class="field-error">{{ errors[`wazuh.labels.${i}.key`] }}</p>
+              </div>
+              <span class="eq mono" aria-hidden="true">=</span>
+              <div class="field">
+                <label :for="`wazuh-label-value-${i}`" class="sr-only">Label value {{ i + 1 }}</label>
+                <input
+                  :id="`wazuh-label-value-${i}`"
+                  v-model="l.value"
+                  class="mono"
+                  placeholder="value"
+                  autocomplete="off"
+                  :aria-invalid="!!errors[`wazuh.labels.${i}.value`]"
+                  :aria-describedby="describedBy(`wazuh.labels.${i}.value`)"
+                >
+                <p v-if="errors[`wazuh.labels.${i}.value`]" :id="errorId(`wazuh.labels.${i}.value`)" class="field-error">{{ errors[`wazuh.labels.${i}.value`] }}</p>
+              </div>
+              <button type="button" :aria-label="`Remove label ${i + 1}`" @click="draft.wazuhLabels.splice(i, 1)">✕</button>
+            </div>
+            <p v-if="errors['wazuh.labels']" class="field-error">{{ errors["wazuh.labels"] }}</p>
+            <div>
+              <button type="button" :disabled="draft.wazuhLabels.length >= MAX_WAZUH_LABELS" @click="draft.wazuhLabels.push({ key: '', value: '' })">Add label</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="wazuh-index">Alerts index pattern</label>
+            <input
+              id="wazuh-index"
+              v-model="draft.wazuhIndex"
+              class="mono"
+              :placeholder="WAZUH_INDEX_PATTERN"
+              autocomplete="off"
+              :aria-invalid="!!errors['wazuh.index_pattern']"
+              :aria-describedby="describedBy('wazuh.index_pattern')"
+            >
+            <p v-if="errors['wazuh.index_pattern']" :id="errorId('wazuh.index_pattern')" class="field-error">{{ errors["wazuh.index_pattern"] }}</p>
+          </div>
+          <div v-if="draft.wazuhGroups.trim()" class="field">
+            <label for="wazuh-monitoring-index">Monitoring index pattern</label>
+            <input
+              id="wazuh-monitoring-index"
+              v-model="draft.wazuhMonitoringIndex"
+              class="mono"
+              :placeholder="WAZUH_MONITORING_INDEX_PATTERN"
+              autocomplete="off"
+              :aria-invalid="!!errors['wazuh.monitoring_index_pattern']"
+              :aria-describedby="describedBy('wazuh.monitoring_index_pattern')"
+            >
+            <p v-if="errors['wazuh.monitoring_index_pattern']" :id="errorId('wazuh.monitoring_index_pattern')" class="field-error">
+              {{ errors["wazuh.monitoring_index_pattern"] }}
+            </p>
+          </div>
+          <div class="field">
+            <label for="wazuh-username">Username</label>
+            <input
+              id="wazuh-username"
+              v-model="draft.wazuhUsername"
+              autocomplete="off"
+              :aria-invalid="!!errors['wazuh.username']"
+              :aria-describedby="describedBy('wazuh.username') ?? 'wazuh-username-hint'"
+            >
+            <p id="wazuh-username-hint" class="muted hint">
+              An indexer user that may only read <code>wazuh-alerts-*</code> (and <code>wazuh-monitoring-*</code> with groups).
+            </p>
+            <p v-if="errors['wazuh.username']" :id="errorId('wazuh.username')" class="field-error">{{ errors["wazuh.username"] }}</p>
+          </div>
+          <div class="field">
+            <label for="wazuh-password">Password</label>
+            <input
+              id="wazuh-password"
+              v-model="draft.wazuhPassword"
+              type="password"
+              autocomplete="new-password"
+              :placeholder="wazuhPasswordStored ? 'Stored — leave empty to keep' : ''"
+              :aria-invalid="!!errors['wazuh.password']"
+              :aria-describedby="describedBy('wazuh.password')"
+            >
+            <p v-if="errors['wazuh.password']" :id="errorId('wazuh.password')" class="field-error">{{ errors["wazuh.password"] }}</p>
+          </div>
+          <div class="row">
+            <button type="button" :disabled="tester.isPending.value" @click="runTest('wazuh')">
+              {{ testing === "wazuh" ? "Testing…" : "Test Wazuh connection" }}
+            </button>
+          </div>
+          <ConnectionTestResult v-if="lastTests.wazuh" :test="lastTests.wazuh.result" :stale="isStale('wazuh')" />
         </template>
       </fieldset>
 

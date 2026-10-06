@@ -211,7 +211,8 @@
         "upstream",
         "database",
         "zone",
-        "application"
+        "application",
+        "agent"
       ],
       "title": "EntityKind",
       "type": "string"
@@ -1222,7 +1223,9 @@
         "edge",
         "security",
         "app_errors",
-        "app_performance"
+        "app_performance",
+        "host_security",
+        "file_integrity"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -1288,7 +1291,8 @@
       "enum": [
         "prometheus",
         "cloudflare",
-        "sentry"
+        "sentry",
+        "wazuh"
       ],
       "title": "SourceKind",
       "type": "string"

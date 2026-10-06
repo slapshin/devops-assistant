@@ -1,0 +1,21 @@
+{
+  "kind": "wazuh",
+  "reachable": true,
+  "auth_ok": true,
+  "matched_series": 8412,
+  "history_days": 28.0,
+  "families": [
+    {
+      "family": "host_security",
+      "status": "supported",
+      "reason": null
+    },
+    {
+      "family": "file_integrity",
+      "status": "supported",
+      "reason": null
+    }
+  ],
+  "message": "8,412 alerts from 3 agents in the last 24 h.",
+  "checked_at": "2026-09-30T10:05:00Z"
+}

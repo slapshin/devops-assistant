@@ -127,7 +127,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 
 **Report schema version:** `schema_version: "1.0"`. Minor bumps add optional fields; major bumps require a reader migration. Readers must open every saved major version they claim to support, or return `report_unavailable` with `code=schema_unsupported` — never a crash.
 
-## 5. Numerical policy (detector config `detectors-2026.10.7`)
+## 5. Numerical policy (detector config `detectors-2026.10.9`)
 
 All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
@@ -202,6 +202,9 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | Sentry transactions (application) | throughput (`is_transaction:true` spans, extrapolated from sampled traces) | both | ×2 or ÷2 and ≥ 0.2/s change | — |
 | Sentry transactions (application) | failed share (`failure_rate()`: every non-ok status, including client-side ones such as `not_found`; volume-guarded at ≥ 30 transactions per step) | up | +3 pp | ≥ 10 % for ≥ 10 min |
 | Sentry transactions (application) | duration p95 (p99 as evidence; volume-guarded) | up | ×1.5 and ≥ +50 ms | — |
+| Wazuh host security (agent) | all alerts; authentication failures (`rule.groups`: `authentication_failed`, `authentication_failures`, `invalid_login`). An alert surge calls for investigation, not an outage: severity ≤ high | up | ×3 and ≥ +0.03/s (9 per 5 min) | — |
+| Wazuh host security (agent) | high-level alerts (`rule.level` ≥ 12; severity ≤ high) | up | ×3 and ≥ +0.005/s | — |
+| Wazuh file integrity (agent) | FIM changes (`rule.groups: syscheck`). Routine updates also change files: severity ≤ medium | up | ×3 and ≥ +0.05/s (15 per 5 min) | — |
 | Latency | p95/p99 from verified classic histograms (HTTP and RPC buckets 0.005–10 s; values at the top bucket are reported as "≥ 10 s"); mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
 
 - Rates are computed before aggregation; ratio numerator and denominator use the same selector scope (project, env, and entity labels).
@@ -211,6 +214,7 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 - Route-level analysis for the top 20 routes by 14-day volume per service; remaining routes aggregated as `(other routes)`.
 - Cloudflare data comes from adaptive (sampled) datasets. Counts are Cloudflare's estimates. A mean sampling interval of ≥ 10 lowers a finding's confidence (`sampled`), and ≥ 100 makes it low (`sampled_low`); sampling never changes severity. Inside a fetched chunk a bucket without rows means zero events, while periods outside retention or of failed queries stay unknown.
 - Sentry transaction counts are extrapolated by Sentry from the client's trace sample rate; a changed sample rate shows up as a throughput change. Error events are counted as stored (after inbound filters and rate limits). Before the project's creation date values are unknown, never zero; a project without transactions in the last 24 h has its transaction signals `unsupported` ("tracing not set up").
+- Wazuh alerts are counted as indexed (level ≥ 3 by default, the manager's `log_alert_level`). An agent's values are unknown before its first alert in the 28-day window, never zero, so a new or long-quiet agent gets a short baseline instead of a fake quiet one. A search that timed out or failed on some shards is a failed chunk, never a partial count. Agents are never matched to Prometheus nodes by name.
 
 ### Severity (magnitude and duration only)
 

@@ -308,6 +308,126 @@
       ],
       "title": "SentryTag",
       "type": "object"
+    },
+    "WazuhLabel": {
+      "additionalProperties": false,
+      "description": "Exact ``agent.labels.<key> = value`` filter (an agent's ``<labels>`` setting).",
+      "properties": {
+        "key": {
+          "description": "Label key as set in the agent's <labels> block, e.g. project.",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "title": "WazuhLabel",
+      "type": "object"
+    },
+    "WazuhSourceInput": {
+      "additionalProperties": false,
+      "description": "Wazuh agents selected by name, group and/or agent labels, read from the Wazuh indexer.\n\nThe named agents and the groups' members together form the selection; label filters\nnarrow it (or alone select every agent that has those labels).",
+      "properties": {
+        "agents": {
+          "description": "Agent names (agent.name); each is analysed as its own entity.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Agents",
+          "type": "array"
+        },
+        "api_url": {
+          "description": "Wazuh indexer URL, e.g. https://wazuh-indexer:9200 (path prefixes are kept); synthetic://<scenario> for demo data.",
+          "maxLength": 2048,
+          "title": "Api Url",
+          "type": "string"
+        },
+        "groups": {
+          "description": "Agent groups; their current members (from the monitoring index) are analysed together with the named agents.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Groups",
+          "type": "array"
+        },
+        "index_pattern": {
+          "default": "wazuh-alerts-4.x-*",
+          "description": "Alerts index pattern of the indexer.",
+          "title": "Index Pattern",
+          "type": "string"
+        },
+        "kind": {
+          "const": "wazuh",
+          "default": "wazuh",
+          "title": "Kind",
+          "type": "string"
+        },
+        "labels": {
+          "description": "Agent label filters (agent.labels.<key>), all of which must match.",
+          "items": {
+            "$ref": "#/$defs/WazuhLabel"
+          },
+          "maxItems": 10,
+          "title": "Labels",
+          "type": "array"
+        },
+        "monitoring_index_pattern": {
+          "default": "wazuh-monitoring-*",
+          "description": "Index of the agent snapshots the Wazuh dashboard writes; used to resolve groups.",
+          "title": "Monitoring Index Pattern",
+          "type": "string"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Omit to keep the stored password (update only); not needed for synthetic://.",
+          "title": "Password"
+        },
+        "tls_verify": {
+          "default": true,
+          "description": "Verify the indexer's TLS certificate; turn off only for a self-signed or internal certificate (the Wazuh default).",
+          "title": "Tls Verify",
+          "type": "boolean"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Indexer user with read access to the alerts indices; not needed for synthetic://.",
+          "title": "Username"
+        }
+      },
+      "required": [
+        "api_url"
+      ],
+      "title": "WazuhSourceInput",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -345,6 +465,9 @@
         },
         {
           "$ref": "#/$defs/SentrySourceInput"
+        },
+        {
+          "$ref": "#/$defs/WazuhSourceInput"
         }
       ],
       "title": "Source"

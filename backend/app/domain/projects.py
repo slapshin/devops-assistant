@@ -2,7 +2,7 @@
 
 A project holds at most one data source per kind; its equality label matchers select the
 series of its Prometheus source. Secrets are write-only: input models accept them, read models
-only say whether one is stored. New source kinds (e.g. Wazuh) are added as new members
+only say whether one is stored. New source kinds are added as new members
 of ``SourceKind`` and of the source unions without changing storage.
 """
 
@@ -19,6 +19,7 @@ from pydantic import (
     Tag,
     ValidationInfo,
     field_validator,
+    model_validator,
 )
 
 from app.domain.common import (
@@ -46,6 +47,16 @@ _SENTRY_TAG_KEY = re.compile(r"^[a-zA-Z0-9_.:-]{1,32}$")
 MAX_SENTRY_PROJECTS = 10
 MAX_SENTRY_TAGS = 10
 MAX_SENTRY_TAG_VALUE_CHARS = 200
+WAZUH_INDEX_PATTERN = "wazuh-alerts-4.x-*"
+_WAZUH_AGENT = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+_WAZUH_LABEL_KEY = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$")
+_WAZUH_INDEX_PATTERN = re.compile(r"^[a-z0-9_*][a-z0-9_.*+-]{0,254}$")
+MAX_WAZUH_AGENTS = 50
+MAX_WAZUH_LABELS = 10
+MAX_WAZUH_LABEL_VALUE_CHARS = 200
+WAZUH_MONITORING_INDEX_PATTERN = "wazuh-monitoring-*"
+_WAZUH_GROUP = re.compile(r"^[A-Za-z0-9_.-]{1,255}$")
+MAX_WAZUH_GROUPS = 10
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
 )
@@ -266,6 +277,148 @@ class SentrySourceInput(Contract):
         return validate_source_url(value)
 
 
+class WazuhLabel(Contract):
+    """Exact ``agent.labels.<key> = value`` filter (an agent's ``<labels>`` setting)."""
+
+    key: str = Field(description="Label key as set in the agent's <labels> block, e.g. project.")
+    value: str = Field(min_length=1, max_length=MAX_WAZUH_LABEL_VALUE_CHARS)
+
+    @field_validator("key")
+    @classmethod
+    def _valid_key(cls, value: str) -> str:
+        value = value.strip()
+        if not _WAZUH_LABEL_KEY.match(value):
+            raise ValueError("expected letters, digits, _ . - (max 64)")
+        return value
+
+    @field_validator("value")
+    @classmethod
+    def _valid_value(cls, value: str) -> str:
+        if "\n" in value or "\r" in value:
+            raise ValueError("must not contain line breaks")
+        return value
+
+
+def normalise_wazuh_labels(labels: list[WazuhLabel]) -> list[WazuhLabel]:
+    """Reject duplicate keys (two values of one key never match) and sort by key."""
+    keys = [label.key for label in labels]
+    if duplicates := sorted({k for k in keys if keys.count(k) > 1}):
+        raise ValueError(f"duplicate label keys: {', '.join(duplicates)}")
+    return sorted(labels, key=lambda label: label.key)
+
+
+def normalise_wazuh_agents(agents: list[str]) -> list[str]:
+    """Unique, sorted agent names (case is kept: agent.name is matched exactly)."""
+    names = sorted({a.strip() for a in agents if a.strip()})
+    if bad := [a for a in names if not _WAZUH_AGENT.match(a)]:
+        raise ValueError(f"invalid agent names: {', '.join(bad)}")
+    return names
+
+
+WazuhAgents = Annotated[
+    list[str], Field(max_length=MAX_WAZUH_AGENTS), AfterValidator(normalise_wazuh_agents)
+]
+
+
+def normalise_wazuh_groups(groups: list[str]) -> list[str]:
+    """Unique, sorted group names (case is kept, as Wazuh stores them)."""
+    names = sorted({g.strip() for g in groups if g.strip()})
+    if bad := [g for g in names if not _WAZUH_GROUP.match(g) or g in (".", "..")]:
+        raise ValueError(f"invalid group names: {', '.join(bad)}")
+    return names
+
+
+WazuhGroups = Annotated[
+    list[str], Field(max_length=MAX_WAZUH_GROUPS), AfterValidator(normalise_wazuh_groups)
+]
+WazuhLabels = Annotated[
+    list[WazuhLabel], Field(max_length=MAX_WAZUH_LABELS), AfterValidator(normalise_wazuh_labels)
+]
+
+
+def validate_index_pattern(value: str) -> str:
+    """One index name or wildcard pattern: no lists, exclusions, or remote clusters."""
+    value = value.strip()
+    if not _WAZUH_INDEX_PATTERN.match(value):
+        raise ValueError(
+            "expected one lower-case index pattern such as wazuh-alerts-4.x-* "
+            "(no commas, spaces, ':' or leading '-')"
+        )
+    return value
+
+
+class WazuhSourceInput(Contract):
+    """Wazuh agents selected by name, group and/or agent labels, read from the Wazuh indexer.
+
+    The named agents and the groups' members together form the selection; label filters
+    narrow it (or alone select every agent that has those labels).
+    """
+
+    kind: Literal[SourceKind.WAZUH] = SourceKind.WAZUH
+    api_url: str = Field(
+        max_length=2048,
+        description="Wazuh indexer URL, e.g. https://wazuh-indexer:9200 (path prefixes are "
+        "kept); synthetic://<scenario> for demo data.",
+    )
+    index_pattern: str = Field(
+        default=WAZUH_INDEX_PATTERN, description="Alerts index pattern of the indexer."
+    )
+    agents: WazuhAgents = Field(
+        default_factory=list,
+        description="Agent names (agent.name); each is analysed as its own entity.",
+    )
+    groups: WazuhGroups = Field(
+        default_factory=list,
+        description="Agent groups; their current members (from the monitoring index) are "
+        "analysed together with the named agents.",
+    )
+    labels: WazuhLabels = Field(
+        default_factory=list,
+        description="Agent label filters (agent.labels.<key>), all of which must match.",
+    )
+    monitoring_index_pattern: str = Field(
+        default=WAZUH_MONITORING_INDEX_PATTERN,
+        description="Index of the agent snapshots the Wazuh dashboard writes; used to resolve "
+        "groups.",
+    )
+    username: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Indexer user with read access to the alerts indices; not needed for "
+        "synthetic://.",
+    )
+    password: SecretStr | None = Field(
+        default=None,
+        description="Omit to keep the stored password (update only); not needed for synthetic://.",
+    )
+    tls_verify: bool = Field(
+        default=True,
+        description="Verify the indexer's TLS certificate; turn off only for a self-signed or "
+        "internal certificate (the Wazuh default).",
+    )
+
+    @field_validator("api_url")
+    @classmethod
+    def _valid_url(cls, value: str) -> str:
+        return validate_source_url(value)
+
+    @field_validator("index_pattern", "monitoring_index_pattern")
+    @classmethod
+    def _valid_index_pattern(cls, value: str) -> str:
+        return validate_index_pattern(value)
+
+    @field_validator("username")
+    @classmethod
+    def _strip_username(cls, value: str | None) -> str | None:
+        return (value or "").strip() or None
+
+    @model_validator(mode="after")
+    def _selects_agents(self) -> WazuhSourceInput:
+        if not self.agents and not self.groups and not self.labels:
+            raise ValueError("select agents by name, group or label (at least one is required)")
+        return self
+
+
 def _source_kind(value: Any) -> str:
     """``kind`` selects the union member; it defaults to prometheus (the only pre-T015 kind)."""
     if isinstance(value, dict):
@@ -276,7 +429,8 @@ def _source_kind(value: Any) -> str:
 SourceInput = Annotated[
     Annotated[PrometheusSourceInput, Tag(SourceKind.PROMETHEUS.value)]
     | Annotated[CloudflareSourceInput, Tag(SourceKind.CLOUDFLARE.value)]
-    | Annotated[SentrySourceInput, Tag(SourceKind.SENTRY.value)],
+    | Annotated[SentrySourceInput, Tag(SourceKind.SENTRY.value)]
+    | Annotated[WazuhSourceInput, Tag(SourceKind.WAZUH.value)],
     Discriminator(_source_kind),
 ]
 
@@ -382,7 +536,20 @@ class SentrySource(Contract):
     token_set: bool
 
 
-AnySource = PrometheusSource | CloudflareSource | SentrySource
+class WazuhSource(Contract):
+    kind: Literal[SourceKind.WAZUH] = SourceKind.WAZUH
+    api_url: str
+    index_pattern: str = WAZUH_INDEX_PATTERN
+    agents: list[str] = Field(default_factory=list)
+    groups: list[str] = Field(default_factory=list)
+    labels: list[WazuhLabel] = Field(default_factory=list)
+    monitoring_index_pattern: str = WAZUH_MONITORING_INDEX_PATTERN
+    username: str | None = None
+    tls_verify: bool = True
+    password_set: bool
+
+
+AnySource = PrometheusSource | CloudflareSource | SentrySource | WazuhSource
 Source = Annotated[AnySource, Field(discriminator="kind")]
 
 
@@ -460,7 +627,8 @@ class ConnectionTest(Contract):
     matched_series: int | None = Field(
         default=None,
         description="Prometheus: series currently matching all matchers. Cloudflare: requests "
-        "in the last 24 h. Sentry: error events and transactions in the last 24 h.",
+        "in the last 24 h. Sentry: error events and transactions in the last 24 h. Wazuh: "
+        "alerts of the selected agents in the last 24 h.",
     )
     history_days: float | None = Field(
         default=None, description="Days of matching history found, up to 30."
@@ -513,5 +681,23 @@ class SentryConnection(Contract):
         return SourceKind.SENTRY
 
 
-SourceConnection = PrometheusConnection | CloudflareConnection | SentryConnection
+class WazuhConnection(Contract):
+    """Resolved Wazuh settings including the decrypted password; never serialised to clients."""
+
+    api_url: str
+    index_pattern: str = WAZUH_INDEX_PATTERN
+    agents: list[str] = Field(default_factory=list)
+    groups: list[str] = Field(default_factory=list)
+    labels: list[WazuhLabel] = Field(default_factory=list)
+    monitoring_index_pattern: str = WAZUH_MONITORING_INDEX_PATTERN
+    username: str | None = None
+    password: SecretStr | None = None
+    tls_verify: bool = True
+
+    @property
+    def kind(self) -> SourceKind:
+        return SourceKind.WAZUH
+
+
+SourceConnection = PrometheusConnection | CloudflareConnection | SentryConnection | WazuhConnection
 """Decrypted connection of any source kind."""

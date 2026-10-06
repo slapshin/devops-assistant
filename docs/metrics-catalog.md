@@ -195,6 +195,25 @@ A project's Sentry source analyses up to 10 Sentry projects of one organization,
   - A response with buckets other than 5 minutes is rejected. Failed chunks become `query_failed`/`query_timeout` exclusions and stay unknown. A rate-limited request is retried once after `Retry-After`.
 - **Live verification pending**: no live Sentry organization was available during T017. Request and response shapes follow Sentry's API documentation (see the T017 task file).
 
+### Wazuh (T018)
+
+A project's Wazuh source analyses the security alerts of selected Wazuh agents, each agent as its own entity (kind `agent`). It reads the **Wazuh indexer** (OpenSearch API, default port 9200; `app/sources/wazuh/`, catalog `wazuh-2026.10.7`), not the Wazuh server API, which has no alert history. Agents are selected by name (`agent.name`, up to 50), by group (up to 10) and/or by agent labels (`agent.labels.<key> = value`, up to 10, all must match; set in the agent's `<labels>` block or a group's `agent.conf`); at least one is required. The named agents and the groups' members together form the selection, and labels narrow it. Alerts do not carry groups, so a group's members are read from the `wazuh-monitoring-*` index (agent snapshots the Wazuh dashboard writes every 15 minutes when `wazuh.monitoring.enabled` is on; pattern configurable): the agents in that group in any snapshot of the 24 h before T, up to 1,000 per group. A missing monitoring index fails the source with that hint; a group without members gets a `no_data` exclusion and never widens the selection. Every request is `POST /<index pattern>/_search` (default `wazuh-alerts-4.x-*`) with `size: 0` and aggregations, and its query uses only `term`, `terms` and `range` clauses, so configured values can never change the query. Basic auth with an indexer user that may read the alerts indices is enough.
+
+| Signal | Filter | Unit |
+| --- | --- | --- |
+| `wazuh_alerts` | every alert | alerts/s |
+| `wazuh_high_alerts` | `rule.level >= 12` | alerts/s |
+| `wazuh_auth_failures` | `rule.groups` ∈ {`authentication_failed`, `authentication_failures`, `invalid_login`} | alerts/s |
+| `wazuh_fim_changes` | `rule.groups = syscheck` | changes/s |
+
+- **Discovery**: one search over the 28-day window lists the selected agents with alerts (`terms` on `agent.name`, up to 51) and each agent's first alert. More than 50 agents keeps the first 50 by name and adds a `series_truncated` exclusion (the report is `partial`). Configured agent names without any alert get a `no_data` exclusion. Without any alert, every signal is `unsupported`. History is the age of the oldest first alert.
+- **Collection**:
+  - One request per time chunk covers all agents: `terms` on `agent.name` → 5-minute `date_histogram` on `timestamp` → a `filters` sub-aggregation with one bucket per filtered signal. Chunks are sized to stay under 40,000 aggregation buckets (OpenSearch's default `search.max_buckets` is 65,535) and at most seven days: 16 hours for 50 agents (42 requests per analysis), seven days for up to 4 agents (4 requests).
+  - Inside a fetched chunk a bucket without alerts is zero, from the agent's first alert on; before it values are unknown.
+  - A search that timed out, failed on some shards, or matched no index fails its chunk (`query_failed`/`query_timeout`, unknown periods) instead of returning partial counts. 401/403 fail the source as an auth error; overloads (429) and 5xx are retried once.
+  - The indexer version is read best-effort from `GET /` (a role limited to the alerts indices may not see it).
+- **Live verification pending**: no live Wazuh indexer was available during T018. Field names follow the Wazuh 4.x alerts template (see the T018 task file).
+
 ## Budgets and behaviour
 
 | Aspect | Behaviour |

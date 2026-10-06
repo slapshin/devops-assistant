@@ -450,7 +450,8 @@
               "mapping": {
                 "cloudflare": "#/$defs/CloudflareSource",
                 "prometheus": "#/$defs/PrometheusSource",
-                "sentry": "#/$defs/SentrySource"
+                "sentry": "#/$defs/SentrySource",
+                "wazuh": "#/$defs/WazuhSource"
               },
               "propertyName": "kind"
             },
@@ -463,6 +464,9 @@
               },
               {
                 "$ref": "#/$defs/SentrySource"
+              },
+              {
+                "$ref": "#/$defs/WazuhSource"
               }
             ]
           },
@@ -795,6 +799,102 @@
       ],
       "title": "StageStatus",
       "type": "string"
+    },
+    "WazuhLabel": {
+      "additionalProperties": false,
+      "description": "Exact ``agent.labels.<key> = value`` filter (an agent's ``<labels>`` setting).",
+      "properties": {
+        "key": {
+          "description": "Label key as set in the agent's <labels> block, e.g. project.",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "title": "WazuhLabel",
+      "type": "object"
+    },
+    "WazuhSource": {
+      "additionalProperties": false,
+      "properties": {
+        "agents": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "api_url": {
+          "title": "Api Url",
+          "type": "string"
+        },
+        "groups": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Groups",
+          "type": "array"
+        },
+        "index_pattern": {
+          "default": "wazuh-alerts-4.x-*",
+          "title": "Index Pattern",
+          "type": "string"
+        },
+        "kind": {
+          "const": "wazuh",
+          "default": "wazuh",
+          "title": "Kind",
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "$ref": "#/$defs/WazuhLabel"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "monitoring_index_pattern": {
+          "default": "wazuh-monitoring-*",
+          "title": "Monitoring Index Pattern",
+          "type": "string"
+        },
+        "password_set": {
+          "title": "Password Set",
+          "type": "boolean"
+        },
+        "tls_verify": {
+          "default": true,
+          "title": "Tls Verify",
+          "type": "boolean"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Username"
+        }
+      },
+      "required": [
+        "api_url",
+        "password_set"
+      ],
+      "title": "WazuhSource",
+      "type": "object"
     },
     "Weekday": {
       "enum": [

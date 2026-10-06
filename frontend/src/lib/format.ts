@@ -117,6 +117,8 @@ export const FAMILY_LABELS: Record<string, string> = {
   security: "Security (WAF)",
   app_errors: "Application errors (Sentry)",
   app_performance: "Transactions (Sentry)",
+  host_security: "Host security (Wazuh)",
+  file_integrity: "File integrity (Wazuh)",
 };
 
 export const STATUS_LABELS: Record<string, { label: string; icon: string }> = {

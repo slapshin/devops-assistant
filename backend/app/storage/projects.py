@@ -13,6 +13,7 @@ from pydantic import SecretStr
 from app.domain.common import LabelMatcher, SourceKind, format_utc
 from app.domain.ids import new_project_id
 from app.domain.projects import (
+    WAZUH_MONITORING_INDEX_PATTERN,
     AuthType,
     BasicAuth,
     BasicAuthInput,
@@ -33,6 +34,10 @@ from app.domain.projects import (
     SentryTag,
     SourceConnection,
     SourceInput,
+    WazuhConnection,
+    WazuhLabel,
+    WazuhSource,
+    WazuhSourceInput,
     synthetic_url,
 )
 from app.domain.schedule import ReportSchedule
@@ -207,6 +212,8 @@ class SqliteProjectRepository:
                 return self._split_cloudflare(source, stored)
             case SentrySourceInput():
                 return self._split_sentry(source, stored)
+            case WazuhSourceInput():
+                return self._split_wazuh(source, stored)
 
     def _split_prometheus(
         self, source: PrometheusSourceInput, stored: Any
@@ -270,6 +277,27 @@ class SqliteProjectRepository:
         if synthetic_url(source.api_url):
             return config, {}
         raise SecretRequired("auth_token")
+
+    def _split_wazuh(
+        self, source: WazuhSourceInput, stored: Any
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        config: dict[str, Any] = {
+            "api_url": source.api_url,
+            "index_pattern": source.index_pattern,
+            "agents": source.agents,
+            "groups": source.groups,
+            "labels": [label.model_dump() for label in source.labels],
+            "monitoring_index_pattern": source.monitoring_index_pattern,
+            "username": source.username,
+            "tls_verify": source.tls_verify,
+        }
+        if source.password is not None:
+            return config, {"password": source.password.get_secret_value()}
+        if stored is not None and stored.secrets is not None:
+            return config, self.box.decrypt(stored.secrets)
+        if synthetic_url(source.api_url) or source.username is None:
+            return config, {}
+        raise SecretRequired("password")
 
     def _write_sources(
         self,
@@ -446,8 +474,22 @@ def _schedule(raw: str | None) -> ReportSchedule | None:
     return ReportSchedule.model_validate_json(raw) if raw else None
 
 
-def _source_view(row: Any) -> PrometheusSource | CloudflareSource | SentrySource:
+def _source_view(row: Any) -> PrometheusSource | CloudflareSource | SentrySource | WazuhSource:
     config = json.loads(row.config)
+    if SourceKind(row.kind) is SourceKind.WAZUH:
+        return WazuhSource(
+            api_url=config["api_url"],
+            index_pattern=config["index_pattern"],
+            agents=config.get("agents", []),
+            groups=config.get("groups", []),
+            labels=[WazuhLabel(**label) for label in config.get("labels", [])],
+            monitoring_index_pattern=config.get(
+                "monitoring_index_pattern", WAZUH_MONITORING_INDEX_PATTERN
+            ),
+            username=config.get("username"),
+            tls_verify=config.get("tls_verify", True),
+            password_set=row.secrets is not None,
+        )
     if SourceKind(row.kind) is SourceKind.SENTRY:
         return SentrySource(
             organization=config["organization"],
@@ -500,6 +542,21 @@ def _any_connection(
                 api_url=config["api_url"],
                 tls_verify=config.get("tls_verify", True),
                 auth_token=SecretStr(auth_token) if auth_token else None,
+            )
+        case SourceKind.WAZUH:
+            password = secrets.get("password")
+            return WazuhConnection(
+                api_url=config["api_url"],
+                index_pattern=config["index_pattern"],
+                agents=config.get("agents", []),
+                groups=config.get("groups", []),
+                labels=[WazuhLabel(**label) for label in config.get("labels", [])],
+                monitoring_index_pattern=config.get(
+                    "monitoring_index_pattern", WAZUH_MONITORING_INDEX_PATTERN
+                ),
+                username=config.get("username"),
+                password=SecretStr(password) if password else None,
+                tls_verify=config.get("tls_verify", True),
             )
 
 

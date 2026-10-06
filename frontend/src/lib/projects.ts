@@ -19,6 +19,17 @@ const SENTRY_TAG_KEY = /^[a-zA-Z0-9_.:-]{1,32}$/;
 export const MAX_SENTRY_PROJECTS = 10;
 export const MAX_SENTRY_TAGS = 10;
 const MAX_SENTRY_TAG_VALUE_CHARS = 200;
+/** Mirrors backend/app/domain/projects.py (Wazuh). */
+export const WAZUH_INDEX_PATTERN = "wazuh-alerts-4.x-*";
+const WAZUH_AGENT = /^[A-Za-z0-9._-]{1,128}$/;
+const WAZUH_LABEL_KEY = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/;
+const WAZUH_INDEX = /^[a-z0-9_*][a-z0-9_.*+-]{0,254}$/;
+export const MAX_WAZUH_AGENTS = 50;
+export const MAX_WAZUH_LABELS = 10;
+export const WAZUH_MONITORING_INDEX_PATTERN = "wazuh-monitoring-*";
+const WAZUH_GROUP = /^[A-Za-z0-9_.-]{1,255}$/;
+export const MAX_WAZUH_GROUPS = 10;
+const MAX_WAZUH_LABEL_VALUE_CHARS = 200;
 
 export type AuthType = "none" | "bearer" | "basic";
 
@@ -96,6 +107,19 @@ export interface ProjectDraft {
   sentryToken: string;
   sentryApiUrl: string;
   sentryTlsVerify: boolean;
+  wazuh: boolean;
+  wazuhUrl: string;
+  /** Comma- or space-separated agent names (case is kept). */
+  wazuhAgents: string;
+  /** Comma- or space-separated agent groups (case is kept); resolved via the monitoring index. */
+  wazuhGroups: string;
+  wazuhMonitoringIndex: string;
+  /** Agent label filters; rows left completely empty are ignored. */
+  wazuhLabels: TagDraft[];
+  wazuhIndex: string;
+  wazuhUsername: string;
+  wazuhPassword: string;
+  wazuhTlsVerify: boolean;
   scheduled: boolean;
   scheduleTime: string;
   scheduleTimezone: string;
@@ -139,6 +163,16 @@ export function emptyDraft(): ProjectDraft {
     sentryToken: "",
     sentryApiUrl: SENTRY_URL,
     sentryTlsVerify: true,
+    wazuh: false,
+    wazuhUrl: "",
+    wazuhAgents: "",
+    wazuhGroups: "",
+    wazuhMonitoringIndex: WAZUH_MONITORING_INDEX_PATTERN,
+    wazuhLabels: [],
+    wazuhIndex: WAZUH_INDEX_PATTERN,
+    wazuhUsername: "",
+    wazuhPassword: "",
+    wazuhTlsVerify: true,
     scheduled: false,
     scheduleTime: DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: browserTimezone(),
@@ -152,6 +186,7 @@ type StoredSource = ProjectSummary["sources"][number];
 type PrometheusSource = Extract<StoredSource, { kind: "prometheus" }>;
 type CloudflareSource = Extract<StoredSource, { kind: "cloudflare" }>;
 type SentrySource = Extract<StoredSource, { kind: "sentry" }>;
+type WazuhSource = Extract<StoredSource, { kind: "wazuh" }>;
 
 export const prometheusSource = (project: { sources: StoredSource[] } | null | undefined) =>
   project?.sources.find((s): s is PrometheusSource => s.kind === "prometheus") ?? null;
@@ -159,11 +194,14 @@ export const cloudflareSource = (project: { sources: StoredSource[] } | null | u
   project?.sources.find((s): s is CloudflareSource => s.kind === "cloudflare") ?? null;
 export const sentrySource = (project: { sources: StoredSource[] } | null | undefined) =>
   project?.sources.find((s): s is SentrySource => s.kind === "sentry") ?? null;
+export const wazuhSource = (project: { sources: StoredSource[] } | null | undefined) =>
+  project?.sources.find((s): s is WazuhSource => s.kind === "wazuh") ?? null;
 
 export function draftFrom(project: ProjectSummary): ProjectDraft {
   const source = prometheusSource(project);
   const cloudflare = cloudflareSource(project);
   const sentry = sentrySource(project);
+  const wazuh = wazuhSource(project);
   const auth = source?.auth;
   return {
     name: project.name,
@@ -188,6 +226,16 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     sentryToken: "",
     sentryApiUrl: sentry?.api_url ?? SENTRY_URL,
     sentryTlsVerify: sentry?.tls_verify ?? true,
+    wazuh: !!wazuh,
+    wazuhUrl: wazuh?.api_url ?? "",
+    wazuhAgents: wazuh?.agents?.join(", ") ?? "",
+    wazuhGroups: wazuh?.groups?.join(", ") ?? "",
+    wazuhMonitoringIndex: wazuh?.monitoring_index_pattern ?? WAZUH_MONITORING_INDEX_PATTERN,
+    wazuhLabels: wazuh?.labels?.map((l) => ({ ...l })) ?? [],
+    wazuhIndex: wazuh?.index_pattern ?? WAZUH_INDEX_PATTERN,
+    wazuhUsername: wazuh?.username ?? "",
+    wazuhPassword: "",
+    wazuhTlsVerify: wazuh?.tls_verify ?? true,
     scheduled: !!project.schedule,
     scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: project.schedule?.timezone ?? browserTimezone(),
@@ -216,6 +264,9 @@ export const storedCloudflareToken = (project: ProjectSummary | null | undefined
 /** True when the project stores a Sentry auth token an empty token input keeps. */
 export const storedSentryToken = (project: ProjectSummary | null | undefined) => !!sentrySource(project)?.token_set;
 
+/** True when the project stores a Wazuh indexer password an empty password input keeps. */
+export const storedWazuhPassword = (project: ProjectSummary | null | undefined) => !!wazuhSource(project)?.password_set;
+
 /** True when the empty secret input for the chosen auth type keeps a stored secret. */
 export const keepsStoredSecret = (draft: ProjectDraft, stored: StoredAuth | null) =>
   !!stored && stored.type === draft.authType && stored.secretSet;
@@ -227,6 +278,11 @@ export function parseList(raw: string): string[] {
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean);
   return [...new Set(items)].sort();
+}
+
+/** Unique, sorted items of a comma- or space-separated list, case kept (Wazuh agent names). */
+export function parseNames(raw: string): string[] {
+  return [...new Set(raw.split(/[\s,]+/).filter(Boolean))].sort();
 }
 
 export const parseHostnames = (raw: string) => parseList(raw.replace(/\.(?=[\s,]|$)/g, ""));
@@ -343,6 +399,41 @@ export function validateSentryTags(tags: TagDraft[]): FieldErrors {
 
 const usedTags = (tags: TagDraft[]) => tags.filter((t) => t.key.trim() || t.value);
 
+export function validateWazuh(draft: ProjectDraft, passwordStored: boolean): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!draft.wazuh) return errors;
+  const apiUrl = draft.wazuhUrl.trim();
+  const badUrl = apiUrl ? urlError(apiUrl) : "Required";
+  if (badUrl) errors["wazuh.api_url"] = badUrl;
+  const agents = parseNames(draft.wazuhAgents);
+  const badAgents = agents.filter((a) => !WAZUH_AGENT.test(a));
+  if (badAgents.length) errors["wazuh.agents"] = `Invalid agent names: ${badAgents.join(", ")}`;
+  else if (agents.length > MAX_WAZUH_AGENTS) errors["wazuh.agents"] = `At most ${MAX_WAZUH_AGENTS} agents`;
+  const groups = parseNames(draft.wazuhGroups);
+  const badGroups = groups.filter((g) => !WAZUH_GROUP.test(g) || g === "." || g === "..");
+  if (badGroups.length) errors["wazuh.groups"] = `Invalid group names: ${badGroups.join(", ")}`;
+  else if (groups.length > MAX_WAZUH_GROUPS) errors["wazuh.groups"] = `At most ${MAX_WAZUH_GROUPS} groups`;
+  if (groups.length && !WAZUH_INDEX.test(draft.wazuhMonitoringIndex.trim())) errors["wazuh.monitoring_index_pattern"] = "One lower-case index pattern, e.g. wazuh-monitoring-*";
+  const labels = usedTags(draft.wazuhLabels);
+  if (labels.length > MAX_WAZUH_LABELS) errors["wazuh.labels"] = `At most ${MAX_WAZUH_LABELS} labels`;
+  const seen = new Set<string>();
+  draft.wazuhLabels.forEach((l, i) => {
+    const key = l.key.trim();
+    if (!key && !l.value) return;
+    if (!WAZUH_LABEL_KEY.test(key)) errors[`wazuh.labels.${i}.key`] = "Letters, digits, _ . - (max 64)";
+    else if (seen.has(key)) errors[`wazuh.labels.${i}.key`] = "Duplicate label";
+    seen.add(key);
+    if (!l.value) errors[`wazuh.labels.${i}.value`] = "Required";
+    else if (l.value.length > MAX_WAZUH_LABEL_VALUE_CHARS) errors[`wazuh.labels.${i}.value`] = `At most ${MAX_WAZUH_LABEL_VALUE_CHARS} characters`;
+    else if (/[\r\n]/.test(l.value)) errors[`wazuh.labels.${i}.value`] = "No line breaks";
+  });
+  if (!agents.length && !groups.length && !labels.length) errors["wazuh.agents"] ??= "Select agents by name, group or label";
+  if (!WAZUH_INDEX.test(draft.wazuhIndex.trim())) errors["wazuh.index_pattern"] = "One lower-case index pattern, e.g. wazuh-alerts-4.x-*";
+  const synthetic = apiUrl.startsWith("synthetic:");
+  if (draft.wazuhUsername.trim() && !draft.wazuhPassword && !passwordStored && !synthetic) errors["wazuh.password"] = "Required";
+  return errors;
+}
+
 export function validateSchedule(draft: ProjectDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!draft.scheduled) return errors;
@@ -359,12 +450,12 @@ export function validateRetention(draft: ProjectDraft): FieldErrors {
   return {};
 }
 
-export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null, cfTokenStored = false, sentryTokenStored = false): FieldErrors {
+export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null, cfTokenStored = false, sentryTokenStored = false, wazuhPasswordStored = false): FieldErrors {
   const errors: FieldErrors = {};
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
-  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...validateCloudflare(draft, cfTokenStored), ...validateSentry(draft, sentryTokenStored), ...validateSchedule(draft), ...validateRetention(draft) };
+  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...validateCloudflare(draft, cfTokenStored), ...validateSentry(draft, sentryTokenStored), ...validateWazuh(draft, wazuhPasswordStored), ...validateSchedule(draft), ...validateRetention(draft) };
 }
 
 type SourceInput = NonNullable<ProjectInput["sources"]>[number];
@@ -402,10 +493,33 @@ export function sentryInput(draft: ProjectDraft): SourceInput {
   };
 }
 
+export function wazuhInput(draft: ProjectDraft): SourceInput {
+  return {
+    kind: "wazuh",
+    api_url: draft.wazuhUrl.trim(),
+    index_pattern: draft.wazuhIndex.trim(),
+    agents: parseNames(draft.wazuhAgents),
+    groups: parseNames(draft.wazuhGroups),
+    monitoring_index_pattern: draft.wazuhMonitoringIndex.trim() || WAZUH_MONITORING_INDEX_PATTERN,
+    labels: usedTags(draft.wazuhLabels).map((l) => ({ key: l.key.trim(), value: l.value })),
+    username: draft.wazuhUsername.trim() || null,
+    tls_verify: draft.wazuhTlsVerify,
+    ...(draft.wazuhPassword ? { password: draft.wazuhPassword } : {}),
+  };
+}
+
 /** The input of one configured source kind. */
 export function sourceInput(draft: ProjectDraft, kind: SourceKind): SourceInput {
-  if (kind === "prometheus") return prometheusInput(draft);
-  return kind === "cloudflare" ? cloudflareInput(draft) : sentryInput(draft);
+  switch (kind) {
+    case "prometheus":
+      return prometheusInput(draft);
+    case "cloudflare":
+      return cloudflareInput(draft);
+    case "sentry":
+      return sentryInput(draft);
+    case "wazuh":
+      return wazuhInput(draft);
+  }
 }
 
 /** Configured source kinds in the order they are sent (server errors refer to their index). */
@@ -414,6 +528,7 @@ export function sourceKinds(draft: ProjectDraft): SourceKind[] {
   if (draft.url.trim()) kinds.push("prometheus");
   if (draft.cloudflare) kinds.push("cloudflare");
   if (draft.sentry) kinds.push("sentry");
+  if (draft.wazuh) kinds.push("wazuh");
   return kinds;
 }
 
@@ -494,8 +609,9 @@ export const HEALTH_LABELS: Record<HealthKey, { label: string; icon: string }> =
 export function testKey(test: ConnectionTest): HealthKey {
   if (!test.reachable) return "unreachable";
   if (test.auth_ok === false) return "auth";
-  // A quiet application legitimately reports no Sentry events, so only metrics and edge warn.
-  if (test.matched_series === 0 && test.kind !== "sentry") return test.kind === "cloudflare" ? "no_traffic" : "no_series";
+  // A quiet application or host legitimately reports no Sentry events or Wazuh alerts, so only
+  // metrics and edge warn.
+  if (test.matched_series === 0 && test.kind !== "sentry" && test.kind !== "wazuh") return test.kind === "cloudflare" ? "no_traffic" : "no_series";
   return "ok";
 }
 
@@ -503,15 +619,17 @@ export const SOURCE_KIND_LABELS: Record<SourceKind, string> = {
   prometheus: "Prometheus",
   cloudflare: "Cloudflare",
   sentry: "Sentry",
+  wazuh: "Wazuh",
 };
 
 export const sourceKindLabel = (kind: SourceKind) => SOURCE_KIND_LABELS[kind];
 
-/** What a connection test counts: matching series (Prometheus), requests (Cloudflare) or events (Sentry) in 24 h. */
+/** What a connection test counts: matching series (Prometheus), requests (Cloudflare), events (Sentry) or alerts (Wazuh) in 24 h. */
 export function testVolume(test: ConnectionTest): string | null {
   if (test.matched_series === null || test.matched_series === undefined) return null;
   if (test.kind === "cloudflare") return `${test.matched_series.toLocaleString("en")} requests in 24 h`;
   if (test.kind === "sentry") return `${test.matched_series.toLocaleString("en")} events in 24 h`;
+  if (test.kind === "wazuh") return `${test.matched_series.toLocaleString("en")} alerts in 24 h`;
   return `${test.matched_series} matching series`;
 }
 

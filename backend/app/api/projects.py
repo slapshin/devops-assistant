@@ -25,6 +25,8 @@ from app.domain.projects import (
     SentrySourceInput,
     SourceConnection,
     SourceInput,
+    WazuhConnection,
+    WazuhSourceInput,
     synthetic_url,
 )
 from app.sources.cloudflare.connect import connect_cloudflare, probe_cloudflare
@@ -34,6 +36,8 @@ from app.sources.prometheus.probe import probe
 from app.sources.prometheus.synthetic import SCENARIOS
 from app.sources.sentry.connect import connect_sentry, probe_sentry
 from app.sources.sentry.synthetic import SCENARIOS as SENTRY_SCENARIOS
+from app.sources.wazuh.connect import connect_wazuh, probe_wazuh
+from app.sources.wazuh.synthetic import SCENARIOS as WAZUH_SCENARIOS
 from app.storage.projects import ProjectNameTaken, SecretRequired
 from app.storage.secrets import SecretsUnreadable
 
@@ -77,6 +81,8 @@ def _check_scenario(source: SourceInput, field_prefix: str) -> None:
             field, scenarios = "api_url", sorted(CLOUDFLARE_SCENARIOS)
         case SentrySourceInput(api_url=url):
             field, scenarios = "api_url", sorted(SENTRY_SCENARIOS)
+        case WazuhSourceInput(api_url=url):
+            field, scenarios = "api_url", sorted(WAZUH_SCENARIOS)
     scenario = synthetic_url(url)
     if scenario is not None and scenario not in scenarios:
         raise _invalid(
@@ -198,6 +204,9 @@ async def _probe(conn: SourceConnection, scope: Scope) -> ConnectionTest:
         case SentryConnection():
             async with connect_sentry(conn) as sentry:
                 return await probe_sentry(sentry, scope)
+        case WazuhConnection():
+            async with connect_wazuh(conn) as wazuh:
+                return await probe_wazuh(wazuh, scope)
 
 
 def _draft_scope(matchers: list[LabelMatcher]) -> Scope:

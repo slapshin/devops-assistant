@@ -28,8 +28,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.8",
-  "config_hash": "e8c76aa9bf2c",
+  "detector_version": "detectors-2026.10.9",
+  "config_hash": "7ebd2dc56c02",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -389,6 +389,24 @@
     },
     {
       "family": "app_performance",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "host_security",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "file_integrity",
       "status": "no_anomaly",
       "capability": "unverified",
       "evaluated_series": 2,

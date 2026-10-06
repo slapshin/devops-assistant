@@ -56,7 +56,9 @@
         "edge",
         "security",
         "app_errors",
-        "app_performance"
+        "app_performance",
+        "host_security",
+        "file_integrity"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -65,7 +67,8 @@
       "enum": [
         "prometheus",
         "cloudflare",
-        "sentry"
+        "sentry",
+        "wazuh"
       ],
       "title": "SourceKind",
       "type": "string"
@@ -123,7 +126,7 @@
         }
       ],
       "default": null,
-      "description": "Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h.",
+      "description": "Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h. Wazuh: alerts of the selected agents in the last 24 h.",
       "title": "Matched Series"
     },
     "message": {

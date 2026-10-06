@@ -11,6 +11,7 @@ from app.analysis.rules.container import CONTAINER_RULES
 from app.analysis.rules.database import DATABASE_RULES
 from app.analysis.rules.edge import EDGE_RULES
 from app.analysis.rules.host import HOST_RULES
+from app.analysis.rules.host_security import HOST_SECURITY_RULES
 from app.analysis.rules.proxy import PROXY_RULES
 from app.analysis.rules.requests import REQUEST_RULES
 from app.analysis.rules.security import SECURITY_RULES
@@ -37,5 +38,6 @@ RULES = _index(
         *EDGE_RULES,
         *SECURITY_RULES,
         *APPLICATION_RULES,
+        *HOST_SECURITY_RULES,
     ),
 )

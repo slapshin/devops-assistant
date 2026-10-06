@@ -68,6 +68,10 @@ DIRECT: dict[str, str] = {
     "sentry_errors": "app_error_rate",
     "sentry_unhandled": "app_unhandled_error_rate",
     "sentry_error_users": "app_error_users",
+    "wazuh_alerts": "hids_alert_rate",
+    "wazuh_high_alerts": "hids_high_alert_rate",
+    "wazuh_auth_failures": "hids_auth_failure_rate",
+    "wazuh_fim_changes": "fim_change_rate",
 }
 """Collected signal -> rule for signals analysed as collected."""
 

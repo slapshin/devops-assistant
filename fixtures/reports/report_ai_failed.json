@@ -28,8 +28,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.8",
-  "config_hash": "e8c76aa9bf2c",
+  "detector_version": "detectors-2026.10.9",
+  "config_hash": "7ebd2dc56c02",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -395,13 +395,31 @@
       "total_series": 2,
       "baseline_days": 14,
       "reasons": []
+    },
+    {
+      "family": "host_security",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "file_integrity",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
     }
   ],
   "findings": [
     {
-      "finding_id": "fnd_cce3edd0c581b6d8",
+      "finding_id": "fnd_fab092ede1233f09",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.8",
+      "detector_version": "detectors-2026.10.9",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -438,7 +456,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_6eb13683d2209808"
+        "evd_5666c915d570482f"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -447,9 +465,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_aed6edc1ff1a8b7c",
+      "finding_id": "fnd_f7da8aa90ed732b3",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.8",
+      "detector_version": "detectors-2026.10.9",
       "method": "relative",
       "family": "client_errors",
       "signal": "client_error_rate",
@@ -496,7 +514,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_7cf04a9d2fe02be9"
+        "evd_8268b475df7157fd"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -529,8 +547,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_cce3edd0c581b6d8",
-          "finding_id": "fnd_cce3edd0c581b6d8",
+          "episode_id": "eps_fab092ede1233f09",
+          "finding_id": "fnd_fab092ede1233f09",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=shop-production",
@@ -550,8 +568,8 @@
           "unit": "ratio"
         },
         {
-          "episode_id": "eps_aed6edc1ff1a8b7c",
-          "finding_id": "fnd_aed6edc1ff1a8b7c",
+          "episode_id": "eps_f7da8aa90ed732b3",
+          "finding_id": "fnd_f7da8aa90ed732b3",
           "entity": {
             "kind": "route",
             "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
@@ -806,8 +824,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_6eb13683d2209808",
-      "finding_id": "fnd_cce3edd0c581b6d8",
+      "evidence_id": "evd_5666c915d570482f",
+      "finding_id": "fnd_fab092ede1233f09",
       "series": {
         "series_id": "ser_6d64ca1e1032319f",
         "family": "cpu",
@@ -1374,8 +1392,8 @@
       "threshold_label": "Diagnostic heuristic: 90 % for ≥ 15 min (not an SLO)"
     },
     {
-      "evidence_id": "evd_7cf04a9d2fe02be9",
-      "finding_id": "fnd_aed6edc1ff1a8b7c",
+      "evidence_id": "evd_8268b475df7157fd",
+      "finding_id": "fnd_f7da8aa90ed732b3",
       "series": {
         "series_id": "ser_70283fa5b0565bd7",
         "family": "client_errors",
