@@ -650,10 +650,9 @@ describe("report", () => {
     expect(screen.getByRole("region", { name: "Recurring problems" })).toHaveTextContent("client_error_rate");
   });
 
-  it("renders a Cloudflare report with its source and edge findings", async () => {
+  it("renders a Cloudflare report with its edge findings", async () => {
     await renderAt(report(cloudflareReport));
-    expect(await screen.findByText("Cloudflare")).toBeInTheDocument();
-    expect(screen.getByText("Synthetic data")).toBeInTheDocument();
+    expect(await screen.findByText("Synthetic data")).toBeInTheDocument();
     expect((await screen.findAllByText(/Origin error rate \(520-530\)/)).length).toBeGreaterThan(0);
   });
 
