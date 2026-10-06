@@ -82,6 +82,7 @@ from app.domain.projects import (
     ProjectList,
     ProjectSummary,
     PrometheusSource,
+    SentryTag,
 )
 from app.domain.report import (
     TREND_DAYS,
@@ -97,6 +98,8 @@ from app.jobs import daily_episodes
 from app.service import AnalysisPipeline
 from app.sources.cloudflare.source import CloudflareMetricsSource
 from app.sources.cloudflare.synthetic import SyntheticCloudflareApi
+from app.sources.sentry.source import SentryMetricsSource
+from app.sources.sentry.synthetic import SyntheticSentryApi
 
 ROOT = Path(__file__).resolve().parents[2] / "fixtures"
 PROJECT_ID = "01999a3c-0000-7000-8000-000000000001"
@@ -1038,6 +1041,7 @@ def build() -> dict[str, BaseModel]:
         "reports/report_short_history.json": short,
         "reports/report_partial_source_error.json": partial,
         "reports/report_cloudflare.json": cloudflare_report(),
+        "reports/report_sentry.json": sentry_report(),
         "jobs/job_running.json": job(
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
@@ -1111,6 +1115,7 @@ def build() -> dict[str, BaseModel]:
             checked_at=T,
         ),
         "api/connection_test_cloudflare.json": cloudflare_connection_test(),
+        "api/connection_test_sentry.json": sentry_connection_test(),
         "api/problem_queue_full.json": Problem(
             title="Analysis queue is full",
             status=429,
@@ -1149,27 +1154,45 @@ def cloudflare_report() -> AnalysisReport:
     """A Cloudflare-only project analysed from the synthetic incident scenario (T015)."""
     api = SyntheticCloudflareApi("incident", CLOUDFLARE_ZONE, ["shop.example.com"])
     source = CloudflareMetricsSource(api, CLOUDFLARE_ZONE, ["shop.example.com"])
+    project = Scope(
+        project_id="01999a3c-0000-7000-8000-0000000000c1", project_name="Shop edge", matchers=[]
+    )
+    return pipeline_report(
+        OpenedSource(SourceKind.CLOUDFLARE, source), project, CLOUDFLARE_ANALYSIS_ID
+    )
+
+
+SENTRY_ANALYSIS_ID = "01999a3c-0000-7000-8000-0000000000e5"
+
+
+def sentry_report() -> AnalysisReport:
+    """A Sentry-only project analysed from the synthetic incident scenario (T017)."""
+    projects, tags = ["shop-api", "shop-web"], [SentryTag(key="team", value="shop")]
+    api = SyntheticSentryApi("incident", "acme", projects, "production", tags)
+    source = SentryMetricsSource(api, "acme", projects, "production", tags)
+    project = Scope(
+        project_id="01999a3c-0000-7000-8000-0000000000e1", project_name="Shop app", matchers=[]
+    )
+    return pipeline_report(OpenedSource(SourceKind.SENTRY, source), project, SENTRY_ANALYSIS_ID)
+
+
+def pipeline_report(opened: OpenedSource, scope: Scope, analysis_id: str) -> AnalysisReport:
+    """A report produced by the real pipeline from one source, with pinned timestamps."""
     config = DetectorConfig()
 
     class Sources:
         @asynccontextmanager
         async def open(self, scope: Scope) -> AsyncIterator[list[OpenedSource]]:
-            yield [OpenedSource(SourceKind.CLOUDFLARE, source)]
+            yield [opened]
 
     pipeline = AnalysisPipeline(Sources(), RobustDetector(), config, FakeExplanationProvider())
     request = AnalysisRequest(
-        scope=Scope(
-            project_id="01999a3c-0000-7000-8000-0000000000c1",
-            project_name="Shop edge",
-            matchers=[],
-        ),
+        scope=scope,
         end_time=T,
         detector_version=config.version,
         config_hash=config.config_hash,
     )
-    report = asyncio.run(
-        pipeline.run(CLOUDFLARE_ANALYSIS_ID, request, _NoProgress(), CancellationToken())
-    )
+    report = asyncio.run(pipeline.run(analysis_id, request, _NoProgress(), CancellationToken()))
     explanation = report.explanation
     if explanation.explanation is not None:  # pin the provider's timestamp
         pinned = explanation.explanation.model_copy(update={"generated_at": T})
@@ -1189,6 +1212,25 @@ def cloudflare_connection_test() -> ConnectionTest:
             FamilyCapability(family=SignalFamily.SECURITY, status=CapabilityStatus.SUPPORTED),
         ],
         message="3,456,789 requests in the last 24 h.",
+        checked_at=T,
+    )
+
+
+def sentry_connection_test() -> ConnectionTest:
+    return ConnectionTest(
+        kind=SourceKind.SENTRY,
+        reachable=True,
+        auth_ok=True,
+        matched_series=1_284_310,
+        history_days=30.0,
+        families=[
+            FamilyCapability(family=SignalFamily.APP_ERRORS, status=CapabilityStatus.SUPPORTED),
+            FamilyCapability(
+                family=SignalFamily.APP_PERFORMANCE, status=CapabilityStatus.SUPPORTED
+            ),
+        ],
+        message="1,842 error events and 1,282,468 transactions in 2 projects (production) "
+        "in the last 24 h.",
         checked_at=T,
     )
 

@@ -1,0 +1,21 @@
+{
+  "kind": "sentry",
+  "reachable": true,
+  "auth_ok": true,
+  "matched_series": 1284310,
+  "history_days": 30.0,
+  "families": [
+    {
+      "family": "app_errors",
+      "status": "supported",
+      "reason": null
+    },
+    {
+      "family": "app_performance",
+      "status": "supported",
+      "reason": null
+    }
+  ],
+  "message": "1,842 error events and 1,282,468 transactions in 2 projects (production) in the last 24 h.",
+  "checked_at": "2026-09-30T10:05:00Z"
+}

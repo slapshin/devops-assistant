@@ -99,6 +99,7 @@ OptionalMatchers = Annotated[
 class SourceKind(StrEnum):
     PROMETHEUS = "prometheus"
     CLOUDFLARE = "cloudflare"
+    SENTRY = "sentry"
 
 
 class Scope(Contract):
@@ -144,12 +145,20 @@ class SignalFamily(StrEnum):
     """CDN edge HTTP traffic: requests, 5xx/4xx, origin errors, cache hits, TTFB (Cloudflare)."""
     SECURITY = "security"
     """WAF/firewall events: blocked and challenged requests (Cloudflare)."""
+    APP_ERRORS = "app_errors"
+    """Application errors reported to Sentry: error events, unhandled errors, affected users."""
+    APP_PERFORMANCE = "app_performance"
+    """Application transactions traced by Sentry: throughput, failure rate, duration."""
 
 
 _EDGE_FAMILIES = (SignalFamily.EDGE, SignalFamily.SECURITY)
+_APP_FAMILIES = (SignalFamily.APP_ERRORS, SignalFamily.APP_PERFORMANCE)
 SOURCE_FAMILIES: Final[dict[SourceKind, tuple[SignalFamily, ...]]] = {
-    SourceKind.PROMETHEUS: tuple(f for f in SignalFamily if f not in _EDGE_FAMILIES),
+    SourceKind.PROMETHEUS: tuple(
+        f for f in SignalFamily if f not in _EDGE_FAMILIES + _APP_FAMILIES
+    ),
     SourceKind.CLOUDFLARE: _EDGE_FAMILIES,
+    SourceKind.SENTRY: _APP_FAMILIES,
 }
 """Families each source kind can provide; a failed source reports these as source errors."""
 
@@ -194,6 +203,8 @@ class EntityKind(StrEnum):
     """A database server (exporter target) or one database on it (PostgreSQL only)."""
     ZONE = "zone"
     """A Cloudflare zone, optionally narrowed to some of its hostnames."""
+    APPLICATION = "application"
+    """A Sentry project, optionally narrowed to one environment."""
 
 
 class Entity(Contract):

@@ -197,6 +197,11 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | Cloudflare edge (zone) | cache hit share (hit, stale, updating, revalidated / all requests; volume-guarded; severity ≤ medium) | down | −15 pp | — |
 | Cloudflare edge (zone) | edge TTFB p95 (p99 as evidence); origin response time p95 (volume-guarded; Pro plan and up) | up | ×1.5 and ≥ +50 ms | — |
 | Cloudflare security (zone) | blocked requests (block, connection close); challenges issued (challenge, JS, managed). Mitigated traffic is not an outage: severity ≤ high | up | ×3 and ≥ +0.1/s | — |
+| Sentry errors (application) | error events; unhandled errors (`error.unhandled:true`) | up | ×3 and ≥ +0.02/s (unhandled: ≥ +0.01/s) | — |
+| Sentry errors (application) | users hitting errors per 5 min (`count_unique(user)`) | up | ×2 and ≥ +5 users | — |
+| Sentry transactions (application) | throughput (`is_transaction:true` spans, extrapolated from sampled traces) | both | ×2 or ÷2 and ≥ 0.2/s change | — |
+| Sentry transactions (application) | failed share (`failure_rate()`: every non-ok status, including client-side ones such as `not_found`; volume-guarded at ≥ 30 transactions per step) | up | +3 pp | ≥ 10 % for ≥ 10 min |
+| Sentry transactions (application) | duration p95 (p99 as evidence; volume-guarded) | up | ×1.5 and ≥ +50 ms | — |
 | Latency | p95/p99 from verified classic histograms (HTTP and RPC buckets 0.005–10 s; values at the top bucket are reported as "≥ 10 s"); mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
 
 - Rates are computed before aggregation; ratio numerator and denominator use the same selector scope (project, env, and entity labels).
@@ -205,6 +210,7 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 - Latency without histogram buckets or native histograms is `unsupported` with the reason; count-only data never yields latency.
 - Route-level analysis for the top 20 routes by 14-day volume per service; remaining routes aggregated as `(other routes)`.
 - Cloudflare data comes from adaptive (sampled) datasets. Counts are Cloudflare's estimates. A mean sampling interval of ≥ 10 lowers a finding's confidence (`sampled`), and ≥ 100 makes it low (`sampled_low`); sampling never changes severity. Inside a fetched chunk a bucket without rows means zero events, while periods outside retention or of failed queries stay unknown.
+- Sentry transaction counts are extrapolated by Sentry from the client's trace sample rate; a changed sample rate shows up as a throughput change. Error events are counted as stored (after inbound filters and rate limits). Before the project's creation date values are unknown, never zero; a project without transactions in the last 24 h has its transaction signals `unsupported` ("tracing not set up").
 
 ### Severity (magnitude and duration only)
 

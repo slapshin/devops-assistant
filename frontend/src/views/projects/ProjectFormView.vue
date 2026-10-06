@@ -11,6 +11,9 @@ import {
   type FieldErrors,
   MAX_KEEP_REPORTS,
   MAX_MATCHERS,
+  MAX_SENTRY_PROJECTS,
+  MAX_SENTRY_TAGS,
+  SENTRY_URL,
   WEEKDAYS,
   cloneDraft,
   cloudflareInput,
@@ -19,17 +22,21 @@ import {
   keepsStoredSecret,
   matchersInput,
   prometheusInput,
+  sentryInput,
   serverFieldErrors,
+  sourceInput,
   sourceKindLabel,
   sourceKinds,
   storedAuth,
   storedCloudflareToken,
+  storedSentryToken,
   testKey,
   timezoneOptions,
   toInput,
   validateCloudflare,
   validateDraft,
   validateMatchers,
+  validateSentry,
   validateSource,
 } from "../../lib/projects";
 
@@ -69,6 +76,7 @@ const deleteName = ref("");
 const stored = computed(() => storedAuth(existing.data.value));
 const keeps = computed(() => keepsStoredSecret(draft.value, stored.value));
 const cfTokenStored = computed(() => storedCloudflareToken(existing.data.value));
+const sentryTokenStored = computed(() => storedSentryToken(existing.data.value));
 
 // Fill the form once from the stored project; later refetches must not overwrite edits.
 watch(
@@ -81,7 +89,7 @@ watch(
   { immediate: true },
 );
 
-const clientErrors = computed(() => validateDraft(draft.value, stored.value, cfTokenStored.value));
+const clientErrors = computed(() => validateDraft(draft.value, stored.value, cfTokenStored.value, sentryTokenStored.value));
 const errors = computed<FieldErrors>(() => ({ ...(submitted.value ? clientErrors.value : {}), ...serverErrors.value }));
 
 // A server error belongs to the value it was about; editing anything clears them.
@@ -90,6 +98,7 @@ watch(draft, () => (serverErrors.value = {}), { deep: true });
 const signatures = computed<Record<SourceKind, string>>(() => ({
   prometheus: JSON.stringify([matchersInput(draft.value), draft.value.url.trim() ? prometheusInput(draft.value) : null]),
   cloudflare: JSON.stringify(draft.value.cloudflare ? cloudflareInput(draft.value) : null),
+  sentry: JSON.stringify(draft.value.sentry ? sentryInput(draft.value) : null),
 }));
 const isStale = (kind: SourceKind) => {
   const last = lastTests.value[kind];
@@ -145,7 +154,9 @@ async function runTest(kind: SourceKind) {
   const problems =
     kind === "prometheus"
       ? { ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, stored.value, true) }
-      : validateCloudflare(draft.value, cfTokenStored.value);
+      : kind === "cloudflare"
+        ? validateCloudflare(draft.value, cfTokenStored.value)
+        : validateSentry(draft.value, sentryTokenStored.value);
   if (Object.keys(problems).length) {
     serverErrors.value = problems;
     return;
@@ -157,7 +168,7 @@ async function runTest(kind: SourceKind) {
     const result = await tester.mutateAsync({
       project_id: sourceId.value,
       matchers: kind === "prometheus" ? matchersInput(draft.value) : [],
-      source: kind === "prometheus" ? prometheusInput(draft.value) : cloudflareInput(draft.value),
+      source: sourceInput(draft.value, kind),
     });
     lastTests.value = { ...lastTests.value, [kind]: { result, signature } };
   } catch (error) {
@@ -415,6 +426,147 @@ async function confirmDelete() {
             </button>
           </div>
           <ConnectionTestResult v-if="lastTests.cloudflare" :test="lastTests.cloudflare.result" :stale="isStale('cloudflare')" />
+        </template>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sentry</legend>
+        <label class="check"><input v-model="draft.sentry" type="checkbox"> Analyse a Sentry project</label>
+        <template v-if="draft.sentry">
+          <p class="muted hint">
+            Application errors (error events, unhandled errors, affected users) and, when tracing is set up, transactions (throughput,
+            failure rate, p95 duration).
+          </p>
+          <div class="field">
+            <label for="sentry-api-url">Sentry URL</label>
+            <input
+              id="sentry-api-url"
+              v-model="draft.sentryApiUrl"
+              class="mono"
+              list="sentry-urls"
+              placeholder="https://sentry.example.com"
+              autocomplete="off"
+              :aria-invalid="!!errors['sentry.api_url']"
+              :aria-describedby="describedBy('sentry.api_url') ?? 'sentry-api-url-hint'"
+            >
+            <datalist id="sentry-urls"><option :value="SENTRY_URL" /><option value="https://de.sentry.io" /></datalist>
+            <p id="sentry-api-url-hint" class="muted hint">
+              <code>https://sentry.io</code> (US), <code>https://de.sentry.io</code> (EU), or the address of your self-hosted Sentry, as in
+              your browser (path prefixes are kept; in Docker use <code>host.docker.internal</code> instead of <code>localhost</code>).
+              <code>synthetic://incident</code> serves demo data without a token.
+            </p>
+            <p v-if="errors['sentry.api_url']" :id="errorId('sentry.api_url')" class="field-error">{{ errors["sentry.api_url"] }}</p>
+          </div>
+          <label class="check"><input v-model="draft.sentryTlsVerify" type="checkbox"> Verify TLS certificates</label>
+          <p v-if="!draft.sentryTlsVerify" class="muted hint">Only for a self-hosted Sentry with a self-signed or internal certificate.</p>
+          <div class="field">
+            <label for="sentry-org">Organization</label>
+            <input
+              id="sentry-org"
+              v-model="draft.sentryOrg"
+              class="mono"
+              placeholder="acme"
+              autocomplete="off"
+              :aria-invalid="!!errors['sentry.organization']"
+              :aria-describedby="describedBy('sentry.organization')"
+            >
+            <p v-if="errors['sentry.organization']" :id="errorId('sentry.organization')" class="field-error">{{ errors["sentry.organization"] }}</p>
+          </div>
+          <div class="field">
+            <label for="sentry-projects">Sentry projects</label>
+            <input
+              id="sentry-projects"
+              v-model="draft.sentryProjects"
+              class="mono"
+              placeholder="shop-web, shop-api"
+              autocomplete="off"
+              :aria-invalid="!!errors['sentry.projects']"
+              :aria-describedby="describedBy('sentry.projects') ?? 'sentry-projects-hint'"
+            >
+            <p id="sentry-projects-hint" class="muted hint">
+              Up to {{ MAX_SENTRY_PROJECTS }} project slugs, separated with commas or spaces, as in
+              <code>sentry.io/organizations/&lt;organization&gt;/projects/&lt;project&gt;/</code>. Each is analysed separately.
+            </p>
+            <p v-if="errors['sentry.projects']" :id="errorId('sentry.projects')" class="field-error">{{ errors["sentry.projects"] }}</p>
+          </div>
+          <div class="field">
+            <label for="sentry-environment">Environment <span class="muted">(optional)</span></label>
+            <input
+              id="sentry-environment"
+              v-model="draft.sentryEnvironment"
+              class="mono"
+              placeholder="production"
+              autocomplete="off"
+              :aria-invalid="!!errors['sentry.environment']"
+              :aria-describedby="describedBy('sentry.environment') ?? 'sentry-environment-hint'"
+            >
+            <p id="sentry-environment-hint" class="muted hint">Empty analyses all environments together.</p>
+            <p v-if="errors['sentry.environment']" :id="errorId('sentry.environment')" class="field-error">{{ errors["sentry.environment"] }}</p>
+          </div>
+          <div class="field" role="group" aria-labelledby="sentry-tags-label" aria-describedby="sentry-tags-hint">
+            <span id="sentry-tags-label" class="field-label">Tag filters <span class="muted">(optional)</span></span>
+            <p id="sentry-tags-hint" class="muted hint">
+              Only events with all of these exact tag values are analysed, in every project, e.g. <code>server_name</code>,
+              <code>release</code> or a custom tag.
+            </p>
+            <div v-for="(t, i) in draft.sentryTags" :key="i" class="matcher">
+              <div class="field">
+                <label :for="`sentry-tag-key-${i}`" class="sr-only">Tag key {{ i + 1 }}</label>
+                <input
+                  :id="`sentry-tag-key-${i}`"
+                  v-model="t.key"
+                  class="mono"
+                  placeholder="tag"
+                  autocomplete="off"
+                  :aria-invalid="!!errors[`sentry.tags.${i}.key`]"
+                  :aria-describedby="describedBy(`sentry.tags.${i}.key`)"
+                >
+                <p v-if="errors[`sentry.tags.${i}.key`]" :id="errorId(`sentry.tags.${i}.key`)" class="field-error">{{ errors[`sentry.tags.${i}.key`] }}</p>
+              </div>
+              <span class="eq mono" aria-hidden="true">=</span>
+              <div class="field">
+                <label :for="`sentry-tag-value-${i}`" class="sr-only">Tag value {{ i + 1 }}</label>
+                <input
+                  :id="`sentry-tag-value-${i}`"
+                  v-model="t.value"
+                  class="mono"
+                  placeholder="value"
+                  autocomplete="off"
+                  :aria-invalid="!!errors[`sentry.tags.${i}.value`]"
+                  :aria-describedby="describedBy(`sentry.tags.${i}.value`)"
+                >
+                <p v-if="errors[`sentry.tags.${i}.value`]" :id="errorId(`sentry.tags.${i}.value`)" class="field-error">{{ errors[`sentry.tags.${i}.value`] }}</p>
+              </div>
+              <button type="button" :aria-label="`Remove tag ${i + 1}`" @click="draft.sentryTags.splice(i, 1)">✕</button>
+            </div>
+            <p v-if="errors['sentry.tags']" class="field-error">{{ errors["sentry.tags"] }}</p>
+            <div>
+              <button type="button" :disabled="draft.sentryTags.length >= MAX_SENTRY_TAGS" @click="draft.sentryTags.push({ key: '', value: '' })">Add tag</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="sentry-token">Auth token</label>
+            <input
+              id="sentry-token"
+              v-model="draft.sentryToken"
+              type="password"
+              autocomplete="new-password"
+              :placeholder="sentryTokenStored ? 'Stored — leave empty to keep' : ''"
+              :aria-invalid="!!errors['sentry.auth_token']"
+              :aria-describedby="describedBy('sentry.auth_token') ?? 'sentry-token-hint'"
+            >
+            <p id="sentry-token-hint" class="muted hint">
+              A personal token or internal integration with the scopes <strong>org:read</strong> and <strong>project:read</strong>.
+              Organization tokens (for CI) cannot read events.
+            </p>
+            <p v-if="errors['sentry.auth_token']" :id="errorId('sentry.auth_token')" class="field-error">{{ errors["sentry.auth_token"] }}</p>
+          </div>
+          <div class="row">
+            <button type="button" :disabled="tester.isPending.value" @click="runTest('sentry')">
+              {{ testing === "sentry" ? "Testing…" : "Test Sentry connection" }}
+            </button>
+          </div>
+          <ConnectionTestResult v-if="lastTests.sentry" :test="lastTests.sentry.result" :stale="isStale('sentry')" />
         </template>
       </fieldset>
 

@@ -12,6 +12,7 @@ from app.domain.interfaces import MetricsSource, OpenedSource
 from app.domain.projects import (
     CloudflareConnection,
     PrometheusConnection,
+    SentryConnection,
     SourceConnection,
     synthetic_url,
 )
@@ -19,6 +20,7 @@ from app.sources.cloudflare.connect import connect_cloudflare
 from app.sources.prometheus.client import PrometheusClient
 from app.sources.prometheus.source import PrometheusMetricsSource
 from app.sources.prometheus.synthetic import SyntheticMetricsSource
+from app.sources.sentry.connect import connect_sentry
 from app.storage.projects import SqliteProjectRepository
 
 
@@ -52,6 +54,9 @@ async def open_source(conn: SourceConnection) -> AsyncIterator[MetricsSource]:
         case CloudflareConnection():
             async with connect_cloudflare(conn) as cloudflare:
                 yield cloudflare
+        case SentryConnection():
+            async with connect_sentry(conn) as sentry:
+                yield sentry
 
 
 class ProjectSources:

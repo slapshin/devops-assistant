@@ -54,7 +54,9 @@
         "proxy",
         "database",
         "edge",
-        "security"
+        "security",
+        "app_errors",
+        "app_performance"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -62,7 +64,8 @@
     "SourceKind": {
       "enum": [
         "prometheus",
-        "cloudflare"
+        "cloudflare",
+        "sentry"
       ],
       "title": "SourceKind",
       "type": "string"
@@ -120,7 +123,7 @@
         }
       ],
       "default": null,
-      "description": "Prometheus: series currently matching all matchers.",
+      "description": "Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h.",
       "title": "Matched Series"
     },
     "message": {

@@ -2,7 +2,7 @@
 
 A project holds at most one data source per kind; its equality label matchers select the
 series of its Prometheus source. Secrets are write-only: input models accept them, read models
-only say whether one is stored. New source kinds (Wazuh, Sentry, ...) are added as new members
+only say whether one is stored. New source kinds (e.g. Wazuh) are added as new members
 of ``SourceKind`` and of the source unions without changing storage.
 """
 
@@ -11,7 +11,15 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Discriminator, Field, SecretStr, Tag, ValidationInfo, field_validator
+from pydantic import (
+    AfterValidator,
+    Discriminator,
+    Field,
+    SecretStr,
+    Tag,
+    ValidationInfo,
+    field_validator,
+)
 
 from app.domain.common import (
     Contract,
@@ -31,6 +39,13 @@ MAX_KEEP_REPORTS = 1000
 CLOUDFLARE_GRAPHQL_URL = "https://api.cloudflare.com/client/v4/graphql"
 MAX_HOSTNAMES = 20
 _ZONE_ID = re.compile(r"^[0-9a-f]{32}$")
+SENTRY_URL = "https://sentry.io"
+_SENTRY_SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,99}$")
+_SENTRY_ENVIRONMENT = re.compile(r"^[^\s/]{1,64}$")
+_SENTRY_TAG_KEY = re.compile(r"^[a-zA-Z0-9_.:-]{1,32}$")
+MAX_SENTRY_PROJECTS = 10
+MAX_SENTRY_TAGS = 10
+MAX_SENTRY_TAG_VALUE_CHARS = 200
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
 )
@@ -144,6 +159,112 @@ class CloudflareSourceInput(Contract):
         return validate_source_url(value)
 
 
+class SentryTag(Contract):
+    """Exact ``key:"value"`` tag filter added to every Sentry query of the source."""
+
+    key: str = Field(description="Tag key, e.g. server_name, release or a custom tag.")
+    value: str = Field(min_length=1, max_length=MAX_SENTRY_TAG_VALUE_CHARS)
+
+    @field_validator("key")
+    @classmethod
+    def _valid_key(cls, value: str) -> str:
+        value = value.strip()
+        if not _SENTRY_TAG_KEY.match(value):
+            raise ValueError("expected letters, digits, _ . : - (max 32)")
+        return value
+
+    @field_validator("value")
+    @classmethod
+    def _valid_value(cls, value: str) -> str:
+        if "\n" in value or "\r" in value:
+            raise ValueError("must not contain line breaks")
+        return value
+
+
+def normalise_sentry_tags(tags: list[SentryTag]) -> list[SentryTag]:
+    """Reject duplicate keys (two values of one key never match) and sort by key."""
+    keys = [t.key for t in tags]
+    if duplicates := sorted({k for k in keys if keys.count(k) > 1}):
+        raise ValueError(f"duplicate tag keys: {', '.join(duplicates)}")
+    return sorted(tags, key=lambda t: t.key)
+
+
+def normalise_sentry_projects(projects: list[str]) -> list[str]:
+    """Lower-cased, unique, sorted project slugs."""
+    slugs = sorted({p.strip().lower() for p in projects})
+    if bad := [p for p in slugs if not _SENTRY_SLUG.match(p)]:
+        raise ValueError(f"invalid project slugs: {', '.join(bad)}")
+    if not slugs:
+        raise ValueError("at least one project is required")
+    return slugs
+
+
+SentryProjects = Annotated[
+    list[str],
+    Field(min_length=1, max_length=MAX_SENTRY_PROJECTS),
+    AfterValidator(normalise_sentry_projects),
+]
+SentryTags = Annotated[
+    list[SentryTag], Field(max_length=MAX_SENTRY_TAGS), AfterValidator(normalise_sentry_tags)
+]
+
+
+class SentrySourceInput(Contract):
+    """Sentry projects of one organization, optionally narrowed to an environment and tags."""
+
+    kind: Literal[SourceKind.SENTRY] = SourceKind.SENTRY
+    organization: str = Field(description="Organization slug (Settings → General).")
+    projects: SentryProjects = Field(
+        description="Project slugs (Settings → Projects); each is analysed as its own entity."
+    )
+    environment: str | None = Field(
+        default=None, description="Analyse only this environment; null analyses all of them."
+    )
+    tags: SentryTags = Field(
+        default_factory=list,
+        description="Tag filters applied to every project, all of which must match.",
+    )
+    auth_token: SecretStr | None = Field(
+        default=None,
+        description="Auth token with org:read and project:read. Omit to keep the stored one "
+        "(update only); not needed for synthetic://.",
+    )
+    api_url: str = Field(
+        default=SENTRY_URL,
+        max_length=2048,
+        description="Sentry base URL: https://sentry.io, https://de.sentry.io for EU "
+        "organizations, or a self-hosted instance (path prefixes are kept); "
+        "synthetic://<scenario> for demo data.",
+    )
+    tls_verify: bool = Field(
+        default=True,
+        description="Verify the server's TLS certificate; turn off only for a self-hosted "
+        "Sentry with a self-signed or internal certificate.",
+    )
+
+    @field_validator("organization")
+    @classmethod
+    def _valid_slug(cls, value: str) -> str:
+        value = value.strip().lower()
+        if not _SENTRY_SLUG.match(value):
+            raise ValueError("expected a slug of lower-case letters, digits, - and _")
+        return value
+
+    @field_validator("environment")
+    @classmethod
+    def _valid_environment(cls, value: str | None) -> str | None:
+        if not (value := (value or "").strip()):
+            return None
+        if not _SENTRY_ENVIRONMENT.match(value) or value == "None":
+            raise ValueError("expected an environment name without spaces or '/' (max 64)")
+        return value
+
+    @field_validator("api_url")
+    @classmethod
+    def _valid_url(cls, value: str) -> str:
+        return validate_source_url(value)
+
+
 def _source_kind(value: Any) -> str:
     """``kind`` selects the union member; it defaults to prometheus (the only pre-T015 kind)."""
     if isinstance(value, dict):
@@ -153,7 +274,8 @@ def _source_kind(value: Any) -> str:
 
 SourceInput = Annotated[
     Annotated[PrometheusSourceInput, Tag(SourceKind.PROMETHEUS.value)]
-    | Annotated[CloudflareSourceInput, Tag(SourceKind.CLOUDFLARE.value)],
+    | Annotated[CloudflareSourceInput, Tag(SourceKind.CLOUDFLARE.value)]
+    | Annotated[SentrySourceInput, Tag(SourceKind.SENTRY.value)],
     Discriminator(_source_kind),
 ]
 
@@ -248,7 +370,19 @@ class CloudflareSource(Contract):
     token_set: bool
 
 
-Source = Annotated[PrometheusSource | CloudflareSource, Field(discriminator="kind")]
+class SentrySource(Contract):
+    kind: Literal[SourceKind.SENTRY] = SourceKind.SENTRY
+    organization: str
+    projects: list[str]
+    environment: str | None = None
+    tags: list[SentryTag] = Field(default_factory=list)
+    api_url: str
+    tls_verify: bool = True
+    token_set: bool
+
+
+AnySource = PrometheusSource | CloudflareSource | SentrySource
+Source = Annotated[AnySource, Field(discriminator="kind")]
 
 
 class Project(Contract):
@@ -271,7 +405,7 @@ class Project(Contract):
     created_at: UtcDatetime
     updated_at: UtcDatetime
 
-    def source(self, kind: SourceKind) -> PrometheusSource | CloudflareSource | None:
+    def source(self, kind: SourceKind) -> AnySource | None:
         return next((s for s in self.sources if s.kind is kind), None)
 
 
@@ -324,7 +458,8 @@ class ConnectionTest(Contract):
     auth_ok: bool | None = Field(description="Null when the source could not be reached.")
     matched_series: int | None = Field(
         default=None,
-        description="Prometheus: series currently matching all matchers.",
+        description="Prometheus: series currently matching all matchers. Cloudflare: requests "
+        "in the last 24 h. Sentry: error events and transactions in the last 24 h.",
     )
     history_days: float | None = Field(
         default=None, description="Days of matching history found, up to 30."
@@ -361,5 +496,21 @@ class CloudflareConnection(Contract):
         return SourceKind.CLOUDFLARE
 
 
-SourceConnection = PrometheusConnection | CloudflareConnection
+class SentryConnection(Contract):
+    """Resolved Sentry settings including the decrypted token; never serialised to clients."""
+
+    organization: str
+    projects: list[str]
+    environment: str | None = None
+    tags: list[SentryTag] = Field(default_factory=list)
+    api_url: str = SENTRY_URL
+    tls_verify: bool = True
+    auth_token: SecretStr | None = None
+
+    @property
+    def kind(self) -> SourceKind:
+        return SourceKind.SENTRY
+
+
+SourceConnection = PrometheusConnection | CloudflareConnection | SentryConnection
 """Decrypted connection of any source kind."""

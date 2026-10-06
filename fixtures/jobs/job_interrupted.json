@@ -15,8 +15,8 @@
     ]
   },
   "end_time": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.7",
-  "config_hash": "d5d649d1df58",
+  "detector_version": "detectors-2026.10.8",
+  "config_hash": "e8c76aa9bf2c",
   "trigger": "manual",
   "state": "failed",
   "stages": [

@@ -449,7 +449,8 @@
             "discriminator": {
               "mapping": {
                 "cloudflare": "#/$defs/CloudflareSource",
-                "prometheus": "#/$defs/PrometheusSource"
+                "prometheus": "#/$defs/PrometheusSource",
+                "sentry": "#/$defs/SentrySource"
               },
               "propertyName": "kind"
             },
@@ -459,6 +460,9 @@
               },
               {
                 "$ref": "#/$defs/CloudflareSource"
+              },
+              {
+                "$ref": "#/$defs/SentrySource"
               }
             ]
           },
@@ -593,6 +597,91 @@
         "matchers"
       ],
       "title": "Scope",
+      "type": "object"
+    },
+    "SentrySource": {
+      "additionalProperties": false,
+      "properties": {
+        "api_url": {
+          "title": "Api Url",
+          "type": "string"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Environment"
+        },
+        "kind": {
+          "const": "sentry",
+          "default": "sentry",
+          "title": "Kind",
+          "type": "string"
+        },
+        "organization": {
+          "title": "Organization",
+          "type": "string"
+        },
+        "projects": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Projects",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "$ref": "#/$defs/SentryTag"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "tls_verify": {
+          "default": true,
+          "title": "Tls Verify",
+          "type": "boolean"
+        },
+        "token_set": {
+          "title": "Token Set",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "organization",
+        "projects",
+        "api_url",
+        "token_set"
+      ],
+      "title": "SentrySource",
+      "type": "object"
+    },
+    "SentryTag": {
+      "additionalProperties": false,
+      "description": "Exact ``key:\"value\"`` tag filter added to every Sentry query of the source.",
+      "properties": {
+        "key": {
+          "description": "Tag key, e.g. server_name, release or a custom tag.",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "title": "SentryTag",
       "type": "object"
     },
     "Severity": {

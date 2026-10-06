@@ -47,7 +47,8 @@
         "proxy",
         "upstream",
         "database",
-        "zone"
+        "zone",
+        "application"
       ],
       "title": "EntityKind",
       "type": "string"
@@ -67,7 +68,9 @@
         "proxy",
         "database",
         "edge",
-        "security"
+        "security",
+        "app_errors",
+        "app_performance"
       ],
       "title": "SignalFamily",
       "type": "string"

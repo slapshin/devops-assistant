@@ -115,6 +115,8 @@ export const FAMILY_LABELS: Record<string, string> = {
   database: "Databases",
   edge: "CDN edge (Cloudflare)",
   security: "Security (WAF)",
+  app_errors: "Application errors (Sentry)",
+  app_performance: "Transactions (Sentry)",
 };
 
 export const STATUS_LABELS: Record<string, { label: string; icon: string }> = {

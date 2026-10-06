@@ -65,6 +65,9 @@ DIRECT: dict[str, str] = {
     "redis_persistence_failed": "database_persistence_failed",
     "cf_blocked": "security_blocked_rate",
     "cf_challenged": "security_challenge_rate",
+    "sentry_errors": "app_error_rate",
+    "sentry_unhandled": "app_unhandled_error_rate",
+    "sentry_error_users": "app_error_users",
 }
 """Collected signal -> rule for signals analysed as collected."""
 
@@ -172,6 +175,15 @@ _TRAFFIC_SPECS = (
         client_errors=("cf_404", "cf_4xx"),
         client_error_rules=("edge_not_found_rate", "edge_client_error_rate"),
         extra_latency=(("cf_origin_p95", "edge_origin_time_p95"),),
+    ),
+    # Sentry transactions: failed share and p95 duration, guarded by the transaction volume.
+    _TrafficSpec(
+        traffic_signal="sentry_transactions",
+        rate_rule="app_transaction_rate",
+        error_ratios=(("sentry_transaction_failures", "app_transaction_failure_ratio"),),
+        quantile_signal="sentry_duration_p95",
+        quantile_rule="app_duration_p95",
+        tail_signal="sentry_duration_p99",
     ),
 )
 

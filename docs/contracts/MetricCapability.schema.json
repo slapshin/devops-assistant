@@ -25,7 +25,9 @@
         "proxy",
         "database",
         "edge",
-        "security"
+        "security",
+        "app_errors",
+        "app_performance"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -33,7 +35,8 @@
     "SourceKind": {
       "enum": [
         "prometheus",
-        "cloudflare"
+        "cloudflare",
+        "sentry"
       ],
       "title": "SourceKind",
       "type": "string"

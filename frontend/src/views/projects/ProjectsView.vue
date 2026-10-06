@@ -43,7 +43,7 @@ const visible = computed(() => {
       <h2>No projects yet</h2>
       <p>
         A project is analysed from its own data sources: Prometheus-compatible metrics selected by labels such as
-        <code>project="shop"</code> and <code>env="prod"</code>, and a Cloudflare zone's edge traffic and security events.
+        <code>project="shop"</code> and <code>env="prod"</code>, a Cloudflare zone's edge traffic and security events, and a Sentry project's errors and transactions.
       </p>
       <RouterLink to="/projects/new" class="button primary">Create project</RouterLink>
     </div>

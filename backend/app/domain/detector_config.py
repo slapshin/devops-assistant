@@ -10,7 +10,7 @@ from pydantic import Field
 
 from app.domain.common import STEP_SECONDS, Contract
 
-DETECTOR_VERSION = "detectors-2026.10.7"
+DETECTOR_VERSION = "detectors-2026.10.8"
 CONFIG_HASH_HEX_CHARS = 12
 
 
@@ -94,6 +94,12 @@ _DEFAULT_SIGNALS: dict[str, SignalThresholds] = {
     ),
     "edge_cache_hit_ratio": _T(min_abs_effect=0.15, abs_floor=0.01),
     "security_event_rate": _T(min_rel_factor=3.0, min_abs_effect=0.1, abs_floor=0.01),
+    "app_error_rate": _T(min_rel_factor=3.0, min_abs_effect=0.02, abs_floor=0.005),
+    "app_unhandled_error_rate": _T(min_rel_factor=3.0, min_abs_effect=0.01, abs_floor=0.002),
+    "app_error_users": _T(min_rel_factor=2.0, min_abs_effect=5.0, abs_floor=1.0),
+    "app_transaction_failure_ratio": _T(
+        min_abs_effect=0.03, abs_floor=0.003, absolute_high=0.10, absolute_min_minutes=10
+    ),
 }
 
 

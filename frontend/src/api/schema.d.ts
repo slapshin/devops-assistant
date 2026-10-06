@@ -424,7 +424,7 @@ export interface components {
             kind: components["schemas"]["SourceKind"];
             /**
              * Matched Series
-             * @description Prometheus: series currently matching all matchers.
+             * @description Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h.
              */
             matched_series?: number | null;
             /** Message */
@@ -448,7 +448,7 @@ export interface components {
              */
             project_id?: string | null;
             /** Source */
-            source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"];
+            source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"];
         };
         /**
          * DailyTrend
@@ -516,7 +516,7 @@ export interface components {
          * EntityKind
          * @enum {string}
          */
-        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone";
+        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone" | "application";
         /** EpisodeSummary */
         EpisodeSummary: {
             /** End */
@@ -935,7 +935,7 @@ export interface components {
             project_id: string;
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"])[];
+            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"])[];
             /** Updated At */
             updated_at: string;
         };
@@ -961,7 +961,7 @@ export interface components {
             /** @description Automatic analyses; null runs analyses on demand only. */
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources?: (components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"])[];
+            sources?: (components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"])[];
         };
         /** ProjectList */
         ProjectList: {
@@ -1011,7 +1011,7 @@ export interface components {
             report_count: number;
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"])[];
+            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"])[];
             /** Updated At */
             updated_at: string;
         };
@@ -1130,6 +1130,93 @@ export interface components {
             /** Project Name */
             project_name: string;
         };
+        /** SentrySource */
+        SentrySource: {
+            /** Api Url */
+            api_url: string;
+            /** Environment */
+            environment?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "sentry";
+            /** Organization */
+            organization: string;
+            /** Projects */
+            projects: string[];
+            /** Tags */
+            tags?: components["schemas"]["SentryTag"][];
+            /**
+             * Tls Verify
+             * @default true
+             */
+            tls_verify: boolean;
+            /** Token Set */
+            token_set: boolean;
+        };
+        /**
+         * SentrySourceInput
+         * @description Sentry projects of one organization, optionally narrowed to an environment and tags.
+         */
+        SentrySourceInput: {
+            /**
+             * Api Url
+             * @description Sentry base URL: https://sentry.io, https://de.sentry.io for EU organizations, or a self-hosted instance (path prefixes are kept); synthetic://<scenario> for demo data.
+             * @default https://sentry.io
+             */
+            api_url: string;
+            /**
+             * Auth Token
+             * @description Auth token with org:read and project:read. Omit to keep the stored one (update only); not needed for synthetic://.
+             */
+            auth_token?: string | null;
+            /**
+             * Environment
+             * @description Analyse only this environment; null analyses all of them.
+             */
+            environment?: string | null;
+            /**
+             * Kind
+             * @default sentry
+             * @constant
+             */
+            kind: "sentry";
+            /**
+             * Organization
+             * @description Organization slug (Settings → General).
+             */
+            organization: string;
+            /**
+             * Projects
+             * @description Project slugs (Settings → Projects); each is analysed as its own entity.
+             */
+            projects: string[];
+            /**
+             * Tags
+             * @description Tag filters applied to every project, all of which must match.
+             */
+            tags?: components["schemas"]["SentryTag"][];
+            /**
+             * Tls Verify
+             * @description Verify the server's TLS certificate; turn off only for a self-hosted Sentry with a self-signed or internal certificate.
+             * @default true
+             */
+            tls_verify: boolean;
+        };
+        /**
+         * SentryTag
+         * @description Exact ``key:"value"`` tag filter added to every Sentry query of the source.
+         */
+        SentryTag: {
+            /**
+             * Key
+             * @description Tag key, e.g. server_name, release or a custom tag.
+             */
+            key: string;
+            /** Value */
+            value: string;
+        };
         /**
          * Severity
          * @enum {string}
@@ -1156,7 +1243,7 @@ export interface components {
          * SignalFamily
          * @enum {string}
          */
-        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security";
+        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security" | "app_errors" | "app_performance";
         /**
          * SignalStatus
          * @enum {string}
@@ -1186,7 +1273,7 @@ export interface components {
          * SourceKind
          * @enum {string}
          */
-        SourceKind: "prometheus" | "cloudflare";
+        SourceKind: "prometheus" | "cloudflare" | "sentry";
         /**
          * StageName
          * @enum {string}

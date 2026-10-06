@@ -21,6 +21,8 @@ from app.domain.projects import (
     ProjectSummary,
     PrometheusConnection,
     PrometheusSourceInput,
+    SentryConnection,
+    SentrySourceInput,
     SourceConnection,
     SourceInput,
     synthetic_url,
@@ -30,6 +32,8 @@ from app.sources.cloudflare.synthetic import SCENARIOS as CLOUDFLARE_SCENARIOS
 from app.sources.factory import connect
 from app.sources.prometheus.probe import probe
 from app.sources.prometheus.synthetic import SCENARIOS
+from app.sources.sentry.connect import connect_sentry, probe_sentry
+from app.sources.sentry.synthetic import SCENARIOS as SENTRY_SCENARIOS
 from app.storage.projects import ProjectNameTaken, SecretRequired
 from app.storage.secrets import SecretsUnreadable
 
@@ -71,6 +75,8 @@ def _check_scenario(source: SourceInput, field_prefix: str) -> None:
             field, scenarios = "url", sorted(SCENARIOS)
         case CloudflareSourceInput(api_url=url):
             field, scenarios = "api_url", sorted(CLOUDFLARE_SCENARIOS)
+        case SentrySourceInput(api_url=url):
+            field, scenarios = "api_url", sorted(SENTRY_SCENARIOS)
     scenario = synthetic_url(url)
     if scenario is not None and scenario not in scenarios:
         raise _invalid(
@@ -189,6 +195,9 @@ async def _probe(conn: SourceConnection, scope: Scope) -> ConnectionTest:
         case CloudflareConnection():
             async with connect_cloudflare(conn) as cloudflare:
                 return await probe_cloudflare(cloudflare, scope)
+        case SentryConnection():
+            async with connect_sentry(conn) as sentry:
+                return await probe_sentry(sentry, scope)
 
 
 def _draft_scope(matchers: list[LabelMatcher]) -> Scope:

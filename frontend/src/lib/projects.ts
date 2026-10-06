@@ -11,6 +11,14 @@ export const CLOUDFLARE_GRAPHQL_URL = "https://api.cloudflare.com/client/v4/grap
 const ZONE_ID = /^[0-9a-f]{32}$/;
 const HOSTNAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 export const MAX_HOSTNAMES = 20;
+/** Mirrors backend/app/domain/projects.py (Sentry). */
+export const SENTRY_URL = "https://sentry.io";
+const SENTRY_SLUG = /^[a-z0-9][a-z0-9_-]{0,99}$/;
+const SENTRY_ENVIRONMENT = /^[^\s/]{1,64}$/;
+const SENTRY_TAG_KEY = /^[a-zA-Z0-9_.:-]{1,32}$/;
+export const MAX_SENTRY_PROJECTS = 10;
+export const MAX_SENTRY_TAGS = 10;
+const MAX_SENTRY_TAG_VALUE_CHARS = 200;
 
 export type AuthType = "none" | "bearer" | "basic";
 
@@ -55,6 +63,11 @@ export interface MatcherDraft {
   value: string;
 }
 
+export interface TagDraft {
+  key: string;
+  value: string;
+}
+
 export interface ProjectDraft {
   name: string;
   description: string;
@@ -72,6 +85,17 @@ export interface ProjectDraft {
   hostnames: string;
   cfToken: string;
   cfApiUrl: string;
+  sentry: boolean;
+  sentryOrg: string;
+  /** Comma- or space-separated project slugs. */
+  sentryProjects: string;
+  /** Tag filters for every project; rows left completely empty are ignored. */
+  sentryTags: TagDraft[];
+  /** Empty analyses every environment. */
+  sentryEnvironment: string;
+  sentryToken: string;
+  sentryApiUrl: string;
+  sentryTlsVerify: boolean;
   scheduled: boolean;
   scheduleTime: string;
   scheduleTimezone: string;
@@ -107,6 +131,14 @@ export function emptyDraft(): ProjectDraft {
     hostnames: "",
     cfToken: "",
     cfApiUrl: CLOUDFLARE_GRAPHQL_URL,
+    sentry: false,
+    sentryOrg: "",
+    sentryProjects: "",
+    sentryTags: [],
+    sentryEnvironment: "",
+    sentryToken: "",
+    sentryApiUrl: SENTRY_URL,
+    sentryTlsVerify: true,
     scheduled: false,
     scheduleTime: DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: browserTimezone(),
@@ -119,15 +151,19 @@ export function emptyDraft(): ProjectDraft {
 type StoredSource = ProjectSummary["sources"][number];
 type PrometheusSource = Extract<StoredSource, { kind: "prometheus" }>;
 type CloudflareSource = Extract<StoredSource, { kind: "cloudflare" }>;
+type SentrySource = Extract<StoredSource, { kind: "sentry" }>;
 
 export const prometheusSource = (project: { sources: StoredSource[] } | null | undefined) =>
   project?.sources.find((s): s is PrometheusSource => s.kind === "prometheus") ?? null;
 export const cloudflareSource = (project: { sources: StoredSource[] } | null | undefined) =>
   project?.sources.find((s): s is CloudflareSource => s.kind === "cloudflare") ?? null;
+export const sentrySource = (project: { sources: StoredSource[] } | null | undefined) =>
+  project?.sources.find((s): s is SentrySource => s.kind === "sentry") ?? null;
 
 export function draftFrom(project: ProjectSummary): ProjectDraft {
   const source = prometheusSource(project);
   const cloudflare = cloudflareSource(project);
+  const sentry = sentrySource(project);
   const auth = source?.auth;
   return {
     name: project.name,
@@ -144,6 +180,14 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     hostnames: cloudflare?.hostnames.join(", ") ?? "",
     cfToken: "",
     cfApiUrl: cloudflare?.api_url ?? CLOUDFLARE_GRAPHQL_URL,
+    sentry: !!sentry,
+    sentryOrg: sentry?.organization ?? "",
+    sentryProjects: sentry?.projects.join(", ") ?? "",
+    sentryTags: sentry?.tags?.map((t) => ({ ...t })) ?? [],
+    sentryEnvironment: sentry?.environment ?? "",
+    sentryToken: "",
+    sentryApiUrl: sentry?.api_url ?? SENTRY_URL,
+    sentryTlsVerify: sentry?.tls_verify ?? true,
     scheduled: !!project.schedule,
     scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: project.schedule?.timezone ?? browserTimezone(),
@@ -169,17 +213,23 @@ export function storedAuth(project: ProjectSummary | null | undefined): StoredAu
 /** True when the project stores a Cloudflare API token an empty token input keeps. */
 export const storedCloudflareToken = (project: ProjectSummary | null | undefined) => !!cloudflareSource(project)?.token_set;
 
+/** True when the project stores a Sentry auth token an empty token input keeps. */
+export const storedSentryToken = (project: ProjectSummary | null | undefined) => !!sentrySource(project)?.token_set;
+
 /** True when the empty secret input for the chosen auth type keeps a stored secret. */
 export const keepsStoredSecret = (draft: ProjectDraft, stored: StoredAuth | null) =>
   !!stored && stored.type === draft.authType && stored.secretSet;
 
-export function parseHostnames(raw: string): string[] {
-  const names = raw
+/** Lower-cased, unique, sorted items of a comma- or space-separated list. */
+export function parseList(raw: string): string[] {
+  const items = raw
     .split(/[\s,]+/)
-    .map((h) => h.trim().toLowerCase().replace(/\.$/, ""))
+    .map((h) => h.trim().toLowerCase())
     .filter(Boolean);
-  return [...new Set(names)].sort();
+  return [...new Set(items)].sort();
 }
+
+export const parseHostnames = (raw: string) => parseList(raw.replace(/\.(?=[\s,]|$)/g, ""));
 
 function urlError(raw: string): string | null {
   let url: URL;
@@ -253,6 +303,46 @@ export function validateCloudflare(draft: ProjectDraft, tokenStored: boolean): F
   return errors;
 }
 
+export function validateSentry(draft: ProjectDraft, tokenStored: boolean): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!draft.sentry) return errors;
+  const slugError = "Lower-case letters, digits, - and _";
+  if (!SENTRY_SLUG.test(draft.sentryOrg.trim().toLowerCase())) errors["sentry.organization"] = draft.sentryOrg.trim() ? slugError : "Required";
+  const projects = parseList(draft.sentryProjects);
+  const badProjects = projects.filter((p) => !SENTRY_SLUG.test(p));
+  if (!projects.length) errors["sentry.projects"] = "Required";
+  else if (badProjects.length) errors["sentry.projects"] = `Invalid project slugs: ${badProjects.join(", ")}`;
+  else if (projects.length > MAX_SENTRY_PROJECTS) errors["sentry.projects"] = `At most ${MAX_SENTRY_PROJECTS} projects`;
+  Object.assign(errors, validateSentryTags(draft.sentryTags));
+  const environment = draft.sentryEnvironment.trim();
+  if (environment && (!SENTRY_ENVIRONMENT.test(environment) || environment === "None")) errors["sentry.environment"] = "No spaces or /, at most 64 characters";
+  const apiUrl = draft.sentryApiUrl.trim();
+  const badUrl = apiUrl ? urlError(apiUrl) : "Required";
+  if (badUrl) errors["sentry.api_url"] = badUrl;
+  const synthetic = apiUrl.startsWith("synthetic:");
+  if (!draft.sentryToken && !tokenStored && !synthetic) errors["sentry.auth_token"] = "Required";
+  return errors;
+}
+
+export function validateSentryTags(tags: TagDraft[]): FieldErrors {
+  const errors: FieldErrors = {};
+  const seen = new Set<string>();
+  if (usedTags(tags).length > MAX_SENTRY_TAGS) errors["sentry.tags"] = `At most ${MAX_SENTRY_TAGS} tags`;
+  tags.forEach((t, i) => {
+    const key = t.key.trim();
+    if (!key && !t.value) return;
+    if (!SENTRY_TAG_KEY.test(key)) errors[`sentry.tags.${i}.key`] = "Letters, digits, _ . : - (max 32)";
+    else if (seen.has(key)) errors[`sentry.tags.${i}.key`] = "Duplicate tag";
+    seen.add(key);
+    if (!t.value) errors[`sentry.tags.${i}.value`] = "Required";
+    else if (t.value.length > MAX_SENTRY_TAG_VALUE_CHARS) errors[`sentry.tags.${i}.value`] = `At most ${MAX_SENTRY_TAG_VALUE_CHARS} characters`;
+    else if (/[\r\n]/.test(t.value)) errors[`sentry.tags.${i}.value`] = "No line breaks";
+  });
+  return errors;
+}
+
+const usedTags = (tags: TagDraft[]) => tags.filter((t) => t.key.trim() || t.value);
+
 export function validateSchedule(draft: ProjectDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!draft.scheduled) return errors;
@@ -269,12 +359,12 @@ export function validateRetention(draft: ProjectDraft): FieldErrors {
   return {};
 }
 
-export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null, cfTokenStored = false): FieldErrors {
+export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null, cfTokenStored = false, sentryTokenStored = false): FieldErrors {
   const errors: FieldErrors = {};
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
-  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...validateCloudflare(draft, cfTokenStored), ...validateSchedule(draft), ...validateRetention(draft) };
+  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...validateCloudflare(draft, cfTokenStored), ...validateSentry(draft, sentryTokenStored), ...validateSchedule(draft), ...validateRetention(draft) };
 }
 
 type SourceInput = NonNullable<ProjectInput["sources"]>[number];
@@ -299,9 +389,32 @@ export function cloudflareInput(draft: ProjectDraft): SourceInput {
   };
 }
 
+export function sentryInput(draft: ProjectDraft): SourceInput {
+  return {
+    kind: "sentry",
+    organization: draft.sentryOrg.trim().toLowerCase(),
+    projects: parseList(draft.sentryProjects),
+    tags: usedTags(draft.sentryTags).map((t) => ({ key: t.key.trim(), value: t.value })),
+    environment: draft.sentryEnvironment.trim() || null,
+    api_url: draft.sentryApiUrl.trim(),
+    tls_verify: draft.sentryTlsVerify,
+    ...(draft.sentryToken ? { auth_token: draft.sentryToken } : {}),
+  };
+}
+
+/** The input of one configured source kind. */
+export function sourceInput(draft: ProjectDraft, kind: SourceKind): SourceInput {
+  if (kind === "prometheus") return prometheusInput(draft);
+  return kind === "cloudflare" ? cloudflareInput(draft) : sentryInput(draft);
+}
+
 /** Configured source kinds in the order they are sent (server errors refer to their index). */
 export function sourceKinds(draft: ProjectDraft): SourceKind[] {
-  return [...(draft.url.trim() ? (["prometheus"] as const) : []), ...(draft.cloudflare ? (["cloudflare"] as const) : [])];
+  const kinds: SourceKind[] = [];
+  if (draft.url.trim()) kinds.push("prometheus");
+  if (draft.cloudflare) kinds.push("cloudflare");
+  if (draft.sentry) kinds.push("sentry");
+  return kinds;
 }
 
 /** Matchers to send; without a Prometheus URL, rows left without a value are dropped. */
@@ -313,7 +426,7 @@ export function toInput(draft: ProjectDraft): ProjectInput {
     name: draft.name.trim(),
     description: draft.description.trim() || null,
     matchers: matchersInput(draft),
-    sources: sourceKinds(draft).map((kind) => (kind === "prometheus" ? prometheusInput(draft) : cloudflareInput(draft))),
+    sources: sourceKinds(draft).map((kind) => sourceInput(draft, kind)),
     schedule: draft.scheduled
       ? {
           time: draft.scheduleTime,
@@ -354,9 +467,14 @@ export function serverFieldErrors(problem: Problem, kinds: SourceKind[] = [], te
   return errors;
 }
 
-/** One line per source: "Prometheus · vm:8428/prom", "Cloudflare · shop.example.com". */
+/** One line per source: "Prometheus · vm:8428/prom", "Cloudflare · shop.example.com", "Sentry · acme: shop-api, shop-web". */
 export function sourceSummary(source: StoredSource): string {
   if (source.kind === "prometheus") return `Prometheus · ${sourceHost(source.url)}`;
+  if (source.kind === "sentry") {
+    const synthetic = source.api_url === SENTRY_URL ? "" : ` (${sourceHost(source.api_url)})`;
+    const environment = source.environment ? ` · ${source.environment}` : "";
+    return `Sentry · ${source.organization}: ${source.projects.join(", ")}${environment}${synthetic}`;
+  }
   const synthetic = source.api_url.startsWith("synthetic:") ? ` (${sourceHost(source.api_url)})` : "";
   const scope = source.hostnames.length ? source.hostnames.join(", ") : `zone ${source.zone_id.slice(0, 8)}…`;
   return `Cloudflare · ${scope}${synthetic}`;
@@ -411,21 +529,24 @@ export function worstTest(tests: ConnectionTest[]): HealthKey {
 export function testKey(test: ConnectionTest): HealthKey {
   if (!test.reachable) return "unreachable";
   if (test.auth_ok === false) return "auth";
-  if (test.matched_series === 0) return test.kind === "cloudflare" ? "no_traffic" : "no_series";
+  // A quiet application legitimately reports no Sentry events, so only metrics and edge warn.
+  if (test.matched_series === 0 && test.kind !== "sentry") return test.kind === "cloudflare" ? "no_traffic" : "no_series";
   return "ok";
 }
 
 export const SOURCE_KIND_LABELS: Record<SourceKind, string> = {
   prometheus: "Prometheus",
   cloudflare: "Cloudflare",
+  sentry: "Sentry",
 };
 
 export const sourceKindLabel = (kind: SourceKind) => SOURCE_KIND_LABELS[kind];
 
-/** What a connection test counts: matching series (Prometheus) or requests in 24 h (Cloudflare). */
+/** What a connection test counts: matching series (Prometheus), requests (Cloudflare) or events (Sentry) in 24 h. */
 export function testVolume(test: ConnectionTest): string | null {
   if (test.matched_series === null || test.matched_series === undefined) return null;
   if (test.kind === "cloudflare") return `${test.matched_series.toLocaleString("en")} requests in 24 h`;
+  if (test.kind === "sentry") return `${test.matched_series.toLocaleString("en")} events in 24 h`;
   return `${test.matched_series} matching series`;
 }
 

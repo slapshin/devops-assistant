@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { LabelMatcher } from "../../api/client";
 
-defineProps<{ matchers: LabelMatcher[] }>();
+withDefaults(defineProps<{ matchers: LabelMatcher[]; label?: string }>(), { label: "Label matchers" });
 </script>
 
 <template>
-  <ul class="chips" aria-label="Label matchers">
+  <ul class="chips" :aria-label="label">
     <li v-for="m in matchers" :key="m.name" class="chip mono">{{ m.name }}=<span class="value">"{{ m.value }}"</span></li>
   </ul>
 </template>

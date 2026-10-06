@@ -62,6 +62,8 @@ Each project has at most one source per kind, configured in the UI:
 - **Prometheus-compatible** (VictoriaMetrics, Prometheus): URL, TLS verification, none/bearer/basic auth. It needs at least one label matcher, which every query carries.
 - **Cloudflare**: zone ID (dashboard → zone → Overview), optional hostnames, and an API token. Create the token under *My Profile → API Tokens → Custom token* with the permission **Zone → Analytics → Read** for that zone only. Timing quantiles (TTFB, origin response time) need a Pro plan or higher; on other plans those signals are reported as unsupported. `synthetic://<scenario>` as the API URL serves demo data without a token.
 
+- **Sentry**: the organization slug, up to 10 project slugs (as in the project URLs; each is analysed separately), an optional environment, optional tag filters (`key = value`, all must match, applied to every project), and an auth token with the scopes **org:read** and **project:read** (*User settings → Personal Tokens*, or an internal integration under *Settings → Custom Integrations*; organization tokens for CI cannot read events). EU organizations use `https://de.sentry.io` as the Sentry URL; self-hosted Sentry needs the `events-timeseries` endpoint (25.x or later; transactions are then read from the classic transactions dataset automatically). Transaction signals need tracing; without transactions in the last 24 h they are reported as unsupported. `synthetic://<scenario>` serves demo data without a token.
+
 Tokens and passwords are encrypted at rest and never returned by the API. When one source of a project fails (e.g. a revoked Cloudflare token), the other sources are still analysed and the report is `partial`.
 
 ## Supported metrics and history

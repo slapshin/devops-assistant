@@ -240,6 +240,112 @@
       "title": "ReportSchedule",
       "type": "object"
     },
+    "SentrySourceInput": {
+      "additionalProperties": false,
+      "description": "Sentry projects of one organization, optionally narrowed to an environment and tags.",
+      "properties": {
+        "api_url": {
+          "default": "https://sentry.io",
+          "description": "Sentry base URL: https://sentry.io, https://de.sentry.io for EU organizations, or a self-hosted instance (path prefixes are kept); synthetic://<scenario> for demo data.",
+          "maxLength": 2048,
+          "title": "Api Url",
+          "type": "string"
+        },
+        "auth_token": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Auth token with org:read and project:read. Omit to keep the stored one (update only); not needed for synthetic://.",
+          "title": "Auth Token"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Analyse only this environment; null analyses all of them.",
+          "title": "Environment"
+        },
+        "kind": {
+          "const": "sentry",
+          "default": "sentry",
+          "title": "Kind",
+          "type": "string"
+        },
+        "organization": {
+          "description": "Organization slug (Settings → General).",
+          "title": "Organization",
+          "type": "string"
+        },
+        "projects": {
+          "description": "Project slugs (Settings → Projects); each is analysed as its own entity.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Projects",
+          "type": "array"
+        },
+        "tags": {
+          "description": "Tag filters applied to every project, all of which must match.",
+          "items": {
+            "$ref": "#/$defs/SentryTag"
+          },
+          "maxItems": 10,
+          "title": "Tags",
+          "type": "array"
+        },
+        "tls_verify": {
+          "default": true,
+          "description": "Verify the server's TLS certificate; turn off only for a self-hosted Sentry with a self-signed or internal certificate.",
+          "title": "Tls Verify",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "organization",
+        "projects"
+      ],
+      "title": "SentrySourceInput",
+      "type": "object"
+    },
+    "SentryTag": {
+      "additionalProperties": false,
+      "description": "Exact ``key:\"value\"`` tag filter added to every Sentry query of the source.",
+      "properties": {
+        "key": {
+          "description": "Tag key, e.g. server_name, release or a custom tag.",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "title": "SentryTag",
+      "type": "object"
+    },
     "Weekday": {
       "enum": [
         "mon",
@@ -320,10 +426,13 @@
           },
           {
             "$ref": "#/$defs/CloudflareSourceInput"
+          },
+          {
+            "$ref": "#/$defs/SentrySourceInput"
           }
         ]
       },
-      "maxItems": 2,
+      "maxItems": 3,
       "title": "Sources",
       "type": "array"
     }

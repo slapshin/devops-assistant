@@ -28,8 +28,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.7",
-  "config_hash": "d5d649d1df58",
+  "detector_version": "detectors-2026.10.8",
+  "config_hash": "e8c76aa9bf2c",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -382,13 +382,31 @@
       "total_series": 2,
       "baseline_days": 4,
       "reasons": []
+    },
+    {
+      "family": "app_errors",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 4,
+      "reasons": []
+    },
+    {
+      "family": "app_performance",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 4,
+      "reasons": []
     }
   ],
   "findings": [
     {
-      "finding_id": "fnd_3ebe46815328c7ff",
+      "finding_id": "fnd_80141d057095c3d2",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.7",
+      "detector_version": "detectors-2026.10.8",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -430,7 +448,7 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_d8151432b6c1dcc8"
+        "evd_cde2975ee6634c76"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -459,8 +477,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_3ebe46815328c7ff",
-          "finding_id": "fnd_3ebe46815328c7ff",
+          "episode_id": "eps_80141d057095c3d2",
+          "finding_id": "fnd_80141d057095c3d2",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=shop-production",
@@ -714,8 +732,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_d8151432b6c1dcc8",
-      "finding_id": "fnd_3ebe46815328c7ff",
+      "evidence_id": "evd_cde2975ee6634c76",
+      "finding_id": "fnd_80141d057095c3d2",
       "series": {
         "series_id": "ser_6d64ca1e1032319f",
         "family": "cpu",

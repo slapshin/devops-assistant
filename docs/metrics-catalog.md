@@ -168,6 +168,30 @@ A project's Cloudflare source analyses one zone, optionally narrowed to some hos
   - A full analysis makes about 28 × 3 requests, well inside Cloudflare's 300 queries per 5 minutes. A rate-limited request is retried once after `Retry-After`.
 - **Live verification pending**: no live zone was available during T015. The field names follow Cloudflare's documentation (see the T015 task file), and a refused field degrades only its signals to `unsupported`.
 
+### Sentry (T017)
+
+A project's Sentry source analyses up to 10 Sentry projects of one organization, each as its own entity (kind `application`), optionally narrowed to one environment and to tag filters that apply to every project. It uses the REST API (`app/sources/sentry/`, catalog `sentry-2026.10.7`): `GET /api/0/projects/{org}/{project}/` per project to check access and read the numeric project ID and creation date, and `GET /api/0/organizations/{org}/events-timeseries/` with `project=<numeric ID>` (Sentry 25.x rejects slugs there), `environment=<name>`, `interval=5m` and several `yAxis` aggregates per request. Tag filters are appended to `query` as quoted terms (`team:"shop"`, quotes and backslashes escaped), all of which must match; built-in fields such as `server_name` or `release` work the same way. An auth token with **org:read** and **project:read** is enough (organization auth tokens for CI cannot read events). EU organizations use `https://de.sentry.io`. Self-hosted Sentry needs `events-timeseries`, which exists from 25.x (checked against the 25.5.1 source: it answers with `timeseries`, intervals in ms, and maps `dataset=spans` to the new span store; all three are handled).
+
+| Signal | Dataset, filter and aggregate | Unit |
+| --- | --- | --- |
+| `sentry_errors` | `errors`, `count()` | events/s |
+| `sentry_error_users` | `errors`, `count_unique(user)` | users per 5 min |
+| `sentry_unhandled` | `errors`, `error.unhandled:true`, `count()` | events/s |
+| `sentry_transactions` | `spans` + `is_transaction:true`, else `transactions`: `count()` | /s |
+| `sentry_transaction_failures` | same dataset, `failure_rate() × count()` | /s |
+| `sentry_duration_p95`, `sentry_duration_p99` | `p95/p99(span.duration)` or `p95/p99(transaction.duration)` (ms → s) | s |
+
+- **Discovery**:
+  - Reading the projects proves the token and slugs; 401/403/404 fail the source as an auth error. A redirect (e.g. a US URL for an EU organization) is reported with the target.
+  - 24-hour probes of each query, over all projects in one request, mark it `unsupported`, with Sentry's message, when it is refused. Transactions are probed in the `spans` dataset first (sentry.io) and then in the classic `transactions` dataset (self-hosted); the first one that is accepted and has transactions is used, and the chosen dataset appears in the capability. Without any transaction in the last 24 h in either, the transaction signals are `unsupported` ("tracing not set up").
+  - History is the age of the oldest project (up to 30 days).
+- **Collection**:
+  - The 28-day grid is fetched per project in chunks of at most seven days (2016 buckets; Sentry allows 10,000 points per request) from the project's creation onwards: 3 queries × 4 chunks per project, so about 12 requests per project per analysis.
+  - A project without any transaction in the fetched window gets no transaction series (it is not traced), while the other projects keep theirs.
+  - Within a fetched chunk, buckets without a value are zero for counts and unknown for durations; durations of buckets without transactions are dropped.
+  - A response with buckets other than 5 minutes is rejected. Failed chunks become `query_failed`/`query_timeout` exclusions and stay unknown. A rate-limited request is retried once after `Retry-After`.
+- **Live verification pending**: no live Sentry organization was available during T017. Request and response shapes follow Sentry's API documentation (see the T017 task file).
+
 ## Budgets and behaviour
 
 | Aspect | Behaviour |

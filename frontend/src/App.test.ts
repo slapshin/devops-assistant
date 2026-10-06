@@ -8,10 +8,12 @@ import jobInterrupted from "../../fixtures/jobs/job_interrupted.json";
 import jobRunning from "../../fixtures/jobs/job_running.json";
 import connectionTest from "../../fixtures/api/connection_test.json";
 import cloudflareTest from "../../fixtures/api/connection_test_cloudflare.json";
+import sentryTest from "../../fixtures/api/connection_test_sentry.json";
 import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
 import cloudflareReport from "../../fixtures/reports/report_cloudflare.json";
+import sentryReport from "../../fixtures/reports/report_sentry.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
@@ -400,6 +402,82 @@ describe("project form", () => {
     expect(put.sources[1]).not.toHaveProperty("api_token");
   });
 
+  it("creates a Sentry project, validates slugs and tests it", async () => {
+    routes["POST /api/projects/test-connection"] = () => json(sentryTest);
+    routes["POST /api/projects"] = () => json({ ...base, project_id: "sentry-id" }, 201);
+    routes["GET /api/projects/sentry-id"] = () => json({ ...base, project_id: "sentry-id" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt("/projects/new");
+    await fireEvent.update(await screen.findByLabelText("Name"), "Shop app");
+    expect(screen.queryByLabelText("Organization")).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByLabelText("Analyse a Sentry project"));
+
+    await fireEvent.update(screen.getByLabelText("Organization"), "acme corp");
+    await fireEvent.update(screen.getByLabelText("Sentry projects"), "shop-web, bad slug!");
+    await fireEvent.update(screen.getByLabelText(/Environment/), "prod/eu");
+    await fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    await fireEvent.update(screen.getByLabelText("Tag key 1"), "bad key");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    expect(screen.getByLabelText("Organization")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Invalid project slugs: slug!")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tag key 1")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Tag value 1")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/Environment/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Auth token")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("The Sentry connection has not been tested.")).toBeInTheDocument();
+
+    await fireEvent.update(screen.getByLabelText("Organization"), "Acme");
+    await fireEvent.update(screen.getByLabelText("Sentry projects"), "Shop-Web shop-api");
+    await fireEvent.update(screen.getByLabelText("Tag key 1"), "team");
+    await fireEvent.update(screen.getByLabelText("Tag value 1"), "shop");
+    await fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    await fireEvent.update(screen.getByLabelText(/Environment/), "production");
+    await fireEvent.update(screen.getByLabelText("Auth token"), "sntrys-token");
+    await fireEvent.click(screen.getByRole("button", { name: "Test Sentry connection" }));
+    const result = await screen.findByRole("region", { name: "Connection test result" });
+    expect(result).toHaveTextContent("Reachable · 1,284,310 events in 24 h · 30 days of history");
+    expect(within(result).getByRole("row", { name: /Transactions \(Sentry\).*Supported/ })).toBeInTheDocument();
+    const source = {
+      kind: "sentry",
+      organization: "acme",
+      projects: ["shop-api", "shop-web"],
+      tags: [{ key: "team", value: "shop" }],
+      environment: "production",
+      api_url: "https://sentry.io",
+      tls_verify: true,
+      auth_token: "sntrys-token",
+    };
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/sentry-id"));
+    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/projects")?.body ?? "{}");
+    expect(sent.sources).toEqual([source]);
+  });
+
+  it("edits a self-hosted Sentry and keeps its stored token", async () => {
+    const url = "https://sentry.internal:9000/sentry";
+    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false, token_set: true };
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, sentry] } as Summary);
+    routes[`PUT /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, sentry] });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    await renderAt(`/projects/${PID}/edit`);
+    expect(await screen.findByLabelText("Auth token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    expect(screen.getByLabelText("Sentry projects")).toHaveValue("shop-web");
+    expect(screen.getByLabelText("Tag value 1")).toHaveValue("shop");
+    expect(screen.getByLabelText("Sentry URL")).toBeVisible();
+    expect(screen.getByLabelText("Sentry URL")).toHaveValue(url);
+    const sentryGroup = screen.getByRole("group", { name: "Sentry" });
+    expect(within(sentryGroup).getByLabelText("Verify TLS certificates")).not.toBeChecked();
+    expect(within(sentryGroup).getByText(/self-signed or internal certificate/)).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
+    const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
+    expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "sentry"]);
+    expect(put.sources[1]).toEqual({ kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false });
+  });
+
   it("deletes only after the name is typed and never while an analysis runs", async () => {
     let current: Summary = { ...base, report_count: 3, active_analysis: running };
     routes[`GET /api/projects/${PID}`] = () => json(current);
@@ -582,6 +660,13 @@ describe("report", () => {
     expect(await screen.findByText("Cloudflare")).toBeInTheDocument();
     expect(screen.getByText("Synthetic data")).toBeInTheDocument();
     expect((await screen.findAllByText(/Origin error rate \(520-530\)/)).length).toBeGreaterThan(0);
+  });
+
+  it("renders a Sentry report with its source and application findings", async () => {
+    await renderAt(`${report(sentryReport)}/findings`);
+    expect((await screen.findAllByText("Sentry")).length).toBeGreaterThan(0);
+    const link = await screen.findByRole("link", { name: /Error spike/ });
+    expect(link.closest("tr")).toHaveTextContent("Sentry");
   });
 
   it("findings show the source each one came from", async () => {

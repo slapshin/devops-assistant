@@ -9,7 +9,7 @@ import SourceHealth from "../../components/projects/SourceHealth.vue";
 import SourceIcon from "../../components/projects/SourceIcon.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import { formatTime, utcTooltip } from "../../lib/format";
-import { cloudflareSource, prometheusSource, scheduleSummary, sourceHost } from "../../lib/projects";
+import { cloudflareSource, prometheusSource, scheduleSummary, sentrySource, sourceHost } from "../../lib/projects";
 
 const HISTORY_PAGE_SIZE = 20;
 const AUTH_LABELS: Record<string, string> = { none: "No authentication", bearer: "Bearer token", basic: "Basic auth" };
@@ -22,6 +22,7 @@ const history = useAnalyses(() => props.projectId, HISTORY_PAGE_SIZE);
 const notFound = computed(() => project.error.value instanceof ApiError && project.error.value.problem.status === 404);
 const prometheus = computed(() => prometheusSource(project.data.value));
 const cloudflare = computed(() => cloudflareSource(project.data.value));
+const sentry = computed(() => sentrySource(project.data.value));
 const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ?? []);
 </script>
 
@@ -61,6 +62,21 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
             zone <span class="mono">{{ cloudflare.zone_id }}</span>
             · {{ cloudflare.hostnames.length ? cloudflare.hostnames.join(", ") : "all hostnames" }}
             <template v-if="cloudflare.api_url.startsWith('synthetic:')"> · <span class="mono">{{ sourceHost(cloudflare.api_url) }}</span></template>
+          </dd>
+          <dd v-else class="muted">Not configured</dd>
+          <dt class="source-kind"><SourceIcon kind="sentry" />Sentry</dt>
+          <dd v-if="sentry">
+            <SourceHealth :project="project.data.value" kind="sentry" />
+            <span class="mono">{{ sentry.organization }}: {{ sentry.projects.join(", ") }}</span>
+            · {{ sentry.environment ?? "all environments" }}
+            <template v-if="sentry.api_url !== 'https://sentry.io'"> · <span class="mono">{{ sourceHost(sentry.api_url) }}</span></template>
+            <template v-if="sentry.tls_verify === false"> · TLS not verified</template>
+            <MatcherChips
+              v-if="sentry.tags?.length"
+              class="chips"
+              label="Sentry tag filters"
+              :matchers="sentry.tags.map((t) => ({ name: t.key, value: t.value }))"
+            />
           </dd>
           <dd v-else class="muted">Not configured</dd>
         </div>

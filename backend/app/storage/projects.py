@@ -27,6 +27,10 @@ from app.domain.projects import (
     PrometheusConnection,
     PrometheusSource,
     PrometheusSourceInput,
+    SentryConnection,
+    SentrySource,
+    SentrySourceInput,
+    SentryTag,
     SourceConnection,
     SourceInput,
     synthetic_url,
@@ -201,6 +205,8 @@ class SqliteProjectRepository:
                 return self._split_prometheus(source, stored)
             case CloudflareSourceInput():
                 return self._split_cloudflare(source, stored)
+            case SentrySourceInput():
+                return self._split_sentry(source, stored)
 
     def _split_prometheus(
         self, source: PrometheusSourceInput, stored: Any
@@ -245,6 +251,25 @@ class SqliteProjectRepository:
         if synthetic_url(source.api_url):
             return config, {}
         raise SecretRequired("api_token")
+
+    def _split_sentry(
+        self, source: SentrySourceInput, stored: Any
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        config: dict[str, Any] = {
+            "organization": source.organization,
+            "projects": source.projects,
+            "environment": source.environment,
+            "tags": [t.model_dump() for t in source.tags],
+            "tls_verify": source.tls_verify,
+            "api_url": source.api_url,
+        }
+        if source.auth_token is not None:
+            return config, {"auth_token": source.auth_token.get_secret_value()}
+        if stored is not None and stored.secrets is not None:
+            return config, self.box.decrypt(stored.secrets)
+        if synthetic_url(source.api_url):
+            return config, {}
+        raise SecretRequired("auth_token")
 
     def _write_sources(
         self,
@@ -421,8 +446,18 @@ def _schedule(raw: str | None) -> ReportSchedule | None:
     return ReportSchedule.model_validate_json(raw) if raw else None
 
 
-def _source_view(row: Any) -> PrometheusSource | CloudflareSource:
+def _source_view(row: Any) -> PrometheusSource | CloudflareSource | SentrySource:
     config = json.loads(row.config)
+    if SourceKind(row.kind) is SourceKind.SENTRY:
+        return SentrySource(
+            organization=config["organization"],
+            projects=_sentry_projects(config),
+            environment=config.get("environment"),
+            tags=[SentryTag(**t) for t in config.get("tags", [])],
+            api_url=config["api_url"],
+            tls_verify=config.get("tls_verify", True),
+            token_set=row.secrets is not None,
+        )
     if SourceKind(row.kind) is SourceKind.CLOUDFLARE:
         return CloudflareSource(
             zone_id=config["zone_id"],
@@ -455,6 +490,22 @@ def _any_connection(
                 api_url=config["api_url"],
                 api_token=SecretStr(token) if token else None,
             )
+        case SourceKind.SENTRY:
+            auth_token = secrets.get("auth_token")
+            return SentryConnection(
+                organization=config["organization"],
+                projects=_sentry_projects(config),
+                environment=config.get("environment"),
+                tags=[SentryTag(**t) for t in config.get("tags", [])],
+                api_url=config["api_url"],
+                tls_verify=config.get("tls_verify", True),
+                auth_token=SecretStr(auth_token) if auth_token else None,
+            )
+
+
+def _sentry_projects(config: dict[str, Any]) -> list[str]:
+    """Project slugs; sources saved before multi-project support stored one ``project``."""
+    return list(config.get("projects") or [config["project"]])
 
 
 def _connection(config: dict[str, Any], secrets: dict[str, str]) -> PrometheusConnection:
