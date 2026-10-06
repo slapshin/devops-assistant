@@ -38,7 +38,7 @@ const WORK_DAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
 const DEFAULT_SCHEDULE_TIME = "08:00";
 /** Mirrors MAX_KEEP_REPORTS in backend/app/domain/projects.py. */
 export const MAX_KEEP_REPORTS = 1000;
-const DEFAULT_KEEP_REPORTS = 30;
+const DEFAULT_KEEP_REPORTS = 10;
 
 /** The viewer's IANA zone, so "08:00" means their morning by default. */
 export function browserTimezone(): string {

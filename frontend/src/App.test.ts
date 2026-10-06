@@ -214,7 +214,7 @@ describe("project form", () => {
     routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
     const router = await renderAt(`/projects/${PID}/edit`);
     await fireEvent.click(await screen.findByLabelText("Keep only the latest reports"));
-    expect(screen.getByLabelText("Reports to keep")).toHaveValue(30);
+    expect(screen.getByLabelText("Reports to keep")).toHaveValue(10);
 
     await fireEvent.update(screen.getByLabelText("Reports to keep"), "0");
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
