@@ -10,7 +10,9 @@ from app.sources.prometheus.catalog.base import (
     sum_rate,
 )
 
-HTTP = ("job", "http_route", "http_request_method")
+# `server_address` (the served host) is opt-in in the semantic conventions, so it is optional.
+HTTP = ("job", "http_route", "http_request_method", "server_address")
+HTTP_OPTIONAL = ("server_address",)
 RPC = ("job", "rpc_method")
 
 HTTP_TRAFFIC = "http_requests"
@@ -32,6 +34,7 @@ def _http_status(signal: str, family: SignalFamily, matcher: str, role: Role) ->
         HTTP,
         q(sum_rate(_HTTP_COUNT, HTTP, matcher), _HTTP_COUNT),
         role=role,
+        optional_labels=HTTP_OPTIONAL,
         traffic=HTTP_TRAFFIC,
     )
 
@@ -46,6 +49,7 @@ REQUEST_CATALOG: tuple[SignalDef, ...] = (
         HTTP,
         q(sum_rate(_HTTP_COUNT, HTTP), _HTTP_COUNT),
         direction=Direction.BOTH,
+        optional_labels=HTTP_OPTIONAL,
         traffic=HTTP_TRAFFIC,
     ),
     _http_status(
@@ -57,7 +61,9 @@ REQUEST_CATALOG: tuple[SignalDef, ...] = (
     _http_status(
         "http_404", SignalFamily.CLIENT_ERRORS, 'http_response_status_code="404"', Role.SIGNAL
     ),
-    *latency_quantiles("http", EntityKind.ROUTE, HTTP, _HTTP_BUCKET, HTTP_TRAFFIC),
+    *latency_quantiles(
+        "http", EntityKind.ROUTE, HTTP, _HTTP_BUCKET, HTTP_TRAFFIC, optional=HTTP_OPTIONAL
+    ),
     SignalDef(
         "http_latency_mean",
         SignalFamily.LATENCY,
@@ -69,6 +75,7 @@ REQUEST_CATALOG: tuple[SignalDef, ...] = (
             _HTTP_SUM,
             _HTTP_COUNT,
         ),
+        optional_labels=HTTP_OPTIONAL,
         traffic=HTTP_TRAFFIC,
         description="Mean latency; used only when histogram buckets are absent.",
     ),

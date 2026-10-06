@@ -3,11 +3,13 @@
 from app.domain.common import EntityKind, SignalFamily, Unit
 from app.sources.prometheus.catalog.base import (
     Direction,
+    RateQuery,
     Role,
     SignalDef,
     aggregate,
     latency_quantiles,
     q,
+    rate,
     sel,
     sum_rate,
 )
@@ -15,15 +17,18 @@ from app.sources.prometheus.catalog.base import (
 # nginx: nginx-prometheus-exporter over stub_status (no status codes, no latency).
 # Angie: the built-in prometheus module with the stock prometheus_all.conf template.
 # Caddy: the built-in metrics endpoint; request counts come from the duration histogram, which
-#   is the only request metric carrying `code`.
-# Traefik: the built-in Prometheus exporter with service labels (the default).
+#   is the only request metric carrying `code`. `host` is set with `metrics { per_host }`.
+# Traefik: the built-in Prometheus exporter with service labels (the default). Where router labels
+#   are enabled too (`addRoutersLabels`), a service's router series replace its service series:
+#   routers are Traefik's analog of virtual hosts. Services without router series stay as-is.
+# Host-like labels an exporter may not emit are optional: absent, they are empty and unnamed.
 NGINX = ("job", "instance")
 ANGIE = ("job", "instance")
 ANGIE_ZONE = ("job", "zone")
 ANGIE_PEER = ("job", "upstream", "peer")
-CADDY = ("job", "server", "handler")
+CADDY = ("job", "host", "server", "handler")
 CADDY_UPSTREAM = ("job", "upstream")
-TRAEFIK = ("job", "service")
+TRAEFIK = ("job", "router", "service")
 TRAEFIK_ENTRYPOINT = ("job", "entrypoint")
 TRAEFIK_SERVER = ("job", "service", "url")
 
@@ -38,14 +43,39 @@ _CADDY_COUNT = "caddy_http_request_duration_seconds_count"
 _CADDY_BUCKET = "caddy_http_request_duration_seconds_bucket"
 _TRAEFIK_COUNT = "traefik_service_requests_total"
 _TRAEFIK_BUCKET = "traefik_service_request_duration_seconds_bucket"
+_TRAEFIK_ROUTER_COUNT = "traefik_router_requests_total"
+_TRAEFIK_ROUTER_BUCKET = "traefik_router_request_duration_seconds_bucket"
+_TRAEFIK_ROUTER_METRIC = {
+    _TRAEFIK_COUNT: _TRAEFIK_ROUTER_COUNT,
+    _TRAEFIK_BUCKET: _TRAEFIK_ROUTER_BUCKET,
+}
 
 # Angie peer states (prometheus_all.conf): 3 = unavailable (max_fails reached), 5 = unhealthy
 # (failed active health check). down (2) is configured by the operator, so it is not a failure.
 _ANGIE_PEER_FAILED_STATES = (3, 5)
 
 
+def _traefik_sum_rate(metric: str, by: tuple[str, ...], *matchers: str) -> str:
+    """Router series for services that have any, service series for the rest.
+
+    Presence is tested on the unfiltered router counter, so a service never mixes router and
+    service series when only some of its status codes have samples in a window.
+    """
+    routers = sum_rate(_TRAEFIK_ROUTER_METRIC[metric], by, *matchers)
+    services = sum_rate(metric, tuple(k for k in by if k != "router"), *matchers)
+    return f"({routers}) or ({services} unless on (job, service) {rate(_TRAEFIK_ROUTER_COUNT)})"
+
+
 def _proxy_request_signals(
-    prefix: str, traffic: str, identity: tuple[str, ...], total: str, responses: str
+    prefix: str,
+    traffic: str,
+    identity: tuple[str, ...],
+    total: str,
+    responses: str,
+    *,
+    optional: tuple[str, ...] = (),
+    by_entity: RateQuery = sum_rate,
+    extra_metrics: tuple[str, ...] = (),
 ) -> tuple[SignalDef, ...]:
     """Request rate plus 5xx/4xx/404 operands for one proxy, all on the same identity."""
 
@@ -56,7 +86,9 @@ def _proxy_request_signals(
             Unit.REQUESTS_PER_SECOND,
             EntityKind.PROXY,
             identity,
-            q(sum_rate(responses, identity, matcher), responses),
+            q(by_entity(responses, identity, matcher), responses, *extra_metrics),
+            required_metrics=(responses,),
+            optional_labels=optional,
             role=role,
             traffic=traffic,
         )
@@ -68,7 +100,9 @@ def _proxy_request_signals(
             Unit.REQUESTS_PER_SECOND,
             EntityKind.PROXY,
             identity,
-            q(sum_rate(total, identity), total),
+            q(by_entity(total, identity), total, *extra_metrics),
+            required_metrics=(total,),
+            optional_labels=optional,
             direction=Direction.BOTH,
             traffic=traffic,
         ),
@@ -157,8 +191,12 @@ PROXY_CATALOG: tuple[SignalDef, ...] = (
         description="1 while the peer is unavailable or unhealthy.",
     ),
     # --- Caddy ----------------------------------------------------------------------------
-    *_proxy_request_signals("caddy", CADDY_TRAFFIC, CADDY, _CADDY_COUNT, _CADDY_COUNT),
-    *latency_quantiles("caddy", EntityKind.PROXY, CADDY, _CADDY_BUCKET, CADDY_TRAFFIC),
+    *_proxy_request_signals(
+        "caddy", CADDY_TRAFFIC, CADDY, _CADDY_COUNT, _CADDY_COUNT, optional=("host",)
+    ),
+    *latency_quantiles(
+        "caddy", EntityKind.PROXY, CADDY, _CADDY_BUCKET, CADDY_TRAFFIC, optional=("host",)
+    ),
     SignalDef(
         "caddy_upstream_unhealthy",
         SignalFamily.PROXY,
@@ -172,8 +210,26 @@ PROXY_CATALOG: tuple[SignalDef, ...] = (
         description="1 while any Caddy instance reports the upstream unhealthy.",
     ),
     # --- Traefik --------------------------------------------------------------------------
-    *_proxy_request_signals("traefik", TRAEFIK_TRAFFIC, TRAEFIK, _TRAEFIK_COUNT, _TRAEFIK_COUNT),
-    *latency_quantiles("traefik", EntityKind.PROXY, TRAEFIK, _TRAEFIK_BUCKET, TRAEFIK_TRAFFIC),
+    *_proxy_request_signals(
+        "traefik",
+        TRAEFIK_TRAFFIC,
+        TRAEFIK,
+        _TRAEFIK_COUNT,
+        _TRAEFIK_COUNT,
+        optional=("router",),
+        by_entity=_traefik_sum_rate,
+        extra_metrics=(_TRAEFIK_ROUTER_COUNT,),
+    ),
+    *latency_quantiles(
+        "traefik",
+        EntityKind.PROXY,
+        TRAEFIK,
+        _TRAEFIK_BUCKET,
+        TRAEFIK_TRAFFIC,
+        optional=("router",),
+        by_entity=_traefik_sum_rate,
+        extra_metrics=(_TRAEFIK_ROUTER_BUCKET, _TRAEFIK_ROUTER_COUNT),
+    ),
     _active_connections("traefik", "traefik_open_connections", TRAEFIK_ENTRYPOINT),
     SignalDef(
         "traefik_server_down",

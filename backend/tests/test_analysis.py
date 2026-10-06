@@ -323,7 +323,11 @@ async def test_proxy_upstream_outage_relates_to_proxy_server_errors() -> None:
     (err,) = by_signal(result, "server_error_ratio")
     assert down.family is SignalFamily.PROXY and down.entity.kind is EntityKind.UPSTREAM
     assert err.entity.kind is EntityKind.PROXY
-    assert err.entity.labels == {"job": "traefik", "service": "checkout-api@swarm"}
+    assert err.entity.labels == {
+        "job": "traefik",
+        "router": "checkout@swarm",
+        "service": "checkout-api@swarm",
+    }
     assert err.finding_id in down.related_finding_ids  # same proxy job, overlapping
     assert "host" not in err.attributes  # no verified proxy -> host mapping
     coverage = {c.family: c.status for c in result.coverage}

@@ -1,10 +1,14 @@
 """Signal definition model and PromQL template builders shared by the catalog modules."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.common import EntityKind, SignalFamily, Unit
 from app.sources.prometheus.promql import QueryTemplate
+
+RateQuery = Callable[..., str]
+"""``(metric, by, *matchers) -> PromQL``: per-entity rate sum, like `sum_rate`."""
 
 
 class Direction(StrEnum):
@@ -38,6 +42,8 @@ class SignalDef:
     query: QueryTemplate
     required_metrics: tuple[str, ...] = ()
     """Metrics that must be present for the signal to be supported; defaults to the query's."""
+    optional_labels: tuple[str, ...] = ()
+    """Identity labels some exporters omit (e.g. a host); absent, they are left empty."""
     direction: Direction = Direction.UP
     role: Role = Role.SIGNAL
     gates: tuple[Gate, ...] = ()
@@ -52,6 +58,10 @@ class SignalDef:
     @property
     def route_level(self) -> bool:
         return self.traffic is not None
+
+    @property
+    def required_labels(self) -> tuple[str, ...]:
+        return tuple(k for k in self.identity if k not in self.optional_labels)
 
 
 # --- template builders ---------------------------------------------------------------------
@@ -88,8 +98,12 @@ def used_ratio(free: str, total: str, by: tuple[str, ...], *matchers: str) -> st
     return f"1 - {free_by} / {total_by}"
 
 
-def quantile(phi: float, bucket: str, by: tuple[str, ...]) -> str:
-    return f"histogram_quantile({phi}, {aggregate('sum', (*by, 'le'), rate(bucket))})"
+def quantile(
+    phi: float, bucket: str, by: tuple[str, ...], by_entity: RateQuery | None = None
+) -> str:
+    """``by_entity(metric, by)`` replaces the plain per-entity rate sum of the buckets."""
+    buckets = (by_entity or sum_rate)(bucket, (*by, "le"))
+    return f"histogram_quantile({phi}, {buckets})"
 
 
 def bucket_gate(bucket: str) -> Gate:
@@ -106,6 +120,10 @@ def latency_quantiles(
     bucket: str,
     traffic: str,
     phis: tuple[float, ...] = (0.95, 0.99),
+    *,
+    optional: tuple[str, ...] = (),
+    by_entity: RateQuery | None = None,
+    extra_metrics: tuple[str, ...] = (),
 ) -> tuple[SignalDef, ...]:
     gate = bucket_gate(bucket)
     return tuple(
@@ -115,7 +133,9 @@ def latency_quantiles(
             Unit.SECONDS,
             kind,
             identity,
-            q(quantile(phi, bucket, identity), bucket),
+            q(quantile(phi, bucket, identity, by_entity), bucket, *extra_metrics),
+            required_metrics=(bucket,),
+            optional_labels=optional,
             gates=(gate,),
             traffic=traffic,
         )

@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.5` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
+The catalog is `catalog-2026.10.6` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
 
 ## Scope enforcement
 
@@ -24,6 +24,7 @@ String literals are masked before the check, so label values cannot fake a selec
   Both are proxies. They show task replacement and shortfall, not in-place process restarts.
 - **Container identity:** the Swarm task name `<service>.<slot|node>.<25-char task id>` is reduced to `<service>.<slot|node>` with `label_replace`, so an identity survives task replacement. Unnamed cgroups (`name=""`, e.g. `/` and system slices) are excluded to avoid duplicating host totals.
 - **Route cardinality:** routes are ranked per service by volume over the last 14 days. The top 20 are kept individually. Rate signals for the rest are summed into `(other routes)`, and quantiles for those routes are dropped (quantiles cannot be summed).
+- **Host labels:** where an exporter can name the served host or a close analog, the label is part of the identity: OTel `server_address`, Caddy `host`, Traefik `router`. These labels are optional. They are not required for support, and when absent they are left out of the entity, so its key and name are unchanged. A route name with a host reads `job · GET /orders @ shop.example.com`.
 
 ## Exclusion rules
 
@@ -65,14 +66,16 @@ All proxy series are kind `proxy` (or `upstream` for backend servers) and carry 
 | --- | --- | --- | --- | --- |
 | nginx | nginx-prometheus-exporter (stub_status) | `job, instance` | `nginx_requests`, `nginx_connections_active`, `nginx_connections_dropped` (accepted − handled), `nginx_down` (`1 − nginx_up`) | — |
 | Angie | built-in `prometheus` module, stock `prometheus_all.conf` | server zone `job, zone`; process `job, instance`; peer `job, upstream, peer` | `angie_requests`, `angie_5xx`, `angie_4xx`, `angie_404` (from `angie_http_server_zones_responses{code}`), `angie_connections_active`, `angie_connections_dropped`, `angie_peer_unavailable` (state 3 unavailable or 5 unhealthy) | — |
-| Caddy | built-in metrics | `job, server, handler`; upstream `job, upstream` | `caddy_requests`, `caddy_5xx`, `caddy_4xx`, `caddy_404` (all from `caddy_http_request_duration_seconds_count{code}`), `caddy_latency_p95/p99`, `caddy_upstream_unhealthy` | buckets present |
-| Traefik | built-in Prometheus exporter (service labels, the default) | service `job, service`; entrypoint `job, entrypoint`; server `job, service, url` | `traefik_requests`, `traefik_5xx`, `traefik_4xx`, `traefik_404`, `traefik_latency_p95/p99`, `traefik_connections_active` (`traefik_open_connections`), `traefik_server_down` | buckets present |
+| Caddy | built-in metrics | `job, host, server, handler` (`host` only with `metrics { per_host }`); upstream `job, upstream` | `caddy_requests`, `caddy_5xx`, `caddy_4xx`, `caddy_404` (all from `caddy_http_request_duration_seconds_count{code}`), `caddy_latency_p95/p99`, `caddy_upstream_unhealthy` | buckets present |
+| Traefik | built-in Prometheus exporter (service labels, the default; router labels with `addRoutersLabels`) | `job, router, service` (`router` only from router metrics); entrypoint `job, entrypoint`; server `job, service, url` | `traefik_requests`, `traefik_5xx`, `traefik_4xx`, `traefik_404`, `traefik_latency_p95/p99`, `traefik_connections_active` (`traefik_open_connections`), `traefik_server_down` | buckets present |
 
 Notes and limitations:
 
 - nginx stub_status exposes no status codes or latency, so nginx yields no failure ratio or latency signal. NGINX Plus (`nginxplus_*`) and the VTS module are not covered.
 - Angie latency is exported only as peer response-time averages, not histograms, so no Angie latency signal is collected (latency requires buckets). Angie `down` (state 2) is operator-configured and is not counted as unavailable.
 - Caddy counts each handler in a chain, so the `handler` label is part of the identity rather than summed.
+- Traefik has no host label on its histograms. Routers are the closest analog because each one usually matches one `Host()` rule. A service that has router series (`traefik_router_*`) is analysed per router; services without router series fall back to `traefik_service_*`. Presence is tested per service on the unfiltered router counter, so one service never mixes the two. A `headerLabels` host label (via `X-Forwarded-Host`, since Go drops `Host` from the header map) reaches only `requests_total`, not the histograms, so it is not used.
+- Angie's server zone (`status_zone`) is already the virtual-host analog. nginx stub_status has no per-host data.
 - Caddy and Traefik upstream/server state uses `min` across proxy instances: one instance seeing a backend down is enough.
 - The "≥ 10 s" top-bucket annotation assumes the OTel bucket layout. Traefik's default top bucket is 5 s, so a Traefik p95 at 5 s is also only a lower bound.
 

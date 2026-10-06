@@ -59,7 +59,12 @@ def scope_labels(scope: Scope) -> dict[str, str]:
 
 
 def entity_for(defn: SignalDef, labels: dict[str, str]) -> Entity:
-    ident = {k: labels.get(k, "") for k in defn.identity}
+    # Absent optional labels are left out, so entities without them keep their key and labels.
+    ident = {
+        k: labels.get(k, "")
+        for k in defn.identity
+        if k not in defn.optional_labels or labels.get(k)
+    }
     key = f"{defn.entity_kind.value}|" + "|".join(f"{k}={v}" for k, v in ident.items())
     match defn.entity_kind:
         case EntityKind.NODE:
@@ -73,13 +78,16 @@ def entity_for(defn: SignalDef, labels: dict[str, str]) -> Entity:
         case EntityKind.SERVICE:
             name = ident["service_name"]
         case EntityKind.PROXY | EntityKind.DATABASE:
-            name = " · ".join(v for v in ident.values() if v)
+            # Traefik routers and services are often named alike; show each value once.
+            name = " · ".join(dict.fromkeys(v for v in ident.values() if v))
         case EntityKind.UPSTREAM:
             name = f"{ident['job']} · " + " → ".join(v for k, v in ident.items() if k != "job")
         case EntityKind.ROUTE if "rpc_method" in ident:
             name = f"{ident['job']} · {ident['rpc_method']}"
         case _:
             name = f"{ident['job']} · {ident['http_request_method']} {ident['http_route']}".strip()
+            if host := ident.get("server_address"):
+                name += f" @ {host}"
     return Entity(kind=defn.entity_kind, key=key, display_name=name, labels=ident)
 
 
@@ -152,7 +160,7 @@ class PrometheusMetricsSource:
             "signal": defn.signal,
             "verified": True,
             "required_metrics": list(defn.required_metrics),
-            "required_labels": [*scope.label_names, *defn.identity],
+            "required_labels": [*scope.label_names, *defn.required_labels],
         }
         if missing:
             return MetricCapability(
@@ -369,6 +377,7 @@ class PrometheusMetricsSource:
     ) -> list[tuple[dict[str, str], list[float | None]]]:
         """Keep the top routes per service by 14-day volume; sum the rest (rates only)."""
         route_labels = defn.identity[1:]
+        rollup_label = defn.required_labels[1]
         traffic = defn.traffic or defn.signal
         # The traffic signal is collected first, so it decides the routes for its operands.
         if defn.signal == traffic:
@@ -390,10 +399,9 @@ class PrometheusMetricsSource:
                         acc[i] = (acc[i] or 0.0) + v
 
         for job, values in sorted(other.items()):
-            labels = {
-                "job": job,
-                **{k: OTHER_ROUTES if k != "http_request_method" else "" for k in route_labels},
-            }
+            # The first required route label names the rollup; the rest (method, host, ...) are
+            # empty, and empty optional labels are dropped from the entity.
+            labels = {"job": job, **{k: "" for k in route_labels}, rollup_label: OTHER_ROUTES}
             kept.append((labels, values))
         return kept
 

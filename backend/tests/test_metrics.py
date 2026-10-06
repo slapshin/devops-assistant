@@ -266,7 +266,51 @@ def test_proxy_entity_names() -> None:
         BY_SIGNAL["caddy_requests"], {"job": "caddy", "server": "srv0", "handler": "reverse_proxy"}
     )
     assert caddy.display_name == "caddy · srv0 · reverse_proxy"
+    assert "host" not in caddy.labels  # absent optional label: unchanged key and labels
     assert caddy.key != entity_for(BY_SIGNAL["traefik_requests"], {"job": "caddy"}).key
+    per_host = entity_for(
+        BY_SIGNAL["caddy_requests"],
+        {"job": "caddy", "host": "shop.example.com", "server": "srv0", "handler": "rp"},
+    )
+    assert per_host.display_name == "caddy · shop.example.com · srv0 · rp"
+    assert per_host.key != caddy.key
+    router = entity_for(
+        BY_SIGNAL["traefik_5xx"],
+        {"job": "traefik", "router": "shop@docker", "service": "shop@docker"},
+    )
+    assert router.display_name == "traefik · shop@docker"  # same name shown once
+    assert router.labels["router"] == "shop@docker"
+
+
+def test_http_route_names_show_the_served_host() -> None:
+    labels = {"job": "api", "http_route": "/orders", "http_request_method": "GET"}
+    plain = entity_for(BY_SIGNAL["http_requests"], labels)
+    assert plain.display_name == "api · GET /orders"
+    assert "server_address" not in plain.labels
+    hosted = entity_for(BY_SIGNAL["http_requests"], {**labels, "server_address": "shop.example"})
+    assert hosted.display_name == "api · GET /orders @ shop.example"
+
+
+def test_optional_host_labels_are_not_required() -> None:
+    for signal, label in (
+        ("caddy_requests", "host"),
+        ("caddy_latency_p95", "host"),
+        ("traefik_requests", "router"),
+        ("traefik_latency_p99", "router"),
+        ("http_requests", "server_address"),
+    ):
+        defn = BY_SIGNAL[signal]
+        assert label in defn.identity and label not in defn.required_labels, signal
+
+
+def test_traefik_prefers_router_series_per_service() -> None:
+    for signal in ("traefik_requests", "traefik_5xx", "traefik_latency_p95"):
+        defn = BY_SIGNAL[signal]
+        query = defn.query.render(SCOPE)
+        assert "traefik_router_" in query and "traefik_service_" in query, signal
+        # Presence is tested on the unfiltered router counter, never on the status-filtered one.
+        assert "unless on (job, service) rate(traefik_router_requests_total{" in query
+        assert all(m.startswith("traefik_service_") for m in defn.required_metrics), signal
 
 
 def test_histogram_quantiles_keep_le_and_are_gated() -> None:
@@ -505,6 +549,34 @@ async def test_proxy_services_are_ranked_by_their_own_traffic() -> None:
     )
     assert other.values[-1] == 0 + 1 + 2
     assert other.entity.display_name == "traefik · (other routes)"
+
+
+async def test_traefik_router_series_are_ranked_and_rolled_up() -> None:
+    t0 = int(T.timestamp()) - 28 * 86400 + STEP_SECONDS
+    routers = matrix(
+        *[
+            (
+                {"job": "traefik", "router": f"r{i}@docker", "service": "shop@docker"},
+                [(t0, str(i)), (int(T.timestamp()), str(i))],
+            )
+            for i in range(4)
+        ]
+    )
+    handler = present_handler(
+        NODE_ONLY | {"traefik_service_requests_total"},
+        {"traefik_router_requests_total": routers},
+    )
+    source = PrometheusMetricsSource(
+        FakeProm(handler).client(), CollectionBudget(top_routes_per_service=2), now=lambda: T
+    )
+    caps = await source.capabilities(SCOPE, WINDOWS)
+    result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+    names = sorted(s.entity.display_name for s in result.series if s.signal == "traefik_requests")
+    assert names == [
+        "traefik · (other routes)",
+        "traefik · r2@docker · shop@docker",
+        "traefik · r3@docker · shop@docker",
+    ]
 
 
 async def test_failing_signal_becomes_exclusion_not_crash() -> None:

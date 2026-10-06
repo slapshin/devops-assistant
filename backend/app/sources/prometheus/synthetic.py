@@ -46,8 +46,8 @@ TASK_ROUTE = {
     "http_request_method": "GET",
 }
 PROXY_JOB = "traefik"
-PROXY_SERVICE = {"job": PROXY_JOB, "service": "checkout-api@swarm"}
-PROXY_SERVER = {**PROXY_SERVICE, "url": "http://10.0.1.7:8080"}
+PROXY_SERVICE = {"job": PROXY_JOB, "router": "checkout@swarm", "service": "checkout-api@swarm"}
+PROXY_SERVER = {"job": PROXY_JOB, "service": "checkout-api@swarm", "url": "http://10.0.1.7:8080"}
 PG_SERVER = {"job": "postgres", "instance": "pg-primary:9187"}
 PG_DATABASE = {**PG_SERVER, "datname": "checkout"}
 MYSQL_PRIMARY = {"job": "mysql", "instance": "mysql-primary:9104"}
