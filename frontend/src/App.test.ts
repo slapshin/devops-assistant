@@ -670,6 +670,16 @@ describe("report", () => {
     expect(link.closest("tr")).toHaveTextContent("Prometheus");
   });
 
+  it("findings filter by source through the URL", async () => {
+    const router = await renderAt(`${report(anomalies)}/findings`);
+    await screen.findByRole("heading", { name: "Findings" });
+    const select = screen.getByLabelText("Source");
+    expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["All", "Prometheus"]);
+    await fireEvent.update(select, "prometheus");
+    await waitFor(() => expect(router.currentRoute.value.query.source).toBe("prometheus"));
+    expect(screen.getByRole("link", { name: /404 increase/ })).toBeInTheDocument();
+  });
+
   it("explains unavailable and incompatible reports", async () => {
     routes["GET /api/analyses/gone/report"] = () => problem(404, "report_unavailable", "No report", "Analysis cancelled.");
     await renderAt("/reports/gone");

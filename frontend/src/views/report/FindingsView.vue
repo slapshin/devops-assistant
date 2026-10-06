@@ -26,10 +26,13 @@ const category = computed(() => (route.query.category as string) || "");
 const severity = computed(() => (route.query.severity as string) || "");
 const entity = computed(() => (route.query.entity as string) || "");
 const recurrence = computed(() => (route.query.recurrence as string) || "");
+const source = computed(() => (route.query.source as string) || "");
 
 const families = computed(() => [...new Set(report.value.findings.map((f) => f.family))]);
 const filtered = computed(() => report.value.findings.filter(matchesFilters));
 const sourceOf = computed(() => sourceByFamily(report.value.capabilities));
+/** Only sources that produced findings, so every option narrows to something. */
+const sources = computed(() => [...new Set(report.value.findings.flatMap((f) => sourceOf.value.get(f.family) ?? []))]);
 const selected = computed(() => (props.findingId ? findingById.value.get(props.findingId) ?? null : null));
 const listLink = computed(() => ({ path: `/reports/${props.id}/findings`, query: route.query }));
 const recurrenceOptions = computed(() => {
@@ -53,6 +56,7 @@ function matchesFilters(f: Finding): boolean {
   return (
     (!category.value || f.family === category.value) &&
     (!severity.value || f.severity === severity.value) &&
+    (!source.value || sourceOf.value.get(f.family) === source.value) &&
     (!recurrence.value || (recurrence.value === "new") === (f.recurrence === "new")) &&
     (!entity.value || f.entity.display_name.toLowerCase().includes(entity.value.toLowerCase()))
   );
@@ -128,6 +132,13 @@ watch(
           </button>
         </div>
         <span class="grow" />
+        <div class="var">
+          <label for="f-source">Source</label>
+          <select id="f-source" :value="source" @change="setFilter('source', ($event.target as HTMLSelectElement).value)">
+            <option value="">All</option>
+            <option v-for="k in sources" :key="k" :value="k">{{ sourceKindLabel(k) }}</option>
+          </select>
+        </div>
         <div class="var">
           <label for="f-category">Category</label>
           <select id="f-category" :value="category" @change="setFilter('category', ($event.target as HTMLSelectElement).value)">
