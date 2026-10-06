@@ -22,6 +22,7 @@ export type Evidence = Schemas["Evidence"];
 export type DailyTrend = Schemas["DailyTrend"];
 export type EpisodeSummary = Schemas["EpisodeSummary"];
 export type SignalCoverage = Schemas["SignalCoverage"];
+export type MetricCapability = Schemas["MetricCapability"];
 export type Hypothesis = Schemas["Hypothesis"];
 export type MetricSeries = Schemas["MetricSeries"];
 

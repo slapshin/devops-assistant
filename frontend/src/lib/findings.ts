@@ -1,4 +1,4 @@
-import type { Finding, SignalCoverage } from "../api/client";
+import type { Finding, MetricCapability, SignalCoverage, SourceKind } from "../api/client";
 import { FAMILY_LABELS, formatDuration, formatValue } from "./format";
 
 /** The 14-day trend window minus the latest day. */
@@ -56,4 +56,9 @@ export function timeOverlaps(findings: Finding[]): [Finding, Finding][] {
     }
   });
   return pairs;
+}
+
+/** Each family comes from exactly one source kind; the report's capabilities say which. */
+export function sourceByFamily(capabilities: MetricCapability[]): Map<Finding["family"], SourceKind> {
+  return new Map(capabilities.map((c) => [c.family, c.source]));
 }

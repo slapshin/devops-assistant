@@ -2,8 +2,10 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { Finding } from "../../api/client";
+import SourceIcon from "../../components/projects/SourceIcon.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
-import { recurrenceText } from "../../lib/findings";
+import { recurrenceText, sourceByFamily } from "../../lib/findings";
+import { sourceKindLabel } from "../../lib/projects";
 import { FAMILY_LABELS, SEVERITIES, capitalize, formatDuration, formatTime, formatValue, utcTooltip } from "../../lib/format";
 import { useReportContext } from "./context";
 import EvidencePanel from "./EvidencePanel.vue";
@@ -27,6 +29,7 @@ const recurrence = computed(() => (route.query.recurrence as string) || "");
 
 const families = computed(() => [...new Set(report.value.findings.map((f) => f.family))]);
 const filtered = computed(() => report.value.findings.filter(matchesFilters));
+const sourceOf = computed(() => sourceByFamily(report.value.capabilities));
 const selected = computed(() => (props.findingId ? findingById.value.get(props.findingId) ?? null : null));
 const listLink = computed(() => ({ path: `/reports/${props.id}/findings`, query: route.query }));
 const recurrenceOptions = computed(() => {
@@ -154,7 +157,7 @@ watch(
         <table class="gt">
           <thead>
             <tr>
-              <th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Entity</th><th scope="col">Started</th>
+              <th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Source</th><th scope="col">Entity</th><th scope="col">Started</th>
               <th scope="col" class="num">Duration</th><th scope="col" class="num">Peak</th><th scope="col" class="num">Usual</th>
               <th scope="col">Confidence</th><th scope="col">State</th>
             </tr>
@@ -176,6 +179,10 @@ watch(
                     {{ f.title }}
                   </RouterLink>
                 </td>
+                <td>
+                  <span v-if="sourceOf.get(f.family)" class="source"><SourceIcon :kind="sourceOf.get(f.family)!" />{{ sourceKindLabel(sourceOf.get(f.family)!) }}</span>
+                  <span v-else class="muted">—</span>
+                </td>
                 <td class="mono muted">{{ f.entity.display_name }}</td>
                 <td :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</td>
                 <td class="num">{{ formatDuration(f.duration_seconds) }}</td>
@@ -185,7 +192,7 @@ watch(
                 <td><span class="tag" :class="{ new: f.recurrence === 'new' }">{{ recurrenceText(f) }}</span></td>
               </tr>
               <tr v-if="selected && f.finding_id === selected.finding_id" class="detail">
-                <td colspan="9">
+                <td colspan="10">
                   <div class="detail-body">
                     <EvidencePanel :key="selected.finding_id" :finding="selected" :close-to="listLink" />
                   </div>
@@ -224,6 +231,7 @@ watch(
 .table-wrap { container-type: inline-size; }
 .detail-body { position: sticky; left: 8px; width: calc(100cqw - 16px); }
 @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
+.source { display: inline-flex; align-items: center; gap: 6px; }
 .peak { font-weight: 600; }
 .keys { margin: 0; padding: 8px 12px; }
 kbd { font-size: 11px; padding: 0 4px; border: 1px solid var(--border2); border-radius: var(--radius-sm); }

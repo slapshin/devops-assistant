@@ -584,6 +584,12 @@ describe("report", () => {
     expect((await screen.findAllByText(/Origin error rate \(520-530\)/)).length).toBeGreaterThan(0);
   });
 
+  it("findings show the source each one came from", async () => {
+    await renderAt(`${report(anomalies)}/findings`);
+    const link = await screen.findByRole("link", { name: /404 increase/ });
+    expect(link.closest("tr")).toHaveTextContent("Prometheus");
+  });
+
   it("explains unavailable and incompatible reports", async () => {
     routes["GET /api/analyses/gone/report"] = () => problem(404, "report_unavailable", "No report", "Analysis cancelled.");
     await renderAt("/reports/gone");
