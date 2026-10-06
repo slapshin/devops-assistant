@@ -63,6 +63,8 @@ DIRECT: dict[str, str] = {
     "redis_evictions": "database_evictions",
     "redis_replica_link_down": "database_replica_link_down",
     "redis_persistence_failed": "database_persistence_failed",
+    "cf_blocked": "security_blocked_rate",
+    "cf_challenged": "security_challenge_rate",
 }
 """Collected signal -> rule for signals analysed as collected."""
 
@@ -88,6 +90,9 @@ class _TrafficSpec:
     """Higher quantile attached as extra evidence."""
     client_errors: tuple[str, str] | None = None
     """(404 signal, 4xx signal) from which 404 and other 4xx rates are derived."""
+    client_error_rules: tuple[str, str] = ("not_found_rate", "client_error_rate")
+    extra_latency: tuple[tuple[str, str], ...] = ()
+    """(signal, rule) pairs of further volume-guarded latencies (Cloudflare origin time)."""
 
 
 _TRAFFIC_SPECS = (
@@ -151,6 +156,22 @@ _TRAFFIC_SPECS = (
         traffic_signal="redis_keyspace_lookups",
         rate_rule=None,
         error_ratios=(("redis_keyspace_misses", "database_cache_miss_ratio"),),
+    ),
+    # Cloudflare edge: 5xx, origin 52x and cache hits as shares of all requests.
+    _TrafficSpec(
+        traffic_signal="cf_requests",
+        rate_rule="edge_request_rate",
+        error_ratios=(
+            ("cf_5xx", "edge_server_error_ratio"),
+            ("cf_52x", "edge_origin_error_ratio"),
+            ("cf_cache_hits", "edge_cache_hit_ratio"),
+        ),
+        quantile_signal="cf_ttfb_p95",
+        quantile_rule="edge_ttfb_p95",
+        tail_signal="cf_ttfb_p99",
+        client_errors=("cf_404", "cf_4xx"),
+        client_error_rules=("edge_not_found_rate", "edge_client_error_rate"),
+        extra_latency=(("cf_origin_p95", "edge_origin_time_p95"),),
     ),
 )
 
@@ -266,12 +287,35 @@ def _traffic_series(
             )
 
         if spec.client_errors is not None:
-            out += _client_error_series(by_signal, spec.client_errors, key, requests, rate)
+            out += _client_error_series(
+                by_signal, spec.client_errors, spec.client_error_rules, key, requests, rate
+            )
 
         latency = _latency_series(by_signal, spec, key, requests, volume, min_requests)
         if latency is not None:
             out.append(latency)
+        for signal, rule_name in spec.extra_latency:
+            if (extra := by_signal.get(signal, {}).get(key)) is not None:
+                out.append(_guarded(extra, RULES[rule_name], requests, volume, min_requests))
     return out
+
+
+def _guarded(
+    series: MetricSeries, rule: Rule, requests: MetricSeries, volume: Array, min_requests: int
+) -> AnalysisSeries:
+    """A latency series, unknown where too few requests were served to judge it."""
+    values = to_array(series)
+    values[volume < min_requests] = np.nan
+    return AnalysisSeries(
+        rule,
+        requests.entity,
+        series.unit,
+        values,
+        series.query,
+        series,
+        volume=volume,
+        extra_evidence=[requests],
+    )
 
 
 def _error_ratio(
@@ -303,6 +347,7 @@ def _error_ratio(
 def _client_error_series(
     by_signal: dict[str, dict[str, MetricSeries]],
     signals: tuple[str, str],
+    rules: tuple[str, str],
     key: str,
     requests: MetricSeries,
     rate: Array,
@@ -320,9 +365,10 @@ def _client_error_series(
 
     not_found_source = not_found_series or requests
     client_error_source = client_error_series or requests
+    not_found_rule, client_error_rule = rules
     return [
         AnalysisSeries(
-            RULES["not_found_rate"],
+            RULES[not_found_rule],
             requests.entity,
             Unit.REQUESTS_PER_SECOND,
             not_found,
@@ -332,7 +378,7 @@ def _client_error_series(
             attributes={STATUS_CODE_ATTRIBUTE: "404"},
         ),
         AnalysisSeries(
-            RULES["client_error_rate"],
+            RULES[client_error_rule],
             requests.entity,
             Unit.REQUESTS_PER_SECOND,
             np.clip(client_errors - not_found, 0.0, None),

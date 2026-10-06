@@ -1,4 +1,4 @@
-import type { ConnectionTest, Problem, ProjectInput, ProjectSummary, ReportSchedule, Weekday } from "../api/client";
+import type { AnalysisReport, ConnectionTest, Problem, ProjectInput, ProjectSummary, ReportSchedule, SourceInfo, SourceKind, Weekday } from "../api/client";
 
 /** Mirrors backend/app/domain/common.py and projects.py so most mistakes never reach the server. */
 const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -6,7 +6,11 @@ const RESERVED_LABEL_PREFIX = "__";
 export const MAX_MATCHERS = 10;
 const MAX_NAME_CHARS = 100;
 const MAX_LABEL_VALUE_CHARS = 256;
-const SOURCE_PATH = "sources.0";
+/** Mirrors backend/app/domain/projects.py (Cloudflare). */
+export const CLOUDFLARE_GRAPHQL_URL = "https://api.cloudflare.com/client/v4/graphql";
+const ZONE_ID = /^[0-9a-f]{32}$/;
+const HOSTNAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+export const MAX_HOSTNAMES = 20;
 
 export type AuthType = "none" | "bearer" | "basic";
 
@@ -55,12 +59,19 @@ export interface ProjectDraft {
   name: string;
   description: string;
   matchers: MatcherDraft[];
+  /** Prometheus source; an empty URL means none. */
   url: string;
   tlsVerify: boolean;
   authType: AuthType;
   token: string;
   username: string;
   password: string;
+  cloudflare: boolean;
+  zoneId: string;
+  /** Comma- or space-separated; empty analyses the whole zone. */
+  hostnames: string;
+  cfToken: string;
+  cfApiUrl: string;
   scheduled: boolean;
   scheduleTime: string;
   scheduleTimezone: string;
@@ -91,6 +102,11 @@ export function emptyDraft(): ProjectDraft {
     token: "",
     username: "",
     password: "",
+    cloudflare: false,
+    zoneId: "",
+    hostnames: "",
+    cfToken: "",
+    cfApiUrl: CLOUDFLARE_GRAPHQL_URL,
     scheduled: false,
     scheduleTime: DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: browserTimezone(),
@@ -100,8 +116,18 @@ export function emptyDraft(): ProjectDraft {
   };
 }
 
+type StoredSource = ProjectSummary["sources"][number];
+type PrometheusSource = Extract<StoredSource, { kind: "prometheus" }>;
+type CloudflareSource = Extract<StoredSource, { kind: "cloudflare" }>;
+
+export const prometheusSource = (project: { sources: StoredSource[] } | null | undefined) =>
+  project?.sources.find((s): s is PrometheusSource => s.kind === "prometheus") ?? null;
+export const cloudflareSource = (project: { sources: StoredSource[] } | null | undefined) =>
+  project?.sources.find((s): s is CloudflareSource => s.kind === "cloudflare") ?? null;
+
 export function draftFrom(project: ProjectSummary): ProjectDraft {
-  const source = project.sources[0];
+  const source = prometheusSource(project);
+  const cloudflare = cloudflareSource(project);
   const auth = source?.auth;
   return {
     name: project.name,
@@ -113,6 +139,11 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     token: "",
     username: auth?.type === "basic" ? auth.username : "",
     password: "",
+    cloudflare: !!cloudflare,
+    zoneId: cloudflare?.zone_id ?? "",
+    hostnames: cloudflare?.hostnames.join(", ") ?? "",
+    cfToken: "",
+    cfApiUrl: cloudflare?.api_url ?? CLOUDFLARE_GRAPHQL_URL,
     scheduled: !!project.schedule,
     scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: project.schedule?.timezone ?? browserTimezone(),
@@ -128,16 +159,27 @@ export function cloneDraft(project: ProjectSummary): ProjectDraft {
 }
 
 export function storedAuth(project: ProjectSummary | null | undefined): StoredAuth | null {
-  const auth = project?.sources[0]?.auth;
+  const auth = prometheusSource(project)?.auth;
   if (!auth) return null;
   if (auth.type === "bearer") return { type: "bearer", secretSet: auth.token_set };
   if (auth.type === "basic") return { type: "basic", secretSet: auth.password_set };
   return { type: "none", secretSet: false };
 }
 
+/** True when the project stores a Cloudflare API token an empty token input keeps. */
+export const storedCloudflareToken = (project: ProjectSummary | null | undefined) => !!cloudflareSource(project)?.token_set;
+
 /** True when the empty secret input for the chosen auth type keeps a stored secret. */
 export const keepsStoredSecret = (draft: ProjectDraft, stored: StoredAuth | null) =>
   !!stored && stored.type === draft.authType && stored.secretSet;
+
+export function parseHostnames(raw: string): string[] {
+  const names = raw
+    .split(/[\s,]+/)
+    .map((h) => h.trim().toLowerCase().replace(/\.$/, ""))
+    .filter(Boolean);
+  return [...new Set(names)].sort();
+}
 
 function urlError(raw: string): string | null {
   let url: URL;
@@ -153,13 +195,17 @@ function urlError(raw: string): string | null {
   return null;
 }
 
-export function validateMatchers(matchers: MatcherDraft[]): FieldErrors {
+/** Labels scope Prometheus queries, so they are required only with a Prometheus source; without
+ * one, rows left without a value are ignored (neither validated nor sent). */
+export function validateMatchers(matchers: MatcherDraft[], required = true): FieldErrors {
   const errors: FieldErrors = {};
-  if (matchers.length === 0) errors.matchers = "Add at least one label";
-  if (matchers.length > MAX_MATCHERS) errors.matchers = `At most ${MAX_MATCHERS} labels`;
+  const used = matchers.filter((m) => required || m.value);
+  if (used.length === 0 && required) errors.matchers = "Add at least one label";
+  if (used.length > MAX_MATCHERS) errors.matchers = `At most ${MAX_MATCHERS} labels`;
 
   const seen = new Set<string>();
   matchers.forEach((m, i) => {
+    if (!required && !m.value) return;
     const name = m.name.trim();
     if (!LABEL_NAME.test(name)) errors[`matchers.${i}.name`] = "Letters, digits and _; must not start with a digit";
     else if (name.startsWith(RESERVED_LABEL_PREFIX)) errors[`matchers.${i}.name`] = "Labels starting with __ are reserved";
@@ -176,18 +222,34 @@ export function validateSource(draft: ProjectDraft, stored: StoredAuth | null, r
   const errors: FieldErrors = {};
   const url = draft.url.trim();
   if (!url) {
-    if (required) errors[`${SOURCE_PATH}.url`] = "Required to test the connection";
+    if (required) errors["prometheus.url"] = "Required to test the connection";
     return errors;
   }
 
   const bad = urlError(url);
-  if (bad) errors[`${SOURCE_PATH}.url`] = bad;
+  if (bad) errors["prometheus.url"] = bad;
   const keeps = keepsStoredSecret(draft, stored);
-  if (draft.authType === "bearer" && !draft.token && !keeps) errors[`${SOURCE_PATH}.auth.token`] = "Required";
+  if (draft.authType === "bearer" && !draft.token && !keeps) errors["prometheus.auth.token"] = "Required";
   if (draft.authType === "basic") {
-    if (!draft.username.trim()) errors[`${SOURCE_PATH}.auth.username`] = "Required";
-    if (!draft.password && !keeps) errors[`${SOURCE_PATH}.auth.password`] = "Required";
+    if (!draft.username.trim()) errors["prometheus.auth.username"] = "Required";
+    if (!draft.password && !keeps) errors["prometheus.auth.password"] = "Required";
   }
+  return errors;
+}
+
+export function validateCloudflare(draft: ProjectDraft, tokenStored: boolean): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!draft.cloudflare) return errors;
+  if (!ZONE_ID.test(draft.zoneId.trim().toLowerCase())) errors["cloudflare.zone_id"] = "Expected a zone ID of 32 hex characters";
+  const hostnames = parseHostnames(draft.hostnames);
+  const bad = hostnames.filter((h) => !HOSTNAME.test(h));
+  if (bad.length) errors["cloudflare.hostnames"] = `Invalid hostnames: ${bad.join(", ")}`;
+  else if (hostnames.length > MAX_HOSTNAMES) errors["cloudflare.hostnames"] = `At most ${MAX_HOSTNAMES} hostnames`;
+  const apiUrl = draft.cfApiUrl.trim();
+  const badUrl = apiUrl ? urlError(apiUrl) : "Required";
+  if (badUrl) errors["cloudflare.api_url"] = badUrl;
+  const synthetic = apiUrl.startsWith("synthetic:");
+  if (!draft.cfToken && !tokenStored && !synthetic) errors["cloudflare.api_token"] = "Required";
   return errors;
 }
 
@@ -207,15 +269,17 @@ export function validateRetention(draft: ProjectDraft): FieldErrors {
   return {};
 }
 
-export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null): FieldErrors {
+export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null, cfTokenStored = false): FieldErrors {
   const errors: FieldErrors = {};
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
-  return { ...errors, ...validateMatchers(draft.matchers), ...validateSource(draft, stored), ...validateSchedule(draft), ...validateRetention(draft) };
+  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...validateCloudflare(draft, cfTokenStored), ...validateSchedule(draft), ...validateRetention(draft) };
 }
 
-function sourceInput(draft: ProjectDraft): NonNullable<ProjectInput["sources"]>[number] {
+type SourceInput = NonNullable<ProjectInput["sources"]>[number];
+
+export function prometheusInput(draft: ProjectDraft): SourceInput {
   const auth =
     draft.authType === "bearer"
       ? { type: "bearer" as const, ...(draft.token ? { token: draft.token } : {}) }
@@ -225,14 +289,31 @@ function sourceInput(draft: ProjectDraft): NonNullable<ProjectInput["sources"]>[
   return { kind: "prometheus", url: draft.url.trim(), tls_verify: draft.tlsVerify, auth };
 }
 
-export const matchersInput = (draft: ProjectDraft) => draft.matchers.map((m) => ({ name: m.name.trim(), value: m.value }));
+export function cloudflareInput(draft: ProjectDraft): SourceInput {
+  return {
+    kind: "cloudflare",
+    zone_id: draft.zoneId.trim().toLowerCase(),
+    hostnames: parseHostnames(draft.hostnames),
+    api_url: draft.cfApiUrl.trim(),
+    ...(draft.cfToken ? { api_token: draft.cfToken } : {}),
+  };
+}
+
+/** Configured source kinds in the order they are sent (server errors refer to their index). */
+export function sourceKinds(draft: ProjectDraft): SourceKind[] {
+  return [...(draft.url.trim() ? (["prometheus"] as const) : []), ...(draft.cloudflare ? (["cloudflare"] as const) : [])];
+}
+
+/** Matchers to send; without a Prometheus URL, rows left without a value are dropped. */
+export const matchersInput = (draft: ProjectDraft) =>
+  draft.matchers.filter((m) => draft.url.trim() || m.value).map((m) => ({ name: m.name.trim(), value: m.value }));
 
 export function toInput(draft: ProjectDraft): ProjectInput {
   return {
     name: draft.name.trim(),
     description: draft.description.trim() || null,
     matchers: matchersInput(draft),
-    sources: draft.url.trim() ? [sourceInput(draft)] : [],
+    sources: sourceKinds(draft).map((kind) => (kind === "prometheus" ? prometheusInput(draft) : cloudflareInput(draft))),
     schedule: draft.scheduled
       ? {
           time: draft.scheduleTime,
@@ -258,16 +339,27 @@ export function scheduleSummary(schedule: ReportSchedule): string {
   return `${when} at ${schedule.time} (${schedule.timezone})`;
 }
 
-export const testRequestSource = sourceInput;
-
-/** Field errors from a 422 problem, keyed like validateDraft ("matchers.0.name", "sources.0.url"). */
-export function serverFieldErrors(problem: Problem): FieldErrors {
+/**
+ * Field errors from a 422 problem, keyed like validateDraft ("matchers.0.name", "prometheus.url"):
+ * "sources.<i>.x" refers to the i-th sent source, "source.x" to the tested one.
+ */
+export function serverFieldErrors(problem: Problem, kinds: SourceKind[] = [], tested?: SourceKind): FieldErrors {
   const errors: FieldErrors = {};
   for (const e of problem.errors ?? []) {
-    const field = (e.field ?? "").replace(/^body\./, "").replace(/^source\./, `${SOURCE_PATH}.`);
+    let field = (e.field ?? "").replace(/^body\./, "");
+    field = field.replace(/^sources\.(\d+)\./, (match, i: string) => (kinds[Number(i)] ? `${kinds[Number(i)]}.` : match));
+    if (tested) field = field.replace(/^source\./, `${tested}.`);
     errors[field] ??= e.message ?? "Invalid";
   }
   return errors;
+}
+
+/** One line per source: "Prometheus · vm:8428/prom", "Cloudflare · shop.example.com". */
+export function sourceSummary(source: StoredSource): string {
+  if (source.kind === "prometheus") return `Prometheus · ${sourceHost(source.url)}`;
+  const synthetic = source.api_url.startsWith("synthetic:") ? ` (${sourceHost(source.api_url)})` : "";
+  const scope = source.hostnames.length ? source.hostnames.join(", ") : `zone ${source.zone_id.slice(0, 8)}…`;
+  return `Cloudflare · ${scope}${synthetic}`;
 }
 
 /** Host, port and path prefix of a source URL; "synthetic: <scenario>" for demo sources. */
@@ -281,7 +373,7 @@ export function sourceHost(url: string): string {
   }
 }
 
-export type HealthKey = "ok" | "checking" | "unreachable" | "auth" | "no_series" | "not_configured" | "unreadable" | "error";
+export type HealthKey = "ok" | "checking" | "unreachable" | "auth" | "no_series" | "no_traffic" | "not_configured" | "unreadable" | "error";
 
 export const HEALTH_LABELS: Record<HealthKey, { label: string; icon: string }> = {
   ok: { label: "Reachable", icon: "✓" },
@@ -289,27 +381,56 @@ export const HEALTH_LABELS: Record<HealthKey, { label: string; icon: string }> =
   unreachable: { label: "Unreachable", icon: "!" },
   auth: { label: "Auth failed", icon: "!" },
   no_series: { label: "No matching series", icon: "◐" },
+  no_traffic: { label: "No traffic", icon: "◐" },
   not_configured: { label: "No source", icon: "–" },
   unreadable: { label: "Credentials unreadable", icon: "!" },
   error: { label: "Check failed", icon: "!" },
 };
 
+/** Most severe first: one failing source makes the whole project unhealthy. */
+const HEALTH_RANK: HealthKey[] = ["unreachable", "auth", "no_series", "no_traffic", "ok"];
+
 export function healthKey(
   project: ProjectSummary,
-  health: ConnectionTest | null | undefined,
+  health: ConnectionTest[] | undefined,
   state: { pending: boolean; failed: boolean },
 ): HealthKey {
   if (project.sources.length === 0) return "not_configured";
   if (!project.credentials_readable) return "unreadable";
   if (state.failed) return "error";
   if (state.pending || health === undefined) return "checking";
-  if (health === null) return "not_configured";
-  return testKey(health);
+  if (health.length === 0) return "not_configured";
+  return worstTest(health);
+}
+
+export function worstTest(tests: ConnectionTest[]): HealthKey {
+  const keys = tests.map(testKey);
+  return HEALTH_RANK.find((k) => keys.includes(k)) ?? "ok";
 }
 
 export function testKey(test: ConnectionTest): HealthKey {
   if (!test.reachable) return "unreachable";
   if (test.auth_ok === false) return "auth";
-  if (test.matched_series === 0) return "no_series";
+  if (test.matched_series === 0) return test.kind === "cloudflare" ? "no_traffic" : "no_series";
   return "ok";
+}
+
+export const SOURCE_KIND_LABELS: Record<SourceKind, string> = {
+  prometheus: "Prometheus",
+  cloudflare: "Cloudflare",
+};
+
+export const sourceKindLabel = (kind: SourceKind) => SOURCE_KIND_LABELS[kind];
+
+/** What a connection test counts: matching series (Prometheus) or requests in 24 h (Cloudflare). */
+export function testVolume(test: ConnectionTest): string | null {
+  if (test.matched_series === null || test.matched_series === undefined) return null;
+  if (test.kind === "cloudflare") return `${test.matched_series.toLocaleString("en")} requests in 24 h`;
+  return `${test.matched_series} matching series`;
+}
+
+/** Every source of a report; 2.0 reports only have ``source``. */
+export function reportSources(report: AnalysisReport): SourceInfo[] {
+  if (report.sources?.length) return report.sources;
+  return report.source ? [report.source] : [];
 }

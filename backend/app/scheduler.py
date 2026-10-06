@@ -13,7 +13,6 @@ from datetime import UTC, datetime, timedelta
 
 from app.domain.common import Scope, floor_to_step
 from app.domain.jobs import JobTrigger
-from app.domain.projects import SourceKind
 from app.jobs import JobRunner, QueueFull
 from app.storage.projects import SqliteProjectRepository
 
@@ -62,8 +61,8 @@ class ReportScheduler:
                 continue
             if now - due > MISSED_RUN_GRACE:
                 log.warning("project %s: skipped scheduled run at %s (missed)", project.name, due)
-            elif project.source(SourceKind.PROMETHEUS) is None:
-                log.warning("project %s: scheduled run skipped, no metrics source", project.name)
+            elif not project.sources:
+                log.warning("project %s: scheduled run skipped, no data source", project.name)
             else:
                 scope = Scope(
                     project_id=project.project_id,

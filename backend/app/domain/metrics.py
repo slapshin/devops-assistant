@@ -11,6 +11,7 @@ from app.domain.common import (
     Labels,
     Ratio,
     SignalFamily,
+    SourceKind,
     Unit,
     UtcDatetime,
 )
@@ -36,11 +37,19 @@ class MetricSeries(Contract):
     entity: Entity
     labels: Labels = Field(description="All retained labels of the result series.")
     unit: Unit
-    query: str = Field(min_length=1, description="Exact PromQL/MetricsQL sent to the source.")
+    query: str = Field(
+        min_length=1, description="Exact query sent to the source (PromQL/MetricsQL, GraphQL)."
+    )
     step_seconds: int = Field(gt=0)
     start: UtcDatetime
     values: list[float | None]
     coverage: Ratio = Field(description="Share of steps with a sample.")
+    sample_interval: float | None = Field(
+        default=None,
+        ge=1,
+        description="Mean sampling interval of the source data (1 = every event counted; "
+        "Cloudflare adaptive sampling). Null when the source does not sample.",
+    )
 
     @model_validator(mode="after")
     def _coverage_matches_values(self) -> Self:
@@ -58,6 +67,7 @@ class MetricSeries(Contract):
 class MetricCapability(Contract):
     """Whether a signal family can be analysed for a scope, and why (not)."""
 
+    source: SourceKind = SourceKind.PROMETHEUS
     family: SignalFamily
     signal: str
     status: CapabilityStatus

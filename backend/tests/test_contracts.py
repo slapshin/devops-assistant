@@ -40,6 +40,7 @@ def fixture_model(rel: str) -> type[BaseModel] | None:
     discovery: dict[str, type[BaseModel]] = {
         "projects.json": ProjectList,
         "connection_test.json": ConnectionTest,
+        "connection_test_cloudflare.json": ConnectionTest,
         "config.json": RuntimeConfig,
     }
     return discovery.get(name)

@@ -55,6 +55,15 @@ All settings are environment variables, optionally read from `config.env` in the
 
 Without AI, numerical reports are complete. The explanation status is `disabled` (with `AI_PROVIDER=none`) or `not_configured` (when the key or model is missing).
 
+## Data sources
+
+Each project has at most one source per kind, configured in the UI:
+
+- **Prometheus-compatible** (VictoriaMetrics, Prometheus): URL, TLS verification, none/bearer/basic auth. It needs at least one label matcher, which every query carries.
+- **Cloudflare**: zone ID (dashboard → zone → Overview), optional hostnames, and an API token. Create the token under *My Profile → API Tokens → Custom token* with the permission **Zone → Analytics → Read** for that zone only. Timing quantiles (TTFB, origin response time) need a Pro plan or higher; on other plans those signals are reported as unsupported. `synthetic://<scenario>` as the API URL serves demo data without a token.
+
+Tokens and passwords are encrypted at rest and never returned by the API. When one source of a project fails (e.g. a revoked Cloudflare token), the other sources are still analysed and the report is `partial`.
+
 ## Supported metrics and history
 
 The catalog (`docs/metrics-catalog.md`) covers:

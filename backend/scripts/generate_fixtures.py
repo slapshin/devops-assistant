@@ -7,16 +7,20 @@ node instance "paas-production", HTTP job "dispatcher-api"). Values are syntheti
 """
 
 import argparse
+import asyncio
 import json
 import math
 import random
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from pydantic import BaseModel
 
-from app.analysis.engine import trend_summary
+from app.ai.providers import FakeExplanationProvider
+from app.analysis.engine import RobustDetector, trend_summary
 from app.domain.common import (
     STEP_SECONDS,
     ConfidenceLevel,
@@ -27,6 +31,7 @@ from app.domain.common import (
     Scope,
     Severity,
     SignalFamily,
+    SourceKind,
     TimeRange,
     Unit,
     format_utc,
@@ -55,6 +60,7 @@ from app.domain.findings import (
     TrendBucketStatus,
 )
 from app.domain.ids import episode_id, evidence_id, finding_id, series_id
+from app.domain.interfaces import CancellationToken, OpenedSource
 from app.domain.jobs import (
     AnalysisJob,
     AnalysisSubmitted,
@@ -80,6 +86,7 @@ from app.domain.projects import (
 from app.domain.report import (
     TREND_DAYS,
     AnalysisReport,
+    AnalysisRequest,
     AnalysisWindows,
     Exclusion,
     ReportState,
@@ -87,6 +94,9 @@ from app.domain.report import (
 )
 from app.domain.schedule import ReportSchedule, Weekday
 from app.jobs import daily_episodes
+from app.service import AnalysisPipeline
+from app.sources.cloudflare.source import CloudflareMetricsSource
+from app.sources.cloudflare.synthetic import SyntheticCloudflareApi
 
 ROOT = Path(__file__).resolve().parents[2] / "fixtures"
 PROJECT_ID = "01999a3c-0000-7000-8000-000000000001"
@@ -1027,6 +1037,7 @@ def build() -> dict[str, BaseModel]:
         "reports/report_ai_failed.json": ai_failed,
         "reports/report_short_history.json": short,
         "reports/report_partial_source_error.json": partial,
+        "reports/report_cloudflare.json": cloudflare_report(),
         "jobs/job_running.json": job(
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
@@ -1099,6 +1110,7 @@ def build() -> dict[str, BaseModel]:
             ],
             checked_at=T,
         ),
+        "api/connection_test_cloudflare.json": cloudflare_connection_test(),
         "api/problem_queue_full.json": Problem(
             title="Analysis queue is full",
             status=429,
@@ -1122,6 +1134,63 @@ def build() -> dict[str, BaseModel]:
 
 class _Manifest(BaseModel):
     items: list[MetricCapability]
+
+
+CLOUDFLARE_ZONE = "0123456789abcdef0123456789abcdef"
+CLOUDFLARE_ANALYSIS_ID = "01999a3c-0000-7000-8000-0000000000cf"
+
+
+class _NoProgress:
+    async def update(self, progress: StageProgress) -> None:
+        pass
+
+
+def cloudflare_report() -> AnalysisReport:
+    """A Cloudflare-only project analysed from the synthetic incident scenario (T015)."""
+    api = SyntheticCloudflareApi("incident", CLOUDFLARE_ZONE, ["shop.example.com"])
+    source = CloudflareMetricsSource(api, CLOUDFLARE_ZONE, ["shop.example.com"])
+    config = DetectorConfig()
+
+    class Sources:
+        @asynccontextmanager
+        async def open(self, scope: Scope) -> AsyncIterator[list[OpenedSource]]:
+            yield [OpenedSource(SourceKind.CLOUDFLARE, source)]
+
+    pipeline = AnalysisPipeline(Sources(), RobustDetector(), config, FakeExplanationProvider())
+    request = AnalysisRequest(
+        scope=Scope(
+            project_id="01999a3c-0000-7000-8000-0000000000c1",
+            project_name="Shop edge",
+            matchers=[],
+        ),
+        end_time=T,
+        detector_version=config.version,
+        config_hash=config.config_hash,
+    )
+    report = asyncio.run(
+        pipeline.run(CLOUDFLARE_ANALYSIS_ID, request, _NoProgress(), CancellationToken())
+    )
+    explanation = report.explanation
+    if explanation.explanation is not None:  # pin the provider's timestamp
+        pinned = explanation.explanation.model_copy(update={"generated_at": T})
+        explanation = explanation.model_copy(update={"explanation": pinned})
+    return report.model_copy(update={"generated_at": T, "explanation": explanation})
+
+
+def cloudflare_connection_test() -> ConnectionTest:
+    return ConnectionTest(
+        kind=SourceKind.CLOUDFLARE,
+        reachable=True,
+        auth_ok=True,
+        matched_series=3_456_789,
+        history_days=30.0,
+        families=[
+            FamilyCapability(family=SignalFamily.EDGE, status=CapabilityStatus.SUPPORTED),
+            FamilyCapability(family=SignalFamily.SECURITY, status=CapabilityStatus.SUPPORTED),
+        ],
+        message="3,456,789 requests in the last 24 h.",
+        checked_at=T,
+    )
 
 
 def render(model: BaseModel) -> str:

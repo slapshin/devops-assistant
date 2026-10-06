@@ -1,6 +1,7 @@
 {
   "items": [
     {
+      "source": "prometheus",
       "family": "cpu",
       "signal": "cpu_utilization",
       "status": "supported",
@@ -22,6 +23,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "cpu",
       "signal": "cpu_iowait",
       "status": "supported",
@@ -43,6 +45,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "memory",
       "signal": "memory_utilization",
       "status": "supported",
@@ -65,6 +68,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "filesystem",
       "signal": "filesystem_used_ratio",
       "status": "supported",
@@ -90,6 +94,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "filesystem",
       "signal": "filesystem_inodes_used_ratio",
       "status": "supported",
@@ -115,6 +120,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "disk_io",
       "signal": "disk_busy_ratio",
       "status": "supported",
@@ -136,6 +142,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "network",
       "signal": "network_bytes",
       "status": "supported",
@@ -159,6 +166,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "network",
       "signal": "network_errors",
       "status": "supported",
@@ -186,6 +194,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "container",
       "signal": "container_cpu",
       "status": "partial",
@@ -208,6 +217,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "container",
       "signal": "container_memory_working_set",
       "status": "partial",
@@ -230,6 +240,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "container",
       "signal": "container_memory_limit_ratio",
       "status": "unsupported",
@@ -249,6 +260,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "container",
       "signal": "container_throttling_ratio",
       "status": "unsupported",
@@ -269,6 +281,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "container",
       "signal": "container_oom",
       "status": "supported",
@@ -290,6 +303,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "container",
       "signal": "container_restarts",
       "status": "supported",
@@ -314,6 +328,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "request_traffic",
       "signal": "request_rate",
       "status": "supported",
@@ -337,6 +352,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "request_traffic",
       "signal": "rpc_request_rate",
       "status": "supported",
@@ -359,6 +375,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "request_failures",
       "signal": "server_error_ratio",
       "status": "supported",
@@ -382,6 +399,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "request_failures",
       "signal": "rpc_error_ratio",
       "status": "supported",
@@ -404,6 +422,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "client_errors",
       "signal": "client_error_rate",
       "status": "supported",
@@ -427,6 +446,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "latency",
       "signal": "latency_quantile",
       "status": "supported",
@@ -451,6 +471,7 @@
       "history_days": 28.4
     },
     {
+      "source": "prometheus",
       "family": "latency",
       "signal": "rpc_latency_quantile",
       "status": "supported",

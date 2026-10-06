@@ -6,19 +6,25 @@ detection, and optional AI explanation.
 """
 
 import logging
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from app.ai.providers import explain_findings
+from app.domain.common import SOURCE_FAMILIES, Scope
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import ExplanationStatus
 from app.domain.interfaces import (
     CancellationToken,
+    CollectionResult,
     Detector,
     ExplanationProvider,
+    OpenedSource,
     ProgressReporter,
+    SourceError,
     SourceProvider,
 )
 from app.domain.jobs import StageName, StageProgress, StageStatus
+from app.domain.metrics import MetricCapability
 from app.domain.report import (
     TREND_DAYS,
     AnalysisReport,
@@ -26,11 +32,18 @@ from app.domain.report import (
     AnalysisWindows,
     Exclusion,
     ReportState,
+    SourceInfo,
 )
 
 log = logging.getLogger("app.service")
 
-PARTIAL_CODES = {"query_failed", "query_timeout", "series_truncated", "evidence_dropped"}
+PARTIAL_CODES = {
+    "query_failed",
+    "query_timeout",
+    "series_truncated",
+    "evidence_dropped",
+    "source_unavailable",
+}
 MAX_REPORT_BYTES = 20 * 1024 * 1024
 MAX_EPISODES_PER_DAY_WHEN_OVER_BUDGET = 50
 EXPLANATION_STAGE_STATUS = {
@@ -80,16 +93,10 @@ class AnalysisPipeline:
             )
 
         await stage(StageName.DISCOVERY, StageStatus.RUNNING)
-        async with self.sources.open(request.scope) as source:
-            source_info = await source.source_info()
-            capabilities = await source.capabilities(request.scope, windows)
-            await stage(StageName.DISCOVERY, StageStatus.DONE)
-            cancel.raise_if_cancelled()
-
-            collection = await source.collect(
-                request.scope, windows, capabilities, progress, cancel
-            )
+        async with self.sources.open(request.scope) as opened:
+            gathered = await _gather(opened, request.scope, windows, progress, cancel)
         cancel.raise_if_cancelled()
+        capabilities, collection = gathered.capabilities, gathered.collection
 
         await stage(StageName.DETECTION, StageStatus.RUNNING)
         result = self.detector.detect(request, windows, capabilities, collection, self.config)
@@ -123,7 +130,8 @@ class AnalysisPipeline:
             generated_at=datetime.now(UTC),
             detector_version=request.detector_version,
             config_hash=request.config_hash,
-            source=source_info,
+            sources=gathered.sources,
+            source=gathered.sources[0],
             state=ReportState.PARTIAL if is_partial else ReportState.COMPLETED,
             capabilities=capabilities,
             coverage=result.coverage,
@@ -148,6 +156,76 @@ class AnalysisPipeline:
 
     def _fits(self, report: AnalysisReport) -> bool:
         return len(report.model_dump_json()) <= self.max_report_bytes
+
+
+@dataclass
+class _Gathered:
+    sources: list[SourceInfo] = field(default_factory=list)
+    capabilities: list[MetricCapability] = field(default_factory=list)
+    collection: CollectionResult = field(
+        default_factory=lambda: CollectionResult(series=[], exclusions=[])
+    )
+
+
+async def _gather(
+    opened: list[OpenedSource],
+    scope: Scope,
+    windows: AnalysisWindows,
+    progress: ProgressReporter,
+    cancel: CancellationToken,
+) -> _Gathered:
+    """Discover and collect every source; a failing source is disclosed, not fatal, unless
+    every source fails (then its error fails the job as with a single source)."""
+    result = _Gathered()
+    failures: list[tuple[OpenedSource, SourceError]] = []
+    discovered: list[tuple[OpenedSource, list[MetricCapability]]] = []
+    for item in opened:
+        try:
+            info = await item.source.source_info()
+            caps = await item.source.capabilities(scope, windows)
+        except SourceError as exc:
+            failures.append((item, exc))
+            continue
+        result.sources.append(info.model_copy(update={"kind": item.kind}))
+        caps = [c.model_copy(update={"source": item.kind}) for c in caps]
+        result.capabilities += caps
+        discovered.append((item, caps))
+        cancel.raise_if_cancelled()
+    await progress.update(
+        StageProgress(
+            stage=StageName.DISCOVERY,
+            status=StageStatus.DONE,
+            finished_at=datetime.now(UTC),
+            message=", ".join(f"{item.kind.value}: unavailable" for item, _ in failures) or None,
+        )
+    )
+
+    series, exclusions, mappings = [], [], []
+    for item, caps in discovered:
+        try:
+            collected = await item.source.collect(scope, windows, caps, progress, cancel)
+        except SourceError as exc:
+            failures.append((item, exc))
+            continue
+        series += collected.series
+        exclusions += collected.exclusions
+        mappings += collected.mappings
+        cancel.raise_if_cancelled()
+
+    if failures and len(failures) == len(opened):
+        raise failures[0][1]
+    for item, error in failures:
+        log.warning("%s source failed: %s", item.kind.value, error.message)
+        exclusions += [
+            Exclusion(
+                code="source_unavailable",
+                message=f"{item.kind.value} source failed ({error.kind.value}): {error.message}",
+                family=family,
+            )
+            for family in SOURCE_FAMILIES[item.kind]
+        ]
+    result.collection = CollectionResult(series=series, exclusions=exclusions, mappings=mappings)
+    return result
 
 
 def _keep_primary_evidence(report: AnalysisReport) -> AnalysisReport:

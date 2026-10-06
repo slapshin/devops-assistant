@@ -11,7 +11,13 @@ from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import ExplanationStatus
 from app.domain.findings import TrendBucketStatus
 from app.domain.ids import new_analysis_id
-from app.domain.interfaces import AnalysisService, CancellationToken, Cancelled, ReportRepository
+from app.domain.interfaces import (
+    AnalysisService,
+    CancellationToken,
+    Cancelled,
+    ReportRepository,
+    SourceError,
+)
 from app.domain.jobs import (
     AnalysisJob,
     ErrorCode,
@@ -23,7 +29,6 @@ from app.domain.jobs import (
     StageStatus,
 )
 from app.domain.report import AnalysisReport, AnalysisRequest, ReportState
-from app.metrics.client import SourceError
 from app.metrics.factory import SourceNotConfigured
 from app.storage.secrets import SecretsUnreadable
 

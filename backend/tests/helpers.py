@@ -3,8 +3,8 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from app.domain.common import LabelMatcher, Scope
-from app.domain.interfaces import MetricsSource
+from app.domain.common import LabelMatcher, Scope, SourceKind
+from app.domain.interfaces import MetricsSource, OpenedSource
 
 
 def make_scope(project: str = "paas", env: str = "production", project_id: str = "p-1") -> Scope:
@@ -17,11 +17,14 @@ def make_scope(project: str = "paas", env: str = "production", project_id: str =
 
 
 class StaticSources:
-    """SourceProvider that serves one source for every project."""
+    """SourceProvider that serves the same sources (Prometheus by default) for every project."""
 
-    def __init__(self, source: MetricsSource) -> None:
-        self.source = source
+    def __init__(self, *sources: MetricsSource | OpenedSource) -> None:
+        self.sources = [
+            s if isinstance(s, OpenedSource) else OpenedSource(SourceKind.PROMETHEUS, s)
+            for s in sources
+        ]
 
     @asynccontextmanager
-    async def open(self, scope: Scope) -> AsyncIterator[MetricsSource]:
-        yield self.source
+    async def open(self, scope: Scope) -> AsyncIterator[list[OpenedSource]]:
+        yield self.sources

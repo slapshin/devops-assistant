@@ -8,9 +8,11 @@ from collections.abc import Iterable
 from app.analysis.rules.base import SEVERITY_ORDER, Dir, Rule, RuleKind, format_value
 from app.analysis.rules.container import CONTAINER_RULES
 from app.analysis.rules.database import DATABASE_RULES
+from app.analysis.rules.edge import EDGE_RULES
 from app.analysis.rules.host import HOST_RULES
 from app.analysis.rules.proxy import PROXY_RULES
 from app.analysis.rules.requests import REQUEST_RULES
+from app.analysis.rules.security import SECURITY_RULES
 
 __all__ = ["RULES", "SEVERITY_ORDER", "Dir", "Rule", "RuleKind", "format_value"]
 
@@ -25,5 +27,13 @@ def _index(rules: Iterable[Rule]) -> dict[str, Rule]:
 
 
 RULES = _index(
-    (*HOST_RULES, *CONTAINER_RULES, *REQUEST_RULES, *PROXY_RULES, *DATABASE_RULES),
+    (
+        *HOST_RULES,
+        *CONTAINER_RULES,
+        *REQUEST_RULES,
+        *PROXY_RULES,
+        *DATABASE_RULES,
+        *EDGE_RULES,
+        *SECURITY_RULES,
+    ),
 )

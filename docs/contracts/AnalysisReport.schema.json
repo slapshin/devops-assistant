@@ -209,7 +209,8 @@
         "route",
         "proxy",
         "upstream",
-        "database"
+        "database",
+        "zone"
       ],
       "title": "EntityKind",
       "type": "string"
@@ -932,6 +933,10 @@
           "title": "Signal",
           "type": "string"
         },
+        "source": {
+          "$ref": "#/$defs/SourceKind",
+          "default": "prometheus"
+        },
         "status": {
           "$ref": "#/$defs/CapabilityStatus"
         },
@@ -978,10 +983,24 @@
           "type": "object"
         },
         "query": {
-          "description": "Exact PromQL/MetricsQL sent to the source.",
+          "description": "Exact query sent to the source (PromQL/MetricsQL, GraphQL).",
           "minLength": 1,
           "title": "Query",
           "type": "string"
+        },
+        "sample_interval": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mean sampling interval of the source data (1 = every event counted; Cloudflare adaptive sampling). Null when the source does not sample.",
+          "title": "Sample Interval"
         },
         "series_id": {
           "pattern": "^ser_[0-9a-f]{16}$",
@@ -1094,14 +1113,13 @@
     },
     "Scope": {
       "additionalProperties": false,
-      "description": "One project's series: every query carries all of its matchers; reports stay inside it.",
+      "description": "One project: every Prometheus query carries all of its matchers; reports stay inside it.\n\n``matchers`` is empty only for projects without a Prometheus source; Prometheus queries\nrefuse an empty scope.",
       "properties": {
         "matchers": {
           "items": {
             "$ref": "#/$defs/LabelMatcher"
           },
           "maxItems": 10,
-          "minItems": 1,
           "title": "Matchers",
           "type": "array"
         },
@@ -1199,7 +1217,9 @@
         "client_errors",
         "latency",
         "proxy",
-        "database"
+        "database",
+        "edge",
+        "security"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -1218,7 +1238,7 @@
     },
     "SourceInfo": {
       "additionalProperties": false,
-      "description": "Identity of the metrics source without credentials.",
+      "description": "Identity of a data source without credentials.",
       "properties": {
         "backend": {
           "anyOf": [
@@ -1238,6 +1258,10 @@
           "title": "Base Url",
           "type": "string"
         },
+        "kind": {
+          "$ref": "#/$defs/SourceKind",
+          "default": "prometheus"
+        },
         "version": {
           "anyOf": [
             {
@@ -1256,6 +1280,14 @@
       ],
       "title": "SourceInfo",
       "type": "object"
+    },
+    "SourceKind": {
+      "enum": [
+        "prometheus",
+        "cloudflare"
+      ],
+      "title": "SourceKind",
+      "type": "string"
     },
     "TimeRange": {
       "additionalProperties": false,
@@ -1431,8 +1463,11 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "2.0",
-      "default": "2.0",
+      "default": "2.1",
+      "enum": [
+        "2.0",
+        "2.1"
+      ],
       "title": "Schema Version",
       "type": "string"
     },
@@ -1440,7 +1475,24 @@
       "$ref": "#/$defs/Scope"
     },
     "source": {
-      "$ref": "#/$defs/SourceInfo"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourceInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Deprecated: the first source; use sources."
+    },
+    "sources": {
+      "description": "Every source analysed (2.1); empty in 2.0 reports.",
+      "items": {
+        "$ref": "#/$defs/SourceInfo"
+      },
+      "title": "Sources",
+      "type": "array"
     },
     "state": {
       "$ref": "#/$defs/ReportState"
@@ -1476,7 +1528,6 @@
     "generated_at",
     "detector_version",
     "config_hash",
-    "source",
     "state",
     "capabilities",
     "coverage",

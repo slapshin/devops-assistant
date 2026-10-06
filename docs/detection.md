@@ -1,6 +1,6 @@
 # Detection engine (T005)
 
-`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.5`, identified by `config_hash`). Every threshold is a provisional diagnostic heuristic, not an SLO.
+`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.7`, identified by `config_hash`). Every threshold is a provisional diagnostic heuristic, not an SLO.
 
 ## Pipeline
 
@@ -12,6 +12,7 @@
    - PostgreSQL (postgres_exporter, kind `database`): server signals (`pg_up`, connections vs `max_connections`, replication lag) and per-database deadlocks, temp-file bytes and the longest open transaction pass through onto the `database_*` rules. The rollback share is `pg_rollbacks / pg_transactions` with the same volume guard as the 5xx ratio (≥ 30 transactions per step).
    - MySQL (mysqld_exporter, kind `database`, server-wide only): `mysql_up`, connections vs `max_connections`, replication lag, row lock waits and on-disk temporary tables pass through; refused connections (`max_connections` reached) use the `database_connections_refused` event rule and stopped replication threads the `database_replication_stopped` shortfall rule. The slow-query share is `mysql_slow_queries / mysql_queries`, volume-guarded at ≥ 30 queries per step.
    - Redis (redis_exporter, kind `database`, server-wide only): `redis_up`, clients vs `maxclients`, memory vs `maxmemory` and evicted keys pass through; rejected connections reuse the `database_connections_refused` event rule, and a replica's broken master link (`database_replica_link_down`) and failed RDB/AOF persistence (`database_persistence_failed`) are shortfall rules. The command rate carries the commandstats mean latency (volume-guarded at ≥ 30 commands per step); the keyspace miss share is `misses / (hits + misses)`, volume-guarded at ≥ 30 lookups per step, and the lookup count itself is not analysed.
+   - Cloudflare (kind `zone`, family `edge`): `cf_requests` is the traffic signal (`edge_request_rate`). The 5xx, origin 52x and cache-hit counts become shares of it (`edge_server_error_ratio`, `edge_origin_error_ratio`, `edge_cache_hit_ratio`, the last one direction down), all volume-guarded at ≥ 30 requests per step. 404 and other 4xx rates map onto `edge_not_found_rate`/`edge_client_error_rate`. Edge TTFB p95 (`edge_ttfb_p95`, p99 as evidence) and origin response time p95 (`edge_origin_time_p95`) carry the volume guard. Blocked and challenged firewall events (family `security`) pass through onto `security_blocked_rate`/`security_challenge_rate`.
    - Latency uses p95 (with p99 kept as evidence), or mean when histograms are absent. It carries the same volume guard.
    - Swarm failed-task counts become **positive deltas**: new failures.
 2. **Baseline** (`baseline.py`): computed for each trend bucket *b* from `[start_b − 14 d, start_b)` only.

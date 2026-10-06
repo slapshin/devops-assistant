@@ -1,0 +1,21 @@
+{
+  "kind": "cloudflare",
+  "reachable": true,
+  "auth_ok": true,
+  "matched_series": 3456789,
+  "history_days": 30.0,
+  "families": [
+    {
+      "family": "edge",
+      "status": "supported",
+      "reason": null
+    },
+    {
+      "family": "security",
+      "status": "supported",
+      "reason": null
+    }
+  ],
+  "message": "3,456,789 requests in the last 24 h.",
+  "checked_at": "2026-09-30T10:05:00Z"
+}

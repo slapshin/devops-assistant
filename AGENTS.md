@@ -2,7 +2,7 @@
 
 ## What this is
 
-A local web app that analyses **projects**: each project selects its series with equality label matchers (e.g. `project="shop", env="prod"`) on its own Prometheus-compatible source (VictoriaMetrics in practice); more source kinds (Wazuh, Cloudflare, Sentry) are planned. It finds anomalies in the latest 24 h against up to 14 preceding days, builds a 14-day anomaly trend, and optionally adds AI explanations (OpenAI). Backend: Python 3.14 + FastAPI + SQLite (uv). Frontend: Vue 3 + TypeScript + Vite + ECharts (npm, Node 24 LTS). FastAPI serves the built frontend in production; a single Docker container runs everything.
+A local web app that analyses **projects**: each project has up to one data source per kind and is analysed from all of them in one run. A Prometheus-compatible source (VictoriaMetrics in practice) selects series with the project's equality label matchers (e.g. `project="shop", env="prod"`); a Cloudflare source analyses one zone's edge traffic and security events (GraphQL Analytics API); Wazuh and Sentry are planned. It finds anomalies in the latest 24 h against up to 14 preceding days, builds a 14-day anomaly trend, and optionally adds AI explanations (OpenAI). Backend: Python 3.14 + FastAPI + SQLite (uv). Frontend: Vue 3 + TypeScript + Vite + ECharts (npm, Node 24 LTS). FastAPI serves the built frontend in production; a single Docker container runs everything.
 
 ## Commands
 
@@ -27,7 +27,7 @@ cd backend && uv run pytest tests/test_analysis.py::test_name -q
 cd frontend && npx vitest run src/App.test.ts -t "test name"
 ```
 
-Offline running without a metrics source: a project whose source URL is `synthetic://<scenario>` (scenarios in `backend/app/metrics/synthetic.py`: `healthy`, `incident`, `short-history`, `degraded`; `DEMO_PROJECTS=true` seeds one per scenario) and `AI_PROVIDER=fake|none`. Check an OpenAI model supports structured output: `cd backend && uv run python -m scripts.check_openai --structured`.
+Offline running without a metrics source: a project whose source URL (Prometheus `url`, Cloudflare `api_url`) is `synthetic://<scenario>` (scenarios in `backend/app/metrics/synthetic.py`: `healthy`, `incident`, `short-history`, `degraded`; `DEMO_PROJECTS=true` seeds one per scenario with both source kinds; Cloudflare scenarios in `app/sources/cloudflare/synthetic.py`) and `AI_PROVIDER=fake|none`. Check an OpenAI model supports structured output: `cd backend && uv run python -m scripts.check_openai --structured`.
 
 ## Generated artefacts (drift-checked in CI)
 
@@ -42,14 +42,15 @@ Pydantic models in `backend/app/domain/` are the single source of truth for all 
 
 Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source → deterministic detection → optional AI explanation → report saved in SQLite → browser polls and renders.
 
-- `app/main.py` — `create_app()` factory; `build_services()` wires `Services` (`app/container.py`): settings, `DetectorConfig`, `SqliteProjectRepository` (projects + encrypted source secrets, `app/storage/secrets.py`), `ProjectSources` (`app/metrics/factory.py`: opens a project's `PrometheusMetricsSource` or `SyntheticMetricsSource` per analysis), `ExplanationProvider`, `SqliteReportRepository`, `JobRunner`. Tests inject fakes through `create_app(settings, source, provider, limits)`; `source` replaces every project's source. `app/bootstrap.py` runs the one-time legacy `METRICS_*` import and demo seeding at startup.
+- `app/main.py` — `create_app()` factory; `build_services()` wires `Services` (`app/container.py`): settings, `DetectorConfig`, `SqliteProjectRepository` (projects + encrypted source secrets, `app/storage/secrets.py`), `ProjectSources` (`app/metrics/factory.py`: opens every configured source of a project per analysis, e.g. `PrometheusMetricsSource` or `SyntheticMetricsSource`), `ExplanationProvider`, `SqliteReportRepository`, `JobRunner`. Tests inject fakes through `create_app(settings, source, provider, limits)`; `source` replaces every project's source. `app/bootstrap.py` runs the one-time legacy `METRICS_*` import and demo seeding at startup.
 - `app/domain/` — contracts and Protocol interfaces (`MetricsSource`, `SourceProvider`, `Detector`, `ExplanationProvider`, `ReportRepository`, `AnalysisService`, progress/cancellation). Other layers depend on these, not on each other.
-- `app/service.py` — `AnalysisPipeline`, the framework-independent entry point (intended for future CLI/scheduled use too). Freezes one UTC end time `T` per run; stages: discovery → collection → detection → explanation.
+- `app/service.py` — `AnalysisPipeline`, the framework-independent entry point (intended for future CLI/scheduled use too). Freezes one UTC end time `T` per run; stages: discovery → collection (per source, merged; a failing source makes the report `partial`, all failing fails the job) → detection → explanation.
 - `app/scheduler.py` — `ReportScheduler`: background loop that submits each project's due scheduled analyses (`ReportSchedule` in `app/domain/schedule.py`) to the runner.
 - `app/jobs.py` — bounded in-process runner (1 running, ≤4 queued, timeout, cancellation by task cancel). On startup, interrupted jobs are marked failed.
 - `app/metrics/` — `client.py` (HTTP Prometheus API, auth, preserves URL path prefix), `catalog/` (scoped query catalog: `base.py` signal model + template builders; one module per source: `host`, `container`, `requests`, `proxy`, `postgres`, `mysql`, `redis`), `promql.py` (every selector carries all project matchers), `source.py` (capability discovery + bounded collection), `factory.py`, `probe.py` (connection test).
-- `app/api/projects.py` — project CRUD, `test-connection`, cached per-project health.
-- `app/analysis/` — `engine.py` (`RobustDetector`, trend summary), `baseline.py` (median/MAD), `detect.py`, `rules/` (`base.py` rule model + formatting; one module per category: `host`, `container`, `requests`, `proxy`, `database`), `derive.py`.
+- `app/sources/cloudflare/` — Cloudflare zone source: `api.py` (typed `CloudflareApi`), `catalog.py` (signals + GraphQL documents), `client.py` (GraphQL client), `source.py` (chunked collection → series), `synthetic.py` (`synthetic://<scenario>` demo API), `connect.py` (open + connection test).
+- `app/api/projects.py` — project CRUD, `test-connection`, cached per-source health.
+- `app/analysis/` — `engine.py` (`RobustDetector`, trend summary), `baseline.py` (median/MAD), `detect.py`, `rules/` (`base.py` rule model + formatting; one module per category: `host`, `container`, `requests`, `proxy`, `database`, `edge`, `security`), `derive.py`.
 - `app/ai/` — `providers.py` (provider selection, `fake`), `prompt.py`, `validation.py` (validates model output references real finding IDs), `openai_adapter.py`.
 - `app/storage/` — SQLAlchemy Core (no ORM) + Alembic migrations in `backend/migrations/`, run upgrade-only at startup. Reports are stored as versioned JSON snapshots (`REPORT_SCHEMA_VERSION`).
 - `app/api/` — routes under `/api`; errors are RFC 9457 `application/problem+json` with a stable `code` (`problems.py`).

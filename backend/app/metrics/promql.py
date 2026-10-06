@@ -31,6 +31,9 @@ def render_matchers(matchers: Sequence[LabelMatcher]) -> str:
 
 
 def scope_matchers(scope: Scope) -> str:
+    """The scope's matchers; an empty scope would select every series, so it is refused."""
+    if not scope.matchers:
+        raise ScopeViolation(f"project {scope.project_id} has no label matchers")
     return render_matchers(scope.matchers)
 
 
@@ -49,6 +52,8 @@ def _mask_strings(query: str) -> str:
 
 
 def assert_scoped(query: str, scope: Scope, metrics: Sequence[str]) -> None:
+    if not scope.matchers:
+        raise ScopeViolation(f"project {scope.project_id} has no label matchers")
     required = [render_matchers([m]) for m in scope.matchers]
     masked = _mask_strings(query)
     blocks = [(m.start(), m.end()) for m in re.finditer(r"\{[^{}]*\}", masked)]

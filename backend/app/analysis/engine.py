@@ -75,6 +75,9 @@ LOW_COVERAGE = 0.7
 REDUCED_COVERAGE = 0.9
 LOW_VOLUME_REQUESTS_PER_STEP = 300
 SHORT_EPISODE_STEPS = 6
+SAMPLED_INTERVAL = 10.0
+HEAVILY_SAMPLED_INTERVAL = 100.0
+"""Mean sampling interval (Cloudflare adaptive sampling) that lowers confidence."""
 LOW_CONFIDENCE_SUFFIX = "_low"
 
 RECURRING_MIN_PRIOR_DAYS = 3
@@ -102,8 +105,11 @@ _CAPABILITY_RANK = {
 
 
 def analysis_key(request: AnalysisRequest) -> str:
+    """Seed of finding/episode IDs; the project ID keeps projects with equal scopes apart."""
     scope = ",".join(f"{m.name}={m.value}" for m in request.scope.matchers)
-    return f"{scope}|{request.end_time.isoformat()}|{request.config_hash}"
+    return (
+        f"{request.scope.project_id}|{scope}|{request.end_time.isoformat()}|{request.config_hash}"
+    )
 
 
 def severity_from_points(points: int, cap: Severity | None) -> Severity:
@@ -342,6 +348,16 @@ class RobustDetector:
                     )
                 )
 
+        interval = ev.series.source.sample_interval
+        if interval is not None and interval >= SAMPLED_INTERVAL:
+            reasons.append(
+                Reason(
+                    code="sampled_low" if interval >= HEAVILY_SAMPLED_INTERVAL else "sampled",
+                    message=f"Source data is sampled (about 1 in {interval:.0f} requests "
+                    "counted); values are estimates.",
+                )
+            )
+
         if is_level and ep.anomalous_steps < SHORT_EPISODE_STEPS and not is_abs:
             reasons.append(
                 Reason(
@@ -486,7 +502,11 @@ class RobustDetector:
         config: DetectorConfig,
     ) -> list[SignalCoverage]:
         rows: list[SignalCoverage] = []
-        for family in SignalFamily:
+        # Only families some analysed (or failed) source provides; others are not applicable.
+        applicable = {c.family for c in capabilities} | {
+            e.family for e in exclusions if e.family is not None
+        }
+        for family in (f for f in SignalFamily if f in applicable):
             caps = [c for c in capabilities if c.family is family]
             best = (
                 max(caps, key=lambda c: _CAPABILITY_RANK[c.status]).status
@@ -512,7 +532,9 @@ class RobustDetector:
             errors = [e for e in exclusions if e.family is family]
             reasons += [Reason(code=e.code, message=e.message) for e in errors]
 
-            if best is CapabilityStatus.UNSUPPORTED:
+            if errors and not caps:  # the whole source failed before discovery
+                status = SignalStatus.SOURCE_ERROR
+            elif best is CapabilityStatus.UNSUPPORTED:
                 status = SignalStatus.UNSUPPORTED
             elif any(f.family is family for f in findings):
                 status = SignalStatus.ANOMALOUS

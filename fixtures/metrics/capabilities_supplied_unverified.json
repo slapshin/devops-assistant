@@ -1,6 +1,7 @@
 {
   "items": [
     {
+      "source": "prometheus",
       "family": "cpu",
       "signal": "cpu_utilization",
       "status": "unverified",
@@ -22,6 +23,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "memory",
       "signal": "memory_utilization",
       "status": "unverified",
@@ -41,6 +43,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "filesystem",
       "signal": "filesystem_used_ratio",
       "status": "unverified",
@@ -60,6 +63,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "disk_io",
       "signal": "disk_busy_ratio",
       "status": "unverified",
@@ -78,6 +82,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "network",
       "signal": "network_bytes",
       "status": "unverified",
@@ -97,6 +102,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "container",
       "signal": "container_cpu",
       "status": "unverified",
@@ -113,6 +119,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "request_traffic",
       "signal": "request_rate",
       "status": "unverified",
@@ -135,6 +142,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "request_failures",
       "signal": "server_error_ratio",
       "status": "unverified",
@@ -157,6 +165,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "client_errors",
       "signal": "client_error_rate",
       "status": "unverified",
@@ -179,6 +188,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "latency",
       "signal": "latency_quantile",
       "status": "unverified",

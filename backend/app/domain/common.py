@@ -18,7 +18,7 @@ from pydantic import (
     field_validator,
 )
 
-REPORT_SCHEMA_VERSION: Final = "2.0"
+REPORT_SCHEMA_VERSION: Final = "2.1"
 STEP_SECONDS = 300
 
 
@@ -88,14 +88,29 @@ Matchers = Annotated[
     Field(min_length=1, max_length=MAX_MATCHERS),
     AfterValidator(normalise_matchers),
 ]
+OptionalMatchers = Annotated[
+    list[LabelMatcher],
+    Field(max_length=MAX_MATCHERS),
+    AfterValidator(normalise_matchers),
+]
+"""Matchers of a project; empty when it has no source that selects series by labels."""
+
+
+class SourceKind(StrEnum):
+    PROMETHEUS = "prometheus"
+    CLOUDFLARE = "cloudflare"
 
 
 class Scope(Contract):
-    """One project's series: every query carries all of its matchers; reports stay inside it."""
+    """One project: every Prometheus query carries all of its matchers; reports stay inside it.
+
+    ``matchers`` is empty only for projects without a Prometheus source; Prometheus queries
+    refuse an empty scope.
+    """
 
     project_id: str
     project_name: str
-    matchers: Matchers
+    matchers: OptionalMatchers
 
     @property
     def label_names(self) -> list[str]:
@@ -125,6 +140,18 @@ class SignalFamily(StrEnum):
     DATABASE = "database"
     """Database server health and workload (PostgreSQL via postgres_exporter, MySQL via
     mysqld_exporter, Redis via redis_exporter)."""
+    EDGE = "edge"
+    """CDN edge HTTP traffic: requests, 5xx/4xx, origin errors, cache hits, TTFB (Cloudflare)."""
+    SECURITY = "security"
+    """WAF/firewall events: blocked and challenged requests (Cloudflare)."""
+
+
+_EDGE_FAMILIES = (SignalFamily.EDGE, SignalFamily.SECURITY)
+SOURCE_FAMILIES: Final[dict[SourceKind, tuple[SignalFamily, ...]]] = {
+    SourceKind.PROMETHEUS: tuple(f for f in SignalFamily if f not in _EDGE_FAMILIES),
+    SourceKind.CLOUDFLARE: _EDGE_FAMILIES,
+}
+"""Families each source kind can provide; a failed source reports these as source errors."""
 
 
 class Unit(StrEnum):
@@ -165,6 +192,8 @@ class EntityKind(StrEnum):
     """A backend server behind a reverse proxy."""
     DATABASE = "database"
     """A database server (exporter target) or one database on it (PostgreSQL only)."""
+    ZONE = "zone"
+    """A Cloudflare zone, optionally narrowed to some of its hostnames."""
 
 
 class Entity(Contract):

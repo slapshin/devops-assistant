@@ -42,8 +42,8 @@ const visible = computed(() => {
     <div v-else-if="items.length === 0" class="card empty stack">
       <h2>No projects yet</h2>
       <p>
-        A project selects its series with labels such as <code>project="shop"</code> and <code>env="prod"</code>, and reads them from
-        its own Prometheus-compatible source.
+        A project is analysed from its own data sources: Prometheus-compatible metrics selected by labels such as
+        <code>project="shop"</code> and <code>env="prod"</code>, and a Cloudflare zone's edge traffic and security events.
       </p>
       <RouterLink to="/projects/new" class="button primary">Create project</RouterLink>
     </div>

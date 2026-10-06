@@ -65,6 +65,59 @@
       "title": "BearerAuthInput",
       "type": "object"
     },
+    "CloudflareSourceInput": {
+      "additionalProperties": false,
+      "description": "One Cloudflare zone, optionally narrowed to some of its hostnames.",
+      "properties": {
+        "api_token": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "API token with Analytics:Read on the zone. Omit to keep the stored one (update only); not needed for synthetic://.",
+          "title": "Api Token"
+        },
+        "api_url": {
+          "default": "https://api.cloudflare.com/client/v4/graphql",
+          "description": "GraphQL endpoint; synthetic://<scenario> for demo data.",
+          "maxLength": 2048,
+          "title": "Api Url",
+          "type": "string"
+        },
+        "hostnames": {
+          "description": "Analyse only these hostnames; empty analyses the whole zone.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Hostnames",
+          "type": "array"
+        },
+        "kind": {
+          "const": "cloudflare",
+          "default": "cloudflare",
+          "title": "Kind",
+          "type": "string"
+        },
+        "zone_id": {
+          "description": "Zone ID (32 hex characters, dashboard → Overview).",
+          "title": "Zone Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "zone_id"
+      ],
+      "title": "CloudflareSourceInput",
+      "type": "object"
+    },
     "LabelMatcher": {
       "additionalProperties": false,
       "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
@@ -155,11 +208,11 @@
   "description": "Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets.",
   "properties": {
     "matchers": {
+      "description": "Required with a Prometheus source.",
       "items": {
         "$ref": "#/$defs/LabelMatcher"
       },
       "maxItems": 10,
-      "minItems": 1,
       "title": "Matchers",
       "type": "array"
     },
@@ -177,11 +230,18 @@
       "title": "Project Id"
     },
     "source": {
-      "$ref": "#/$defs/PrometheusSourceInput"
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PrometheusSourceInput"
+        },
+        {
+          "$ref": "#/$defs/CloudflareSourceInput"
+        }
+      ],
+      "title": "Source"
     }
   },
   "required": [
-    "matchers",
     "source"
   ],
   "title": "ConnectionTestRequest",

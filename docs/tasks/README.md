@@ -2,7 +2,7 @@
 
 This is the execution index for the first usable DevOps AI assistant release. Read [the product plan](../PRODUCT_PLAN.md) and [architecture](../ARCHITECTURE.md) before starting. Web UI, project/env selection, 24-hour analysis, two-week trends, and OpenAI-first explanations are confirmed. The Vue.js frontend is an owner decision (2026-09-30); Python/FastAPI, TypeScript, SQLite, and Docker are proposed defaults made concrete in T001.
 
-All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. The first release is validated; see [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for evidence and remaining limitations. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
+All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. Multiple data sources with Cloudflare as the second kind (T014–T016) are DONE. The first release is validated; see [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for evidence and remaining limitations. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
 
 ## Ordered backlog
 
@@ -21,6 +21,9 @@ All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. The 
 | T011 | [Project model, encrypted source config, and project API](T011-projects-model-and-api.md) | T010 | DONE |
 | T012 | [Project-scoped analyses, reports, and legacy migration](T012-project-scoped-analysis.md) | T011 | DONE |
 | T013 | [Projects UI](T013-projects-ui.md) | T012 | DONE |
+| T014 | [Multi-source foundation](T014-multi-source-foundation.md) | T013 | DONE |
+| T015 | [Cloudflare source: edge traffic and security events](T015-cloudflare-source.md) | T014 | DONE |
+| T016 | [Sources UI (Cloudflare)](T016-sources-ui.md) | T015 | DONE |
 
 ## How the next agent should work
 

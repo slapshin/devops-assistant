@@ -1,14 +1,15 @@
-"""Bounded, read-only connection test for a project's draft or stored metrics source."""
+"""Bounded, read-only connection test for a project's draft or stored source."""
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
-from app.domain.common import STEP_SECONDS, Scope, SignalFamily
-from app.domain.interfaces import MetricsSource
+from app.domain.common import STEP_SECONDS, Scope, SignalFamily, SourceKind
+from app.domain.interfaces import MetricsSource, SourceError, SourceErrorKind
 from app.domain.metrics import CapabilityStatus, MetricCapability
 from app.domain.projects import ConnectionTest, FamilyCapability
 from app.domain.report import AnalysisWindows
-from app.metrics.client import PrometheusClient, SourceError, SourceErrorKind
+from app.metrics.client import PrometheusClient
 from app.metrics.promql import scope_matchers
 
 PROBE_TIMEOUT_SECONDS = 30
@@ -86,14 +87,16 @@ async def _measure(
     )
 
 
-async def probe(
-    source: MetricsSource, client: PrometheusClient | None, scope: Scope
+async def guarded(
+    kind: SourceKind, measure: Callable[[datetime], Awaitable[ConnectionTest]]
 ) -> ConnectionTest:
+    """Run a bounded connection test; timeouts and source errors become a failed test."""
     now = _now()
     try:
-        return await asyncio.wait_for(_measure(source, client, scope, now), PROBE_TIMEOUT_SECONDS)
+        return await asyncio.wait_for(measure(now), PROBE_TIMEOUT_SECONDS)
     except TimeoutError:
         return ConnectionTest(
+            kind=kind,
             reachable=False,
             auth_ok=None,
             message=f"No answer within {PROBE_TIMEOUT_SECONDS} s.",
@@ -102,12 +105,19 @@ async def probe(
     except SourceError as exc:
         if exc.kind is SourceErrorKind.AUTH:
             return ConnectionTest(
-                reachable=True, auth_ok=False, message=exc.message, checked_at=now
+                kind=kind, reachable=True, auth_ok=False, message=exc.message, checked_at=now
             )
         reachable = exc.kind not in UNREACHABLE_KINDS
         return ConnectionTest(
+            kind=kind,
             reachable=reachable,
             auth_ok=True if reachable else None,
             message=f"{exc.kind.value}: {exc.message}",
             checked_at=now,
         )
+
+
+async def probe(
+    source: MetricsSource, client: PrometheusClient | None, scope: Scope
+) -> ConnectionTest:
+    return await guarded(SourceKind.PROMETHEUS, lambda now: _measure(source, client, scope, now))

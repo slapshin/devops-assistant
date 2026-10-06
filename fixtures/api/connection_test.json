@@ -1,4 +1,5 @@
 {
+  "kind": "prometheus",
   "reachable": true,
   "auth_ok": true,
   "matched_series": 1832,

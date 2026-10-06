@@ -14,7 +14,7 @@ const submit = useSubmit();
 const active = computed(() => props.project.active_analysis ?? null);
 const runnable = computed(() => props.project.sources.length > 0 && props.project.credentials_readable);
 const blockedReason = computed(() => {
-  if (props.project.sources.length === 0) return "Add a metrics source to run an analysis.";
+  if (props.project.sources.length === 0) return "Add a data source to run an analysis.";
   if (!props.project.credentials_readable) return "Re-enter the source credentials to run an analysis.";
   return null;
 });

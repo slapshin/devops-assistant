@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { ProjectSummary } from "../../api/client";
 import { JOB_STATES, formatAge, utcTooltip } from "../../lib/format";
-import { scheduleSummary, sourceHost } from "../../lib/projects";
+import { scheduleSummary, sourceSummary } from "../../lib/projects";
 import SeverityCounts from "../SeverityCounts.vue";
 import HealthBadge from "./HealthBadge.vue";
 import MatcherChips from "./MatcherChips.vue";
@@ -18,7 +18,6 @@ const latestLink = computed(() => {
   if (!job) return null;
   return job.report_available ? `/reports/${job.analysis_id}` : `/analyses/${job.analysis_id}`;
 });
-const source = computed(() => props.project.sources[0] ?? null);
 </script>
 
 <template>
@@ -27,9 +26,10 @@ const source = computed(() => props.project.sources[0] ?? null);
       <h2 :id="`project-${project.project_id}`">
         <RouterLink :to="`/projects/${project.project_id}`">{{ project.name }}</RouterLink>
       </h2>
-      <MatcherChips :matchers="project.matchers" />
+      <MatcherChips v-if="project.matchers.length" :matchers="project.matchers" />
       <p class="source">
-        <span class="mono muted">{{ source ? sourceHost(source.url) : "No metrics source" }}</span>
+        <span v-for="s in project.sources" :key="s.kind" class="mono muted">{{ sourceSummary(s) }}</span>
+        <span v-if="!project.sources.length" class="mono muted">No data source</span>
         <HealthBadge :project="project" />
       </p>
       <p v-if="project.schedule" class="muted schedule">Scheduled: {{ scheduleSummary(project.schedule) }}</p>

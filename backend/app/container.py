@@ -21,5 +21,5 @@ class Services:
     runner: JobRunner
     projects: SqliteProjectRepository
     scheduler: ReportScheduler
-    health_cache: dict[str, tuple[float, str, ConnectionTest]] = field(default_factory=dict)
+    health_cache: dict[str, tuple[float, str, list[ConnectionTest]]] = field(default_factory=dict)
     """project_id -> (monotonic time, project updated_at, last connection test)."""

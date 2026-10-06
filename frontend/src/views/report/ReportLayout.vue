@@ -7,6 +7,7 @@ import AppTopbar from "../../components/shell/AppTopbar.vue";
 import type { Crumb } from "../../components/shell/crumbs";
 import { longestBaselineDays } from "../../lib/findings";
 import { formatTime, timezone, utcTooltip } from "../../lib/format";
+import { reportSources, sourceKindLabel } from "../../lib/projects";
 import { provideReport } from "./context";
 
 const SECONDS_PER_MINUTE = 60;
@@ -80,7 +81,7 @@ async function runAgain() {
 
 <template>
   <AppTopbar :crumbs="crumbs">
-    <span v-if="report?.source.backend === 'synthetic'" class="badge">Synthetic data</span>
+    <span v-if="report && reportSources(report).some((s) => s.backend === 'synthetic')" class="badge">Synthetic data</span>
   </AppTopbar>
 
   <main v-if="query.isPending.value" aria-busy="true" class="page">
@@ -102,6 +103,9 @@ async function runAgain() {
 
   <template v-else-if="report">
     <div class="ctl">
+      <span v-for="s in reportSources(report)" :key="s.kind ?? 'prometheus'" class="var" :title="s.base_url">
+        <span>source</span><span>{{ sourceKindLabel(s.kind ?? "prometheus") }}</span>
+      </span>
       <span v-for="m in report.scope.matchers" :key="m.name" class="var"><span>{{ m.name }}</span><span class="mono">{{ m.value }}</span></span>
       <span v-if="baselineDays" class="var"><span>baseline</span><span>{{ baselineDays }} days</span></span>
       <span class="grow" />

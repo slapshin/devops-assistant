@@ -15,6 +15,8 @@ from app.domain.interfaces import (
     EntityMapping,
     MappingKind,
     ProgressReporter,
+    SourceError,
+    SourceErrorKind,
 )
 from app.domain.jobs import StageName, StageProgress, StageStatus
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
@@ -27,7 +29,7 @@ from app.metrics.catalog import (
     TRAFFIC_SIGNALS,
     SignalDef,
 )
-from app.metrics.client import PrometheusClient, RangeResult, SourceError, SourceErrorKind
+from app.metrics.client import PrometheusClient, RangeResult
 from app.metrics.promql import assert_scoped, scope_matchers
 
 log = logging.getLogger("app.metrics")

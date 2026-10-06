@@ -46,7 +46,8 @@
         "route",
         "proxy",
         "upstream",
-        "database"
+        "database",
+        "zone"
       ],
       "title": "EntityKind",
       "type": "string"
@@ -64,7 +65,9 @@
         "client_errors",
         "latency",
         "proxy",
-        "database"
+        "database",
+        "edge",
+        "security"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -108,10 +111,24 @@
       "type": "object"
     },
     "query": {
-      "description": "Exact PromQL/MetricsQL sent to the source.",
+      "description": "Exact query sent to the source (PromQL/MetricsQL, GraphQL).",
       "minLength": 1,
       "title": "Query",
       "type": "string"
+    },
+    "sample_interval": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Mean sampling interval of the source data (1 = every event counted; Cloudflare adaptive sampling). Null when the source does not sample.",
+      "title": "Sample Interval"
     },
     "series_id": {
       "pattern": "^ser_[0-9a-f]{16}$",

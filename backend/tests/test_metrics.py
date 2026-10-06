@@ -10,13 +10,13 @@ import pytest
 from pydantic import SecretStr
 
 from app.domain.common import STEP_SECONDS, EntityKind, LabelMatcher, Scope
-from app.domain.interfaces import CancellationToken, Cancelled
+from app.domain.interfaces import CancellationToken, Cancelled, SourceError, SourceErrorKind
 from app.domain.jobs import StageProgress
 from app.domain.metrics import CapabilityStatus
 from app.domain.projects import PrometheusConnection
 from app.domain.report import AnalysisWindows
 from app.metrics.catalog import BY_SIGNAL, CATALOG
-from app.metrics.client import ClientLimits, PrometheusClient, SourceError, SourceErrorKind
+from app.metrics.client import ClientLimits, PrometheusClient
 from app.metrics.promql import (
     QueryTemplate,
     ScopeViolation,

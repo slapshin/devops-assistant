@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { ConnectionTest } from "../../api/client";
 import { CAPABILITY_LABELS, FAMILY_LABELS, formatTime, utcTooltip } from "../../lib/format";
-import { HEALTH_LABELS, testKey } from "../../lib/projects";
+import { HEALTH_LABELS, testKey, testVolume } from "../../lib/projects";
 
 const props = defineProps<{ test: ConnectionTest; stale?: boolean }>();
 
@@ -14,7 +14,7 @@ const info = computed(() => HEALTH_LABELS[key.value]);
   <section class="result card" aria-label="Connection test result" aria-live="polite">
     <p class="summary">
       <strong :class="`h-${key}`"><span aria-hidden="true">{{ info.icon }}</span> {{ info.label }}</strong>
-      <span v-if="test.matched_series !== null && test.matched_series !== undefined"> · {{ test.matched_series }} matching series</span>
+      <span v-if="testVolume(test)"> · {{ testVolume(test) }}</span>
       <span v-if="test.history_days !== null && test.history_days !== undefined"> · {{ test.history_days }} days of history</span>
       <span class="muted" :title="utcTooltip(test.checked_at)"> · checked {{ formatTime(test.checked_at) }}</span>
     </p>
@@ -41,6 +41,6 @@ const info = computed(() => HEALTH_LABELS[key.value]);
 .result p { margin: 0 0 var(--space); }
 .h-ok, .cap-supported { color: var(--ok); }
 .h-unreachable, .h-auth, .h-error { color: var(--crit); }
-.h-no_series, .cap-partial { color: var(--med); }
+.h-no_series, .h-no_traffic, .cap-partial { color: var(--med); }
 .cap-unsupported, .cap-unverified { color: var(--muted); }
 </style>

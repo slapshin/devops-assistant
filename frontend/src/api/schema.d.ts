@@ -157,7 +157,7 @@ export interface paths {
         };
         /**
          * Get Project Health
-         * @description Null when the project has no metrics source configured.
+         * @description One connection test per configured source; empty when the project has none.
          */
         get: operations["get_project_health_api_projects__project_id__health_get"];
         put?: never;
@@ -244,12 +244,18 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 2.0
-             * @constant
+             * @default 2.1
+             * @enum {string}
              */
-            schema_version: "2.0";
+            schema_version: "2.0" | "2.1";
             scope: components["schemas"]["Scope"];
-            source: components["schemas"]["SourceInfo"];
+            /** @description Deprecated: the first source; use sources. */
+            source?: components["schemas"]["SourceInfo"] | null;
+            /**
+             * Sources
+             * @description Every source analysed (2.1); empty in 2.0 reports.
+             */
+            sources?: components["schemas"]["SourceInfo"][];
             state: components["schemas"]["ReportState"];
             trend_summary?: components["schemas"]["TrendSummary"] | null;
             /** Trends */
@@ -344,6 +350,55 @@ export interface components {
          * @enum {string}
          */
         CapabilityStatus: "supported" | "partial" | "unsupported" | "unverified";
+        /** CloudflareSource */
+        CloudflareSource: {
+            /** Api Url */
+            api_url: string;
+            /** Hostnames */
+            hostnames: string[];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "cloudflare";
+            /** Token Set */
+            token_set: boolean;
+            /** Zone Id */
+            zone_id: string;
+        };
+        /**
+         * CloudflareSourceInput
+         * @description One Cloudflare zone, optionally narrowed to some of its hostnames.
+         */
+        CloudflareSourceInput: {
+            /**
+             * Api Token
+             * @description API token with Analytics:Read on the zone. Omit to keep the stored one (update only); not needed for synthetic://.
+             */
+            api_token?: string | null;
+            /**
+             * Api Url
+             * @description GraphQL endpoint; synthetic://<scenario> for demo data.
+             * @default https://api.cloudflare.com/client/v4/graphql
+             */
+            api_url: string;
+            /**
+             * Hostnames
+             * @description Analyse only these hostnames; empty analyses the whole zone.
+             */
+            hostnames?: string[];
+            /**
+             * Kind
+             * @default cloudflare
+             * @constant
+             */
+            kind: "cloudflare";
+            /**
+             * Zone Id
+             * @description Zone ID (32 hex characters, dashboard → Overview).
+             */
+            zone_id: string;
+        };
         /**
          * ConfidenceLevel
          * @enum {string}
@@ -365,9 +420,11 @@ export interface components {
              * @description Days of matching history found, up to 30.
              */
             history_days?: number | null;
+            /** @default prometheus */
+            kind: components["schemas"]["SourceKind"];
             /**
              * Matched Series
-             * @description Series currently matching all matchers.
+             * @description Prometheus: series currently matching all matchers.
              */
             matched_series?: number | null;
             /** Message */
@@ -380,14 +437,18 @@ export interface components {
          * @description Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets.
          */
         ConnectionTestRequest: {
-            /** Matchers */
-            matchers: components["schemas"]["LabelMatcher"][];
+            /**
+             * Matchers
+             * @description Required with a Prometheus source.
+             */
+            matchers?: components["schemas"]["LabelMatcher"][];
             /**
              * Project Id
              * @description Reuse this project's stored secrets for omitted ones.
              */
             project_id?: string | null;
-            source: components["schemas"]["PrometheusSourceInput"];
+            /** Source */
+            source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"];
         };
         /**
          * DailyTrend
@@ -455,7 +516,7 @@ export interface components {
          * EntityKind
          * @enum {string}
          */
-        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database";
+        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone";
         /** EpisodeSummary */
         EpisodeSummary: {
             /** End */
@@ -753,6 +814,8 @@ export interface components {
             required_metrics: string[];
             /** Signal */
             signal: string;
+            /** @default prometheus */
+            source: components["schemas"]["SourceKind"];
             status: components["schemas"]["CapabilityStatus"];
             /**
              * Verified
@@ -783,9 +846,14 @@ export interface components {
             };
             /**
              * Query
-             * @description Exact PromQL/MetricsQL sent to the source.
+             * @description Exact query sent to the source (PromQL/MetricsQL, GraphQL).
              */
             query: string;
+            /**
+             * Sample Interval
+             * @description Mean sampling interval of the source data (1 = every event counted; Cloudflare adaptive sampling). Null when the source does not sample.
+             */
+            sample_interval?: number | null;
             /** Series Id */
             series_id: string;
             /**
@@ -867,7 +935,7 @@ export interface components {
             project_id: string;
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources: components["schemas"]["PrometheusSource"][];
+            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"])[];
             /** Updated At */
             updated_at: string;
         };
@@ -883,14 +951,17 @@ export interface components {
              * @description Keep only this many newest reports; older analyses are deleted automatically. Null keeps all.
              */
             keep_reports?: number | null;
-            /** Matchers */
-            matchers: components["schemas"]["LabelMatcher"][];
+            /**
+             * Matchers
+             * @description Required (1-10) with a Prometheus source.
+             */
+            matchers?: components["schemas"]["LabelMatcher"][];
             /** Name */
             name: string;
             /** @description Automatic analyses; null runs analyses on demand only. */
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources?: components["schemas"]["PrometheusSourceInput"][];
+            sources?: (components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"])[];
         };
         /** ProjectList */
         ProjectList: {
@@ -940,7 +1011,7 @@ export interface components {
             report_count: number;
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources: components["schemas"]["PrometheusSource"][];
+            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"])[];
             /** Updated At */
             updated_at: string;
         };
@@ -949,9 +1020,8 @@ export interface components {
             /** Auth */
             auth: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuth"] | components["schemas"]["BasicAuth"];
             /**
-             * Kind
-             * @default prometheus
-             * @constant
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
             kind: "prometheus";
             /** Tls Verify */
@@ -1047,7 +1117,10 @@ export interface components {
         };
         /**
          * Scope
-         * @description One project's series: every query carries all of its matchers; reports stay inside it.
+         * @description One project: every Prometheus query carries all of its matchers; reports stay inside it.
+         *
+         *     ``matchers`` is empty only for projects without a Prometheus source; Prometheus queries
+         *     refuse an empty scope.
          */
         Scope: {
             /** Matchers */
@@ -1083,7 +1156,7 @@ export interface components {
          * SignalFamily
          * @enum {string}
          */
-        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database";
+        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security";
         /**
          * SignalStatus
          * @enum {string}
@@ -1091,7 +1164,7 @@ export interface components {
         SignalStatus: "anomalous" | "no_anomaly" | "insufficient_data" | "unsupported" | "source_error" | "not_evaluated";
         /**
          * SourceInfo
-         * @description Identity of the metrics source without credentials.
+         * @description Identity of a data source without credentials.
          */
         SourceInfo: {
             /**
@@ -1104,9 +1177,16 @@ export interface components {
              * @description Scheme, host, port, and path prefix; never userinfo.
              */
             base_url: string;
+            /** @default prometheus */
+            kind: components["schemas"]["SourceKind"];
             /** Version */
             version?: string | null;
         };
+        /**
+         * SourceKind
+         * @enum {string}
+         */
+        SourceKind: "prometheus" | "cloudflare";
         /**
          * StageName
          * @enum {string}
@@ -1786,7 +1866,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConnectionTest"] | null;
+                    "application/json": components["schemas"]["ConnectionTest"][];
                 };
             };
             /** @description Problem */

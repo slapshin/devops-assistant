@@ -113,6 +113,8 @@ export const FAMILY_LABELS: Record<string, string> = {
   latency: "Latency",
   proxy: "Reverse proxies",
   database: "Databases",
+  edge: "CDN edge (Cloudflare)",
+  security: "Security (WAF)",
 };
 
 export const STATUS_LABELS: Record<string, { label: string; icon: string }> = {

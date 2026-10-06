@@ -3,7 +3,7 @@
 import { computed } from "vue";
 import type { ProjectSummary } from "../../api/client";
 import { useProjectHealth } from "../../api/queries";
-import { HEALTH_LABELS, healthKey } from "../../lib/projects";
+import { HEALTH_LABELS, healthKey, sourceKindLabel, testKey, testVolume } from "../../lib/projects";
 
 const props = defineProps<{ project: ProjectSummary }>();
 
@@ -15,10 +15,12 @@ const key = computed(() =>
 const info = computed(() => HEALTH_LABELS[key.value]);
 const detail = computed(() => {
   if (health.isError.value) return health.error.value?.message;
-  const test = health.data.value;
-  if (!test) return undefined;
-  const series = test.matched_series !== null && test.matched_series !== undefined ? `${test.matched_series} matching series` : null;
-  return [series, test.message].filter(Boolean).join(" · ") || undefined;
+  const tests = health.data.value ?? [];
+  const lines = tests.map((test) => {
+    const status = HEALTH_LABELS[testKey(test)].label;
+    return [`${sourceKindLabel(test.kind ?? "prometheus")}: ${status}`, testVolume(test), test.message].filter(Boolean).join(" · ");
+  });
+  return lines.join("\n") || undefined;
 });
 </script>
 
@@ -32,6 +34,6 @@ const detail = computed(() => {
 .health { white-space: nowrap; font-weight: 500; font-size: 0.9rem; }
 .h-ok { color: var(--ok); }
 .h-unreachable, .h-auth, .h-unreadable, .h-error { color: var(--crit); }
-.h-no_series { color: var(--med); }
+.h-no_series, .h-no_traffic { color: var(--med); }
 .h-checking, .h-not_configured { color: var(--muted); }
 </style>

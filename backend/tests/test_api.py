@@ -16,13 +16,18 @@ from app.ai.providers import FakeExplanationProvider
 from app.analysis.engine import RobustDetector
 from app.domain.common import Scope
 from app.domain.detector_config import DetectorConfig
-from app.domain.interfaces import CancellationToken, CollectionResult, ProgressReporter
+from app.domain.interfaces import (
+    CancellationToken,
+    CollectionResult,
+    ProgressReporter,
+    SourceError,
+    SourceErrorKind,
+)
 from app.domain.jobs import StageProgress
 from app.domain.metrics import MetricCapability
 from app.domain.report import AnalysisRequest, AnalysisWindows, Exclusion
 from app.jobs import RunnerLimits
 from app.main import create_app
-from app.metrics.client import SourceError, SourceErrorKind
 from app.metrics.synthetic import SyntheticMetricsSource
 from app.service import AnalysisPipeline
 from app.settings import load_settings

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-/** Create (/projects/new), clone (/projects/new?from=:projectId) or edit (/projects/:projectId/edit) a project, test its source, delete it. */
+/** Create (/projects/new), clone (/projects/new?from=:projectId) or edit (/projects/:projectId/edit) a project, test its sources, delete it. */
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ApiError, type ConnectionTest } from "../../api/client";
+import { ApiError, type ConnectionTest, type SourceKind } from "../../api/client";
 import { useCreateProject, useDeleteProject, useProject, useTestConnection, useUpdateProject } from "../../api/queries";
 import ConnectionTestResult from "../../components/projects/ConnectionTestResult.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
@@ -13,16 +13,21 @@ import {
   MAX_MATCHERS,
   WEEKDAYS,
   cloneDraft,
+  cloudflareInput,
   draftFrom,
   emptyDraft,
   keepsStoredSecret,
   matchersInput,
+  prometheusInput,
   serverFieldErrors,
+  sourceKindLabel,
+  sourceKinds,
   storedAuth,
+  storedCloudflareToken,
   testKey,
-  testRequestSource,
   timezoneOptions,
   toInput,
+  validateCloudflare,
   validateDraft,
   validateMatchers,
   validateSource,
@@ -56,12 +61,14 @@ const loaded = ref(!sourceId.value);
 const submitted = ref(false);
 const serverErrors = ref<FieldErrors>({});
 const formError = ref<string | null>(null);
-const lastTest = ref<{ result: ConnectionTest; signature: string } | null>(null);
+const lastTests = ref<Partial<Record<SourceKind, { result: ConnectionTest; signature: string }>>>({});
+const testing = ref<SourceKind | null>(null);
 const confirmingDelete = ref(false);
 const deleteName = ref("");
 
 const stored = computed(() => storedAuth(existing.data.value));
 const keeps = computed(() => keepsStoredSecret(draft.value, stored.value));
+const cfTokenStored = computed(() => storedCloudflareToken(existing.data.value));
 
 // Fill the form once from the stored project; later refetches must not overwrite edits.
 watch(
@@ -74,21 +81,31 @@ watch(
   { immediate: true },
 );
 
-const clientErrors = computed(() => validateDraft(draft.value, stored.value));
+const clientErrors = computed(() => validateDraft(draft.value, stored.value, cfTokenStored.value));
 const errors = computed<FieldErrors>(() => ({ ...(submitted.value ? clientErrors.value : {}), ...serverErrors.value }));
 
 // A server error belongs to the value it was about; editing anything clears them.
 watch(draft, () => (serverErrors.value = {}), { deep: true });
 
-const sourceSignature = computed(() =>
-  JSON.stringify([matchersInput(draft.value), draft.value.url.trim() ? testRequestSource(draft.value) : null]),
-);
-const testStale = computed(() => !!lastTest.value && lastTest.value.signature !== sourceSignature.value);
+const signatures = computed<Record<SourceKind, string>>(() => ({
+  prometheus: JSON.stringify([matchersInput(draft.value), draft.value.url.trim() ? prometheusInput(draft.value) : null]),
+  cloudflare: JSON.stringify(draft.value.cloudflare ? cloudflareInput(draft.value) : null),
+}));
+const isStale = (kind: SourceKind) => {
+  const last = lastTests.value[kind];
+  return !!last && last.signature !== signatures.value[kind];
+};
 const saveWarning = computed(() => {
-  if (!draft.value.url.trim()) return "Without a metrics source this project cannot be analysed yet.";
-  if (!lastTest.value) return editing.value ? null : "The connection has not been tested.";
-  if (testStale.value) return "The connection was not tested with the current values.";
-  if (testKey(lastTest.value.result) !== "ok") return "The last connection test did not succeed.";
+  const kinds = sourceKinds(draft.value);
+  if (!kinds.length) return "Without a data source this project cannot be analysed yet.";
+  for (const kind of kinds) {
+    const label = sourceKindLabel(kind);
+    const last = lastTests.value[kind];
+    if (!last) {
+      if (!editing.value) return `The ${label} connection has not been tested.`;
+    } else if (isStale(kind)) return `The ${label} connection was not tested with the current values.`;
+    else if (testKey(last.result) !== "ok") return `The last ${label} connection test did not succeed.`;
+  }
   return null;
 });
 
@@ -112,9 +129,9 @@ function problemMessage(error: unknown): string {
   return "Unexpected error";
 }
 
-function applyServerError(error: unknown) {
+function applyServerError(error: unknown, tested?: SourceKind) {
   if (error instanceof ApiError && error.problem.code === "validation_error") {
-    serverErrors.value = serverFieldErrors(error.problem);
+    serverErrors.value = serverFieldErrors(error.problem, sourceKinds(draft.value), tested);
     formError.value = "Some fields need attention.";
   } else if (error instanceof ApiError && error.problem.code === "project_name_taken") {
     serverErrors.value = { name: error.problem.detail ?? "Name already in use" };
@@ -123,24 +140,30 @@ function applyServerError(error: unknown) {
   }
 }
 
-async function runTest() {
+async function runTest(kind: SourceKind) {
   formError.value = null;
-  const problems = { ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, stored.value, true) };
+  const problems =
+    kind === "prometheus"
+      ? { ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, stored.value, true) }
+      : validateCloudflare(draft.value, cfTokenStored.value);
   if (Object.keys(problems).length) {
     serverErrors.value = problems;
     return;
   }
 
-  const signature = sourceSignature.value;
+  const signature = signatures.value[kind];
+  testing.value = kind;
   try {
     const result = await tester.mutateAsync({
       project_id: sourceId.value,
-      matchers: matchersInput(draft.value),
-      source: testRequestSource(draft.value),
+      matchers: kind === "prometheus" ? matchersInput(draft.value) : [],
+      source: kind === "prometheus" ? prometheusInput(draft.value) : cloudflareInput(draft.value),
     });
-    lastTest.value = { result, signature };
+    lastTests.value = { ...lastTests.value, [kind]: { result, signature } };
   } catch (error) {
-    applyServerError(error);
+    applyServerError(error, kind);
+  } finally {
+    testing.value = null;
   }
 }
 
@@ -198,8 +221,10 @@ async function confirmDelete() {
       </div>
 
       <fieldset>
-        <legend>Labels</legend>
-        <p class="muted hint">Every query of this project is restricted to series with all of these exact label values.</p>
+        <legend>Prometheus-compatible metrics</legend>
+        <p class="muted hint">Host, container, HTTP/RPC, proxy and database metrics from VictoriaMetrics or Prometheus.</p>
+        <h2 class="source-title">Labels</h2>
+        <p class="muted hint">Every query is restricted to series with all of these exact label values. Required with a URL.</p>
         <div v-for="(m, i) in draft.matchers" :key="i" class="matcher">
           <div class="field">
             <label :for="`matcher-name-${i}`" class="sr-only">Label name {{ i + 1 }}</label>
@@ -228,15 +253,19 @@ async function confirmDelete() {
             >
             <p v-if="errors[`matchers.${i}.value`]" :id="errorId(`matchers.${i}.value`)" class="field-error">{{ errors[`matchers.${i}.value`] }}</p>
           </div>
-          <button type="button" :aria-label="`Remove label ${i + 1}`" :disabled="draft.matchers.length === 1" @click="removeMatcher(i)">✕</button>
+          <button
+            type="button"
+            :aria-label="`Remove label ${i + 1}`"
+            :disabled="draft.matchers.length === 1 && !!draft.url.trim()"
+            @click="removeMatcher(i)"
+          >
+            ✕
+          </button>
         </div>
         <p v-if="errors.matchers" class="field-error">{{ errors.matchers }}</p>
         <button type="button" :disabled="draft.matchers.length >= MAX_MATCHERS" @click="addMatcher">Add label</button>
-      </fieldset>
 
-      <fieldset>
-        <legend>Sources</legend>
-        <h2 class="source-title">Prometheus-compatible metrics</h2>
+        <h2 class="source-title">Connection</h2>
         <div class="field">
           <label for="source-url">URL</label>
           <input
@@ -245,14 +274,14 @@ async function confirmDelete() {
             class="mono"
             placeholder="http://localhost:8428"
             autocomplete="off"
-            :aria-invalid="!!errors['sources.0.url']"
-            :aria-describedby="describedBy('sources.0.url') ?? 'source-url-hint'"
+            :aria-invalid="!!errors['prometheus.url']"
+            :aria-describedby="describedBy('prometheus.url') ?? 'source-url-hint'"
           >
           <p id="source-url-hint" class="muted hint">
-            Path prefixes are kept. In Docker use <code>host.docker.internal</code> instead of <code>localhost</code>. Leave empty to save
-            without a source.
+            Path prefixes are kept. In Docker use <code>host.docker.internal</code> instead of <code>localhost</code>. Leave empty for a
+            project without Prometheus.
           </p>
-          <p v-if="errors['sources.0.url']" :id="errorId('sources.0.url')" class="field-error">{{ errors["sources.0.url"] }}</p>
+          <p v-if="errors['prometheus.url']" :id="errorId('prometheus.url')" class="field-error">{{ errors["prometheus.url"] }}</p>
         </div>
         <label class="check"><input v-model="draft.tlsVerify" type="checkbox"> Verify TLS certificates</label>
         <div class="field">
@@ -271,10 +300,10 @@ async function confirmDelete() {
             type="password"
             autocomplete="new-password"
             :placeholder="keeps ? 'Stored — leave empty to keep' : ''"
-            :aria-invalid="!!errors['sources.0.auth.token']"
-            :aria-describedby="describedBy('sources.0.auth.token')"
+            :aria-invalid="!!errors['prometheus.auth.token']"
+            :aria-describedby="describedBy('prometheus.auth.token')"
           >
-          <p v-if="errors['sources.0.auth.token']" :id="errorId('sources.0.auth.token')" class="field-error">{{ errors["sources.0.auth.token"] }}</p>
+          <p v-if="errors['prometheus.auth.token']" :id="errorId('prometheus.auth.token')" class="field-error">{{ errors["prometheus.auth.token"] }}</p>
         </div>
         <template v-if="draft.authType === 'basic'">
           <div class="field">
@@ -283,11 +312,11 @@ async function confirmDelete() {
               id="source-username"
               v-model="draft.username"
               autocomplete="off"
-              :aria-invalid="!!errors['sources.0.auth.username']"
-              :aria-describedby="describedBy('sources.0.auth.username')"
+              :aria-invalid="!!errors['prometheus.auth.username']"
+              :aria-describedby="describedBy('prometheus.auth.username')"
             >
-            <p v-if="errors['sources.0.auth.username']" :id="errorId('sources.0.auth.username')" class="field-error">
-              {{ errors["sources.0.auth.username"] }}
+            <p v-if="errors['prometheus.auth.username']" :id="errorId('prometheus.auth.username')" class="field-error">
+              {{ errors["prometheus.auth.username"] }}
             </p>
           </div>
           <div class="field">
@@ -298,24 +327,100 @@ async function confirmDelete() {
               type="password"
               autocomplete="new-password"
               :placeholder="keeps ? 'Stored — leave empty to keep' : ''"
-              :aria-invalid="!!errors['sources.0.auth.password']"
-              :aria-describedby="describedBy('sources.0.auth.password')"
+              :aria-invalid="!!errors['prometheus.auth.password']"
+              :aria-describedby="describedBy('prometheus.auth.password')"
             >
-            <p v-if="errors['sources.0.auth.password']" :id="errorId('sources.0.auth.password')" class="field-error">
-              {{ errors["sources.0.auth.password"] }}
+            <p v-if="errors['prometheus.auth.password']" :id="errorId('prometheus.auth.password')" class="field-error">
+              {{ errors["prometheus.auth.password"] }}
             </p>
           </div>
         </template>
-        <p v-if="existing.data.value && !existing.data.value.credentials_readable" class="banner error">
-          The stored credentials cannot be decrypted (the secret key changed). Enter them again.
-        </p>
         <div class="row">
-          <button type="button" :disabled="tester.isPending.value" @click="runTest">
-            {{ tester.isPending.value ? "Testing…" : "Test connection" }}
+          <button type="button" :disabled="tester.isPending.value" @click="runTest('prometheus')">
+            {{ testing === "prometheus" ? "Testing…" : "Test Prometheus connection" }}
           </button>
         </div>
-        <ConnectionTestResult v-if="lastTest" :test="lastTest.result" :stale="testStale" />
+        <ConnectionTestResult v-if="lastTests.prometheus" :test="lastTests.prometheus.result" :stale="isStale('prometheus')" />
       </fieldset>
+
+      <fieldset>
+        <legend>Cloudflare</legend>
+        <label class="check"><input v-model="draft.cloudflare" type="checkbox"> Analyse a Cloudflare zone</label>
+        <template v-if="draft.cloudflare">
+          <p class="muted hint">
+            Edge traffic (requests, 5xx/4xx, origin errors, cache hits, time to first byte) and security events (blocked and challenged
+            requests) from the GraphQL Analytics API.
+          </p>
+          <div class="field">
+            <label for="cf-zone">Zone ID</label>
+            <input
+              id="cf-zone"
+              v-model="draft.zoneId"
+              class="mono"
+              placeholder="32 hex characters"
+              autocomplete="off"
+              :aria-invalid="!!errors['cloudflare.zone_id']"
+              :aria-describedby="describedBy('cloudflare.zone_id') ?? 'cf-zone-hint'"
+            >
+            <p id="cf-zone-hint" class="muted hint">Cloudflare dashboard → your domain → Overview → API → Zone ID.</p>
+            <p v-if="errors['cloudflare.zone_id']" :id="errorId('cloudflare.zone_id')" class="field-error">{{ errors["cloudflare.zone_id"] }}</p>
+          </div>
+          <div class="field">
+            <label for="cf-hostnames">Hostnames <span class="muted">(optional)</span></label>
+            <input
+              id="cf-hostnames"
+              v-model="draft.hostnames"
+              class="mono"
+              placeholder="shop.example.com, api.example.com"
+              autocomplete="off"
+              :aria-invalid="!!errors['cloudflare.hostnames']"
+              :aria-describedby="describedBy('cloudflare.hostnames') ?? 'cf-hostnames-hint'"
+            >
+            <p id="cf-hostnames-hint" class="muted hint">Separate with commas or spaces. Empty analyses the whole zone.</p>
+            <p v-if="errors['cloudflare.hostnames']" :id="errorId('cloudflare.hostnames')" class="field-error">{{ errors["cloudflare.hostnames"] }}</p>
+          </div>
+          <div class="field">
+            <label for="cf-token">API token</label>
+            <input
+              id="cf-token"
+              v-model="draft.cfToken"
+              type="password"
+              autocomplete="new-password"
+              :placeholder="cfTokenStored ? 'Stored — leave empty to keep' : ''"
+              :aria-invalid="!!errors['cloudflare.api_token']"
+              :aria-describedby="describedBy('cloudflare.api_token') ?? 'cf-token-hint'"
+            >
+            <p id="cf-token-hint" class="muted hint">A custom token with the permission <strong>Zone → Analytics → Read</strong> for this zone.</p>
+            <p v-if="errors['cloudflare.api_token']" :id="errorId('cloudflare.api_token')" class="field-error">{{ errors["cloudflare.api_token"] }}</p>
+          </div>
+          <details :open="!!errors['cloudflare.api_url']">
+            <summary>Advanced</summary>
+            <div class="field">
+              <label for="cf-api-url">API URL</label>
+              <input
+                id="cf-api-url"
+                v-model="draft.cfApiUrl"
+                class="mono"
+                autocomplete="off"
+                :aria-invalid="!!errors['cloudflare.api_url']"
+                :aria-describedby="describedBy('cloudflare.api_url') ?? 'cf-api-url-hint'"
+              >
+              <p id="cf-api-url-hint" class="muted hint">GraphQL endpoint; <code>synthetic://incident</code> serves demo data without a token.</p>
+              <p v-if="errors['cloudflare.api_url']" :id="errorId('cloudflare.api_url')" class="field-error">{{ errors["cloudflare.api_url"] }}</p>
+            </div>
+          </details>
+          <div class="row">
+            <button type="button" :disabled="tester.isPending.value" @click="runTest('cloudflare')">
+              {{ testing === "cloudflare" ? "Testing…" : "Test Cloudflare connection" }}
+            </button>
+          </div>
+          <ConnectionTestResult v-if="lastTests.cloudflare" :test="lastTests.cloudflare.result" :stale="isStale('cloudflare')" />
+        </template>
+      </fieldset>
+
+      <p v-if="existing.data.value && !existing.data.value.credentials_readable" class="banner error">
+        The stored credentials cannot be decrypted (the secret key changed). Enter them again.
+      </p>
 
       <fieldset>
         <legend>Schedule</legend>
@@ -359,7 +464,7 @@ async function confirmDelete() {
             </div>
             <p v-if="errors['schedule.weekdays']" :id="errorId('schedule.weekdays')" class="field-error">{{ errors["schedule.weekdays"] }}</p>
           </div>
-          <p v-if="!draft.url.trim()" class="muted hint">Scheduled runs are skipped until a metrics source is configured.</p>
+          <p v-if="!sourceKinds(draft).length" class="muted hint">Scheduled runs are skipped until a data source is configured.</p>
         </template>
       </fieldset>
 
@@ -428,7 +533,10 @@ legend { font-weight: 500; color: var(--strong); padding: 0 4px; }
 .hint { font-size: 0.85rem; margin: 0; }
 .matcher { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.4fr) auto; gap: var(--space); align-items: start; }
 .eq { padding-top: 6px; }
-.source-title { margin: 0; font-size: 0.95rem; }
+.source-title { margin: calc(var(--space) * 2) 0 0; font-size: 0.95rem; }
+fieldset > .hint:first-of-type + .source-title { margin-top: var(--space); }
+details summary { cursor: pointer; color: var(--muted); }
+details .field { margin-top: var(--space); }
 .check { display: flex; gap: 6px; align-items: center; }
 .field .check { font-weight: 400; }
 .schedule { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: var(--space); align-items: start; }

@@ -3,9 +3,10 @@
 import logging
 
 from app.domain.common import LabelMatcher
-from app.domain.projects import ProjectInput, PrometheusSourceInput
+from app.domain.projects import CloudflareSourceInput, ProjectInput, PrometheusSourceInput
 from app.metrics.synthetic import SCENARIOS
 from app.settings import Settings
+from app.sources.cloudflare.synthetic import SYNTHETIC_ZONE_ID
 from app.storage.projects import SqliteProjectRepository
 
 log = logging.getLogger("app")
@@ -20,9 +21,17 @@ def demo_projects() -> list[ProjectInput]:
     return [
         ProjectInput(
             name=f"Demo: {scenario}",
-            description=f"Synthetic data, scenario {scenario!r}. No real metrics are queried.",
+            description=f"Synthetic data, scenario {scenario!r}. No real metrics or Cloudflare "
+            "analytics are queried.",
             matchers=DEMO_MATCHERS,
-            sources=[PrometheusSourceInput(url=f"synthetic://{scenario}")],
+            sources=[
+                PrometheusSourceInput(url=f"synthetic://{scenario}"),
+                CloudflareSourceInput(
+                    zone_id=SYNTHETIC_ZONE_ID,
+                    hostnames=["shop.example.com"],
+                    api_url=f"synthetic://{scenario}",
+                ),
+            ],
         )
         for scenario in SCENARIOS
     ]

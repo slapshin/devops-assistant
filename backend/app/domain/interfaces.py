@@ -4,13 +4,14 @@ storage and orchestration). Kept free of web framework and LLM SDK types."""
 import asyncio
 from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
 from pydantic import Field
 
-from app.domain.common import Contract, Scope, Severity, UtcDatetime
+from app.domain.common import Contract, Scope, Severity, SourceKind, UtcDatetime
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import Explanation, ExplanationInput, ExplanationStatus
 from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
@@ -31,6 +32,24 @@ class ProjectActivity(Contract):
     active: AnalysisJob | None = None
     """Queued or running job."""
     report_count: int = 0
+
+
+class SourceErrorKind(StrEnum):
+    TIMEOUT = "timeout"
+    UNAVAILABLE = "unavailable"
+    BAD_QUERY = "bad_query"
+    TOO_LARGE = "too_large"
+    SERVER_ERROR = "server_error"
+    AUTH = "auth"
+
+
+class SourceError(Exception):
+    """A data source failed; ``message`` never contains credentials."""
+
+    def __init__(self, kind: SourceErrorKind, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
+        self.message = message
 
 
 class Cancelled(Exception):
@@ -82,7 +101,11 @@ class CollectionResult(Contract):
 
 
 class MetricsSource(Protocol):
-    """Read-only, scope-enforcing access to a Prometheus-compatible API (T004)."""
+    """Read-only, scope-enforcing access to one data source as metric series (T004, T014).
+
+    Implemented for Prometheus-compatible APIs and synthetic demo data; every source kind
+    turns its data into series on the analysis step grid.
+    """
 
     async def source_info(self) -> SourceInfo: ...
 
@@ -100,10 +123,16 @@ class MetricsSource(Protocol):
     ) -> CollectionResult: ...
 
 
-class SourceProvider(Protocol):
-    """Opens a project's MetricsSource for the duration of one analysis or probe."""
+@dataclass(frozen=True)
+class OpenedSource:
+    kind: SourceKind
+    source: MetricsSource
 
-    def open(self, scope: Scope) -> AbstractAsyncContextManager[MetricsSource]: ...
+
+class SourceProvider(Protocol):
+    """Opens every configured source of a project for the duration of one analysis."""
+
+    def open(self, scope: Scope) -> AbstractAsyncContextManager[list[OpenedSource]]: ...
 
 
 class DetectionResult(Contract):

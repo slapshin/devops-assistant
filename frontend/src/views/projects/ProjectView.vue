@@ -8,7 +8,7 @@ import MatcherChips from "../../components/projects/MatcherChips.vue";
 import RunAnalysis from "../../components/projects/RunAnalysis.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import { formatTime, utcTooltip } from "../../lib/format";
-import { scheduleSummary, sourceHost } from "../../lib/projects";
+import { cloudflareSource, prometheusSource, scheduleSummary, sourceHost } from "../../lib/projects";
 
 const HISTORY_PAGE_SIZE = 20;
 const AUTH_LABELS: Record<string, string> = { none: "No authentication", bearer: "Bearer token", basic: "Basic auth" };
@@ -19,7 +19,8 @@ const project = useProject(() => props.projectId);
 const history = useAnalyses(() => props.projectId, HISTORY_PAGE_SIZE);
 
 const notFound = computed(() => project.error.value instanceof ApiError && project.error.value.problem.status === 404);
-const source = computed(() => project.data.value?.sources[0] ?? null);
+const prometheus = computed(() => prometheusSource(project.data.value));
+const cloudflare = computed(() => cloudflareSource(project.data.value));
 const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ?? []);
 </script>
 
@@ -44,15 +45,22 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
       <p v-if="project.data.value.description">{{ project.data.value.description }}</p>
 
       <dl class="facts card">
-        <dt>Labels</dt>
-        <dd><MatcherChips :matchers="project.data.value.matchers" /></dd>
-        <dt>Metrics source</dt>
-        <dd v-if="source">
-          <span class="mono">{{ sourceHost(source.url) }}</span>
-          · {{ AUTH_LABELS[source.auth.type] }}<template v-if="!source.tls_verify"> · TLS not verified</template>
-          · <HealthBadge :project="project.data.value" />
+        <dt>Prometheus</dt>
+        <dd v-if="prometheus">
+          <span class="mono">{{ sourceHost(prometheus.url) }}</span>
+          · {{ AUTH_LABELS[prometheus.auth.type] }}<template v-if="!prometheus.tls_verify"> · TLS not verified</template>
+          <MatcherChips class="chips" :matchers="project.data.value.matchers" />
         </dd>
         <dd v-else class="muted">Not configured</dd>
+        <dt>Cloudflare</dt>
+        <dd v-if="cloudflare">
+          zone <span class="mono">{{ cloudflare.zone_id }}</span>
+          · {{ cloudflare.hostnames.length ? cloudflare.hostnames.join(", ") : "all hostnames" }}
+          <template v-if="cloudflare.api_url.startsWith('synthetic:')"> · <span class="mono">{{ sourceHost(cloudflare.api_url) }}</span></template>
+        </dd>
+        <dd v-else class="muted">Not configured</dd>
+        <dt>Health</dt>
+        <dd><HealthBadge :project="project.data.value" /></dd>
         <dt>Schedule</dt>
         <dd v-if="project.data.value.schedule">
           {{ scheduleSummary(project.data.value.schedule) }}
@@ -87,6 +95,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px calc(var(--space) * 2); margin: 0; }
 .facts dt { font-weight: 600; color: var(--muted); }
 .facts dd { margin: 0; }
+.chips { margin-top: 4px; }
 @media (max-width: 600px) {
   .facts { grid-template-columns: minmax(0, 1fr); }
   .facts dd { margin-bottom: var(--space); }

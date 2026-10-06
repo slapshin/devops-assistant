@@ -21,7 +21,6 @@ from app.domain.jobs import (
     Limits,
     RuntimeConfig,
 )
-from app.domain.projects import SourceKind
 from app.domain.report import AnalysisReport
 from app.jobs import NotActive, QueueFull
 from app.metrics.client import ClientLimits
@@ -109,12 +108,12 @@ async def project_scope(services: Services, project_id: str) -> Scope:
         raise ProblemError(
             404, ErrorCode.PROJECT_NOT_FOUND, "Project not found", f"No project {project_id}."
         )
-    if project.source(SourceKind.PROMETHEUS) is None:
+    if not project.sources:
         raise ProblemError(
             409,
             ErrorCode.SOURCE_NOT_CONFIGURED,
-            "No metrics source",
-            f"Project {project.name!r} has no metrics source configured.",
+            "No data source",
+            f"Project {project.name!r} has no data source configured.",
         )
     if not project.credentials_readable:
         raise ProblemError(

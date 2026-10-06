@@ -1,11 +1,13 @@
 """RFC 9457 problem responses."""
 
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.domain.common import SourceKind
 from app.domain.jobs import ErrorCode, Problem
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
@@ -42,6 +44,15 @@ def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
     }
 
 
+_UNION_TAGS = {kind.value for kind in SourceKind}
+
+
+def field_path(loc: Sequence[int | str]) -> str:
+    """Dotted path of an error; source union tags (``sources.0.prometheus.url``) are dropped."""
+    parts = [str(p) for i, p in enumerate(loc) if not (i and p in _UNION_TAGS)]
+    return ".".join(parts)
+
+
 def install_problem_handlers(app: FastAPI) -> None:
     @app.exception_handler(ProblemError)
     async def _problem(_: Request, exc: ProblemError) -> JSONResponse:
@@ -49,9 +60,7 @@ def install_problem_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:
-        errors = [
-            {"field": ".".join(str(p) for p in e["loc"]), "message": e["msg"]} for e in exc.errors()
-        ]
+        errors = [{"field": field_path(e["loc"]), "message": e["msg"]} for e in exc.errors()]
         problem = Problem(
             status=422,
             code=ErrorCode.VALIDATION_ERROR,

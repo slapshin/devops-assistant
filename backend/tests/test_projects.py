@@ -299,6 +299,19 @@ def test_validation_errors_name_the_field(
 # --- connection test --------------------------------------------------------------------------
 
 
+def test_matchers_are_optional_without_prometheus(client: TestClient) -> None:
+    project = create(client, name="no labels", matchers=[], sources=[])
+    assert project["matchers"] == []
+    res = client.post("/api/projects", json=body(name="bad", matchers=[]))
+    assert res.status_code == 422
+    assert [e["field"] for e in res.json()["errors"]] == ["body.matchers"]
+    res = client.post(
+        "/api/projects/test-connection", json={"source": {"url": "synthetic://incident"}}
+    )
+    assert res.status_code == 422
+    assert [e["field"] for e in res.json()["errors"]] == ["body.matchers"]
+
+
 def test_connection_test_synthetic_and_health(client: TestClient) -> None:
     res = client.post(
         "/api/projects/test-connection",
@@ -310,10 +323,10 @@ def test_connection_test_synthetic_and_health(client: TestClient) -> None:
     assert families["cpu"] == "supported" and families["latency"] == "supported"
 
     project = create(client, sources=[{"kind": "prometheus", "url": "synthetic://healthy"}])
-    health = client.get(f"/api/projects/{project['project_id']}/health").json()
-    assert health["reachable"] is True
+    [health] = client.get(f"/api/projects/{project['project_id']}/health").json()
+    assert health["kind"] == "prometheus" and health["reachable"] is True
     no_source = create(client, name="empty", sources=[])
-    assert client.get(f"/api/projects/{no_source['project_id']}/health").json() is None
+    assert client.get(f"/api/projects/{no_source['project_id']}/health").json() == []
     assert client.get("/api/projects/missing/health").status_code == 404
 
 

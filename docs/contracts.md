@@ -67,7 +67,7 @@ The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is
 
 ## Exclusion codes
 
-`query_failed`, `query_timeout`, `series_truncated` (per-query or per-job series budget), `evidence_dropped` (report size budget), `label_cardinality` (discovery guard). Each has a `message`, and optionally a `family` or `finding_id`.
+`query_failed`, `query_timeout`, `series_truncated` (per-query or per-job series budget), `evidence_dropped` (report size budget), `label_cardinality` (discovery guard), `source_unavailable` (one of several data sources failed; one exclusion per family it provides, and the report is `partial`). Each has a `message`, and optionally a `family` or `finding_id`.
 
 ## Errors and routes
 
@@ -77,7 +77,7 @@ Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-ap
 
 ## Schema versions
 
-`AnalysisReport.schema_version = "1.0"`. Adding an optional field is a minor bump. Removing, renaming, or changing the meaning of a field is a major bump and needs a reader migration in T007. `DetectorConfig.version` (`detectors-2026.10.5`) and `config_hash` (the first 12 hex characters of the SHA-256 of the canonical config JSON) identify the calculation.
+`AnalysisReport.schema_version = "2.1"`. Adding an optional field is a minor bump. Removing, renaming, or changing the meaning of a field is a major bump and needs a reader migration in T007. `DetectorConfig.version` (`detectors-2026.10.7`) and `config_hash` (the first 12 hex characters of the SHA-256 of the canonical config JSON) identify the calculation.
 
 ## Fixtures
 

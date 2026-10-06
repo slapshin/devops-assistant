@@ -1,6 +1,7 @@
 """SQLite ProjectRepository: projects and per-kind source configs with encrypted secrets."""
 
 import asyncio
+import builtins
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -9,7 +10,7 @@ from typing import Any
 import sqlalchemy as sa
 from pydantic import SecretStr
 
-from app.domain.common import LabelMatcher, format_utc
+from app.domain.common import LabelMatcher, SourceKind, format_utc
 from app.domain.ids import new_project_id
 from app.domain.projects import (
     AuthType,
@@ -17,13 +18,18 @@ from app.domain.projects import (
     BasicAuthInput,
     BearerAuth,
     BearerAuthInput,
+    CloudflareConnection,
+    CloudflareSource,
+    CloudflareSourceInput,
     NoAuth,
     Project,
     ProjectInput,
     PrometheusConnection,
     PrometheusSource,
     PrometheusSourceInput,
-    SourceKind,
+    SourceConnection,
+    SourceInput,
+    synthetic_url,
 )
 from app.domain.schedule import ReportSchedule
 from app.storage.db import app_meta, project_sources, projects
@@ -155,22 +161,50 @@ class SqliteProjectRepository:
         secrets = self.box.decrypt(row.secrets) if row.secrets is not None else {}
         return _connection(config, secrets)
 
+    async def connections(self, project_id: str) -> builtins.list[SourceConnection]:
+        """Decrypted connections of every stored source, by kind; raises SecretsUnreadable."""
+
+        def q(conn: sa.Connection) -> builtins.list[Any]:
+            return builtins.list(
+                conn.execute(
+                    sa.select(project_sources)
+                    .where(project_sources.c.project_id == project_id)
+                    .order_by(project_sources.c.kind)
+                )
+            )
+
+        found: builtins.list[SourceConnection] = []
+        for row in await self._run(q):
+            secrets = self.box.decrypt(row.secrets) if row.secrets is not None else {}
+            found.append(_any_connection(SourceKind(row.kind), json.loads(row.config), secrets))
+        return found
+
     async def resolve_connection(
-        self, source: PrometheusSourceInput, project_id: str | None
-    ) -> PrometheusConnection:
+        self, source: SourceInput, project_id: str | None
+    ) -> SourceConnection:
         """Connection for a draft source, filling omitted secrets from the stored project."""
         row = None
         if project_id is not None:
-            row = await self._run(lambda c: self._stored(c, project_id, SourceKind.PROMETHEUS))
+            row = await self._run(lambda c: self._stored(c, project_id, source.kind))
         config, secrets = self._split(source, row)
-        return _connection(config, secrets)
+        return _any_connection(source.kind, config, secrets)
 
     # --- writes --------------------------------------------------------------------------
 
-    def _split(
+    def _split(self, source: SourceInput, stored: Any) -> tuple[dict[str, Any], dict[str, str]]:
+        """Non-secret config and the secrets to store, keeping omitted secrets from ``stored``.
+
+        Raises SecretRequired with the field path relative to the source.
+        """
+        match source:
+            case PrometheusSourceInput():
+                return self._split_prometheus(source, stored)
+            case CloudflareSourceInput():
+                return self._split_cloudflare(source, stored)
+
+    def _split_prometheus(
         self, source: PrometheusSourceInput, stored: Any
     ) -> tuple[dict[str, Any], dict[str, str]]:
-        """Non-secret config and the secrets to store, keeping omitted secrets from ``stored``."""
         auth = source.auth
         config: dict[str, Any] = {
             "url": source.url,
@@ -196,6 +230,22 @@ class SqliteProjectRepository:
                 secrets = {}
         return config, secrets
 
+    def _split_cloudflare(
+        self, source: CloudflareSourceInput, stored: Any
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        config: dict[str, Any] = {
+            "zone_id": source.zone_id,
+            "hostnames": source.hostnames,
+            "api_url": source.api_url,
+        }
+        if source.api_token is not None:
+            return config, {"api_token": source.api_token.get_secret_value()}
+        if stored is not None and stored.secrets is not None:
+            return config, self.box.decrypt(stored.secrets)
+        if synthetic_url(source.api_url):
+            return config, {}
+        raise SecretRequired("api_token")
+
     def _write_sources(
         self,
         conn: sa.Connection,
@@ -206,9 +256,12 @@ class SqliteProjectRepository:
     ) -> None:
         """Replace the project's sources; omitted secrets come from ``secrets_from`` or itself."""
         rows = []
-        for source in data.sources:
+        for i, source in enumerate(data.sources):
             stored = self._stored(conn, secrets_from or project_id, source.kind)
-            config, secrets = self._split(source, stored)
+            try:
+                config, secrets = self._split(source, stored)
+            except SecretRequired as exc:
+                raise SecretRequired(f"{i}.{exc.field}") from None
             rows.append(
                 {
                     "project_id": project_id,
@@ -368,8 +421,15 @@ def _schedule(raw: str | None) -> ReportSchedule | None:
     return ReportSchedule.model_validate_json(raw) if raw else None
 
 
-def _source_view(row: Any) -> PrometheusSource:
+def _source_view(row: Any) -> PrometheusSource | CloudflareSource:
     config = json.loads(row.config)
+    if SourceKind(row.kind) is SourceKind.CLOUDFLARE:
+        return CloudflareSource(
+            zone_id=config["zone_id"],
+            hostnames=config["hostnames"],
+            api_url=config["api_url"],
+            token_set=row.secrets is not None,
+        )
     auth = config["auth"]
     match AuthType(auth["type"]):
         case AuthType.BEARER:
@@ -379,6 +439,22 @@ def _source_view(row: Any) -> PrometheusSource:
         case AuthType.NONE:
             view = NoAuth()
     return PrometheusSource(url=config["url"], tls_verify=config["tls_verify"], auth=view)
+
+
+def _any_connection(
+    kind: SourceKind, config: dict[str, Any], secrets: dict[str, str]
+) -> SourceConnection:
+    match kind:
+        case SourceKind.PROMETHEUS:
+            return _connection(config, secrets)
+        case SourceKind.CLOUDFLARE:
+            token = secrets.get("api_token")
+            return CloudflareConnection(
+                zone_id=config["zone_id"],
+                hostnames=config["hostnames"],
+                api_url=config["api_url"],
+                api_token=SecretStr(token) if token else None,
+            )
 
 
 def _connection(config: dict[str, Any], secrets: dict[str, str]) -> PrometheusConnection:

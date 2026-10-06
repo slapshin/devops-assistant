@@ -13,6 +13,7 @@ from app.domain.common import (
     Reason,
     Scope,
     SignalFamily,
+    SourceKind,
     TimeRange,
     UtcDatetime,
 )
@@ -58,8 +59,9 @@ class AnalysisWindows(Contract):
 
 
 class SourceInfo(Contract):
-    """Identity of the metrics source without credentials."""
+    """Identity of a data source without credentials."""
 
+    kind: SourceKind = SourceKind.PROMETHEUS
     base_url: str = Field(description="Scheme, host, port, and path prefix; never userinfo.")
     backend: str | None = Field(default=None, description="E.g. 'victoriametrics' when detected.")
     version: str | None = None
@@ -78,14 +80,19 @@ class Exclusion(Reason):
 
 
 class AnalysisReport(Contract):
-    schema_version: Literal["2.0"] = REPORT_SCHEMA_VERSION
+    schema_version: Literal["2.0", "2.1"] = REPORT_SCHEMA_VERSION
     analysis_id: str
     scope: Scope
     windows: AnalysisWindows
     generated_at: UtcDatetime
     detector_version: str
     config_hash: str
-    source: SourceInfo
+    sources: list[SourceInfo] = Field(
+        default_factory=list, description="Every source analysed (2.1); empty in 2.0 reports."
+    )
+    source: SourceInfo | None = Field(
+        default=None, description="Deprecated: the first source; use sources."
+    )
     state: ReportState
     capabilities: list[MetricCapability]
     coverage: list[SignalCoverage]
@@ -95,6 +102,11 @@ class AnalysisReport(Contract):
     evidence: list[Evidence]
     exclusions: list[Exclusion]
     explanation: ExplanationResult
+
+    @property
+    def all_sources(self) -> list[SourceInfo]:
+        """Sources of 2.1 reports, or the single source of a 2.0 report."""
+        return self.sources or ([self.source] if self.source else [])
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Self:

@@ -26,14 +26,13 @@
     },
     "Scope": {
       "additionalProperties": false,
-      "description": "One project's series: every query carries all of its matchers; reports stay inside it.",
+      "description": "One project: every Prometheus query carries all of its matchers; reports stay inside it.\n\n``matchers`` is empty only for projects without a Prometheus source; Prometheus queries\nrefuse an empty scope.",
       "properties": {
         "matchers": {
           "items": {
             "$ref": "#/$defs/LabelMatcher"
           },
           "maxItems": 10,
-          "minItems": 1,
           "title": "Matchers",
           "type": "array"
         },

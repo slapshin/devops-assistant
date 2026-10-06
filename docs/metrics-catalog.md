@@ -145,6 +145,29 @@ Notes and limitations:
 - The RDB/AOF status stays `err` until the next successful save or write, so a failing disk is reported for as long as it fails. With the default `stop-writes-on-bgsave-error yes`, the master also rejects writes meanwhile.
 - Not covered: replication offset lag (redis_exporter exports per-replica offsets on the master, not a lag in seconds), blocked clients (normal for queue consumers), Cluster and Sentinel state, slowlog, and per-command latency.
 
+### Cloudflare (T015)
+
+A project's Cloudflare source analyses one zone, optionally narrowed to some hostnames (`clientRequestHTTPHost_in`). It uses the GraphQL Analytics API (`app/sources/cloudflare/`, catalog `cloudflare-2026.10.6`). An API token with **Analytics: Read** on the zone is enough. Every query is filtered by zone, time range and hostnames and grouped by `datetimeFiveMinutes`, so one row is one bucket of the analysis grid. HTTP queries keep only end-user traffic (`requestSource: "eyeball"`).
+
+| Signal | Dataset and field | Unit |
+| --- | --- | --- |
+| `cf_requests` | `httpRequestsAdaptiveGroups.count` (+ `avg.sampleInterval`) | req/s |
+| `cf_5xx`, `cf_52x`, `cf_404`, `cf_4xx` | `count` filtered by `edgeResponseStatus` (500–599, 520–530, 404, 400–499) | req/s |
+| `cf_cache_hits` | `count` filtered by `cacheStatus_in: [hit, stale, updating, revalidated]` | req/s |
+| `cf_ttfb_p95`, `cf_ttfb_p99`, `cf_origin_p95` | `quantiles.edgeTimeToFirstByteMsP95/P99`, `quantiles.originResponseDurationMsP95` (Pro plan and up) | s |
+| `cf_blocked`, `cf_challenged` | `firewallEventsAdaptiveGroups.count` by `action` (block/connection close; challenge/JS/managed challenge) | events/s |
+
+- **Discovery**:
+  - The `settings` node gives each dataset's `enabled`, `maxDuration`, `notOlderThan` and `maxPageSize`. When it cannot be read, the documented defaults apply (1 day per query, 31 days back) and capabilities are unverified.
+  - One-hour probes of the timing quantiles and firewall events mark them `unsupported`, with Cloudflare's message, when the plan or token refuses them.
+  - History comes from `httpRequests1dGroups` for the whole zone.
+- **Collection**:
+  - The 28-day grid is fetched in chunks of at most one day (or the dataset's `maxDuration`, if smaller), never earlier than `notOlderThan`.
+  - Within a fetched chunk, buckets without rows are zero for counts and unknown for quantiles.
+  - Failed chunks become `query_failed`/`query_timeout` exclusions and stay unknown. A result at the page-size limit adds `series_truncated`.
+  - A full analysis makes about 28 × 3 requests, well inside Cloudflare's 300 queries per 5 minutes. A rate-limited request is retried once after `Retry-After`.
+- **Live verification pending**: no live zone was available during T015. The field names follow Cloudflare's documentation (see the T015 task file), and a refused field degrades only its signals to `unsupported`.
+
 ## Budgets and behaviour
 
 | Aspect | Behaviour |

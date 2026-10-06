@@ -11,6 +11,8 @@ from app.container import Services
 from app.domain.common import LabelMatcher, Scope
 from app.domain.jobs import ErrorCode
 from app.domain.projects import (
+    CloudflareConnection,
+    CloudflareSourceInput,
     ConnectionTest,
     ConnectionTestRequest,
     Project,
@@ -18,11 +20,16 @@ from app.domain.projects import (
     ProjectList,
     ProjectSummary,
     PrometheusConnection,
-    SourceKind,
+    PrometheusSourceInput,
+    SourceConnection,
+    SourceInput,
+    synthetic_url,
 )
-from app.metrics.factory import connect, synthetic_scenario
+from app.metrics.factory import connect
 from app.metrics.probe import probe
 from app.metrics.synthetic import SCENARIOS
+from app.sources.cloudflare.connect import connect_cloudflare, probe_cloudflare
+from app.sources.cloudflare.synthetic import SCENARIOS as CLOUDFLARE_SCENARIOS
 from app.storage.projects import ProjectNameTaken, SecretRequired
 from app.storage.secrets import SecretsUnreadable
 
@@ -58,15 +65,23 @@ DRAFT_PROJECT_ID = "draft"
 DRAFT_PROJECT_NAME = "Connection test"
 
 
-def _check_scenario(url: str, field: str) -> None:
-    scenario = synthetic_scenario(url)
-    if scenario is not None and scenario not in SCENARIOS:
-        raise _invalid(field, f"unknown synthetic scenario; expected one of {sorted(SCENARIOS)}")
+def _check_scenario(source: SourceInput, field_prefix: str) -> None:
+    match source:
+        case PrometheusSourceInput(url=url):
+            field, scenarios = "url", sorted(SCENARIOS)
+        case CloudflareSourceInput(api_url=url):
+            field, scenarios = "api_url", sorted(CLOUDFLARE_SCENARIOS)
+    scenario = synthetic_url(url)
+    if scenario is not None and scenario not in scenarios:
+        raise _invalid(
+            f"{field_prefix}.{field}",
+            f"unknown synthetic scenario; expected one of {scenarios}",
+        )
 
 
 def _validate(data: ProjectInput) -> None:
     for i, source in enumerate(data.sources):
-        _check_scenario(source.url, f"body.sources.{i}.url")
+        _check_scenario(source, f"body.sources.{i}")
 
 
 def _write_error(exc: Exception, field_prefix: str) -> ProblemError:
@@ -120,7 +135,7 @@ async def create_project(
     try:
         return await services.projects.create(data, secrets_from=clone_of)
     except (ProjectNameTaken, SecretRequired, SecretsUnreadable) as exc:
-        raise _write_error(exc, "body.sources.0") from None
+        raise _write_error(exc, "body.sources") from None
 
 
 @router.get("/{project_id}", response_model=ProjectSummary, responses=problem_responses(404))
@@ -137,7 +152,7 @@ async def update_project(project_id: str, data: ProjectInput, services: Services
     try:
         project = await services.projects.update(project_id, data)
     except (ProjectNameTaken, SecretRequired, SecretsUnreadable) as exc:
-        raise _write_error(exc, "body.sources.0") from None
+        raise _write_error(exc, "body.sources") from None
     if project is None:
         raise _not_found(project_id)
     services.health_cache.pop(project_id, None)
@@ -166,9 +181,14 @@ async def delete_project(project_id: str, services: ServicesDep) -> Response:
     return Response(status_code=204)
 
 
-async def _probe(conn: PrometheusConnection, scope: Scope) -> ConnectionTest:
-    async with connect(conn) as (source, client):
-        return await probe(source, client, scope)
+async def _probe(conn: SourceConnection, scope: Scope) -> ConnectionTest:
+    match conn:
+        case PrometheusConnection():
+            async with connect(conn) as (source, client):
+                return await probe(source, client, scope)
+        case CloudflareConnection():
+            async with connect_cloudflare(conn) as cloudflare:
+                return await probe_cloudflare(cloudflare, scope)
 
 
 def _draft_scope(matchers: list[LabelMatcher]) -> Scope:
@@ -179,7 +199,7 @@ def _draft_scope(matchers: list[LabelMatcher]) -> Scope:
     "/test-connection", response_model=ConnectionTest, responses=problem_responses(404, 409, 422)
 )
 async def test_connection(body: ConnectionTestRequest, services: ServicesDep) -> ConnectionTest:
-    _check_scenario(body.source.url, "body.source.url")
+    _check_scenario(body.source, "body.source")
     if body.project_id is not None and await services.projects.get(body.project_id) is None:
         raise _not_found(body.project_id)
     try:
@@ -189,36 +209,34 @@ async def test_connection(body: ConnectionTestRequest, services: ServicesDep) ->
     return await _probe(conn, _draft_scope(body.matchers))
 
 
-async def project_health(services: Services, project: Project) -> ConnectionTest | None:
-    """Cached connection test of a stored project; None when it has no metrics source."""
-    if project.source(SourceKind.PROMETHEUS) is None:
-        return None
+async def project_health(services: Services, project: Project) -> list[ConnectionTest]:
+    """Cached connection test of each stored source; empty when none is configured."""
+    if not project.sources:
+        return []
     version = project.updated_at.isoformat()
     cached = services.health_cache.get(project.project_id)
     if cached and cached[1] == version and time.monotonic() - cached[0] < HEALTH_CACHE_SECONDS:
         return cached[2]
 
     try:
-        conn = await services.projects.prometheus_connection(project.project_id)
+        connections = await services.projects.connections(project.project_id)
     except SecretsUnreadable:
         raise _unreadable() from None
-    if conn is None:
-        return None
     scope = Scope(
         project_id=project.project_id, project_name=project.name, matchers=project.matchers
     )
-    result = await _probe(conn, scope)
+    result = [await _probe(conn, scope) for conn in connections]
     services.health_cache[project.project_id] = (time.monotonic(), version, result)
     return result
 
 
 @router.get(
     "/{project_id}/health",
-    response_model=ConnectionTest | None,
+    response_model=list[ConnectionTest],
     responses=problem_responses(404, 409),
 )
-async def get_project_health(project_id: str, services: ServicesDep) -> ConnectionTest | None:
-    """Null when the project has no metrics source configured."""
+async def get_project_health(project_id: str, services: ServicesDep) -> list[ConnectionTest]:
+    """One connection test per configured source; empty when the project has none."""
     project = await services.projects.get(project_id)
     if project is None:
         raise _not_found(project_id)

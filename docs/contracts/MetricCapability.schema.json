@@ -23,9 +23,19 @@
         "client_errors",
         "latency",
         "proxy",
-        "database"
+        "database",
+        "edge",
+        "security"
       ],
       "title": "SignalFamily",
+      "type": "string"
+    },
+    "SourceKind": {
+      "enum": [
+        "prometheus",
+        "cloudflare"
+      ],
+      "title": "SourceKind",
       "type": "string"
     }
   },
@@ -85,6 +95,10 @@
     "signal": {
       "title": "Signal",
       "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/SourceKind",
+      "default": "prometheus"
     },
     "status": {
       "$ref": "#/$defs/CapabilityStatus"

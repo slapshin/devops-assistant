@@ -12,11 +12,11 @@ import time
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from enum import StrEnum
 from typing import Any
 
 import httpx
 
+from app.domain.interfaces import SourceError, SourceErrorKind
 from app.domain.projects import PrometheusConnection
 
 log = logging.getLogger("app.metrics")
@@ -34,23 +34,7 @@ MIN_SERVER_ERROR_STATUS = 500
 MIN_CLIENT_ERROR_STATUS = 400
 
 
-class SourceErrorKind(StrEnum):
-    TIMEOUT = "timeout"
-    UNAVAILABLE = "unavailable"
-    BAD_QUERY = "bad_query"
-    TOO_LARGE = "too_large"
-    SERVER_ERROR = "server_error"
-    AUTH = "auth"
-
-
 TRANSIENT_ERROR_KINDS = (SourceErrorKind.UNAVAILABLE, SourceErrorKind.SERVER_ERROR)
-
-
-class SourceError(Exception):
-    def __init__(self, kind: SourceErrorKind, message: str) -> None:
-        super().__init__(message)
-        self.kind = kind
-        self.message = message
 
 
 @dataclass(frozen=True)

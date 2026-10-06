@@ -127,7 +127,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 
 **Report schema version:** `schema_version: "1.0"`. Minor bumps add optional fields; major bumps require a reader migration. Readers must open every saved major version they claim to support, or return `report_unavailable` with `code=schema_unsupported` — never a crash.
 
-## 5. Numerical policy (detector config `detectors-2026.10.5`)
+## 5. Numerical policy (detector config `detectors-2026.10.7`)
 
 All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
@@ -190,6 +190,13 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | Redis server | evicted keys (severity ≤ medium) | up | ×2 and ≥ +1/s | — |
 | Redis server | keyspace miss share (`misses / (hits + misses)`, volume-guarded at ≥ 30 lookups per step; severity ≤ medium) | up | ×1.5 and ≥ +10 pp | — |
 | Redis server | mean command latency (commandstats `usec / calls`, volume-guarded at ≥ 30 commands per step) | up | ×2 and ≥ +0.5 ms | — |
+| Cloudflare edge (zone) | request rate | both | ×2 or ÷2 and ≥ 0.2 req/s change | — |
+| Cloudflare edge (zone) | 5xx share (edge status 500–599, volume-guarded at ≥ 30 requests per step) | up | +2 pp | ≥ 5 % for ≥ 5 min |
+| Cloudflare edge (zone) | origin error share (520–530: origin down, timed out, TLS failure; volume-guarded) | up | +1 pp | ≥ 2 % for ≥ 5 min |
+| Cloudflare edge (zone) | 404 rate; other 4xx rate (severity ≤ medium; WAF blocks answer 403, so they also count here) | up | ×2 and ≥ +0.1/s | — |
+| Cloudflare edge (zone) | cache hit share (hit, stale, updating, revalidated / all requests; volume-guarded; severity ≤ medium) | down | −15 pp | — |
+| Cloudflare edge (zone) | edge TTFB p95 (p99 as evidence); origin response time p95 (volume-guarded; Pro plan and up) | up | ×1.5 and ≥ +50 ms | — |
+| Cloudflare security (zone) | blocked requests (block, connection close); challenges issued (challenge, JS, managed). Mitigated traffic is not an outage: severity ≤ high | up | ×3 and ≥ +0.1/s | — |
 | Latency | p95/p99 from verified classic histograms (HTTP and RPC buckets 0.005–10 s; values at the top bucket are reported as "≥ 10 s"); mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
 
 - Rates are computed before aggregation; ratio numerator and denominator use the same selector scope (project, env, and entity labels).
@@ -197,6 +204,7 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 - `error_type` is reported as an attribute; it never classifies a request as a server failure on its own (e.g. `error_type="404"`).
 - Latency without histogram buckets or native histograms is `unsupported` with the reason; count-only data never yields latency.
 - Route-level analysis for the top 20 routes by 14-day volume per service; remaining routes aggregated as `(other routes)`.
+- Cloudflare data comes from adaptive (sampled) datasets. Counts are Cloudflare's estimates. A mean sampling interval of ≥ 10 lowers a finding's confidence (`sampled`), and ≥ 100 makes it low (`sampled_low`); sampling never changes severity. Inside a fetched chunk a bucket without rows means zero events, while periods outside retention or of failed queries stay unknown.
 
 ### Severity (magnitude and duration only)
 

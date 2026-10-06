@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0",
+  "schema_version": "2.1",
   "analysis_id": "01999a2b-0000-7000-8000-000000000004",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -28,9 +28,11 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.5",
-  "config_hash": "4fb87b42b943",
+  "detector_version": "detectors-2026.10.7",
+  "config_hash": "d5d649d1df58",
+  "sources": [],
   "source": {
+    "kind": "prometheus",
     "base_url": "http://localhost:8428",
     "backend": null,
     "version": null
@@ -38,6 +40,7 @@
   "state": "completed",
   "capabilities": [
     {
+      "source": "prometheus",
       "family": "cpu",
       "signal": "cpu_utilization",
       "status": "unverified",
@@ -59,6 +62,7 @@
       "history_days": 5.0
     },
     {
+      "source": "prometheus",
       "family": "memory",
       "signal": "memory_utilization",
       "status": "unverified",
@@ -78,6 +82,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "filesystem",
       "signal": "filesystem_used_ratio",
       "status": "unverified",
@@ -97,6 +102,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "disk_io",
       "signal": "disk_busy_ratio",
       "status": "unverified",
@@ -115,6 +121,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "network",
       "signal": "network_bytes",
       "status": "unverified",
@@ -134,6 +141,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "container",
       "signal": "container_cpu",
       "status": "unsupported",
@@ -150,6 +158,7 @@
       "history_days": null
     },
     {
+      "source": "prometheus",
       "family": "request_traffic",
       "signal": "request_rate",
       "status": "unverified",
@@ -172,6 +181,7 @@
       "history_days": 5.0
     },
     {
+      "source": "prometheus",
       "family": "request_failures",
       "signal": "server_error_ratio",
       "status": "unverified",
@@ -194,6 +204,7 @@
       "history_days": 5.0
     },
     {
+      "source": "prometheus",
       "family": "client_errors",
       "signal": "client_error_rate",
       "status": "unverified",
@@ -216,6 +227,7 @@
       "history_days": 5.0
     },
     {
+      "source": "prometheus",
       "family": "latency",
       "signal": "latency_quantile",
       "status": "unsupported",
@@ -352,13 +364,31 @@
       "total_series": 2,
       "baseline_days": 4,
       "reasons": []
+    },
+    {
+      "family": "edge",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 4,
+      "reasons": []
+    },
+    {
+      "family": "security",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 4,
+      "reasons": []
     }
   ],
   "findings": [
     {
-      "finding_id": "fnd_ef3a6fd82f91e36e",
+      "finding_id": "fnd_70a7d6cb55890a3d",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.5",
+      "detector_version": "detectors-2026.10.7",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -400,7 +430,7 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_f9ce2449328bfadc"
+        "evd_9d8a55d3d994d8d1"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -429,8 +459,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_ef3a6fd82f91e36e",
-          "finding_id": "fnd_ef3a6fd82f91e36e",
+          "episode_id": "eps_70a7d6cb55890a3d",
+          "finding_id": "fnd_70a7d6cb55890a3d",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=paas-production",
@@ -684,8 +714,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_f9ce2449328bfadc",
-      "finding_id": "fnd_ef3a6fd82f91e36e",
+      "evidence_id": "evd_9d8a55d3d994d8d1",
+      "finding_id": "fnd_70a7d6cb55890a3d",
       "series": {
         "series_id": "ser_063ed23f9b327c5f",
         "family": "cpu",
@@ -843,7 +873,8 @@
           0.2539,
           0.2495
         ],
-        "coverage": 1.0
+        "coverage": 1.0,
+        "sample_interval": null
       },
       "expected": [
         0.22,

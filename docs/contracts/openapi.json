@@ -223,8 +223,11 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "2.0",
-            "default": "2.0",
+            "default": "2.1",
+            "enum": [
+              "2.0",
+              "2.1"
+            ],
             "title": "Schema Version",
             "type": "string"
           },
@@ -232,7 +235,23 @@
             "$ref": "#/components/schemas/Scope"
           },
           "source": {
-            "$ref": "#/components/schemas/SourceInfo"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deprecated: the first source; use sources."
+          },
+          "sources": {
+            "description": "Every source analysed (2.1); empty in 2.0 reports.",
+            "items": {
+              "$ref": "#/components/schemas/SourceInfo"
+            },
+            "title": "Sources",
+            "type": "array"
           },
           "state": {
             "$ref": "#/components/schemas/ReportState"
@@ -267,7 +286,6 @@
           "generated_at",
           "detector_version",
           "config_hash",
-          "source",
           "state",
           "capabilities",
           "coverage",
@@ -478,6 +496,96 @@
         "title": "CapabilityStatus",
         "type": "string"
       },
+      "CloudflareSource": {
+        "additionalProperties": false,
+        "properties": {
+          "api_url": {
+            "title": "Api Url",
+            "type": "string"
+          },
+          "hostnames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hostnames",
+            "type": "array"
+          },
+          "kind": {
+            "const": "cloudflare",
+            "default": "cloudflare",
+            "title": "Kind",
+            "type": "string"
+          },
+          "token_set": {
+            "title": "Token Set",
+            "type": "boolean"
+          },
+          "zone_id": {
+            "title": "Zone Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "zone_id",
+          "hostnames",
+          "api_url",
+          "token_set"
+        ],
+        "title": "CloudflareSource",
+        "type": "object"
+      },
+      "CloudflareSourceInput": {
+        "additionalProperties": false,
+        "description": "One Cloudflare zone, optionally narrowed to some of its hostnames.",
+        "properties": {
+          "api_token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API token with Analytics:Read on the zone. Omit to keep the stored one (update only); not needed for synthetic://.",
+            "title": "Api Token"
+          },
+          "api_url": {
+            "default": "https://api.cloudflare.com/client/v4/graphql",
+            "description": "GraphQL endpoint; synthetic://<scenario> for demo data.",
+            "maxLength": 2048,
+            "title": "Api Url",
+            "type": "string"
+          },
+          "hostnames": {
+            "description": "Analyse only these hostnames; empty analyses the whole zone.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Hostnames",
+            "type": "array"
+          },
+          "kind": {
+            "const": "cloudflare",
+            "default": "cloudflare",
+            "title": "Kind",
+            "type": "string"
+          },
+          "zone_id": {
+            "description": "Zone ID (32 hex characters, dashboard → Overview).",
+            "title": "Zone Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "zone_id"
+        ],
+        "title": "CloudflareSourceInput",
+        "type": "object"
+      },
       "ConfidenceLevel": {
         "enum": [
           "low",
@@ -525,6 +633,10 @@
             "description": "Days of matching history found, up to 30.",
             "title": "History Days"
           },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind",
+            "default": "prometheus"
+          },
           "matched_series": {
             "anyOf": [
               {
@@ -534,7 +646,7 @@
                 "type": "null"
               }
             ],
-            "description": "Series currently matching all matchers.",
+            "description": "Prometheus: series currently matching all matchers.",
             "title": "Matched Series"
           },
           "message": {
@@ -566,11 +678,11 @@
         "description": "Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets.",
         "properties": {
           "matchers": {
+            "description": "Required with a Prometheus source.",
             "items": {
               "$ref": "#/components/schemas/LabelMatcher"
             },
             "maxItems": 10,
-            "minItems": 1,
             "title": "Matchers",
             "type": "array"
           },
@@ -587,11 +699,18 @@
             "title": "Project Id"
           },
           "source": {
-            "$ref": "#/components/schemas/PrometheusSourceInput"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PrometheusSourceInput"
+              },
+              {
+                "$ref": "#/components/schemas/CloudflareSourceInput"
+              }
+            ],
+            "title": "Source"
           }
         },
         "required": [
-          "matchers",
           "source"
         ],
         "title": "ConnectionTestRequest",
@@ -752,7 +871,8 @@
           "route",
           "proxy",
           "upstream",
-          "database"
+          "database",
+          "zone"
         ],
         "title": "EntityKind",
         "type": "string"
@@ -1631,6 +1751,10 @@
             "title": "Signal",
             "type": "string"
           },
+          "source": {
+            "$ref": "#/components/schemas/SourceKind",
+            "default": "prometheus"
+          },
           "status": {
             "$ref": "#/components/schemas/CapabilityStatus"
           },
@@ -1677,10 +1801,23 @@
             "type": "object"
           },
           "query": {
-            "description": "Exact PromQL/MetricsQL sent to the source.",
+            "description": "Exact query sent to the source (PromQL/MetricsQL, GraphQL).",
             "minLength": 1,
             "title": "Query",
             "type": "string"
+          },
+          "sample_interval": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mean sampling interval of the source data (1 = every event counted; Cloudflare adaptive sampling). Null when the source does not sample.",
+            "title": "Sample Interval"
           },
           "series_id": {
             "pattern": "^ser_[0-9a-f]{16}$",
@@ -1899,7 +2036,21 @@
           },
           "sources": {
             "items": {
-              "$ref": "#/components/schemas/PrometheusSource"
+              "discriminator": {
+                "mapping": {
+                  "cloudflare": "#/components/schemas/CloudflareSource",
+                  "prometheus": "#/components/schemas/PrometheusSource"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PrometheusSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CloudflareSource"
+                }
+              ]
             },
             "title": "Sources",
             "type": "array"
@@ -1951,11 +2102,11 @@
             "title": "Keep Reports"
           },
           "matchers": {
+            "description": "Required (1-10) with a Prometheus source.",
             "items": {
               "$ref": "#/components/schemas/LabelMatcher"
             },
             "maxItems": 10,
-            "minItems": 1,
             "title": "Matchers",
             "type": "array"
           },
@@ -1978,16 +2129,22 @@
           },
           "sources": {
             "items": {
-              "$ref": "#/components/schemas/PrometheusSourceInput"
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PrometheusSourceInput"
+                },
+                {
+                  "$ref": "#/components/schemas/CloudflareSourceInput"
+                }
+              ]
             },
-            "maxItems": 1,
+            "maxItems": 2,
             "title": "Sources",
             "type": "array"
           }
         },
         "required": [
-          "name",
-          "matchers"
+          "name"
         ],
         "title": "ProjectInput",
         "type": "object"
@@ -2114,7 +2271,21 @@
           },
           "sources": {
             "items": {
-              "$ref": "#/components/schemas/PrometheusSource"
+              "discriminator": {
+                "mapping": {
+                  "cloudflare": "#/components/schemas/CloudflareSource",
+                  "prometheus": "#/components/schemas/PrometheusSource"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PrometheusSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CloudflareSource"
+                }
+              ]
             },
             "title": "Sources",
             "type": "array"
@@ -2380,14 +2551,13 @@
       },
       "Scope": {
         "additionalProperties": false,
-        "description": "One project's series: every query carries all of its matchers; reports stay inside it.",
+        "description": "One project: every Prometheus query carries all of its matchers; reports stay inside it.\n\n``matchers`` is empty only for projects without a Prometheus source; Prometheus queries\nrefuse an empty scope.",
         "properties": {
           "matchers": {
             "items": {
               "$ref": "#/components/schemas/LabelMatcher"
             },
             "maxItems": 10,
-            "minItems": 1,
             "title": "Matchers",
             "type": "array"
           },
@@ -2484,7 +2654,9 @@
           "client_errors",
           "latency",
           "proxy",
-          "database"
+          "database",
+          "edge",
+          "security"
         ],
         "title": "SignalFamily",
         "type": "string"
@@ -2503,7 +2675,7 @@
       },
       "SourceInfo": {
         "additionalProperties": false,
-        "description": "Identity of the metrics source without credentials.",
+        "description": "Identity of a data source without credentials.",
         "properties": {
           "backend": {
             "anyOf": [
@@ -2522,6 +2694,10 @@
             "title": "Base Url",
             "type": "string"
           },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind",
+            "default": "prometheus"
+          },
           "version": {
             "anyOf": [
               {
@@ -2539,6 +2715,14 @@
         ],
         "title": "SourceInfo",
         "type": "object"
+      },
+      "SourceKind": {
+        "enum": [
+          "prometheus",
+          "cloudflare"
+        ],
+        "title": "SourceKind",
+        "type": "string"
       },
       "StageName": {
         "enum": [
@@ -3526,7 +3710,7 @@
     },
     "/api/projects/{project_id}/health": {
       "get": {
-        "description": "Null when the project has no metrics source configured.",
+        "description": "One connection test per configured source; empty when the project has none.",
         "operationId": "get_project_health_api_projects__project_id__health_get",
         "parameters": [
           {
@@ -3544,15 +3728,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/ConnectionTest"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "title": "Response Get Project Health Api Projects  Project Id  Health Get"
+                  "items": {
+                    "$ref": "#/components/schemas/ConnectionTest"
+                  },
+                  "title": "Response Get Project Health Api Projects  Project Id  Health Get",
+                  "type": "array"
                 }
               }
             },

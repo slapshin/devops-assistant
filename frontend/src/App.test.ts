@@ -7,9 +7,11 @@ import jobCompleted from "../../fixtures/jobs/job_completed.json";
 import jobInterrupted from "../../fixtures/jobs/job_interrupted.json";
 import jobRunning from "../../fixtures/jobs/job_running.json";
 import connectionTest from "../../fixtures/api/connection_test.json";
+import cloudflareTest from "../../fixtures/api/connection_test_cloudflare.json";
 import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
+import cloudflareReport from "../../fixtures/reports/report_cloudflare.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
@@ -87,10 +89,10 @@ describe("projects list", () => {
       withId("locked", { credentials_readable: false }),
     ];
     routes["GET /api/projects"] = () => json({ items });
-    routes["GET /api/projects/ok/health"] = () => json(reachable);
-    routes["GET /api/projects/down/health"] = () => json({ ...reachable, reachable: false, auth_ok: null, matched_series: null });
-    routes["GET /api/projects/denied/health"] = () => json({ ...reachable, auth_ok: false, matched_series: null });
-    routes["GET /api/projects/empty-match/health"] = () => json({ ...reachable, matched_series: 0 });
+    routes["GET /api/projects/ok/health"] = () => json([reachable]);
+    routes["GET /api/projects/down/health"] = () => json([{ ...reachable, reachable: false, auth_ok: null, matched_series: null }]);
+    routes["GET /api/projects/denied/health"] = () => json([{ ...reachable, auth_ok: false, matched_series: null }]);
+    routes["GET /api/projects/empty-match/health"] = () => json([{ ...reachable, matched_series: 0 }]);
     await renderAt("/");
 
     const card = (name: string) => screen.getByRole("article", { name });
@@ -109,13 +111,13 @@ describe("projects list", () => {
     expect(within(card("down")).getByText("No report yet")).toBeInTheDocument();
     expect(within(card("down")).getByText("No trend yet")).toBeInTheDocument();
     expect(within(card("no-source")).getByRole("button", { name: "Run analysis" })).toBeDisabled();
-    expect(within(card("no-source")).getByText(/Add a metrics source/)).toBeInTheDocument();
+    expect(within(card("no-source")).getByText(/Add a data source/)).toBeInTheDocument();
   });
 
   it("runs an analysis from the list and shows its progress inline", async () => {
     let active = false;
     routes["GET /api/projects"] = () => json({ items: [{ ...base, active_analysis: active ? running : null }] });
-    routes[`GET /api/projects/${PID}/health`] = () => json(reachable);
+    routes[`GET /api/projects/${PID}/health`] = () => json([reachable]);
     routes["POST /api/analyses"] = () => {
       active = true;
       return json({ analysis: jobRunning, duplicate_of_active: false }, 202);
@@ -129,7 +131,7 @@ describe("projects list", () => {
   });
 
   it("shows queue-full with the retry time", async () => {
-    routes[`GET /api/projects/${PID}/health`] = () => json(reachable);
+    routes[`GET /api/projects/${PID}/health`] = () => json([reachable]);
     routes["POST /api/analyses"] = () => problem(429, "queue_full", "Analysis queue is full", undefined, { "retry-after": "45" });
     await renderAt("/");
     await fireEvent.click(await screen.findByRole("button", { name: "Run analysis" }));
@@ -168,6 +170,9 @@ describe("project form", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Create project" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Some fields need attention");
     expect(screen.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
+    // labels are required only once a Prometheus URL is set
+    expect(screen.getByLabelText("Label value 1")).not.toHaveAttribute("aria-invalid", "true");
+    await fireEvent.update(screen.getByLabelText("URL"), "http://vm:8428");
     expect(screen.getByLabelText("Label value 1")).toHaveAttribute("aria-invalid", "true");
     expect(calls.some((c) => c.method === "POST")).toBe(false);
 
@@ -184,7 +189,7 @@ describe("project form", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
     expect(screen.getByLabelText("Token")).toHaveAttribute("aria-invalid", "true");
     await fireEvent.update(screen.getByLabelText("Token"), "tok");
-    expect(screen.getByText("The connection has not been tested.")).toBeInTheDocument();
+    expect(screen.getByText("The Prometheus connection has not been tested.")).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
     await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/new-id"));
@@ -296,7 +301,7 @@ describe("project form", () => {
     expect(screen.getByLabelText("Token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
     expect(screen.queryByRole("heading", { name: "Delete project" })).not.toBeInTheDocument();
 
-    await fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Test Prometheus connection" }));
     await waitFor(() => expect(calls.some((c) => c.url === "/api/projects/test-connection")).toBe(true));
     expect(JSON.parse(calls.find((c) => c.url === "/api/projects/test-connection")?.body ?? "{}").project_id).toBe(PID);
 
@@ -316,12 +321,12 @@ describe("project form", () => {
     await renderAt("/projects/new");
     await fireEvent.update(await screen.findByLabelText("Label value 1"), "paas");
     await fireEvent.update(screen.getByLabelText("Label value 2"), "production");
-    await fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Test Prometheus connection" }));
     expect(await screen.findByText("Required to test the connection")).toBeInTheDocument();
     expect(calls.some((c) => c.url.includes("test-connection"))).toBe(false);
 
     await fireEvent.update(screen.getByLabelText("URL"), "http://vm:8428");
-    await fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Test Prometheus connection" }));
     const result = await screen.findByRole("region", { name: "Connection test result" });
     expect(result).toHaveTextContent("Reachable · 1832 matching series · 30 days of history");
     expect(within(result).getByRole("row", { name: /Latency.*Unsupported.*histogram/ })).toBeInTheDocument();
@@ -337,7 +342,62 @@ describe("project form", () => {
 
     await fireEvent.update(screen.getByLabelText("URL"), "http://other:8428");
     expect(screen.getByText(/The form changed after this test/)).toBeInTheDocument();
-    expect(screen.getByText("The connection was not tested with the current values.")).toBeInTheDocument();
+    expect(screen.getByText("The Prometheus connection was not tested with the current values.")).toBeInTheDocument();
+  });
+
+  it("creates a Cloudflare-only project without labels and tests it", async () => {
+    routes["POST /api/projects/test-connection"] = () => json(cloudflareTest);
+    routes["POST /api/projects"] = () => json({ ...base, project_id: "cf-id" }, 201);
+    routes["GET /api/projects/cf-id"] = () => json({ ...base, project_id: "cf-id" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt("/projects/new");
+    await fireEvent.update(await screen.findByLabelText("Name"), "Shop edge");
+    expect(screen.queryByLabelText("Zone ID")).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByLabelText("Analyse a Cloudflare zone"));
+
+    await fireEvent.update(screen.getByLabelText("Zone ID"), "not-a-zone");
+    await fireEvent.update(screen.getByLabelText(/Hostnames/), "Shop.Example.com, bad_host");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    expect(screen.getByLabelText("Zone ID")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Invalid hostnames: bad_host")).toBeInTheDocument();
+    expect(screen.getByLabelText("API token")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Label value 1")).not.toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("The Cloudflare connection has not been tested.")).toBeInTheDocument();
+
+    await fireEvent.update(screen.getByLabelText("Zone ID"), "0123456789ABCDEF0123456789ABCDEF");
+    await fireEvent.update(screen.getByLabelText(/Hostnames/), "Shop.Example.com api.example.com");
+    await fireEvent.update(screen.getByLabelText("API token"), "cf-token");
+    await fireEvent.click(screen.getByRole("button", { name: "Test Cloudflare connection" }));
+    const result = await screen.findByRole("region", { name: "Connection test result" });
+    expect(result).toHaveTextContent("Reachable · 3,456,789 requests in 24 h · 30 days of history");
+    expect(within(result).getByRole("row", { name: /Security \(WAF\).*Supported/ })).toBeInTheDocument();
+    const source = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["api.example.com", "shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", api_token: "cf-token" };
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/cf-id"));
+    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/projects")?.body ?? "{}");
+    expect(sent.matchers).toEqual([]);
+    expect(sent.sources).toEqual([source]);
+  });
+
+  it("keeps a stored Cloudflare token and maps server errors to the right source", async () => {
+    const cloudflare = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", token_set: true };
+    const both = { ...base, sources: [...base.sources, cloudflare] } as Summary;
+    routes[`GET /api/projects/${PID}`] = () => json(both);
+    routes[`PUT /api/projects/${PID}`] = () =>
+      json({ type: "about:blank", title: "Request validation failed", status: 422, code: "validation_error", errors: [{ field: "body.sources.1.zone_id", message: "zone rejected" }] }, 422);
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    await renderAt(`/projects/${PID}/edit`);
+    expect(await screen.findByLabelText("API token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    expect(screen.getByLabelText(/Hostnames/)).toHaveValue("shop.example.com");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("zone rejected")).toBeInTheDocument();
+    expect(screen.getByLabelText("Zone ID")).toHaveAttribute("aria-invalid", "true");
+    const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
+    expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "cloudflare"]);
+    expect(put.sources[1]).not.toHaveProperty("api_token");
   });
 
   it("deletes only after the name is typed and never while an analysis runs", async () => {
@@ -367,7 +427,7 @@ describe("project form", () => {
 describe("project page", () => {
   it("shows configuration and pages through the analysis history", async () => {
     routes[`GET /api/projects/${PID}`] = () => json(base);
-    routes[`GET /api/projects/${PID}/health`] = () => json(reachable);
+    routes[`GET /api/projects/${PID}/health`] = () => json([reachable]);
     routes["GET /api/analyses"] = (init) => {
       void init;
       const cursor = new URL(calls.at(-1)?.url ?? "", "http://x").searchParams.get("cursor");
@@ -515,6 +575,13 @@ describe("report", () => {
     await fireEvent.click(buttons[buttons.length - 1]!);
     expect(await screen.findByRole("heading", { name: /2 episodes/ })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Recurring problems" })).toHaveTextContent("client_error_rate");
+  });
+
+  it("renders a Cloudflare report with its source and edge findings", async () => {
+    await renderAt(report(cloudflareReport));
+    expect(await screen.findByText("Cloudflare")).toBeInTheDocument();
+    expect(screen.getByText("Synthetic data")).toBeInTheDocument();
+    expect((await screen.findAllByText(/Origin error rate \(520-530\)/)).length).toBeGreaterThan(0);
   });
 
   it("explains unavailable and incompatible reports", async () => {

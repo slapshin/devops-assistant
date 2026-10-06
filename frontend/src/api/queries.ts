@@ -52,11 +52,11 @@ export function useProject(id: MaybeRefOrGetter<string | null>) {
   });
 }
 
-/** Lazy, cached connection test of a stored project (the server caches it for 60 s too). */
+/** Lazy, cached connection test of each source of a stored project (the server caches it for 60 s too). */
 export function useProjectHealth(id: MaybeRefOrGetter<string>, enabled: MaybeRefOrGetter<boolean>) {
   return useQuery({
     queryKey: computed(() => ["project-health", toValue(id)]),
-    queryFn: () => apiGet<ConnectionTest | null>(`${projectPath(toValue(id))}/health`),
+    queryFn: () => apiGet<ConnectionTest[]>(`${projectPath(toValue(id))}/health`),
     enabled: computed(() => toValue(enabled)),
     staleTime: HEALTH_STALE_MS,
     retry: false,
