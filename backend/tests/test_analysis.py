@@ -92,7 +92,7 @@ async def test_healthy_data_has_no_findings_and_full_coverage() -> None:
 async def test_sustained_cpu_load() -> None:
     result = await detect(Scenario(cpu_load=True))
     (cpu,) = by_signal(result, "cpu_utilization")
-    assert cpu.entity.labels == {"job": "node", "instance": "paas-production"}
+    assert cpu.entity.labels == {"job": "node", "instance": "shop-production"}
     assert cpu.start == T - timedelta(hours=5) and cpu.end == T - timedelta(hours=2)
     assert cpu.method is DetectionMethod.ABSOLUTE and cpu.threshold == 0.90
     assert cpu.severity is Severity.CRITICAL and cpu.confidence.value == "high"
@@ -156,7 +156,7 @@ async def test_low_volume_route_ratio_is_not_evaluated() -> None:
             }
         )
         for s in col.series
-        if s.signal == "http_requests" and "task-sla" in s.entity.key
+        if s.signal == "http_requests" and "order-sla" in s.entity.key
     ]
     result = RobustDetector().detect(
         REQUEST, WINDOWS, caps, col.model_copy(update={"series": series}), CONFIG
@@ -169,7 +169,7 @@ async def test_gap_is_not_healthy_and_lowers_confidence() -> None:
     cpu = next(
         s
         for s in col.series
-        if s.signal == "cpu_utilization" and s.entity.labels["instance"] == "paas-production"
+        if s.signal == "cpu_utilization" and s.entity.labels["instance"] == "shop-production"
     )
     values = np.array([np.nan if v is None else v for v in cpu.values])
     values[N - 70 : N - 50] = np.nan  # gap overlapping the start of the load
@@ -177,7 +177,7 @@ async def test_gap_is_not_healthy_and_lowers_confidence() -> None:
         REQUEST,
         WINDOWS,
         caps,
-        replace_values(col, "cpu_utilization", "instance=paas-production", values),
+        replace_values(col, "cpu_utilization", "instance=shop-production", values),
         CONFIG,
     )
     (finding,) = by_signal(result, "cpu_utilization")
@@ -306,13 +306,13 @@ async def test_changing_population_does_not_masquerade_as_deterioration() -> Non
 
 async def test_cross_layer_relations_need_verified_mapping() -> None:
     result = await detect(Scenario(cpu_load=True, server_error_burst=True))
-    (cpu,) = by_signal(result, "cpu_utilization")  # paas-production
-    (err,) = by_signal(result, "server_error_ratio")  # dispatcher-api -> paas-production-2
+    (cpu,) = by_signal(result, "cpu_utilization")  # shop-production
+    (err,) = by_signal(result, "server_error_ratio")  # checkout-api -> shop-production-2
     assert cpu.end > err.start  # they overlap in time...
     assert err.finding_id not in cpu.related_finding_ids  # ...but share no verified host
-    assert err.attributes["host"] == "paas-production-2"
+    assert err.attributes["host"] == "shop-production-2"
     degraded = await detect("degraded")
-    (fs,) = by_signal(degraded, "filesystem_used_ratio")  # on paas-production-2
+    (fs,) = by_signal(degraded, "filesystem_used_ratio")  # on shop-production-2
     (lat,) = by_signal(degraded, "latency_p95")
     assert lat.finding_id in fs.related_finding_ids  # verified service -> host mapping
 
@@ -323,7 +323,7 @@ async def test_proxy_upstream_outage_relates_to_proxy_server_errors() -> None:
     (err,) = by_signal(result, "server_error_ratio")
     assert down.family is SignalFamily.PROXY and down.entity.kind is EntityKind.UPSTREAM
     assert err.entity.kind is EntityKind.PROXY
-    assert err.entity.labels == {"job": "traefik", "service": "dispatcher-api@swarm"}
+    assert err.entity.labels == {"job": "traefik", "service": "checkout-api@swarm"}
     assert err.finding_id in down.related_finding_ids  # same proxy job, overlapping
     assert "host" not in err.attributes  # no verified proxy -> host mapping
     coverage = {c.family: c.status for c in result.coverage}
@@ -345,7 +345,7 @@ async def test_database_pileup_findings_relate_within_the_server() -> None:
     }
     connections = database["database_connections_ratio"]
     assert connections.entity.labels == {"job": "postgres", "instance": "pg-primary:9187"}
-    assert database["database_deadlocks"].entity.labels["datname"] == "dispatcher"
+    assert database["database_deadlocks"].entity.labels["datname"] == "checkout"
     others = {f.finding_id for s, f in database.items() if s != "database_connections_ratio"}
     assert others <= set(connections.related_finding_ids)  # server and its database
     assert "host" not in connections.attributes  # no verified exporter -> host mapping

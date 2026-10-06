@@ -56,7 +56,7 @@ def responses_api(output: dict[str, Any] | None = None, **overrides: Any) -> htt
 def good_output(ids: list[str] | None = None) -> dict[str, Any]:
     ids = ids or IDS[:1]
     return {
-        "summary": "CPU saturated on paas-production.",
+        "summary": "CPU saturated on shop-production.",
         "hypotheses": [{"text": "Batch job.", "finding_ids": ids, "likelihood": "plausible"}],
         "investigation_steps": [{"text": "Check top processes.", "finding_ids": ids}],
         "uncertainty": "No process metrics.",
@@ -300,7 +300,7 @@ def test_redaction_happens_before_truncation() -> None:
 
 
 def test_ordinary_labels_are_unchanged() -> None:
-    for label in ("/api/v3/tasks/:task", "paas-production-2", "GET", "10.0.4.251:5555"):
+    for label in ("/api/v1/orders/:order", "shop-production-2", "GET", "10.0.2.15:8080"):
         assert clean(label) == label
 
 

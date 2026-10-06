@@ -33,8 +33,8 @@ from app.settings import load_settings
 from app.sources.prometheus.synthetic import SyntheticMetricsSource
 from tests.helpers import StaticSources, make_scope
 
-PAAS_MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "paas"}]
-PAAS_NAME = "paas / production"
+SHOP_MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "shop"}]
+SHOP_NAME = "shop / production"
 
 
 class GatedSource(SyntheticMetricsSource):
@@ -114,7 +114,7 @@ def wait(client: TestClient, analysis_id: str, *states: str, timeout: float = 30
     raise AssertionError(f"job did not reach {states}: {job}")
 
 
-def project_id(client: TestClient, name: str = PAAS_NAME, url: str = "synthetic://incident") -> str:
+def project_id(client: TestClient, name: str = SHOP_NAME, url: str = "synthetic://incident") -> str:
     """ID of the named project, created on first use (projects persist across restarts)."""
     for project in client.get("/api/projects").json()["items"]:
         if project["name"] == name:
@@ -123,7 +123,7 @@ def project_id(client: TestClient, name: str = PAAS_NAME, url: str = "synthetic:
         "/api/projects",
         json={
             "name": name,
-            "matchers": PAAS_MATCHERS,
+            "matchers": SHOP_MATCHERS,
             "sources": [{"kind": "prometheus", "url": url}],
         },
     )
@@ -141,7 +141,7 @@ def submit(client: TestClient, **body: Any) -> Any:
 def test_submission_validation(client: TestClient) -> None:
     missing = client.post("/api/analyses", json={"project_id": "nope"})
     assert missing.status_code == 404 and missing.json()["code"] == "project_not_found"
-    sourceless = client.post("/api/projects", json={"name": "empty", "matchers": PAAS_MATCHERS})
+    sourceless = client.post("/api/projects", json={"name": "empty", "matchers": SHOP_MATCHERS})
     res = client.post("/api/analyses", json={"project_id": sourceless.json()["project_id"]})
     assert res.status_code == 409 and res.json()["code"] == "source_not_configured"
     future = submit(client, end_time=(datetime.now(UTC) + timedelta(hours=1)).isoformat())
@@ -178,8 +178,8 @@ def test_submit_progress_and_report(client: TestClient) -> None:
     report = res.json()
     assert report["scope"] == {
         "project_id": project_id(client),
-        "project_name": PAAS_NAME,
-        "matchers": PAAS_MATCHERS,
+        "project_name": SHOP_NAME,
+        "matchers": SHOP_MATCHERS,
     }
     assert report["windows"]["end_time"] == job["end_time"]
     assert report["source"]["backend"] == "synthetic"

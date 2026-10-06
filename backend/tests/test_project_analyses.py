@@ -19,7 +19,7 @@ from app.sources.prometheus.synthetic import SCENARIOS
 from app.storage.db import MIGRATIONS, make_engine
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures"
-MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "paas"}]
+MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "shop"}]
 
 
 def make_client(data_dir: Path, **settings: Any) -> TestClient:
@@ -158,16 +158,16 @@ def legacy_database(data_dir: Path) -> tuple[str, dict[str, Any]]:
         command.upgrade(config, "0002")
 
     report = json.loads((FIXTURES / "reports" / "report_anomalies.json").read_text())
-    report["scope"] = {"project": "paas", "env": "production"}
+    report["scope"] = {"project": "shop", "env": "production"}
     report["schema_version"] = "1.0"
     job = json.loads((FIXTURES / "jobs" / "job_completed.json").read_text())
-    job["scope"] = {"project": "paas", "env": "production"}
+    job["scope"] = {"project": "shop", "env": "production"}
     del job["daily_episodes"]
     raw = json.dumps(report).encode()
     with engine.begin() as conn:
         conn.exec_driver_sql(
             "INSERT INTO analysis_jobs (analysis_id, project, env, end_time, config_hash, state,"
-            " created_at, job) VALUES (?, 'paas', 'production', ?, ?, 'completed', ?, ?)",
+            " created_at, job) VALUES (?, 'shop', 'production', ?, ?, 'completed', ?, ?)",
             (
                 job["analysis_id"],
                 job["end_time"],
@@ -196,7 +196,7 @@ def test_upgrade_creates_projects_and_keeps_reports(
     caplog.set_level(logging.WARNING, logger="app")
     with make_client(tmp_path / "data", **legacy_settings) as client:
         [project] = client.get("/api/projects").json()["items"]
-        assert project["name"] == "paas / production"
+        assert project["name"] == "shop / production"
         assert project["matchers"] == MATCHERS
         assert project["sources"] == [
             {
@@ -213,7 +213,7 @@ def test_upgrade_creates_projects_and_keeps_reports(
         assert report["schema_version"] == "2.0"
         assert report["scope"] == {
             "project_id": project["project_id"],
-            "project_name": "paas / production",
+            "project_name": "shop / production",
             "matchers": MATCHERS,
         }
         assert {k: v for k, v in report.items() if k not in ("scope", "schema_version")} == {

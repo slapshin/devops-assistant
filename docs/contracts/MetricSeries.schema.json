@@ -9,7 +9,7 @@
           "type": "string"
         },
         "key": {
-          "description": "Stable canonical key, e.g. 'node|job=node|instance=paas-production'.",
+          "description": "Stable canonical key, e.g. 'node|job=node|instance=shop-production'.",
           "minLength": 1,
           "title": "Key",
           "type": "string"

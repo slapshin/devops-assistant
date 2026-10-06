@@ -81,7 +81,7 @@ def test_fixture_validates_against_exported_json_schema(rel: str) -> None:
 
 def test_observed_manifest_is_verified_and_honest_about_gaps() -> None:
     items = json.loads(
-        (FIXTURES / "metrics/capabilities_paas_production_observed.json").read_text()
+        (FIXTURES / "metrics/capabilities_shop_production_observed.json").read_text()
     )["items"]
     assert all(c["verified"] for c in items)
     unsupported = {c["signal"] for c in items if c["status"] == "unsupported"}
@@ -95,15 +95,15 @@ def test_capability_manifest_is_explicitly_unverified() -> None:
     assert all(not c["verified"] for c in items["items"])
 
 
-def test_fixtures_use_supplied_labels_and_no_secrets() -> None:
+def test_fixtures_use_synthetic_labels_and_no_secrets() -> None:
     text = "".join((FIXTURES / r).read_text() for r in FIXTURE_FILES)
     for expected in (
-        '"project": "paas"',
+        '"project": "shop"',
         '"env": "production"',
-        "paas-production",
-        "dispatcher-api",
+        "shop-production",
+        "checkout-api",
         "http_response_status_code",
-        "/api/v3/tasks/:task",
+        "/api/v1/orders/:order",
     ):
         assert expected in text
     for forbidden in ("sk-", "Bearer ", "password", "OPENAI_API_KEY="):

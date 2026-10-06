@@ -213,7 +213,7 @@
       "observed_metrics": [
         "container_cpu_usage_seconds_total"
       ],
-      "reason": "Named containers on 3 of 4 hosts; paas-production-4 exposes only the root cgroup.",
+      "reason": "Named containers on 3 of 4 hosts; shop-production-4 exposes only the root cgroup.",
       "history_days": 28.4
     },
     {

@@ -2,8 +2,8 @@
 
 Usage: uv run python -m scripts.generate_fixtures [--check]
 
-Label conventions follow the owner-supplied examples (project="paas", env="production",
-node instance "paas-production", HTTP job "dispatcher-api"). Values are synthetic.
+Labels are neutral and made up (project="shop", env="production",
+node instance "shop-production", HTTP job "checkout-api"). Values are synthetic.
 """
 
 import argparse
@@ -102,10 +102,10 @@ ROOT = Path(__file__).resolve().parents[2] / "fixtures"
 PROJECT_ID = "01999a3c-0000-7000-8000-000000000001"
 SCOPE = Scope(
     project_id=PROJECT_ID,
-    project_name="paas / production",
+    project_name="shop / production",
     matchers=[
         LabelMatcher(name="env", value="production"),
-        LabelMatcher(name="project", value="paas"),
+        LabelMatcher(name="project", value="shop"),
     ],
 )
 SCOPE_LABELS = {m.name: m.value for m in SCOPE.matchers}
@@ -117,35 +117,35 @@ STEP = timedelta(seconds=STEP_SECONDS)
 CONFIG = DetectorConfig()
 WINDOWS = AnalysisWindows.for_end(T)
 SOURCE = SourceInfo(base_url="http://localhost:8428", backend=None, version=None)
-SEL = 'project="paas", env="production"'
+SEL = 'project="shop", env="production"'
 
 NODE = Entity(
     kind=EntityKind.NODE,
-    key="node|job=node|instance=paas-production",
-    display_name="node · paas-production",
-    labels={"job": "node", "instance": "paas-production"},
+    key="node|job=node|instance=shop-production",
+    display_name="node · shop-production",
+    labels={"job": "node", "instance": "shop-production"},
 )
 ROUTE = Entity(
     kind=EntityKind.ROUTE,
-    key="route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
-    display_name="dispatcher-api · GET /api/v3/tasks/:task",
+    key="route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
+    display_name="checkout-api · GET /api/v1/orders/:order",
     labels={
-        "job": "dispatcher-api",
-        "http_route": "/api/v3/tasks/:task",
+        "job": "checkout-api",
+        "http_route": "/api/v1/orders/:order",
         "http_request_method": "GET",
     },
 )
 SERVICE = Entity(
     kind=EntityKind.SERVICE,
-    key="service|job=dispatcher-api",
-    display_name="dispatcher-api",
-    labels={"job": "dispatcher-api"},
+    key="service|job=checkout-api",
+    display_name="checkout-api",
+    labels={"job": "checkout-api"},
 )
 
 CPU_QUERY = f'1 - avg by (job, instance) (rate(node_cpu_seconds_total{{{SEL}, mode="idle"}}[5m]))'
 HTTP_404_QUERY = (
     "sum by (job, http_route, http_request_method) (rate(http_server_request_duration_seconds_count"
-    f'{{{SEL}, job="dispatcher-api", http_route="/api/v3/tasks/:task", '
+    f'{{{SEL}, job="checkout-api", http_route="/api/v1/orders/:order", '
     'http_request_method="GET", http_response_status_code="404"}[5m]))'
 )
 
@@ -262,7 +262,7 @@ def capabilities(
 
 
 def observed_capabilities() -> list[MetricCapability]:
-    """paas/production capabilities verified live by T003 (docs/telemetry-inventory.md §4)."""
+    """shop/production capabilities verified live by T003 (docs/telemetry-inventory.md §4)."""
     history = 28.4
     http_labels = [
         "project",
@@ -367,7 +367,7 @@ def observed_capabilities() -> list[MetricCapability]:
             partial,
             ["container_cpu_usage_seconds_total"],
             [*node_labels, "name", "id"],
-            "Named containers on 3 of 4 hosts; paas-production-4 exposes only the root cgroup.",
+            "Named containers on 3 of 4 hosts; shop-production-4 exposes only the root cgroup.",
         ),
         cap(
             SignalFamily.CONTAINER,
@@ -650,7 +650,7 @@ def trends(
     recurring_404_days: tuple[int, ...] = (),
 ) -> list[DailyTrend]:
     out = []
-    entities = 2  # node + dispatcher-api route in the synthetic scope
+    entities = 2  # node + checkout-api route in the synthetic scope
     for i in range(TREND_DAYS):
         end = T - timedelta(days=i)
         start = end - timedelta(days=1)
@@ -854,11 +854,11 @@ def ai_success(findings: list[Finding]) -> ExplanationResult:
     return ExplanationResult(
         status=ExplanationStatus.SUCCEEDED,
         explanation=Explanation(
-            summary="Sustained CPU saturation on paas-production for 3 h and an earlier, separate "
-            "increase of 404 responses on dispatcher-api GET /api/v3/tasks/:task.",
+            summary="Sustained CPU saturation on shop-production for 3 h and an earlier, separate "
+            "increase of 404 responses on checkout-api GET /api/v1/orders/:order.",
             hypotheses=[
                 Hypothesis(
-                    text="A batch or runaway process saturated CPU on paas-production.",
+                    text="A batch or runaway process saturated CPU on shop-production.",
                     finding_ids=[cpu.finding_id],
                     likelihood=Likelihood.PLAUSIBLE,
                 ),
@@ -870,15 +870,15 @@ def ai_success(findings: list[Finding]) -> ExplanationResult:
             ],
             investigation_steps=[
                 InvestigationStep(
-                    text="List top CPU consumers on paas-production for 05:05-08:05 UTC.",
+                    text="List top CPU consumers on shop-production for 05:05-08:05 UTC.",
                     finding_ids=[cpu.finding_id],
                 ),
                 InvestigationStep(
-                    text="Group 404 requests on /api/v3/tasks/:task by client.",
+                    text="Group 404 requests on /api/v1/orders/:order by client.",
                     finding_ids=[nf.finding_id],
                 ),
             ],
-            uncertainty="No established mapping between node paas-production and dispatcher-api "
+            uncertainty="No established mapping between node shop-production and checkout-api "
             "instances; the two findings are treated as unrelated.",
             provider="openai",
             model="configured-model",
@@ -1126,7 +1126,7 @@ def build() -> dict[str, BaseModel]:
         "metrics/capabilities_supplied_unverified.json": _Manifest(
             items=capabilities(history_days=None, histogram=True)
         ),
-        "metrics/capabilities_paas_production_observed.json": _Manifest(
+        "metrics/capabilities_shop_production_observed.json": _Manifest(
             items=observed_capabilities()
         ),
     }

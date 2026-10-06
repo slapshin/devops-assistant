@@ -3,7 +3,7 @@
   "analysis_id": "01999a2b-0000-7000-8000-000000000004",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
-    "project_name": "paas / production",
+    "project_name": "shop / production",
     "matchers": [
       {
         "name": "env",
@@ -11,7 +11,7 @@
       },
       {
         "name": "project",
-        "value": "paas"
+        "value": "shop"
       }
     ]
   },
@@ -386,7 +386,7 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_70a7d6cb55890a3d",
+      "finding_id": "fnd_3ebe46815328c7ff",
       "detector": "robust_baseline",
       "detector_version": "detectors-2026.10.7",
       "method": "relative",
@@ -395,11 +395,11 @@
       "title": "CPU utilisation above expected range",
       "entity": {
         "kind": "node",
-        "key": "node|job=node|instance=paas-production",
-        "display_name": "node · paas-production",
+        "key": "node|job=node|instance=shop-production",
+        "display_name": "node · shop-production",
         "labels": {
           "job": "node",
-          "instance": "paas-production"
+          "instance": "shop-production"
         }
       },
       "start": "2026-09-30T05:05:00Z",
@@ -430,7 +430,7 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_9d8a55d3d994d8d1"
+        "evd_d8151432b6c1dcc8"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -451,7 +451,7 @@
       "anomalous_minutes": 180,
       "peak_severity": "critical",
       "affected_entities": [
-        "node|job=node|instance=paas-production"
+        "node|job=node|instance=shop-production"
       ],
       "observed_entity_minutes": 2880,
       "anomalous_share": 0.0625,
@@ -459,15 +459,15 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_70a7d6cb55890a3d",
-          "finding_id": "fnd_70a7d6cb55890a3d",
+          "episode_id": "eps_3ebe46815328c7ff",
+          "finding_id": "fnd_3ebe46815328c7ff",
           "entity": {
             "kind": "node",
-            "key": "node|job=node|instance=paas-production",
-            "display_name": "node · paas-production",
+            "key": "node|job=node|instance=shop-production",
+            "display_name": "node · shop-production",
             "labels": {
               "job": "node",
-              "instance": "paas-production"
+              "instance": "shop-production"
             }
           },
           "family": "cpu",
@@ -714,29 +714,29 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_9d8a55d3d994d8d1",
-      "finding_id": "fnd_70a7d6cb55890a3d",
+      "evidence_id": "evd_d8151432b6c1dcc8",
+      "finding_id": "fnd_3ebe46815328c7ff",
       "series": {
-        "series_id": "ser_063ed23f9b327c5f",
+        "series_id": "ser_6d64ca1e1032319f",
         "family": "cpu",
         "signal": "cpu_utilization",
         "entity": {
           "kind": "node",
-          "key": "node|job=node|instance=paas-production",
-          "display_name": "node · paas-production",
+          "key": "node|job=node|instance=shop-production",
+          "display_name": "node · shop-production",
           "labels": {
             "job": "node",
-            "instance": "paas-production"
+            "instance": "shop-production"
           }
         },
         "labels": {
           "env": "production",
-          "project": "paas",
+          "project": "shop",
           "job": "node",
-          "instance": "paas-production"
+          "instance": "shop-production"
         },
         "unit": "ratio",
-        "query": "1 - avg by (job, instance) (rate(node_cpu_seconds_total{project=\"paas\", env=\"production\", mode=\"idle\"}[5m]))",
+        "query": "1 - avg by (job, instance) (rate(node_cpu_seconds_total{project=\"shop\", env=\"production\", mode=\"idle\"}[5m]))",
         "step_seconds": 300,
         "start": "2026-09-29T23:05:00Z",
         "values": [

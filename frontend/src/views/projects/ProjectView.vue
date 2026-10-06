@@ -3,9 +3,10 @@ import { computed } from "vue";
 import { ApiError } from "../../api/client";
 import { useAnalyses, useProject } from "../../api/queries";
 import AnalysesTable from "../../components/AnalysesTable.vue";
-import HealthBadge from "../../components/projects/HealthBadge.vue";
 import MatcherChips from "../../components/projects/MatcherChips.vue";
 import RunAnalysis from "../../components/projects/RunAnalysis.vue";
+import SourceHealth from "../../components/projects/SourceHealth.vue";
+import SourceIcon from "../../components/projects/SourceIcon.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import { formatTime, utcTooltip } from "../../lib/format";
 import { cloudflareSource, prometheusSource, scheduleSummary, sourceHost } from "../../lib/projects";
@@ -45,22 +46,24 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
       <p v-if="project.data.value.description">{{ project.data.value.description }}</p>
 
       <dl class="facts card">
-        <dt>Prometheus</dt>
-        <dd v-if="prometheus">
-          <span class="mono">{{ sourceHost(prometheus.url) }}</span>
-          · {{ AUTH_LABELS[prometheus.auth.type] }}<template v-if="!prometheus.tls_verify"> · TLS not verified</template>
-          <MatcherChips class="chips" :matchers="project.data.value.matchers" />
-        </dd>
-        <dd v-else class="muted">Not configured</dd>
-        <dt>Cloudflare</dt>
-        <dd v-if="cloudflare">
-          zone <span class="mono">{{ cloudflare.zone_id }}</span>
-          · {{ cloudflare.hostnames.length ? cloudflare.hostnames.join(", ") : "all hostnames" }}
-          <template v-if="cloudflare.api_url.startsWith('synthetic:')"> · <span class="mono">{{ sourceHost(cloudflare.api_url) }}</span></template>
-        </dd>
-        <dd v-else class="muted">Not configured</dd>
-        <dt>Health</dt>
-        <dd><HealthBadge :project="project.data.value" /></dd>
+        <div class="sources" role="group" aria-label="Sources">
+          <dt class="source-kind"><SourceIcon kind="prometheus" />Prometheus</dt>
+          <dd v-if="prometheus">
+            <SourceHealth :project="project.data.value" kind="prometheus" />
+            <span class="mono">{{ sourceHost(prometheus.url) }}</span>
+            · {{ AUTH_LABELS[prometheus.auth.type] }}<template v-if="!prometheus.tls_verify"> · TLS not verified</template>
+            <MatcherChips class="chips" :matchers="project.data.value.matchers" />
+          </dd>
+          <dd v-else class="muted">Not configured</dd>
+          <dt class="source-kind"><SourceIcon kind="cloudflare" />Cloudflare</dt>
+          <dd v-if="cloudflare">
+            <SourceHealth :project="project.data.value" kind="cloudflare" />
+            zone <span class="mono">{{ cloudflare.zone_id }}</span>
+            · {{ cloudflare.hostnames.length ? cloudflare.hostnames.join(", ") : "all hostnames" }}
+            <template v-if="cloudflare.api_url.startsWith('synthetic:')"> · <span class="mono">{{ sourceHost(cloudflare.api_url) }}</span></template>
+          </dd>
+          <dd v-else class="muted">Not configured</dd>
+        </div>
         <dt>Schedule</dt>
         <dd v-if="project.data.value.schedule">
           {{ scheduleSummary(project.data.value.schedule) }}
@@ -95,6 +98,13 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px calc(var(--space) * 2); margin: 0; }
 .facts dt { font-weight: 600; color: var(--muted); }
 .facts dd { margin: 0; }
+.sources {
+  grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; gap: inherit;
+  padding: var(--space); margin-bottom: var(--space);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.sources::before { content: "Sources"; grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.source-kind { display: inline-flex; align-items: center; gap: 6px; align-self: start; }
 .chips { margin-top: 4px; }
 @media (max-width: 600px) {
   .facts { grid-template-columns: minmax(0, 1fr); }

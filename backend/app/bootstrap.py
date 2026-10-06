@@ -13,7 +13,7 @@ log = logging.getLogger("app")
 
 DEMO_MATCHERS = [
     LabelMatcher(name="env", value="production"),
-    LabelMatcher(name="project", value="paas"),
+    LabelMatcher(name="project", value="shop"),
 ]
 
 

@@ -500,7 +500,7 @@ export interface components {
             display_name: string;
             /**
              * Key
-             * @description Stable canonical key, e.g. 'node|job=node|instance=paas-production'.
+             * @description Stable canonical key, e.g. 'node|job=node|instance=shop-production'.
              */
             key: string;
             kind: components["schemas"]["EntityKind"];

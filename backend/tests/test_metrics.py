@@ -138,14 +138,14 @@ def test_bare_metric_name_is_rejected() -> None:
 
 
 def test_string_literal_cannot_fake_scope() -> None:
-    query = 'label_replace(up{job="x"}, "l", "{project=\\"paas\\", env=\\"production\\"}", "", "")'
+    query = 'label_replace(up{job="x"}, "l", "{project=\\"shop\\", env=\\"production\\"}", "", "")'
     with pytest.raises(ScopeViolation):
         assert_scoped(query, SCOPE, ("up",))
 
 
 def test_other_project_matcher_does_not_satisfy_scope() -> None:
     with pytest.raises(ScopeViolation):
-        assert_scoped('up{project="paas-gpu", env="production"}', SCOPE, ("up",))
+        assert_scoped('up{project="shop-gpu", env="production"}', SCOPE, ("up",))
 
 
 def test_every_matcher_is_required() -> None:
@@ -361,12 +361,12 @@ async def test_response_size_limit() -> None:
 async def test_cache_is_keyed_by_exact_query() -> None:
     fake = FakeProm(lambda p, q: vector(({"a": "1"}, "1")))
     client = fake.client()
-    paas = f"up{{{scope_matchers(SCOPE)}}}"
-    other = f"up{{{scope_matchers(make_scope('paas-gpu', 'production'))}}}"
-    await client.query(paas, 10)
-    await client.query(paas, 10)
+    shop = f"up{{{scope_matchers(SCOPE)}}}"
+    other = f"up{{{scope_matchers(make_scope('shop-gpu', 'production'))}}}"
+    await client.query(shop, 10)
+    await client.query(shop, 10)
     await client.query(other, 10)
-    assert [p["query"][0] for _, p in fake.requests] == [paas, other]
+    assert [p["query"][0] for _, p in fake.requests] == [shop, other]
 
 
 async def test_bearer_token_is_sent_but_never_in_query() -> None:
@@ -471,7 +471,7 @@ async def test_collect_limits_routes_and_aggregates_the_rest() -> None:
     assert routes == ["(other routes)", "/r3", "/r4"]
     other = next(s for s in reqs if s.entity.labels["http_route"] == "(other routes)")
     assert other.values[-1] == 0 + 1 + 2
-    assert all(s.labels["project"] == "paas" for s in result.series)
+    assert all(s.labels["project"] == "shop" for s in result.series)
     assert all(len(s.values) == 28 * 288 for s in result.series)
 
 
@@ -532,11 +532,11 @@ async def test_per_query_series_budget_is_disclosed() -> None:
 async def test_out_of_scope_results_are_dropped() -> None:
     leaked = matrix(
         (
-            {"job": "node", "instance": "a", "project": "paas", "env": "production"},
+            {"job": "node", "instance": "a", "project": "shop", "env": "production"},
             [(int(T.timestamp()), "0.5")],
         ),
         (
-            {"job": "node", "instance": "b", "project": "paas-gpu", "env": "production"},
+            {"job": "node", "instance": "b", "project": "shop-gpu", "env": "production"},
             [(int(T.timestamp()), "0.9")],
         ),
     )
@@ -563,19 +563,19 @@ async def test_cancellation_stops_collection() -> None:
 async def test_service_to_host_mapping_by_container_id_prefix() -> None:
     extra = {
         "target_info": vector(
-            ({"job": "dispatcher-api", "service_instance_id": "1711aba3a574"}, "1")
+            ({"job": "checkout-api", "service_instance_id": "1711aba3a574"}, "1")
         ),
         "container_start_time_seconds": vector(
             (
                 {
-                    "instance": "paas-production-2",
+                    "instance": "shop-production-2",
                     "id": "/system.slice/docker-1711aba3a574ff6224911dc2.scope",
                 },
                 "1",
             )
         ),
         "docker_swarm_task_info{": vector(
-            ({"service_name": "paas_dispatcher-api", "node_hostname": "paas-production-2"}, "1")
+            ({"service_name": "shop_checkout-api", "node_hostname": "shop-production-2"}, "1")
         ),
     }
     source = PrometheusMetricsSource(
@@ -584,6 +584,6 @@ async def test_service_to_host_mapping_by_container_id_prefix() -> None:
     caps = await source.capabilities(SCOPE, WINDOWS)
     result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
     assert [(m.kind.value, m.service, m.host) for m in result.mappings] == [
-        ("otel_service", "dispatcher-api", "paas-production-2"),
-        ("swarm_service", "paas_dispatcher-api", "paas-production-2"),
+        ("otel_service", "checkout-api", "shop-production-2"),
+        ("swarm_service", "shop_checkout-api", "shop-production-2"),
     ]

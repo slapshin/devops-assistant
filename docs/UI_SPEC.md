@@ -28,7 +28,7 @@ Every page has a left **icon rail** (home, Projects, and Overview / Findings / T
 Report routes add a toolbar and tabs under the top bar:
 
 ```
-[env | production] [project | paas] [baseline | 14 days]   Completed · detectors-2026.09.1 · saved 30 Sep 10:07 UTC   [◷ 29 Sep 10:05 – 30 Sep 10:05 | UTC ▾] [Run again]
+[env | production] [project | shop] [baseline | 14 days]   Completed · detectors-2026.09.1 · saved 30 Sep 10:07 UTC   [◷ 29 Sep 10:05 – 30 Sep 10:05 | UTC ▾] [Run again]
 Tabs:  Overview | Findings 12 | Trends
 ```
 
@@ -75,7 +75,7 @@ Replaces the original start view (project/env selectors). Screenshots: `docs/scr
 Order (top to bottom). The page answers "what is wrong, how bad, and what is new" before any detail:
 
 1. **Stat panels**: one per severity (Critical, High, Medium always; Low when present), filled with the severity colour when the count is above zero, with the family and new/seen-before note; *New today*; *Signal coverage* (evaluated of total families, with a bar); *Blind spots* (count and family names).
-2. **Summary**: a one-line headline of the most severe finding ("CPU on node · paas-production peaked at 95.4 % over 3 h"), its ratio to the usual value, how many findings are new today versus seen before, a link to the most severe finding, the 14-day trend line, and a warning box naming the families that were not evaluated (unsupported, insufficient data, source error) and saying that problems there would not show up. Beside it, **Check first** (the AI explanation panel, below).
+2. **Summary**: a one-line headline of the most severe finding ("CPU on node · shop-production peaked at 95.4 % over 3 h"), its ratio to the usual value, how many findings are new today versus seen before, a link to the most severe finding, the 14-day trend line, and a warning box naming the families that were not evaluated (unsupported, insufficient data, source error) and saying that problems there would not show up. Beside it, **Check first** (the AI explanation panel, below).
 3. **Episodes** (a collapsible row): a **State timeline** with one lane per finding (at most 8) on the latest-day axis; the lane background is neutral ("No episode"), never "normal", because it does not prove the entity was healthy. Findings that overlap in time are listed as "coincide in time (not established as related)". Below it, the 6 most severe findings as panels: severity, title, New today / Recurring tag, the observed peak with the usual range (or the heuristic), a mini evidence chart with axes, episode span, heuristic line and usual band, the series legend, then time, duration, state and confidence. A "View all findings" link.
 4. **Coverage** (a collapsible row): a **Signal families** tile grid (one solid tile per family: red anomalous, amber not evaluated, green no anomaly; each with text and icon), then the coverage table (5).
 5. **Check first** contents:
@@ -101,7 +101,7 @@ Severity chips: Critical / High / Medium / Low, each with a text label (solid fi
 
 ## 6. Findings
 
-- A grid table in one panel (it scrolls horizontally inside its container on narrow screens). Columns: severity, finding, entity (e.g. `node · paas-production` or `dispatcher-api · GET /api/v3/tasks/:task`), started, duration, peak, usual range (or heuristic), confidence, and recurrence state. The open finding's row is highlighted.
+- A grid table in one panel (it scrolls horizontally inside its container on narrow screens). Columns: severity, finding, entity (e.g. `node · shop-production` or `checkout-api · GET /api/v1/orders/:order`), started, duration, peak, usual range (or heuristic), confidence, and recurrence state. The open finding's row is highlighted.
 - Default sort is severity, then peak time. Filters are labelled controls (Category, Severity, Entity), and filter state lives in the URL. A **Recurrence** toggle (All / New today / Happened before, `?recurrence=new|seen`) sits on the left of the filter row.
 - 4xx findings are titled "Client error increase (4xx)" or "404 increase". 5xx findings are titled "Server error rate (5xx)". The two never share a label.
 - An empty list after filtering shows "No findings match these filters" and a Clear filters button.
@@ -157,9 +157,9 @@ Unsupported or insufficient signals have no chart. They show a text block explai
 
 | Scenario | Path through the UI | Expected presentation |
 | --- | --- | --- |
-| **Healthy data** (paas/production, 14 d history) | Start → Analyze → progress → Overview | 0 findings, "No anomalies detected in evaluated signals", full coverage table, Trends with 14 bars at 0 % anomalous share and full coverage. AI skipped (`skipped_no_findings`). |
-| **Sustained CPU load** (`node_cpu_seconds_total` idle drops, 95 % for 3 h on `paas-production`) | Overview top finding → Evidence | High/critical "CPU utilisation" on `node · paas-production`: observed 95 % vs expected 22 % (band), a 3 h span, the absolute heuristic line at 90 %, confidence high. The AI hypothesis links to it. Trends day 14 shows the spike. |
-| **404 increase** (`dispatcher-api`, `GET /api/v3/tasks/:task` 404s ×6, 5xx flat) | Findings → filter category "Client errors" | "404 increase" (severity ≤ medium). The 5xx row reads "No anomaly". `error_type="404"` is shown as a label, not as a failure. No host attribution to `paas-production`. |
+| **Healthy data** (shop/production, 14 d history) | Start → Analyze → progress → Overview | 0 findings, "No anomalies detected in evaluated signals", full coverage table, Trends with 14 bars at 0 % anomalous share and full coverage. AI skipped (`skipped_no_findings`). |
+| **Sustained CPU load** (`node_cpu_seconds_total` idle drops, 95 % for 3 h on `shop-production`) | Overview top finding → Evidence | High/critical "CPU utilisation" on `node · shop-production`: observed 95 % vs expected 22 % (band), a 3 h span, the absolute heuristic line at 90 %, confidence high. The AI hypothesis links to it. Trends day 14 shows the spike. |
+| **404 increase** (`checkout-api`, `GET /api/v1/orders/:order` 404s ×6, 5xx flat) | Findings → filter category "Client errors" | "404 increase" (severity ≤ medium). The 5xx row reads "No anomaly". `error_type="404"` is shown as a label, not as a failure. No host attribution to `shop-production`. |
 | **Missing histogram buckets** (only `_count`) | Overview → Coverage | Latency row is *Unsupported*: "No histogram buckets or `_sum` for `http_server_request_duration_seconds`". Traffic and status findings still appear. No latency chart. |
 | **Short retention** (5 days of history) | Overview → Trends | Latest-day findings have confidence medium (4 baseline days). Trend buckets with < 3 baseline days (the oldest observed days) are hatched "insufficient baseline", buckets before the history starts show "insufficient data", and the rest show their reduced baseline length. The summary shows "Baseline: 4 days". |
 | **AI failure** (OpenAI timeout) | Overview | All findings and evidence render. The explanation panel reads "could not be generated (timeout)". Job state is `completed`, explanation status `failed`. |

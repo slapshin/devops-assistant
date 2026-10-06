@@ -1,9 +1,9 @@
 """Deterministic synthetic MetricsSource for tests, UI development, and offline demos.
 
-Series follow the label conventions of the owner-supplied examples (node "paas-production",
-HTTP job "dispatcher-api") and carry whatever matchers the project's scope has, so any
-project can point at it. Values are synthetic. The
-source reports ``backend="synthetic"`` so reports can never be mistaken for live data.
+Series use neutral, made-up labels (node "shop-production", HTTP job "checkout-api") and
+carry whatever matchers the project's scope has, so any project can point at it. Values are
+synthetic. The source reports ``backend="synthetic"`` so reports can never be mistaken for live
+data.
 """
 
 from collections.abc import Sequence
@@ -35,28 +35,28 @@ N = HISTORY_DAYS * DAY
 LATEST = N - DAY
 """First step of the latest day."""
 
-INCIDENT_HOST = "paas-production"
-SECOND_HOST = "paas-production-2"
-NEW_HOST = "paas-production-4"
-SERVICE_JOB = "dispatcher-api"
+INCIDENT_HOST = "shop-production"
+SECOND_HOST = "shop-production-2"
+NEW_HOST = "shop-production-4"
+SERVICE_JOB = "checkout-api"
 
 TASK_ROUTE = {
     "job": SERVICE_JOB,
-    "http_route": "/api/v3/tasks/:task",
+    "http_route": "/api/v1/orders/:order",
     "http_request_method": "GET",
 }
 PROXY_JOB = "traefik"
-PROXY_SERVICE = {"job": PROXY_JOB, "service": "dispatcher-api@swarm"}
+PROXY_SERVICE = {"job": PROXY_JOB, "service": "checkout-api@swarm"}
 PROXY_SERVER = {**PROXY_SERVICE, "url": "http://10.0.1.7:8080"}
 PG_SERVER = {"job": "postgres", "instance": "pg-primary:9187"}
-PG_DATABASE = {**PG_SERVER, "datname": "dispatcher"}
+PG_DATABASE = {**PG_SERVER, "datname": "checkout"}
 MYSQL_PRIMARY = {"job": "mysql", "instance": "mysql-primary:9104"}
 MYSQL_REPLICA = {"job": "mysql", "instance": "mysql-replica:9104"}
 REDIS_MASTER = {"job": "redis", "instance": "redis://redis-master:6379"}
 REDIS_REPLICA = {"job": "redis", "instance": "redis://redis-replica:6379"}
 QUIET_ROUTE = {
     "job": SERVICE_JOB,
-    "http_route": "/internal/task-sla",
+    "http_route": "/internal/order-sla",
     "http_request_method": "GET",
 }
 
@@ -67,7 +67,7 @@ class Scenario:
 
     history_days: int = HISTORY_DAYS
     cpu_load: bool = False
-    """paas-production CPU at 95 % for 3 h, ending 2 h before T."""
+    """shop-production CPU at 95 % for 3 h, ending 2 h before T."""
     memory_growth: bool = False
     disk_depletion: bool = False
     not_found_burst: bool = False
@@ -75,19 +75,19 @@ class Scenario:
     latency_shift: bool = False
     traffic_drop: bool = False
     gaps: bool = False
-    """A 2 h scrape gap on paas-production during the latest day."""
+    """A 2 h scrape gap on shop-production during the latest day."""
     flat_memory: bool = False
-    """paas-production-2 memory constant (zero MAD)."""
+    """shop-production-2 memory constant (zero MAD)."""
     new_host_days: int | None = None
-    """paas-production-4 appears this many days before T (changing population)."""
+    """shop-production-4 appears this many days before T (changing population)."""
     histogram: bool = True
     containers: bool = True
     proxies: bool = True
-    """Traefik in front of dispatcher-api."""
+    """Traefik in front of checkout-api."""
     proxy_outage: bool = False
     """One Traefik backend server down for 45 min with a 5xx burst, ending 4 h before T."""
     databases: bool = True
-    """A PostgreSQL primary (postgres_exporter) with the dispatcher database."""
+    """A PostgreSQL primary (postgres_exporter) with the checkout database."""
     database_pileup: bool = False
     """An idle-in-transaction session holds locks for 1 h, ending 150 min before T: the oldest
     transaction grows, connections pile up, and blocked writers deadlock and roll back."""
@@ -196,7 +196,7 @@ def build_series(
         for host in hosts[:2]:
             builder.add(
                 "container_cpu",
-                {"instance": host, "container": "paas_dispatcher-api.1"},
+                {"instance": host, "container": "shop_checkout-api.1"},
                 gen.available(np.clip(gen.base(0.3, 0.05, 0.01), 0, None)),
             )
 

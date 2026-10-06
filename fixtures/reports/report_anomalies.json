@@ -3,7 +3,7 @@
   "analysis_id": "01999a2b-0000-7000-8000-000000000002",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
-    "project_name": "paas / production",
+    "project_name": "shop / production",
     "matchers": [
       {
         "name": "env",
@@ -11,7 +11,7 @@
       },
       {
         "name": "project",
-        "value": "paas"
+        "value": "shop"
       }
     ]
   },
@@ -381,7 +381,7 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_fd00d64224e4459e",
+      "finding_id": "fnd_913fb6cda0c56d7d",
       "detector": "robust_baseline",
       "detector_version": "detectors-2026.10.7",
       "method": "relative",
@@ -390,11 +390,11 @@
       "title": "CPU utilisation above expected range",
       "entity": {
         "kind": "node",
-        "key": "node|job=node|instance=paas-production",
-        "display_name": "node · paas-production",
+        "key": "node|job=node|instance=shop-production",
+        "display_name": "node · shop-production",
         "labels": {
           "job": "node",
-          "instance": "paas-production"
+          "instance": "shop-production"
         }
       },
       "start": "2026-09-30T05:05:00Z",
@@ -420,7 +420,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_97b259fa31860ef4"
+        "evd_e68c78945b961d6e"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -429,7 +429,7 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_6b04dec20dcd7192",
+      "finding_id": "fnd_596fa28ccd45dfc7",
       "detector": "robust_baseline",
       "detector_version": "detectors-2026.10.7",
       "method": "relative",
@@ -438,11 +438,11 @@
       "title": "404 increase",
       "entity": {
         "kind": "route",
-        "key": "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
-        "display_name": "dispatcher-api · GET /api/v3/tasks/:task",
+        "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
+        "display_name": "checkout-api · GET /api/v1/orders/:order",
         "labels": {
-          "job": "dispatcher-api",
-          "http_route": "/api/v3/tasks/:task",
+          "job": "checkout-api",
+          "http_route": "/api/v1/orders/:order",
           "http_request_method": "GET"
         }
       },
@@ -478,7 +478,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_3d7861dd0937a76d"
+        "evd_3aec253b4ab65864"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -502,8 +502,8 @@
       "anomalous_minutes": 270,
       "peak_severity": "critical",
       "affected_entities": [
-        "node|job=node|instance=paas-production",
-        "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET"
+        "node|job=node|instance=shop-production",
+        "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET"
       ],
       "observed_entity_minutes": 2880,
       "anomalous_share": 0.09375,
@@ -511,15 +511,15 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_fd00d64224e4459e",
-          "finding_id": "fnd_fd00d64224e4459e",
+          "episode_id": "eps_913fb6cda0c56d7d",
+          "finding_id": "fnd_913fb6cda0c56d7d",
           "entity": {
             "kind": "node",
-            "key": "node|job=node|instance=paas-production",
-            "display_name": "node · paas-production",
+            "key": "node|job=node|instance=shop-production",
+            "display_name": "node · shop-production",
             "labels": {
               "job": "node",
-              "instance": "paas-production"
+              "instance": "shop-production"
             }
           },
           "family": "cpu",
@@ -532,15 +532,15 @@
           "unit": "ratio"
         },
         {
-          "episode_id": "eps_6b04dec20dcd7192",
-          "finding_id": "fnd_6b04dec20dcd7192",
+          "episode_id": "eps_596fa28ccd45dfc7",
+          "finding_id": "fnd_596fa28ccd45dfc7",
           "entity": {
             "kind": "route",
-            "key": "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
-            "display_name": "dispatcher-api · GET /api/v3/tasks/:task",
+            "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
+            "display_name": "checkout-api · GET /api/v1/orders/:order",
             "labels": {
-              "job": "dispatcher-api",
-              "http_route": "/api/v3/tasks/:task",
+              "job": "checkout-api",
+              "http_route": "/api/v1/orders/:order",
               "http_request_method": "GET"
             }
           },
@@ -600,7 +600,7 @@
       "anomalous_minutes": 45,
       "peak_severity": "low",
       "affected_entities": [
-        "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET"
+        "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET"
       ],
       "observed_entity_minutes": 2880,
       "anomalous_share": 0.015625,
@@ -608,15 +608,15 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_8b3a63094442a287",
+          "episode_id": "eps_edfedf89ef0fa7c1",
           "finding_id": null,
           "entity": {
             "kind": "route",
-            "key": "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
-            "display_name": "dispatcher-api · GET /api/v3/tasks/:task",
+            "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
+            "display_name": "checkout-api · GET /api/v1/orders/:order",
             "labels": {
-              "job": "dispatcher-api",
-              "http_route": "/api/v3/tasks/:task",
+              "job": "checkout-api",
+              "http_route": "/api/v1/orders/:order",
               "http_request_method": "GET"
             }
           },
@@ -659,7 +659,7 @@
       "anomalous_minutes": 45,
       "peak_severity": "low",
       "affected_entities": [
-        "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET"
+        "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET"
       ],
       "observed_entity_minutes": 2880,
       "anomalous_share": 0.015625,
@@ -667,15 +667,15 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_7b534bd0e29e4cf4",
+          "episode_id": "eps_274c3af96a994a4f",
           "finding_id": null,
           "entity": {
             "kind": "route",
-            "key": "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
-            "display_name": "dispatcher-api · GET /api/v3/tasks/:task",
+            "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
+            "display_name": "checkout-api · GET /api/v1/orders/:order",
             "labels": {
-              "job": "dispatcher-api",
-              "http_route": "/api/v3/tasks/:task",
+              "job": "checkout-api",
+              "http_route": "/api/v1/orders/:order",
               "http_request_method": "GET"
             }
           },
@@ -752,7 +752,7 @@
       "anomalous_minutes": 45,
       "peak_severity": "low",
       "affected_entities": [
-        "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET"
+        "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET"
       ],
       "observed_entity_minutes": 2880,
       "anomalous_share": 0.015625,
@@ -760,15 +760,15 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_86fdaef19b6d8e4c",
+          "episode_id": "eps_8a2d05670b46796f",
           "finding_id": null,
           "entity": {
             "kind": "route",
-            "key": "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
-            "display_name": "dispatcher-api · GET /api/v3/tasks/:task",
+            "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
+            "display_name": "checkout-api · GET /api/v1/orders/:order",
             "labels": {
-              "job": "dispatcher-api",
-              "http_route": "/api/v3/tasks/:task",
+              "job": "checkout-api",
+              "http_route": "/api/v1/orders/:order",
               "http_request_method": "GET"
             }
           },
@@ -863,29 +863,29 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_97b259fa31860ef4",
-      "finding_id": "fnd_fd00d64224e4459e",
+      "evidence_id": "evd_e68c78945b961d6e",
+      "finding_id": "fnd_913fb6cda0c56d7d",
       "series": {
-        "series_id": "ser_063ed23f9b327c5f",
+        "series_id": "ser_6d64ca1e1032319f",
         "family": "cpu",
         "signal": "cpu_utilization",
         "entity": {
           "kind": "node",
-          "key": "node|job=node|instance=paas-production",
-          "display_name": "node · paas-production",
+          "key": "node|job=node|instance=shop-production",
+          "display_name": "node · shop-production",
           "labels": {
             "job": "node",
-            "instance": "paas-production"
+            "instance": "shop-production"
           }
         },
         "labels": {
           "env": "production",
-          "project": "paas",
+          "project": "shop",
           "job": "node",
-          "instance": "paas-production"
+          "instance": "shop-production"
         },
         "unit": "ratio",
-        "query": "1 - avg by (job, instance) (rate(node_cpu_seconds_total{project=\"paas\", env=\"production\", mode=\"idle\"}[5m]))",
+        "query": "1 - avg by (job, instance) (rate(node_cpu_seconds_total{project=\"shop\", env=\"production\", mode=\"idle\"}[5m]))",
         "step_seconds": 300,
         "start": "2026-09-29T23:05:00Z",
         "values": [
@@ -1431,32 +1431,32 @@
       "threshold_label": "Diagnostic heuristic: 90 % for ≥ 15 min (not an SLO)"
     },
     {
-      "evidence_id": "evd_3d7861dd0937a76d",
-      "finding_id": "fnd_6b04dec20dcd7192",
+      "evidence_id": "evd_3aec253b4ab65864",
+      "finding_id": "fnd_596fa28ccd45dfc7",
       "series": {
-        "series_id": "ser_02c37ee087ed4e7e",
+        "series_id": "ser_70283fa5b0565bd7",
         "family": "client_errors",
         "signal": "client_error_rate",
         "entity": {
           "kind": "route",
-          "key": "route|job=dispatcher-api|http_route=/api/v3/tasks/:task|http_request_method=GET",
-          "display_name": "dispatcher-api · GET /api/v3/tasks/:task",
+          "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",
+          "display_name": "checkout-api · GET /api/v1/orders/:order",
           "labels": {
-            "job": "dispatcher-api",
-            "http_route": "/api/v3/tasks/:task",
+            "job": "checkout-api",
+            "http_route": "/api/v1/orders/:order",
             "http_request_method": "GET"
           }
         },
         "labels": {
           "env": "production",
-          "project": "paas",
-          "job": "dispatcher-api",
-          "http_route": "/api/v3/tasks/:task",
+          "project": "shop",
+          "job": "checkout-api",
+          "http_route": "/api/v1/orders/:order",
           "http_request_method": "GET",
           "http_response_status_code": "404"
         },
         "unit": "requests_per_second",
-        "query": "sum by (job, http_route, http_request_method) (rate(http_server_request_duration_seconds_count{project=\"paas\", env=\"production\", job=\"dispatcher-api\", http_route=\"/api/v3/tasks/:task\", http_request_method=\"GET\", http_response_status_code=\"404\"}[5m]))",
+        "query": "sum by (job, http_route, http_request_method) (rate(http_server_request_duration_seconds_count{project=\"shop\", env=\"production\", job=\"checkout-api\", http_route=\"/api/v1/orders/:order\", http_request_method=\"GET\", http_response_status_code=\"404\"}[5m]))",
         "step_seconds": 300,
         "start": "2026-09-29T19:05:00Z",
         "values": [
@@ -2126,38 +2126,38 @@
   "explanation": {
     "status": "succeeded",
     "explanation": {
-      "summary": "Sustained CPU saturation on paas-production for 3 h and an earlier, separate increase of 404 responses on dispatcher-api GET /api/v3/tasks/:task.",
+      "summary": "Sustained CPU saturation on shop-production for 3 h and an earlier, separate increase of 404 responses on checkout-api GET /api/v1/orders/:order.",
       "hypotheses": [
         {
-          "text": "A batch or runaway process saturated CPU on paas-production.",
+          "text": "A batch or runaway process saturated CPU on shop-production.",
           "finding_ids": [
-            "fnd_fd00d64224e4459e"
+            "fnd_913fb6cda0c56d7d"
           ],
           "likelihood": "plausible"
         },
         {
           "text": "A client is polling for task IDs that no longer exist.",
           "finding_ids": [
-            "fnd_6b04dec20dcd7192"
+            "fnd_596fa28ccd45dfc7"
           ],
           "likelihood": "possible"
         }
       ],
       "investigation_steps": [
         {
-          "text": "List top CPU consumers on paas-production for 05:05-08:05 UTC.",
+          "text": "List top CPU consumers on shop-production for 05:05-08:05 UTC.",
           "finding_ids": [
-            "fnd_fd00d64224e4459e"
+            "fnd_913fb6cda0c56d7d"
           ]
         },
         {
-          "text": "Group 404 requests on /api/v3/tasks/:task by client.",
+          "text": "Group 404 requests on /api/v1/orders/:order by client.",
           "finding_ids": [
-            "fnd_6b04dec20dcd7192"
+            "fnd_596fa28ccd45dfc7"
           ]
         }
       ],
-      "uncertainty": "No established mapping between node paas-production and dispatcher-api instances; the two findings are treated as unrelated.",
+      "uncertainty": "No established mapping between node shop-production and checkout-api instances; the two findings are treated as unrelated.",
       "provider": "openai",
       "model": "configured-model",
       "generated_at": "2026-09-30T10:07:00Z"

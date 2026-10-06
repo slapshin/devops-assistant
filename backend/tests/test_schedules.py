@@ -13,7 +13,7 @@ from app.main import create_app
 from app.scheduler import MISSED_RUN_GRACE
 from app.settings import load_settings
 
-MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "paas"}]
+MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "shop"}]
 
 
 def utc(year: int, month: int, day: int, hour: int, minute: int) -> datetime:

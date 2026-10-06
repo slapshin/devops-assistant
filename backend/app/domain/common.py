@@ -202,7 +202,7 @@ class Entity(Contract):
     kind: EntityKind
     key: str = Field(
         min_length=1,
-        description="Stable canonical key, e.g. 'node|job=node|instance=paas-production'.",
+        description="Stable canonical key, e.g. 'node|job=node|instance=shop-production'.",
     )
     display_name: str
     labels: Labels = Field(description="Identity labels only (no scope matchers).")

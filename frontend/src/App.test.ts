@@ -319,7 +319,7 @@ describe("project form", () => {
   it("tests the connection with the draft and marks the result stale after edits", async () => {
     routes["POST /api/projects/test-connection"] = () => json(connectionTest);
     await renderAt("/projects/new");
-    await fireEvent.update(await screen.findByLabelText("Label value 1"), "paas");
+    await fireEvent.update(await screen.findByLabelText("Label value 1"), "shop");
     await fireEvent.update(screen.getByLabelText("Label value 2"), "production");
     await fireEvent.click(screen.getByRole("button", { name: "Test Prometheus connection" }));
     expect(await screen.findByText("Required to test the connection")).toBeInTheDocument();
@@ -333,7 +333,7 @@ describe("project form", () => {
     expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({
       project_id: null,
       matchers: [
-        { name: "project", value: "paas" },
+        { name: "project", value: "shop" },
         { name: "env", value: "production" },
       ],
       source: { kind: "prometheus", url: "http://vm:8428", tls_verify: true, auth: { type: "none" } },
@@ -414,7 +414,7 @@ describe("project form", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Delete project…" })).toBeEnabled());
     await fireEvent.click(screen.getByRole("button", { name: "Delete project…" }));
     const confirm = screen.getByRole("button", { name: "Delete permanently" });
-    await fireEvent.update(screen.getByLabelText(/to confirm/), "paas");
+    await fireEvent.update(screen.getByLabelText(/to confirm/), "shop");
     expect(confirm).toBeDisabled();
     await fireEvent.update(screen.getByLabelText(/to confirm/), base.name);
     expect(confirm).toBeEnabled();
@@ -593,7 +593,7 @@ describe("report", () => {
 
   it("overview leads with the worst finding, blind spots and a timeline", async () => {
     await renderAt(report(anomalies));
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("CPU on node · paas-production peaked at 96.3 % over 3 h");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("CPU on node · shop-production peaked at 96.3 % over 3 h");
     expect(screen.getByText(/4\.4× the usual 22\.0 %/)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Summary" })).toHaveTextContent("Containers (no metrics found) is not evaluated");
     expect(screen.getByRole("region", { name: "Blind spots" })).toHaveTextContent("Containers");

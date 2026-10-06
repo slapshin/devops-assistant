@@ -7,7 +7,7 @@ from app.domain.common import LabelMatcher, Scope, SourceKind
 from app.domain.interfaces import MetricsSource, OpenedSource
 
 
-def make_scope(project: str = "paas", env: str = "production", project_id: str = "p-1") -> Scope:
+def make_scope(project: str = "shop", env: str = "production", project_id: str = "p-1") -> Scope:
     """Scope of a project selecting ``project=<project>, env=<env>`` (the pre-T012 shape)."""
     return Scope(
         project_id=project_id,

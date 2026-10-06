@@ -73,8 +73,8 @@ def test_backup_and_prune_are_explicit(
         project = client.post(
             "/api/projects",
             json={
-                "name": "paas",
-                "matchers": [{"name": "project", "value": "paas"}],
+                "name": "shop",
+                "matchers": [{"name": "project", "value": "shop"}],
                 "sources": [{"kind": "prometheus", "url": "synthetic://healthy"}],
             },
         ).json()

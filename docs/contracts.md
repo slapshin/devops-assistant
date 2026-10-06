@@ -58,7 +58,7 @@ The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is
 
 ## States
 
-- **Capability** (`CapabilityStatus`): `supported | partial | unsupported | unverified`. `verified=true` only when the capability was observed in the live source. T003 produced the first verified manifest for paas/production (`fixtures/metrics/capabilities_paas_production_observed.json`). Other scopes are discovered at runtime.
+- **Capability** (`CapabilityStatus`): `supported | partial | unsupported | unverified`. `verified=true` only when the capability was observed in the live source. T003 produced the first verified manifest for shop/production (`fixtures/metrics/capabilities_shop_production_observed.json`). Other scopes are discovered at runtime.
 - **Signal coverage** (`SignalStatus`): `anomalous | no_anomaly | insufficient_data | unsupported | source_error | not_evaluated`. The UI vocabulary is in UI_SPEC §5.
 - **Trend bucket**: `ok | insufficient_baseline | insufficient_data | source_error`.
 - **Job** (`JobState`): `queued | running | completed | partial | failed | cancelled`. **Stages**: `discovery, collection, detection, trends, explanation, saving`, each `pending | running | done | failed | skipped`.
@@ -81,7 +81,7 @@ Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-ap
 
 ## Fixtures
 
-All fixtures are synthetic and sanitised. They use the supplied label conventions (`project="paas"`, `env="production"`, node `job="node", instance="paas-production"`, HTTP `job="dispatcher-api"`, route `/api/v3/tasks/:task`, `http_response_status_code`, `error_type`) and contain no credentials. T = `2026-09-30T10:05:00Z`.
+All fixtures are synthetic and sanitised. They use neutral, made-up labels (`project="shop"`, `env="production"`, node `job="node", instance="shop-production"`, HTTP `job="checkout-api"`, route `/api/v1/orders/:order`, `http_response_status_code`, `error_type`) and contain no credentials. T = `2026-09-30T10:05:00Z`.
 
 | File | Scenario |
 | --- | --- |
@@ -93,6 +93,6 @@ All fixtures are synthetic and sanitised. They use the supplied label convention
 | `jobs/job_running.json`, `job_completed.json`, `job_interrupted.json`, `submitted_duplicate.json` | Lifecycle states, including restart interruption and a duplicate submission |
 | `api/config.json`, `projects.json`, `connection_test.json`, `problem_queue_full.json`, `problem_report_not_ready.json` | API bodies |
 | `metrics/capabilities_supplied_unverified.json` | Capability manifest from supplied examples only (all `verified=false`); fallback for scopes not yet discovered |
-| `metrics/capabilities_paas_production_observed.json` | paas/production capabilities verified live by T003, including `partial` containers and `unsupported` memory limits/throttling |
+| `metrics/capabilities_shop_production_observed.json` | shop/production capabilities verified live by T003, including `partial` containers and `unsupported` memory limits/throttling |
 
 Fixture values are illustrative. They are not detector output: T005 must derive its own results from series and must not copy them.

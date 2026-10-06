@@ -3,7 +3,7 @@
     "analysis_id": "01999a2b-0000-7000-8000-000000000006",
     "scope": {
       "project_id": "01999a3c-0000-7000-8000-000000000001",
-      "project_name": "paas / production",
+      "project_name": "shop / production",
       "matchers": [
         {
           "name": "env",
@@ -11,7 +11,7 @@
         },
         {
           "name": "project",
-          "value": "paas"
+          "value": "shop"
         }
       ]
     },
