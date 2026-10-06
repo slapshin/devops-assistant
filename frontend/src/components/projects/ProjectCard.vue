@@ -1,15 +1,25 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { ProjectSummary } from "../../api/client";
+import type { ProjectSummary, SourceKind } from "../../api/client";
 import { JOB_STATES, formatAge, utcTooltip } from "../../lib/format";
-import { scheduleSummary, sourceSummary } from "../../lib/projects";
+import { SOURCE_KIND_LABELS, scheduleSummary } from "../../lib/projects";
 import SeverityCounts from "../SeverityCounts.vue";
-import HealthBadge from "./HealthBadge.vue";
-import MatcherChips from "./MatcherChips.vue";
 import RunAnalysis from "./RunAnalysis.vue";
+import SourceIcon from "./SourceIcon.vue";
 import TrendSparkline from "./TrendSparkline.vue";
 
 const props = defineProps<{ project: ProjectSummary }>();
+
+/** Every source kind, dimmed unless the project configures it. */
+const sources = computed(() =>
+  (Object.keys(SOURCE_KIND_LABELS) as SourceKind[]).map((kind) => {
+    const configured = props.project.sources.some((s) => s.kind === kind);
+    return { kind, label: `${SOURCE_KIND_LABELS[kind]}: ${configured ? "configured" : "not configured"}`, configured };
+  }),
+);
+const retention = computed(() =>
+  props.project.keep_reports != null ? `Keeps latest ${props.project.keep_reports} reports` : "Keeps all reports",
+);
 
 const latest = computed(() => props.project.latest_analysis ?? null);
 const latestAt = computed(() => latest.value?.finished_at ?? latest.value?.created_at ?? null);
@@ -26,13 +36,20 @@ const latestLink = computed(() => {
       <h2 :id="`project-${project.project_id}`">
         <RouterLink :to="`/projects/${project.project_id}`">{{ project.name }}</RouterLink>
       </h2>
-      <MatcherChips v-if="project.matchers.length" :matchers="project.matchers" />
-      <p class="source">
-        <span v-for="s in project.sources" :key="s.kind" class="mono muted">{{ sourceSummary(s) }}</span>
-        <span v-if="!project.sources.length" class="mono muted">No data source</span>
-        <HealthBadge :project="project" />
-      </p>
-      <p v-if="project.schedule" class="muted schedule">Scheduled: {{ scheduleSummary(project.schedule) }}</p>
+      <ul class="sources" aria-label="Data sources">
+        <li
+          v-for="s in sources"
+          :key="s.kind"
+          :class="{ off: !s.configured }"
+          role="img"
+          :aria-label="s.label"
+          :title="s.label"
+        >
+          <SourceIcon :kind="s.kind" />
+        </li>
+      </ul>
+      <p v-if="project.schedule" class="muted meta">Scheduled: {{ scheduleSummary(project.schedule) }}</p>
+      <p class="muted meta">{{ retention }}</p>
     </div>
 
     <div class="latest">
@@ -66,8 +83,10 @@ const latestLink = computed(() => {
 }
 h2 { margin: 0 0 6px; font-size: 15px; }
 .identity > * + * { margin-top: 6px; }
-.schedule { margin: 0; font-size: 12px; }
-.source { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 0; }
+.meta { margin: 0; font-size: 12px; }
+.sources { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
+.sources li { display: inline-flex; cursor: help; }
+.sources .off { color: var(--muted); opacity: 0.35; filter: grayscale(1); }
 .latest, .trend { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 960px) {
   .project { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

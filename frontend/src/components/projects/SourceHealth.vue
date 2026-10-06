@@ -18,7 +18,6 @@ const GLYPHS: Record<HealthKey, string> = {
   unreadable: "source_error",
   error: "source_error",
   checking: "",
-  not_configured: "",
 };
 
 const checkable = computed(() => props.project.credentials_readable);
@@ -47,5 +46,5 @@ const detail = computed(() => {
 .h-ok { color: var(--ok); }
 .h-unreachable, .h-auth, .h-unreadable, .h-error { color: var(--crit); }
 .h-no_series, .h-no_traffic { color: var(--med); }
-.h-checking, .h-not_configured { color: var(--muted); }
+.h-checking { color: var(--muted); }
 </style>

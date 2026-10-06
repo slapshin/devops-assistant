@@ -467,19 +467,6 @@ export function serverFieldErrors(problem: Problem, kinds: SourceKind[] = [], te
   return errors;
 }
 
-/** One line per source: "Prometheus · vm:8428/prom", "Cloudflare · shop.example.com", "Sentry · acme: shop-api, shop-web". */
-export function sourceSummary(source: StoredSource): string {
-  if (source.kind === "prometheus") return `Prometheus · ${sourceHost(source.url)}`;
-  if (source.kind === "sentry") {
-    const synthetic = source.api_url === SENTRY_URL ? "" : ` (${sourceHost(source.api_url)})`;
-    const environment = source.environment ? ` · ${source.environment}` : "";
-    return `Sentry · ${source.organization}: ${source.projects.join(", ")}${environment}${synthetic}`;
-  }
-  const synthetic = source.api_url.startsWith("synthetic:") ? ` (${sourceHost(source.api_url)})` : "";
-  const scope = source.hostnames.length ? source.hostnames.join(", ") : `zone ${source.zone_id.slice(0, 8)}…`;
-  return `Cloudflare · ${scope}${synthetic}`;
-}
-
 /** Host, port and path prefix of a source URL; "synthetic: <scenario>" for demo sources. */
 export function sourceHost(url: string): string {
   try {
@@ -491,7 +478,7 @@ export function sourceHost(url: string): string {
   }
 }
 
-export type HealthKey = "ok" | "checking" | "unreachable" | "auth" | "no_series" | "no_traffic" | "not_configured" | "unreadable" | "error";
+export type HealthKey = "ok" | "checking" | "unreachable" | "auth" | "no_series" | "no_traffic" | "unreadable" | "error";
 
 export const HEALTH_LABELS: Record<HealthKey, { label: string; icon: string }> = {
   ok: { label: "Reachable", icon: "✓" },
@@ -500,31 +487,9 @@ export const HEALTH_LABELS: Record<HealthKey, { label: string; icon: string }> =
   auth: { label: "Auth failed", icon: "!" },
   no_series: { label: "No matching series", icon: "◐" },
   no_traffic: { label: "No traffic", icon: "◐" },
-  not_configured: { label: "No source", icon: "–" },
   unreadable: { label: "Credentials unreadable", icon: "!" },
   error: { label: "Check failed", icon: "!" },
 };
-
-/** Most severe first: one failing source makes the whole project unhealthy. */
-const HEALTH_RANK: HealthKey[] = ["unreachable", "auth", "no_series", "no_traffic", "ok"];
-
-export function healthKey(
-  project: ProjectSummary,
-  health: ConnectionTest[] | undefined,
-  state: { pending: boolean; failed: boolean },
-): HealthKey {
-  if (project.sources.length === 0) return "not_configured";
-  if (!project.credentials_readable) return "unreadable";
-  if (state.failed) return "error";
-  if (state.pending || health === undefined) return "checking";
-  if (health.length === 0) return "not_configured";
-  return worstTest(health);
-}
-
-export function worstTest(tests: ConnectionTest[]): HealthKey {
-  const keys = tests.map(testKey);
-  return HEALTH_RANK.find((k) => keys.includes(k)) ?? "ok";
-}
 
 export function testKey(test: ConnectionTest): HealthKey {
   if (!test.reachable) return "unreachable";

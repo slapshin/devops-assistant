@@ -81,31 +81,26 @@ const withId = (id: string, changes: Partial<Summary> = {}): Summary => ({ ...ba
 const reachable = { reachable: true, auth_ok: true, matched_series: 12, history_days: 30, families: [], checked_at: "2026-09-30T10:05:00Z" };
 
 describe("projects list", () => {
-  it("shows health, latest report, trend and empty states for every project", async () => {
+  it("shows source status, retention, latest report, trend and empty states for every project", async () => {
     const items = [
-      withId("ok"),
+      withId("ok", { keep_reports: 10 }),
       withId("down", { latest_analysis: null }),
-      withId("denied"),
-      withId("empty-match"),
       withId("no-source", { sources: [] }),
-      withId("locked", { credentials_readable: false }),
     ];
     routes["GET /api/projects"] = () => json({ items });
-    routes["GET /api/projects/ok/health"] = () => json([reachable]);
-    routes["GET /api/projects/down/health"] = () => json([{ ...reachable, reachable: false, auth_ok: null, matched_series: null }]);
-    routes["GET /api/projects/denied/health"] = () => json([{ ...reachable, auth_ok: false, matched_series: null }]);
-    routes["GET /api/projects/empty-match/health"] = () => json([{ ...reachable, matched_series: 0 }]);
     await renderAt("/");
 
     const card = (name: string) => screen.getByRole("article", { name });
-    await waitFor(() => expect(within(card("ok")).getByText(/Reachable/)).toBeInTheDocument());
-    expect(await within(card("down")).findByText(/Unreachable/)).toBeInTheDocument();
-    expect(await within(card("denied")).findByText(/Auth failed/)).toBeInTheDocument();
-    expect(await within(card("empty-match")).findByText(/No matching series/)).toBeInTheDocument();
-    expect(within(card("no-source")).getByText(/No source/)).toBeInTheDocument();
-    expect(within(card("locked")).getByText(/Credentials unreadable/)).toBeInTheDocument();
-    // health is never requested for projects that cannot be checked
-    expect(calls.some((c) => c.url.includes("no-source/health") || c.url.includes("locked/health"))).toBe(false);
+    await waitFor(() => expect(card("ok")).toBeInTheDocument());
+    expect(within(card("ok")).getByRole("img", { name: "Prometheus: configured" })).toBeInTheDocument();
+    expect(within(card("ok")).getByRole("img", { name: "Cloudflare: not configured" })).toBeInTheDocument();
+    expect(within(card("ok")).getByRole("img", { name: "Sentry: not configured" })).toBeInTheDocument();
+    expect(within(card("no-source")).getByRole("img", { name: "Prometheus: not configured" })).toBeInTheDocument();
+    expect(within(card("ok")).getByText("Keeps latest 10 reports")).toBeInTheDocument();
+    expect(within(card("down")).getByText("Keeps all reports")).toBeInTheDocument();
+    // labels and per-source health stay on the project page
+    expect(within(card("ok")).queryByText(/project=/)).not.toBeInTheDocument();
+    expect(calls.some((c) => c.url.endsWith("/health"))).toBe(false);
 
     expect(within(card("ok")).getByRole("link", { name: /Completed/ })).toHaveAttribute("href", `/reports/${base.latest_analysis?.analysis_id}`);
     expect(within(card("ok")).getByText("1 critical")).toBeInTheDocument();
