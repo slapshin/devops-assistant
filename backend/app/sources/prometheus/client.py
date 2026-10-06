@@ -18,11 +18,10 @@ import httpx
 
 from app.domain.interfaces import SourceError, SourceErrorKind
 from app.domain.projects import PrometheusConnection
+from app.sources.base import ClientLimits
 
-log = logging.getLogger("app.metrics")
+log = logging.getLogger("app.sources.prometheus")
 
-MAX_RESPONSE_BYTES = 64 * 1024 * 1024
-CHUNK_SECONDS = 7 * 86400
 RETRY_BACKOFF_SECONDS = 0.5
 MAX_ERROR_MESSAGE_CHARS = 500
 LABEL_CACHE_BUCKET_SECONDS = 300
@@ -43,17 +42,6 @@ class RangeResult:
 
     labels: Mapping[str, str]
     samples: Sequence[tuple[int, float | None]]
-
-
-@dataclass
-class ClientLimits:
-    timeout_seconds: float = 30.0
-    concurrency: int = 4
-    retries: int = 1
-    max_response_bytes: int = MAX_RESPONSE_BYTES
-    chunk_seconds: int = CHUNK_SECONDS
-    cache_entries: int = 256
-    cache_ttl_seconds: float = 600.0
 
 
 @dataclass

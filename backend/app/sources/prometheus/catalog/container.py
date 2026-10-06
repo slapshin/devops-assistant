@@ -1,7 +1,7 @@
 """Container (cAdvisor) and Docker Swarm signals."""
 
 from app.domain.common import EntityKind, SignalFamily, Unit
-from app.metrics.catalog.base import (
+from app.sources.prometheus.catalog.base import (
     Gate,
     SignalDef,
     aggregate,

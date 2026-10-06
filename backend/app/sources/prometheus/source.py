@@ -21,7 +21,8 @@ from app.domain.interfaces import (
 from app.domain.jobs import StageName, StageProgress, StageStatus
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.report import AnalysisWindows, Exclusion, SourceInfo
-from app.metrics.catalog import (
+from app.sources.base import HISTORY_DAYS
+from app.sources.prometheus.catalog import (
     ALL_REQUIRED_METRICS,
     BY_SIGNAL,
     CATALOG,
@@ -29,12 +30,11 @@ from app.metrics.catalog import (
     TRAFFIC_SIGNALS,
     SignalDef,
 )
-from app.metrics.client import PrometheusClient, RangeResult
-from app.metrics.promql import assert_scoped, scope_matchers
+from app.sources.prometheus.client import PrometheusClient, RangeResult
+from app.sources.prometheus.promql import assert_scoped, scope_matchers
 
-log = logging.getLogger("app.metrics")
+log = logging.getLogger("app.sources.prometheus")
 
-HISTORY_DAYS = 28
 OTHER_ROUTES = "(other routes)"
 SECONDS_PER_DAY = 86400
 HISTORY_PROBE_DAYS = 30

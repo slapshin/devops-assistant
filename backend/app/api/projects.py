@@ -25,11 +25,11 @@ from app.domain.projects import (
     SourceInput,
     synthetic_url,
 )
-from app.metrics.factory import connect
-from app.metrics.probe import probe
-from app.metrics.synthetic import SCENARIOS
 from app.sources.cloudflare.connect import connect_cloudflare, probe_cloudflare
 from app.sources.cloudflare.synthetic import SCENARIOS as CLOUDFLARE_SCENARIOS
+from app.sources.factory import connect
+from app.sources.prometheus.probe import probe
+from app.sources.prometheus.synthetic import SCENARIOS
 from app.storage.projects import ProjectNameTaken, SecretRequired
 from app.storage.secrets import SecretsUnreadable
 

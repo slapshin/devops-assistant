@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.common import EntityKind, SignalFamily, Unit
-from app.metrics.promql import QueryTemplate
+from app.sources.prometheus.promql import QueryTemplate
 
 
 class Direction(StrEnum):

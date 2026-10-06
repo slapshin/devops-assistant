@@ -57,7 +57,7 @@ IDs are derived from `project|env|T|config_hash` plus entity, signal and start t
 
 ## Verification
 
-`backend/tests/test_analysis.py` uses the deterministic `SyntheticMetricsSource` (`backend/app/metrics/synthetic.py`) and covers:
+`backend/tests/test_analysis.py` uses the deterministic `SyntheticMetricsSource` (`backend/app/sources/prometheus/synthetic.py`) and covers:
 
 - healthy data; sustained CPU; memory growth (ongoing); disk depletion (critical);
 - independent 404 and 5xx bursts; latency shift; mean-only latency; traffic drop;

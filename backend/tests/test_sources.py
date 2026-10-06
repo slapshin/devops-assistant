@@ -29,9 +29,9 @@ from app.domain.report import (
     ReportState,
     SourceInfo,
 )
-from app.metrics.promql import ScopeViolation, scope_matchers
-from app.metrics.synthetic import SyntheticMetricsSource
 from app.service import AnalysisPipeline
+from app.sources.prometheus.promql import ScopeViolation, scope_matchers
+from app.sources.prometheus.synthetic import SyntheticMetricsSource
 from tests.helpers import StaticSources, make_scope
 
 END = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)

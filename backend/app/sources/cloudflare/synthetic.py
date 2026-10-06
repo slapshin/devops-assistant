@@ -11,7 +11,7 @@ from datetime import UTC, date, datetime
 import numpy as np
 
 from app.domain.interfaces import SourceError, SourceErrorKind
-from app.metrics.source import HISTORY_DAYS
+from app.sources.base import HISTORY_DAYS
 from app.sources.cloudflare.api import (
     DATASETS,
     SECONDS_PER_DAY,

@@ -20,10 +20,10 @@ from app.container import Services
 from app.domain.detector_config import DetectorConfig
 from app.domain.interfaces import ExplanationProvider, MetricsSource
 from app.jobs import JobRunner, RunnerLimits
-from app.metrics.factory import ProjectSources
 from app.scheduler import ReportScheduler
 from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
+from app.sources.factory import ProjectSources
 from app.static import mount_ui
 from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository

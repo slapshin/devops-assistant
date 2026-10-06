@@ -1,7 +1,7 @@
 """HTTP and RPC server signals (OpenTelemetry semantic conventions)."""
 
 from app.domain.common import EntityKind, SignalFamily, Unit
-from app.metrics.catalog.base import (
+from app.sources.prometheus.catalog.base import (
     Direction,
     Role,
     SignalDef,

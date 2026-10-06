@@ -28,10 +28,9 @@ from app.domain.metrics import CapabilityStatus
 from app.domain.projects import CloudflareConnection, CloudflareSourceInput
 from app.domain.report import AnalysisReport, AnalysisRequest, AnalysisWindows, ReportState
 from app.main import create_app
-from app.metrics.client import ClientLimits
-from app.metrics.synthetic import SyntheticMetricsSource
 from app.service import AnalysisPipeline
 from app.settings import load_settings
+from app.sources.base import ClientLimits
 from app.sources.cloudflare.api import (
     FIREWALL_DATASET,
     HTTP_DATASET,
@@ -42,6 +41,7 @@ from app.sources.cloudflare.client import CloudflareClient
 from app.sources.cloudflare.connect import connect_cloudflare, probe_cloudflare
 from app.sources.cloudflare.source import CloudflareMetricsSource
 from app.sources.cloudflare.synthetic import SyntheticCloudflareApi
+from app.sources.prometheus.synthetic import SyntheticMetricsSource
 from tests.helpers import StaticSources, make_scope
 
 ZONE = "0123456789abcdef0123456789abcdef"

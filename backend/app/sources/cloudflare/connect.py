@@ -10,11 +10,11 @@ from app.domain.common import STEP_SECONDS, Scope, SourceKind
 from app.domain.metrics import CapabilityStatus
 from app.domain.projects import CloudflareConnection, ConnectionTest, synthetic_url
 from app.domain.report import AnalysisWindows
-from app.metrics.probe import guarded, summarise_families
 from app.sources.cloudflare.api import SECONDS_PER_DAY, CloudflareApi
 from app.sources.cloudflare.client import CloudflareClient
 from app.sources.cloudflare.source import CloudflareMetricsSource
 from app.sources.cloudflare.synthetic import SyntheticCloudflareApi
+from app.sources.probe import guarded, summarise_families
 
 
 @asynccontextmanager

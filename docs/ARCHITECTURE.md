@@ -20,7 +20,7 @@ An analysis opens every source of the project (`SourceProvider.open` yields one 
 
 - Projects are created in the UI and stored in SQLite (`projects`, `project_sources`). Secrets are write-only through the API and encrypted with `SECRET_KEY` or a generated `DATA_DIR/secret.key`.
 - `Scope` is `{project_id, project_name, matchers}`. `promql.render` requires every matcher in every selector block, so no query (including ratio operands) can leave the project.
-- `ProjectSources` (`app/metrics/factory.py`) opens the project's source for each analysis or connection test and closes it afterwards; editing a project never affects a running job.
+- `ProjectSources` (`app/sources/factory.py`) opens the project's sources for each analysis or connection test and closes it afterwards; editing a project never affects a running job.
 - Every job and report belongs to one project (`analysis_jobs.project_id`, cascading to reports). Deleting a project deletes its analyses; it is refused while one is queued or running.
 - A project may have a **report schedule** (`ReportSchedule`, `app/domain/schedule.py`): a local `HH:MM` time, an IANA time zone and weekdays (all by default). `ReportScheduler` (`app/scheduler.py`) checks every 30 s and submits due runs to the `JobRunner` with `trigger: scheduled`. Each run analyses the 24 h ending at the scheduled instant (floored to the step). `projects.schedule_anchor` records the instant runs are handled up to: saving a changed schedule resets it to the save time (it never fires for earlier times), runs missed by more than 6 h are skipped, a full queue is retried on the next tick, and projects without a metrics source are skipped.
 - A project may set **report retention** (`keep_reports`, null keeps all). `SqliteReportRepository.prune_reports` deletes the project's finished analyses older than its newest N reports (reports cascade; queued/running jobs are never touched). The `JobRunner` prunes after each saved report (a pruning error is logged and never changes the job's outcome), and saving the project prunes immediately, so lowering N takes effect at once.
@@ -38,7 +38,7 @@ An analysis opens every source of the project (`SourceProvider.open` yields one 
 | Boundary | Responsibility | Proposed ownership |
 | --- | --- | --- |
 | Domain/contracts | Versioned inputs, reports, findings, evidence, interfaces | `backend/app/domain/` |
-| Metrics | Capability discovery, scoped query catalog, bounded collection | `backend/app/metrics/` |
+| Sources | Per kind: capability discovery, query catalog, bounded collection into series | `backend/app/sources/` (`prometheus/`, `cloudflare/`) |
 | Analysis | Baselines, detectors, episodes, correlation, daily trends | `backend/app/analysis/` |
 | AI | Bounded evidence explanation, provider adapters, output validation | `backend/app/ai/` |
 | Application/API | Job lifecycle and framework-independent orchestration | `backend/app/api/` and orchestration module |

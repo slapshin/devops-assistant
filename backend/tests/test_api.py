@@ -28,9 +28,9 @@ from app.domain.metrics import MetricCapability
 from app.domain.report import AnalysisRequest, AnalysisWindows, Exclusion
 from app.jobs import RunnerLimits
 from app.main import create_app
-from app.metrics.synthetic import SyntheticMetricsSource
 from app.service import AnalysisPipeline
 from app.settings import load_settings
+from app.sources.prometheus.synthetic import SyntheticMetricsSource
 from tests.helpers import StaticSources, make_scope
 
 PAAS_MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "paas"}]

@@ -15,16 +15,22 @@ from app.domain.jobs import StageProgress
 from app.domain.metrics import CapabilityStatus
 from app.domain.projects import PrometheusConnection
 from app.domain.report import AnalysisWindows
-from app.metrics.catalog import BY_SIGNAL, CATALOG
-from app.metrics.client import ClientLimits, PrometheusClient
-from app.metrics.promql import (
+from app.sources.base import ClientLimits
+from app.sources.prometheus.catalog import BY_SIGNAL, CATALOG
+from app.sources.prometheus.client import PrometheusClient
+from app.sources.prometheus.promql import (
     QueryTemplate,
     ScopeViolation,
     assert_scoped,
     escape_label_value,
     scope_matchers,
 )
-from app.metrics.source import CollectionBudget, PrometheusMetricsSource, _to_grid, entity_for
+from app.sources.prometheus.source import (
+    CollectionBudget,
+    PrometheusMetricsSource,
+    _to_grid,
+    entity_for,
+)
 from tests.helpers import make_scope
 
 SCOPE = make_scope()
@@ -381,7 +387,7 @@ async def test_bearer_token_is_sent_but_never_in_query() -> None:
 
 
 def test_grid_places_interval_samples_and_keeps_gaps() -> None:
-    from app.metrics.client import RangeResult
+    from app.sources.prometheus.client import RangeResult
 
     start, step = 1000 * STEP_SECONDS, STEP_SECONDS
     r = RangeResult(labels={}, samples=[(start + step, 1.0), (start + 3 * step, 3.0), (7, 9.0)])

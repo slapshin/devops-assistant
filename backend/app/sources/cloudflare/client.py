@@ -15,7 +15,7 @@ import httpx
 from app.domain.common import format_utc
 from app.domain.interfaces import SourceError, SourceErrorKind
 from app.domain.projects import CloudflareConnection
-from app.metrics.client import ClientLimits
+from app.sources.base import ClientLimits
 from app.sources.cloudflare.api import (
     DATASETS,
     DEFAULT_MAX_DURATION,

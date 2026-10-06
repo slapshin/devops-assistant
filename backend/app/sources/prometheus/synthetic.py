@@ -24,8 +24,9 @@ from app.domain.interfaces import (
 from app.domain.jobs import StageName, StageProgress, StageStatus
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.report import AnalysisWindows, SourceInfo
-from app.metrics.catalog import BY_SIGNAL, CATALOG
-from app.metrics.source import HISTORY_DAYS, entity_for, scope_labels
+from app.sources.base import HISTORY_DAYS
+from app.sources.prometheus.catalog import BY_SIGNAL, CATALOG
+from app.sources.prometheus.source import entity_for, scope_labels
 
 DAY = 288
 """Steps per day."""

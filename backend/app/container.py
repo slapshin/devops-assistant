@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 from app.domain.detector_config import DetectorConfig
 from app.domain.projects import ConnectionTest
 from app.jobs import JobRunner
-from app.metrics.factory import ProjectSources
 from app.scheduler import ReportScheduler
 from app.settings import Settings
+from app.sources.factory import ProjectSources
 from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository
 

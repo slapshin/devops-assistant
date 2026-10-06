@@ -13,14 +13,14 @@ Conventions:
   source modules, documented in docs/metrics-catalog.md.
 """
 
-from app.metrics.catalog.base import Direction, Gate, Role, SignalDef
-from app.metrics.catalog.container import CONTAINER_CATALOG
-from app.metrics.catalog.host import HOST_CATALOG
-from app.metrics.catalog.mysql import MYSQL_CATALOG
-from app.metrics.catalog.postgres import POSTGRES_CATALOG
-from app.metrics.catalog.proxy import PROXY_CATALOG
-from app.metrics.catalog.redis import REDIS_CATALOG
-from app.metrics.catalog.requests import REQUEST_CATALOG
+from app.sources.prometheus.catalog.base import Direction, Gate, Role, SignalDef
+from app.sources.prometheus.catalog.container import CONTAINER_CATALOG
+from app.sources.prometheus.catalog.host import HOST_CATALOG
+from app.sources.prometheus.catalog.mysql import MYSQL_CATALOG
+from app.sources.prometheus.catalog.postgres import POSTGRES_CATALOG
+from app.sources.prometheus.catalog.proxy import PROXY_CATALOG
+from app.sources.prometheus.catalog.redis import REDIS_CATALOG
+from app.sources.prometheus.catalog.requests import REQUEST_CATALOG
 
 __all__ = [
     "ALL_REQUIRED_METRICS",

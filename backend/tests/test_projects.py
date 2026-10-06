@@ -13,10 +13,10 @@ from fastapi.testclient import TestClient
 from app.domain.common import LabelMatcher, Scope
 from app.domain.projects import PrometheusConnection
 from app.main import create_app
-from app.metrics.client import PrometheusClient
-from app.metrics.probe import probe
-from app.metrics.source import PrometheusMetricsSource
 from app.settings import load_settings
+from app.sources.prometheus.client import PrometheusClient
+from app.sources.prometheus.probe import probe
+from app.sources.prometheus.source import PrometheusMetricsSource
 from app.storage.secrets import SecretBox, SecretsUnreadable
 
 TOKEN = "s3cr3t-token-value"

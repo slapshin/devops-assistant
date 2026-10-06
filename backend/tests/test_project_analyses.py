@@ -14,8 +14,8 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.metrics.synthetic import SCENARIOS
 from app.settings import load_settings
+from app.sources.prometheus.synthetic import SCENARIOS
 from app.storage.db import MIGRATIONS, make_engine
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures"

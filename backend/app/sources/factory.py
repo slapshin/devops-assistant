@@ -15,10 +15,10 @@ from app.domain.projects import (
     SourceConnection,
     synthetic_url,
 )
-from app.metrics.client import PrometheusClient
-from app.metrics.source import PrometheusMetricsSource
-from app.metrics.synthetic import SyntheticMetricsSource
 from app.sources.cloudflare.connect import connect_cloudflare
+from app.sources.prometheus.client import PrometheusClient
+from app.sources.prometheus.source import PrometheusMetricsSource
+from app.sources.prometheus.synthetic import SyntheticMetricsSource
 from app.storage.projects import SqliteProjectRepository
 
 

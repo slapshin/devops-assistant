@@ -4,9 +4,9 @@ import logging
 
 from app.domain.common import LabelMatcher
 from app.domain.projects import CloudflareSourceInput, ProjectInput, PrometheusSourceInput
-from app.metrics.synthetic import SCENARIOS
 from app.settings import Settings
 from app.sources.cloudflare.synthetic import SYNTHETIC_ZONE_ID
+from app.sources.prometheus.synthetic import SCENARIOS
 from app.storage.projects import SqliteProjectRepository
 
 log = logging.getLogger("app")

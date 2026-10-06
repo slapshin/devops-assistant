@@ -1,7 +1,7 @@
 """Node signals: CPU, memory, filesystems, disks and network (node_exporter)."""
 
 from app.domain.common import EntityKind, SignalFamily, Unit
-from app.metrics.catalog.base import (
+from app.sources.prometheus.catalog.base import (
     Direction,
     SignalDef,
     aggregate,

@@ -23,9 +23,9 @@ from app.domain.jobs import (
 )
 from app.domain.report import AnalysisReport
 from app.jobs import NotActive, QueueFull
-from app.metrics.client import ClientLimits
-from app.metrics.source import CollectionBudget
 from app.settings import AIProvider, Settings
+from app.sources.base import ClientLimits
+from app.sources.prometheus.source import CollectionBudget
 from app.storage.repository import SchemaUnsupported
 
 router = APIRouter(prefix="/api")

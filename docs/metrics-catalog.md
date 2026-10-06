@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.5` in `backend/app/metrics/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/metrics/source.py`) through the bounded client (`backend/app/metrics/client.py`).
+The catalog is `catalog-2026.10.5` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
 
 ## Scope enforcement
 
@@ -9,7 +9,7 @@ Templates write each selector as `metric{{{s}, …}}`. `{s}` expands to the proj
 - any matcher block lacks **any** of the project's exact matchers (this covers both operands of every ratio and every gate query), or
 - a declared metric name appears without a matcher block.
 
-String literals are masked before the check, so label values cannot fake a selector. As a second line of defence, the source drops any returned series whose matcher labels differ from the scope and records this in `exclusions`. Every result series is labelled with the scope's matchers. The project connection test (`app/metrics/probe.py`) uses the same scope rules.
+String literals are masked before the check, so label values cannot fake a selector. As a second line of defence, the source drops any returned series whose matcher labels differ from the scope and records this in `exclusions`. Every result series is labelled with the scope's matchers. The project connection test (`app/sources/prometheus/probe.py`) uses the same scope rules.
 
 ## Semantics
 

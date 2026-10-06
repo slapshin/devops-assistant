@@ -25,8 +25,8 @@ from app.domain.interfaces import CancellationToken, CollectionResult, Detection
 from app.domain.jobs import StageProgress
 from app.domain.metrics import MetricCapability, MetricSeries
 from app.domain.report import AnalysisReport, AnalysisRequest, AnalysisWindows, ReportState
-from app.metrics.catalog import CATALOG
-from app.metrics.synthetic import N, Scenario, SyntheticMetricsSource, _SeriesBuilder
+from app.sources.prometheus.catalog import CATALOG
+from app.sources.prometheus.synthetic import N, Scenario, SyntheticMetricsSource, _SeriesBuilder
 from tests.helpers import make_scope
 
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
