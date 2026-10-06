@@ -52,7 +52,8 @@ UNSUPPORTED_PROBE_KINDS = (SourceErrorKind.AUTH, SourceErrorKind.BAD_QUERY)
 zone is unreachable (settings and history already proved access)."""
 
 
-def zone_entity(zone_id: str, hostnames: list[str]) -> Entity:
+def zone_entity(zone_id: str, hostnames: list[str], zone_name: str | None = None) -> Entity:
+    """The zone as one entity; its domain only names it, so the key stays stable without it."""
     labels = {"zone_id": zone_id}
     if hostnames:
         labels["hostnames"] = ",".join(hostnames)
@@ -60,7 +61,7 @@ def zone_entity(zone_id: str, hostnames: list[str]) -> Entity:
         more = len(hostnames) - MAX_LISTED_HOSTNAMES
         name = f"{shown} (+{more})" if more > 0 else shown
     else:
-        name = f"zone {zone_id[:8]}…"
+        name = zone_name or f"zone {zone_id[:8]}…"
     key = "zone|" + "|".join(f"{k}={v}" for k, v in labels.items())
     return Entity(kind=EntityKind.ZONE, key=key, display_name=name, labels=labels)
 
@@ -95,8 +96,10 @@ class CloudflareMetricsSource:
         self.zone_id = zone_id
         self.hostnames = hostnames
         self.entity = zone_entity(zone_id, hostnames)
+        self.zone_name: str | None = None
         self._now = now or (lambda: datetime.now(UTC))
         self._settings: dict[str, DatasetSettings] | None = None
+        self._named = False
 
     async def source_info(self) -> SourceInfo:
         return SourceInfo(base_url=self.api.base_url, backend=self.api.backend, version=None)
@@ -114,6 +117,14 @@ class CloudflareMetricsSource:
                 log.warning("Cloudflare settings unavailable, using defaults: %s", exc.message)
                 self._settings = {d: DatasetSettings(verified=False) for d in DATASETS}
         return self._settings
+
+    async def resolve_zone_name(self) -> str | None:
+        """Looks up the zone's domain once and names the entity after it."""
+        if not self._named:
+            self._named = True
+            self.zone_name = await self.api.zone_name()
+            self.entity = zone_entity(self.zone_id, self.hostnames, self.zone_name)
+        return self.zone_name
 
     async def history_days(self, end: datetime) -> float | None:
         """Days since the zone's first day with requests in the last 30 days (whole zone)."""
@@ -144,6 +155,7 @@ class CloudflareMetricsSource:
     async def capabilities(self, scope: Scope, windows: AnalysisWindows) -> list[MetricCapability]:
         self.api.begin(windows.end_time)
         settings = await self.settings()
+        await self.resolve_zone_name()
         history = await self.history_days(windows.end_time)
         at = _ts(windows.end_time)
 

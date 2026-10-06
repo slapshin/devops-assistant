@@ -45,6 +45,8 @@ AUTH_FAILURE_STATUSES = (401, 403)
 RATE_LIMITED_STATUS = 429
 MIN_SERVER_ERROR_STATUS = 500
 MIN_CLIENT_ERROR_STATUS = 400
+HTTP_OK = 200
+GRAPHQL_PATH = "/graphql"
 _AUTH_HINTS = ("authentication", "authorization", "not authorized", "unauthorized", "permission")
 _RATE_HINTS = ("rate limit", "too many requests")
 
@@ -162,8 +164,13 @@ class CloudflareClient:
         return data
 
     async def _post_bounded(self, document: str) -> tuple[int, httpx.Headers, bytes]:
+        return await self._request_bounded("POST", self.base_url, {"query": document})
+
+    async def _request_bounded(
+        self, method: str, url: str, body: dict[str, Any] | None = None
+    ) -> tuple[int, httpx.Headers, bytes]:
         try:
-            async with self._http.stream("POST", self.base_url, json={"query": document}) as res:
+            async with self._http.stream(method, url, json=body) as res:
                 chunks: list[bytes] = []
                 size = 0
                 async for chunk in res.aiter_bytes():
@@ -195,6 +202,29 @@ class CloudflareClient:
         return zone
 
     # --- CloudflareApi --------------------------------------------------------------------
+
+    async def zone_name(self) -> str | None:
+        """The zone's domain via REST ``GET /zones/{id}``; None when the token lacks Zone:Read.
+
+        Only for display, so it never fails an analysis and is not retried.
+        """
+        if not self.base_url.endswith(GRAPHQL_PATH):
+            return None
+        url = f"{self.base_url.removesuffix(GRAPHQL_PATH)}/zones/{self.conn.zone_id}"
+        try:
+            async with self._sem:
+                self.request_count += 1
+                status, _, body = await self._request_bounded("GET", url)
+            payload = httpx.Response(status, content=body).json()
+        except (SourceError, ValueError) as exc:
+            log.info("Cloudflare zone name unavailable: %s", exc)
+            return None
+        result = payload.get("result") if isinstance(payload, dict) else None
+        name = result.get("name") if isinstance(result, dict) else None
+        if status != HTTP_OK or not isinstance(name, str) or not name:
+            log.info("Cloudflare zone name unavailable (HTTP %s)", status)
+            return None
+        return name
 
     async def settings(self) -> dict[str, DatasetSettings]:
         zone = await self._zone(settings_document(self.conn.zone_id))

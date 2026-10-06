@@ -239,6 +239,40 @@ async def test_rate_limit_is_retried_once() -> None:
     assert not settings[FIREWALL_DATASET].enabled  # missing from the settings node
 
 
+@pytest.mark.parametrize(
+    ("status", "body", "expected"),
+    [
+        (200, {"success": True, "result": {"id": ZONE, "name": "example.com"}}, "example.com"),
+        (403, {"success": False, "errors": [{"message": "Authentication error"}]}, None),
+        (200, {"success": True, "result": {}}, None),
+    ],
+)
+async def test_zone_name_is_best_effort(
+    status: int, body: dict[str, Any], expected: str | None
+) -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(status, json=body)
+
+    client = make_client(handler)
+    assert await client.zone_name() == expected
+    await client.aclose()
+    assert seen[0].method == "GET"
+    assert str(seen[0].url) == f"https://api.cloudflare.com/client/v4/zones/{ZONE}"
+
+
+async def test_zone_name_skipped_without_a_rest_api() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no request expected")
+
+    conn = CloudflareConnection(zone_id=ZONE, api_url="https://proxy.example.com/cf-analytics")
+    client = CloudflareClient(conn, transport=httpx.MockTransport(handler))
+    assert await client.zone_name() is None
+    await client.aclose()
+
+
 # --- collection over a fake API ---------------------------------------------------------------
 
 
@@ -259,6 +293,7 @@ class FakeApi:
         self.timing_error = timing_error
         self.sample_interval = sample_interval
         self.calls: list[tuple[str, int, int]] = []
+        self.name: str | None = "example.com"
 
     base_url = "https://api.cloudflare.com/client/v4/graphql"
     backend = "cloudflare"
@@ -271,6 +306,9 @@ class FakeApi:
 
     async def settings(self) -> dict[str, DatasetSettings]:
         return {HTTP_DATASET: self._settings, FIREWALL_DATASET: self._settings}
+
+    async def zone_name(self) -> str | None:
+        return self.name
 
     def _chunk(self, signals: dict[str, float], start: int, end: int) -> Chunk:
         chunk = Chunk(query="{ fake }", truncated=self.truncate)
@@ -328,6 +366,26 @@ async def test_collection_chunks_respect_retention_and_duration() -> None:
     assert "$start" in requests.query and "GraphQL" in requests.query
     assert {c.status for c in caps} == {CapabilityStatus.SUPPORTED}
     assert caps[0].history_days is not None
+
+
+async def test_zone_domain_names_the_entity_without_changing_its_key() -> None:
+    api = FakeApi()
+    source = CloudflareMetricsSource(api, ZONE, [])
+    key = source.entity.key
+    assert source.entity.display_name == f"zone {ZONE[:8]}…"
+    await source.capabilities(SCOPE, AnalysisWindows.for_end(END))
+    assert source.entity.display_name == "example.com"
+    assert source.entity.key == key
+    assert source.entity.labels == {"zone_id": ZONE}
+
+    api.name = None
+    unnamed = CloudflareMetricsSource(api, ZONE, [])
+    await unnamed.capabilities(SCOPE, AnalysisWindows.for_end(END))
+    assert unnamed.entity.display_name == f"zone {ZONE[:8]}…"
+
+    hosts = CloudflareMetricsSource(FakeApi(), ZONE, ["shop.example.com"])
+    await hosts.capabilities(SCOPE, AnalysisWindows.for_end(END))
+    assert hosts.entity.display_name == "shop.example.com", "hostnames stay more specific"
 
 
 async def test_failed_and_truncated_chunks_are_disclosed() -> None:
@@ -440,6 +498,7 @@ async def test_probe_reports_requests_and_families() -> None:
     assert test.kind is SourceKind.CLOUDFLARE
     assert test.reachable and test.auth_ok
     assert test.matched_series and test.matched_series > 0
+    assert test.message and test.message.startswith("healthy.example.com: ")
     assert {f.family for f in test.families} == {SignalFamily.EDGE, SignalFamily.SECURITY}
 
     transport = httpx.MockTransport(lambda request: httpx.Response(401))

@@ -373,7 +373,7 @@ export interface components {
         CloudflareSourceInput: {
             /**
              * Api Token
-             * @description API token with Analytics:Read on the zone. Omit to keep the stored one (update only); not needed for synthetic://.
+             * @description API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain). Omit to keep the stored one (update only); not needed for synthetic://.
              */
             api_token?: string | null;
             /**

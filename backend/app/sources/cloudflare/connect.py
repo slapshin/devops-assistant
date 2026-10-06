@@ -59,6 +59,10 @@ async def _measure(source: CloudflareMetricsSource, scope: Scope, now: datetime)
         )
     else:
         message = f"{requests:,} requests in the last 24 h."
+    if source.zone_name is not None:
+        message = f"{source.zone_name}: {message}"
+    elif source.api.backend != "synthetic":
+        message += " Zone name unavailable: add Zone:Read to the token to show the domain."
     return ConnectionTest(
         kind=SourceKind.CLOUDFLARE,
         reachable=True,

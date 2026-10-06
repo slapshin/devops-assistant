@@ -58,6 +58,10 @@ class CloudflareApi(Protocol):
 
     async def settings(self) -> dict[str, DatasetSettings]: ...
 
+    async def zone_name(self) -> str | None:
+        """The zone's domain, or None when the token cannot read it (needs Zone:Read)."""
+        ...
+
     async def traffic(self, start: int, end: int, page_size: int) -> Chunk:
         """Requests, 5xx, origin errors (520-530), 404, 4xx and cache hits per bucket."""
         ...

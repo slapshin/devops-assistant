@@ -174,6 +174,9 @@ class SyntheticCloudflareApi:
 
     # --- CloudflareApi --------------------------------------------------------------------
 
+    async def zone_name(self) -> str | None:
+        return f"{self.name}.example.com"
+
     async def settings(self) -> dict[str, DatasetSettings]:
         not_older_than = self.scenario.history_days * SECONDS_PER_DAY
         return {d: DatasetSettings(not_older_than=not_older_than) for d in DATASETS}

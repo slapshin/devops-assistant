@@ -128,8 +128,9 @@ class CloudflareSourceInput(Contract):
     )
     api_token: SecretStr | None = Field(
         default=None,
-        description="API token with Analytics:Read on the zone. Omit to keep the stored one "
-        "(update only); not needed for synthetic://.",
+        description="API token with Analytics:Read on the zone (and optionally Zone:Read, to "
+        "show its domain). Omit to keep the stored one (update only); not needed for "
+        "synthetic://.",
     )
     api_url: str = Field(
         default=CLOUDFLARE_GRAPHQL_URL,

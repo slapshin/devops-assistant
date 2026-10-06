@@ -401,7 +401,7 @@ async function confirmDelete() {
               :aria-invalid="!!errors['cloudflare.api_token']"
               :aria-describedby="describedBy('cloudflare.api_token') ?? 'cf-token-hint'"
             >
-            <p id="cf-token-hint" class="muted hint">A custom token with the permission <strong>Zone → Analytics → Read</strong> for this zone.</p>
+            <p id="cf-token-hint" class="muted hint">A custom token with the permission <strong>Zone → Analytics → Read</strong> for this zone. Add <strong>Zone → Zone → Read</strong> to show the zone’s domain in findings.</p>
             <p v-if="errors['cloudflare.api_token']" :id="errorId('cloudflare.api_token')" class="field-error">{{ errors["cloudflare.api_token"] }}</p>
           </div>
           <details :open="!!errors['cloudflare.api_url']">
