@@ -51,13 +51,13 @@ type TimezoneChoice = "utc" | "local";
 
 function readTimezone(): TimezoneChoice {
   try {
-    return localStorage.getItem(TIMEZONE_STORAGE_KEY) === "local" ? "local" : "utc";
+    return localStorage.getItem(TIMEZONE_STORAGE_KEY) === "utc" ? "utc" : "local";
   } catch {
-    return "utc";
+    return "local";
   }
 }
 
-/** UTC by default (UI_SPEC §2); the choice is a per-viewer convenience. */
+/** Local time by default (UI_SPEC §2); the choice is a per-viewer convenience. */
 export const timezone = ref<TimezoneChoice>(readTimezone());
 
 watch(timezone, (choice) => {

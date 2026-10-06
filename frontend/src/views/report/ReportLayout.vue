@@ -123,8 +123,8 @@ async function runAgain() {
           <time :datetime="report.windows.latest_day.end" :title="utcTooltip(report.windows.latest_day.end)">{{ formatTime(report.windows.latest_day.end, true, false) }}</time>
         </span>
         <select v-model="timezone" aria-label="Time zone" class="tz">
-          <option value="utc">UTC</option>
           <option value="local">Local</option>
+          <option value="utc">UTC</option>
         </select>
       </div>
       <button type="button" class="primary" :disabled="submit.isPending.value" @click="runAgain">

@@ -32,7 +32,7 @@ Report routes add a toolbar and tabs under the top bar:
 Tabs:  Overview | Findings 12 | Trends
 ```
 
-- The project's label matchers, the longest baseline used, and the frozen latest-day window are always visible. Times are shown in UTC by default, with a UTC/Local select next to the window; tooltips always include UTC.
+- The project's label matchers, the longest baseline used, and the frozen latest-day window are always visible. Times are shown in the viewer's local time by default, with a Local/UTC select next to the window; tooltips always include UTC.
 - The project name in the breadcrumbs links to its project page. *Run again* uses the same project with `T = now`.
 - A `partial` report shows a persistent amber banner ("Some signals could not be collected — see Coverage"), with a link to the coverage section.
 
