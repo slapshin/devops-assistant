@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from app.ai.providers import FakeExplanationProvider
 from app.analysis.engine import RobustDetector
-from app.domain.common import Scope
+from app.domain.common import Scope, SignalFamily
 from app.domain.detector_config import DetectorConfig
 from app.domain.interfaces import (
     CancellationToken,
@@ -68,7 +68,7 @@ class FlakySource(SyntheticMetricsSource):
                 "exclusions": [
                     Exclusion(
                         code="query_timeout",
-                        family="network",
+                        family=SignalFamily.NETWORK,
                         message="network_errors: timeout",
                     )
                 ]
@@ -106,8 +106,9 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
 
 def wait(client: TestClient, analysis_id: str, *states: str, timeout: float = 30) -> dict[str, Any]:
     deadline = time.monotonic() + timeout
+    job: dict[str, Any] = {}
     while time.monotonic() < deadline:
-        job: dict[str, Any] = client.get(f"/api/analyses/{analysis_id}").json()
+        job = client.get(f"/api/analyses/{analysis_id}").json()
         if job["state"] in states:
             return job
         time.sleep(0.05)

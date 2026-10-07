@@ -4,7 +4,7 @@ Every analysis or probe opens its own clients and closes them afterwards, so edi
 a project can never pull a client out from under a running job.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager
 
 from app.domain.common import Scope, SourceKind
@@ -33,7 +33,7 @@ class SourceNotConfigured(Exception):
 @asynccontextmanager
 async def connect(
     conn: PrometheusConnection,
-) -> AsyncIterator[tuple[MetricsSource, PrometheusClient | None]]:
+) -> AsyncGenerator[tuple[MetricsSource, PrometheusClient | None]]:
     """The source for a connection, plus its HTTP client (None for synthetic sources)."""
     if (scenario := synthetic_url(conn.url)) is not None:
         yield SyntheticMetricsSource(scenario), None
@@ -47,7 +47,7 @@ async def connect(
 
 
 @asynccontextmanager
-async def open_source(conn: SourceConnection) -> AsyncIterator[MetricsSource]:
+async def open_source(conn: SourceConnection) -> AsyncGenerator[MetricsSource]:
     """The MetricsSource of any connection kind."""
     match conn:
         case PrometheusConnection():
@@ -78,7 +78,7 @@ class ProjectSources:
         self.override = override
 
     @asynccontextmanager
-    async def open(self, scope: Scope) -> AsyncIterator[list[OpenedSource]]:
+    async def open(self, scope: Scope) -> AsyncGenerator[list[OpenedSource]]:
         if self.override is not None:
             yield [OpenedSource(SourceKind.PROMETHEUS, self.override)]
             return

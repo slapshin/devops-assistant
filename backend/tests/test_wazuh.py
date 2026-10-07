@@ -82,11 +82,13 @@ class Progress:
 
 
 def test_source_input_normalises_and_validates() -> None:
-    source = WazuhSourceInput(
-        api_url="https://indexer:9200/",
-        agents=[" web-2", "web-1", "web-2"],
-        labels=[{"key": "project", "value": "shop"}, {"key": "env", "value": "prod"}],
-        username=" ",
+    source = WazuhSourceInput.model_validate(
+        {
+            "api_url": "https://indexer:9200/",
+            "agents": [" web-2", "web-1", "web-2"],
+            "labels": [{"key": "project", "value": "shop"}, {"key": "env", "value": "prod"}],
+            "username": " ",
+        }
     )
     assert source.api_url == "https://indexer:9200"
     assert source.agents == ["web-1", "web-2"]
@@ -100,15 +102,19 @@ def test_source_input_normalises_and_validates() -> None:
     with pytest.raises(ValidationError):
         WazuhSourceInput(api_url="https://i:9200", agents=[f"a{i}" for i in range(51)])
     with pytest.raises(ValidationError, match="duplicate label keys"):
-        WazuhSourceInput(
-            api_url="https://indexer:9200",
-            labels=[{"key": "env", "value": "a"}, {"key": "env", "value": "b"}],
+        WazuhSourceInput.model_validate(
+            {
+                "api_url": "https://indexer:9200",
+                "labels": [{"key": "env", "value": "a"}, {"key": "env", "value": "b"}],
+            }
         )
     for pattern in ("wazuh-*,-secret", "remote:wazuh-*", "-wazuh", "wazuh alerts"):
         with pytest.raises(ValidationError, match="index pattern"):
             WazuhSourceInput(api_url="https://indexer:9200", agents=["a"], index_pattern=pattern)
     with pytest.raises(ValidationError):
-        WazuhSourceInput(api_url="https://indexer:9200", labels=[{"key": "a b", "value": "x"}])
+        WazuhSourceInput.model_validate(
+            {"api_url": "https://indexer:9200", "labels": [{"key": "a b", "value": "x"}]}
+        )
 
 
 def test_groups_alone_select_agents_and_are_validated() -> None:

@@ -11,7 +11,7 @@ All from the repo root. `make help` lists every target. The Makefile includes an
 ```sh
 make install         # uv sync --locked + npm ci
 make check           # full gate: backend + frontend checks (run before declaring work done)
-make check-backend   # ruff format --check, ruff check, mypy (strict), schema/fixture drift, pytest
+make check-backend   # ruff format --check, ruff check, mypy (strict), basedpyright, schema/fixture drift, pytest
 make check-frontend  # npm run check: API-type drift, vue-tsc, eslint (0 warnings), vitest, build
 make dev-backend     # uvicorn with reload on :8000 (API docs at /api/docs)
 make dev-frontend    # Vite on :5173, proxies /api to the backend

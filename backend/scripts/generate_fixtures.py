@@ -12,7 +12,7 @@ import json
 import math
 import random
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -505,6 +505,11 @@ def make_series(
     )
 
 
+def _flat(value: float, n: int) -> list[float | None]:
+    """A constant evidence band of n points (typed for Evidence's optional points)."""
+    return [value for _ in range(n)]
+
+
 def wave(n: int, start: datetime, base: float, amp: float, noise: float, seed: int) -> list[float]:
     rng = random.Random(seed)
     out = []
@@ -571,9 +576,9 @@ def cpu_finding(
         evidence_id=eid,
         finding_id=fid,
         series=series,
-        expected=[0.22] * n,
-        lower=[0.16] * n,
-        upper=[0.28] * n,
+        expected=_flat(0.22, n),
+        lower=_flat(0.16, n),
+        upper=_flat(0.28, n),
         threshold=0.90,
         threshold_label="Diagnostic heuristic: 90 % for ≥ 15 min (not an SLO)",
     )
@@ -638,9 +643,9 @@ def not_found_finding(aid: str) -> tuple[Finding, Evidence]:
         evidence_id=eid,
         finding_id=fid,
         series=series,
-        expected=[0.8] * n,
-        lower=[0.4] * n,
-        upper=[1.3] * n,
+        expected=_flat(0.8, n),
+        lower=_flat(0.4, n),
+        upper=_flat(1.3, n),
     )
     return finding, evidence
 
@@ -1201,7 +1206,7 @@ def pipeline_report(opened: OpenedSource, scope: Scope, analysis_id: str) -> Ana
 
     class Sources:
         @asynccontextmanager
-        async def open(self, scope: Scope) -> AsyncIterator[list[OpenedSource]]:
+        async def open(self, scope: Scope) -> AsyncGenerator[list[OpenedSource]]:
             yield [opened]
 
     pipeline = AnalysisPipeline(Sources(), RobustDetector(), config, FakeExplanationProvider())

@@ -9,6 +9,7 @@ import httpx
 import pytest
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.domain.common import LabelMatcher, Scope
 from app.domain.projects import PrometheusConnection
@@ -338,7 +339,7 @@ SCOPE = Scope(
 
 
 async def run_probe(handler: Any) -> Any:
-    conn = PrometheusConnection(url="http://vm.example", bearer_token=TOKEN)
+    conn = PrometheusConnection(url="http://vm.example", bearer_token=SecretStr(TOKEN))
     client = PrometheusClient.from_connection(conn, transport=httpx.MockTransport(handler))
     return await probe(PrometheusMetricsSource(client), client, SCOPE)
 

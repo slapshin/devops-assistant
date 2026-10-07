@@ -1,6 +1,6 @@
 """Shared test helpers."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from app.domain.common import LabelMatcher, Scope, SourceKind
@@ -26,5 +26,5 @@ class StaticSources:
         ]
 
     @asynccontextmanager
-    async def open(self, scope: Scope) -> AsyncIterator[list[OpenedSource]]:
+    async def open(self, scope: Scope) -> AsyncGenerator[list[OpenedSource]]:
         yield self.sources

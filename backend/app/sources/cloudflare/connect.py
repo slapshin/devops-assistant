@@ -1,6 +1,6 @@
 """Opening a Cloudflare source from its connection, and its connection test."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
@@ -20,7 +20,7 @@ from app.sources.probe import guarded, summarise_families
 @asynccontextmanager
 async def connect_cloudflare(
     conn: CloudflareConnection, transport: httpx.AsyncBaseTransport | None = None
-) -> AsyncIterator[CloudflareMetricsSource]:
+) -> AsyncGenerator[CloudflareMetricsSource]:
     scenario = synthetic_url(conn.api_url)
     api: CloudflareApi = (
         SyntheticCloudflareApi(scenario, conn.zone_id, conn.hostnames)

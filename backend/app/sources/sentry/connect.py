@@ -1,6 +1,6 @@
 """Opening a Sentry source from its connection, and its connection test."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
@@ -21,7 +21,7 @@ from app.sources.sentry.synthetic import SyntheticSentryApi
 @asynccontextmanager
 async def connect_sentry(
     conn: SentryConnection, transport: httpx.AsyncBaseTransport | None = None
-) -> AsyncIterator[SentryMetricsSource]:
+) -> AsyncGenerator[SentryMetricsSource]:
     scenario = synthetic_url(conn.api_url)
     api: SentryApi = (
         SyntheticSentryApi(scenario, conn.organization, conn.projects, conn.environment, conn.tags)

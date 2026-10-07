@@ -6,6 +6,7 @@ from typing import Any
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import event
 
 MIGRATIONS = Path(__file__).resolve().parents[2] / "migrations"
 # Wait this long for a competing writer (e.g. a maintenance command) before failing.
@@ -93,7 +94,7 @@ def make_engine(path: Path) -> sa.Engine:
     path.parent.mkdir(parents=True, exist_ok=True)
     engine = sa.create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
 
-    @sa.event.listens_for(engine, "connect")
+    @event.listens_for(engine, "connect")
     def _pragmas(dbapi_connection: Any, _: Any) -> None:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")

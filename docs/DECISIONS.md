@@ -26,6 +26,7 @@ Lookup date for every version below: **2026-09-30**. Sources: PyPI JSON API (`ht
 | pytest | 9.1.1 | Tests; plus pytest-asyncio 1.4.0, jsonschema 4.26.0 (fixture validation), and types-jsonschema (pinned by T002). |
 | ruff | 0.16.9 | Lint + format. |
 | mypy | 2.3.1 | Strict type checking of `backend/app`. |
+| basedpyright | 1.40.2 | Complements mypy: pyright `standard` checks plus `reportDeprecated` (newer typeshed). |
 
 ### Frontend
 

@@ -130,7 +130,6 @@ async def test_independent_404_and_5xx_bursts_stay_separate() -> None:
 
 async def test_latency_shift_and_mean_labelling() -> None:
     (p95,) = by_signal(await detect(Scenario(latency_shift=True)), "latency_p95")
-    assert p95.unit if hasattr(p95, "unit") else True
     assert p95.observed.unit is Unit.SECONDS and p95.observed.value > 0.35
     mean_only = await detect(Scenario(histogram=False))
     latency = next(c for c in mean_only.coverage if c.family is SignalFamily.LATENCY)

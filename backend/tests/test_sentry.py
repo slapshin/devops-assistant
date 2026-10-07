@@ -110,11 +110,13 @@ class Progress:
 
 
 def test_source_input_normalises_and_validates() -> None:
-    source = SentrySourceInput(
-        organization=" Acme ",
-        projects=["Shop-Web", "api", "shop-web"],
-        environment=" ",
-        tags=[{"key": "team", "value": "shop"}, {"key": "server_name", "value": "web 1"}],
+    source = SentrySourceInput.model_validate(
+        {
+            "organization": " Acme ",
+            "projects": ["Shop-Web", "api", "shop-web"],
+            "environment": " ",
+            "tags": [{"key": "team", "value": "shop"}, {"key": "server_name", "value": "web 1"}],
+        }
     )
     assert (source.organization, source.projects, source.environment) == (
         "acme",
@@ -133,13 +135,17 @@ def test_source_input_normalises_and_validates() -> None:
     with pytest.raises(ValidationError):
         SentrySourceInput(organization=ORG, projects=[f"p{i}" for i in range(11)])
     with pytest.raises(ValidationError, match="duplicate tag keys"):
-        SentrySourceInput(
-            organization=ORG,
-            projects=[PROJECT],
-            tags=[{"key": "team", "value": "a"}, {"key": "team", "value": "b"}],
+        SentrySourceInput.model_validate(
+            {
+                "organization": ORG,
+                "projects": [PROJECT],
+                "tags": [{"key": "team", "value": "a"}, {"key": "team", "value": "b"}],
+            }
         )
     with pytest.raises(ValidationError, match="max 32"):
-        SentrySourceInput(organization=ORG, projects=[PROJECT], tags=[{"key": "a b", "value": "x"}])
+        SentrySourceInput.model_validate(
+            {"organization": ORG, "projects": [PROJECT], "tags": [{"key": "a b", "value": "x"}]}
+        )
     with pytest.raises(ValidationError, match="environment"):
         SentrySourceInput(organization=ORG, projects=[PROJECT], environment="prod/eu")
     with pytest.raises(ValidationError):

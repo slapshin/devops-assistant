@@ -37,10 +37,11 @@ fixtures: ## Regenerate test fixtures
 
 check: check-backend check-frontend ## Run all backend and frontend checks
 
-check-backend: ## ruff, mypy, contract/fixture drift, pytest
+check-backend: ## ruff, mypy, basedpyright, contract/fixture drift, pytest
 	cd backend && uv run ruff format --check .
 	cd backend && uv run ruff check .
 	cd backend && uv run mypy
+	cd backend && uv run basedpyright
 	cd backend && uv run python -m scripts.export_schemas --check
 	cd backend && uv run python -m scripts.generate_fixtures --check
 	cd backend && uv run pytest -q

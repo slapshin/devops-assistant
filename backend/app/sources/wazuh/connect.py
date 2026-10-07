@@ -1,6 +1,6 @@
 """Opening a Wazuh source from its connection, and its connection test."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
@@ -20,7 +20,7 @@ from app.sources.wazuh.synthetic import SyntheticWazuhApi
 @asynccontextmanager
 async def connect_wazuh(
     conn: WazuhConnection, transport: httpx.AsyncBaseTransport | None = None
-) -> AsyncIterator[WazuhMetricsSource]:
+) -> AsyncGenerator[WazuhMetricsSource]:
     scenario = synthetic_url(conn.api_url)
     api: WazuhApi = (
         SyntheticWazuhApi(scenario, conn.index_pattern, conn.agents, conn.labels, conn.groups)

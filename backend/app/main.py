@@ -3,7 +3,7 @@
 import json
 import logging
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -100,7 +100,7 @@ def create_app(
         raise SystemExit(CONFIG_ERROR_EXIT_CODE) from None
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         await bootstrap_projects(settings, services.projects)
         recovered = await services.runner.start()
         services.scheduler.start()
