@@ -911,8 +911,10 @@ describe("report", () => {
     await renderAt(`${report(sentryReport)}/findings`);
 
     expect((await screen.findAllByText("Sentry")).length).toBeGreaterThan(0);
-    const link = await screen.findByRole("link", { name: /Error spike/ });
-    expect(link.closest("tr")).toHaveTextContent("Sentry");
+    const links = await screen.findAllByRole("link", { name: /Error spike/ });
+    expect(links).toHaveLength(2);
+    expect(links.every((link) => link.closest("tr")?.textContent?.includes("Sentry"))).toBe(true);
+    expect(links.some((link) => link.closest("tr")?.textContent?.includes("TypeError"))).toBe(true);
   });
 
   it("renders a Wazuh report with agent findings", async () => {

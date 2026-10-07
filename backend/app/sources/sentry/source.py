@@ -7,10 +7,10 @@ Inside a chunk that was fetched, a bucket without events is zero for counts and 
 durations; outside fetched chunks values stay unknown (None), so missing data is never
 reported as healthy.
 
-Error events are analysed per error kind: each project's top issues (``catalog.TOP_ISSUES``)
-are their own entities, and the remaining events form an "(other errors)" entity (the
-project's total minus those issues). When Sentry refuses to rank issues, a project's errors
-are analysed together, as one series.
+Error events are analysed as the project's total and per error kind: each project's top
+issues (``catalog.TOP_ISSUES``) are their own entities, and the remaining events form an
+"(other errors)" entity (the project's total minus those issues). When Sentry refuses to rank
+issues, only the total is analysed.
 """
 
 import asyncio
@@ -237,8 +237,8 @@ class SentryMetricsSource:
 
     async def _error_kinds(self, info: ProjectInfo, grid_start: int, end: int) -> list[IssueInfo]:
         """The project's top issues: those of the latest 24 h first, then those of the whole
-        window. None when Sentry cannot rank them; the project's errors are then analysed
-        together, as they are when Sentry refuses every grouped request."""
+        window. None when Sentry cannot rank them; only the project's total is then analysed,
+        as it is when Sentry refuses every grouped request."""
         try:
             recent = await self.api.top_issues([info.id], end - SECONDS_PER_DAY, end, RECENT_ISSUES)
             window = await self.api.top_issues([info.id], grid_start, end, TOP_ISSUES)
@@ -349,7 +349,7 @@ class SentryMetricsSource:
             ):
                 first = got_kinds.failures[0].message if got_kinds.failures else ""
                 log.warning("sentry project %s: error kinds refused: %s", pid, first)
-                continue  # the project's errors are analysed together
+                continue  # only the project's total is analysed
             fetched_kinds[pid] = got_kinds
             cancel.raise_if_cancelled()
 
@@ -381,13 +381,10 @@ class SentryMetricsSource:
                     spec, self.organization, info.id, self.environment, tags, _span(got, step)
                 )
                 entity = self.entity(info.slug)
-                split = info.id in fetched_kinds and query is Query.ERRORS
                 series += [
-                    _series(d, entity, grid.values(d, got.chunks), grid, text)
-                    for d in signals
-                    if not (split and d.signal == ERRORS_SIGNAL)
+                    _series(d, entity, grid.values(d, got.chunks), grid, text) for d in signals
                 ]
-                if split:
+                if info.id in fetched_kinds and query is Query.ERRORS:
                     got_kinds = fetched_kinds[info.id]
                     exclusions += _exclusions(
                         f"error kinds of {info.slug}", got_kinds, [BY_SIGNAL[ERRORS_SIGNAL]]

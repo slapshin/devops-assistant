@@ -578,7 +578,10 @@ async def test_errors_are_split_by_kind_with_the_rest_as_other_errors() -> None:
     _, result = await collect(api)
 
     errors = {s.entity.labels.get("issue"): s for s in result.series if s.signal == "sentry_errors"}
-    assert set(errors) == {"SHOP-WEB-1", "SHOP-WEB-2", "(other errors)"}, "no project total"
+    assert set(errors) == {None, "SHOP-WEB-1", "SHOP-WEB-2", "(other errors)"}, (
+        "the project's total, its error kinds and the rest"
+    )
+    assert errors[None].entity.display_name == f"{PROJECT} (production)"
 
     currency = errors["SHOP-WEB-1"]
     assert (
@@ -612,7 +615,7 @@ async def test_failed_error_kind_chunks_are_unknown_and_disclosed() -> None:
 
 
 @pytest.mark.parametrize("rank", ["refused", "ungrouped"])
-async def test_errors_stay_one_series_when_sentry_cannot_split_them(rank: str) -> None:
+async def test_only_the_total_is_analysed_when_sentry_cannot_split_errors(rank: str) -> None:
     issues = [IssueInfo("SHOP-WEB-1", "KeyError", 40.0)]
 
     _, result = await collect(FakeApi(issues=issues, rank=rank))
@@ -696,9 +699,13 @@ async def test_incident_yields_error_and_performance_findings() -> None:
     projects = {f.entity.labels["project"] for f in report.findings}
     assert projects == {PROJECT}, "only the first project had the incident"
 
-    spikes = [f.entity for f in report.findings if f.signal == "app_error_rate"]
-    assert [e.labels.get("issue") for e in spikes] == ["SHOP-WEB-4"], "only the new error kind"
-    assert "TypeError" in spikes[0].display_name
+    spikes = {
+        f.entity.labels.get("issue"): f.entity
+        for f in report.findings
+        if f.signal == "app_error_rate"
+    }
+    assert set(spikes) == {None, "SHOP-WEB-4"}, "the project's total and only the new error kind"
+    assert "TypeError" in spikes["SHOP-WEB-4"].display_name
 
 
 async def test_healthy_yields_no_findings() -> None:
