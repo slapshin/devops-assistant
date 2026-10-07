@@ -26,12 +26,24 @@ class ProjectInfo:
     """When the project was created; nothing can be reported before it."""
 
 
+@dataclass(frozen=True)
+class IssueInfo:
+    """One error kind: a Sentry issue and its event count in the ranked range."""
+
+    issue: str
+    """Short issue ID, e.g. ``SHOP-WEB-1A``."""
+    title: str
+    count: float
+
+
 @dataclass
 class Chunk:
-    """Values of one query over [start, end): signal -> bucket start -> value."""
+    """Values of one query over [start, end): signal -> bucket start -> value, or for an
+    issue query, issue -> bucket start -> error events."""
 
     query: str
     values: dict[str, dict[int, float]] = field(default_factory=dict)
+    groups: dict[str, dict[int, float]] = field(default_factory=dict)
 
 
 class SentryApi(Protocol):
@@ -56,6 +68,18 @@ class SentryApi(Protocol):
     async def series(self, query: Query, project_ids: Sequence[str], start: int, end: int) -> Chunk:
         """The signals of ``query`` per 5-minute bucket of [start, end), summed over the
         projects (numeric IDs from ``projects``)."""
+        ...
+
+    async def top_issues(
+        self, project_ids: Sequence[str], start: int, end: int, limit: int
+    ) -> list[IssueInfo]:
+        """Up to ``limit`` issues with the most error events in [start, end), most first."""
+        ...
+
+    async def issue_series(
+        self, issues: Sequence[str], project_ids: Sequence[str], start: int, end: int
+    ) -> Chunk:
+        """Error events of each issue (short IDs) per 5-minute bucket of [start, end)."""
         ...
 
     async def aclose(self) -> None: ...

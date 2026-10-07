@@ -27,7 +27,7 @@ from app.service import AnalysisPipeline
 from app.settings import load_settings
 from app.sources.base import ClientLimits
 from app.sources.prometheus.synthetic import SyntheticMetricsSource
-from app.sources.sentry.api import Chunk, ProjectInfo
+from app.sources.sentry.api import Chunk, IssueInfo, ProjectInfo
 from app.sources.sentry.catalog import Query
 from app.sources.sentry.client import SentryClient
 from app.sources.sentry.connect import connect_sentry, probe_sentry
@@ -248,6 +248,64 @@ async def test_self_hosted_25_response_and_transactions_dataset() -> None:
     assert "dataset=transactions" in chunk.query
 
 
+async def test_top_issues_request_and_parsing() -> None:
+    sent: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        rows = [
+            {"issue": "SHOP-WEB-1", "title": "KeyError: 'currency'", "count()": 40},
+            {"issue": "SHOP-WEB-1", "title": "KeyError: 'price'", "count()": 5},
+            {"issue": "unknown", "title": "<no issue>", "count()": 30},
+            {"issue": "SHOP-WEB-2", "title": "TimeoutError", "count()": 3},
+        ]
+        return httpx.Response(200, json={"data": rows, "meta": {}})
+
+    client = make_client(with_project(handler))
+
+    issues = await client.top_issues(["42"], 0, int(END.timestamp()), 10)
+    await client.aclose()
+
+    url = sent[0].url
+    assert url.path == f"/api/0/organizations/{ORG}/events/"
+    assert url.params.get_list("field") == ["issue", "title", "count()"]
+    assert (url.params["sort"], url.params["per_page"]) == ("-count()", "20")
+    assert url.params["query"] == 'team:"shop \\"eu\\""'
+    assert issues == [
+        IssueInfo("SHOP-WEB-1", "KeyError: 'currency'", 40.0),
+        IssueInfo("SHOP-WEB-2", "TimeoutError", 3.0),
+    ], "one entry per issue; rows without a valid issue ID are dropped"
+
+
+async def test_issue_series_request_and_parsing() -> None:
+    sent: list[httpx.Request] = []
+    bucket = END - timedelta(minutes=5)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        body = timeseries({"count()": [(bucket, 4)]})
+        series = body["timeSeries"]
+        series += [dict(series[0]), dict(series[0])]
+        series[0]["groupBy"] = [{"key": "issue", "value": "SHOP-WEB-1"}]
+        series[1]["groupBy"] = [{"key": "issue", "value": "SHOP-WEB-9"}]
+        series[2]["values"] = [{"timestamp": int(bucket.timestamp() * 1000), "value": 9}]
+        return httpx.Response(200, json=body)
+
+    client = make_client(with_project(handler))
+
+    chunk = await client.issue_series(["SHOP-WEB-1", "SHOP-WEB-2"], ["42"], 0, int(END.timestamp()))
+    await client.aclose()
+
+    params = sent[0].url.params
+    assert params["query"] == 'issue:[SHOP-WEB-1,SHOP-WEB-2] team:"shop \\"eu\\""'
+    assert (params["groupBy"], params["topEvents"], params["excludeOther"]) == ("issue", "2", "1")
+    assert params.get_list("yAxis") == ["count()"]
+    assert chunk.groups == {"SHOP-WEB-1": {int(bucket.timestamp()): 4.0}}, (
+        "unrequested groups and the ungrouped total are ignored"
+    )
+    assert chunk.values == {}
+
+
 async def test_wrong_bucket_size_is_rejected() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         body = timeseries({"count()": [(END, 1)]})
@@ -340,6 +398,9 @@ class FakeApi:
     """Every other bucket has 3 errors and 300 transactions; the chunk at ``fail_at`` fails.
 
     ``untraced`` adds a second project (ID 43) that sends errors but no transactions.
+    ``issues`` are the error kinds Sentry ranks, each with 1 of those 3 errors. ``rank`` says
+    how Sentry answers about them: with ``data``, ``refused`` ranking, or ranking but
+    refusing the grouped series (``ungrouped``).
     ``spans`` says how the spans dataset answers: with data, ``empty`` or ``refused`` (as on
     self-hosted Sentry, which keeps transactions in the transactions dataset).
     """
@@ -355,6 +416,8 @@ class FakeApi:
         refuse: Query | None = None,
         spans: str = "data",
         untraced: bool = False,
+        issues: Sequence[IssueInfo] = (),
+        rank: str = "data",
     ) -> None:
         self.transactions_dataset = "spans"
         self.spans = spans
@@ -363,7 +426,10 @@ class FakeApi:
         self.transactions = transactions
         self.refuse = refuse
         self.untraced = untraced
+        self.issues = list(issues)
+        self.rank = rank
         self.calls: list[tuple[Query, tuple[str, ...], int, int]] = []
+        self.issue_calls: list[tuple[tuple[str, ...], int, int]] = []
 
     @property
     def slugs(self) -> list[str]:
@@ -403,6 +469,24 @@ class FakeApi:
         return Chunk(
             query="GET fake", values={s: dict.fromkeys(buckets, v) for s, v in values.items()}
         )
+
+    async def top_issues(
+        self, project_ids: Sequence[str], start: int, end: int, limit: int
+    ) -> list[IssueInfo]:
+        if self.rank == "refused":
+            raise SourceError(SourceErrorKind.BAD_QUERY, "HTTP 400: unknown field issue")
+        return self.issues[:limit]
+
+    async def issue_series(
+        self, issues: Sequence[str], project_ids: Sequence[str], start: int, end: int
+    ) -> Chunk:
+        self.issue_calls.append((tuple(issues), start, end))
+        if start == self.fail_at:
+            raise SourceError(SourceErrorKind.SERVER_ERROR, "HTTP 502")
+        if self.rank == "ungrouped":
+            raise SourceError(SourceErrorKind.BAD_QUERY, "HTTP 400: groupBy is not supported")
+        buckets = range(start, end, 600)
+        return Chunk(query="GET fake", groups={i: dict.fromkeys(buckets, 1.0) for i in issues})
 
 
 async def collect(api: FakeApi) -> tuple[list[Any], Any]:
@@ -484,6 +568,61 @@ async def test_failed_chunks_are_disclosed() -> None:
     assert None not in errors.values[-7 * 288 :]
 
 
+async def test_errors_are_split_by_kind_with_the_rest_as_other_errors() -> None:
+    issues = [
+        IssueInfo("SHOP-WEB-1", "KeyError: 'currency'", 40.0),
+        IssueInfo("SHOP-WEB-2", "TimeoutError", 3.0),
+    ]
+    api = FakeApi(issues=issues)
+
+    _, result = await collect(api)
+
+    errors = {s.entity.labels.get("issue"): s for s in result.series if s.signal == "sentry_errors"}
+    assert set(errors) == {"SHOP-WEB-1", "SHOP-WEB-2", "(other errors)"}, "no project total"
+
+    currency = errors["SHOP-WEB-1"]
+    assert (
+        currency.entity.display_name
+        == f"{PROJECT} (production) · KeyError: 'currency' (SHOP-WEB-1)"
+    )
+    assert currency.entity.key.endswith("|tags=team=shop|issue=SHOP-WEB-1")
+    assert "groupBy=issue" in currency.query and "issue:[SHOP-WEB-1,SHOP-WEB-2]" in currency.query
+    assert set(currency.values[-2:]) == {0.0, round(1 / 300, 6)}
+
+    other = errors["(other errors)"]
+    assert set(other.values[-2:]) == {0.0, round(1 / 300, 6)}, "3 errors minus 2 listed"
+    assert other.entity.display_name == f"{PROJECT} (production) · (other errors)"
+
+    assert all(e - s <= 3 * 86400 for _, s, e in api.issue_calls), "grouped chunks: 3 days"
+    assert any(s.signal == "sentry_error_users" for s in result.series), "users stay per project"
+
+
+async def test_failed_error_kind_chunks_are_unknown_and_disclosed() -> None:
+    issues = [IssueInfo("SHOP-WEB-1", "KeyError", 40.0)]
+    fail_at = int((END - timedelta(days=28)).timestamp())  # the first chunk of each plan
+
+    _, result = await collect(FakeApi(issues=issues, fail_at=fail_at))
+
+    messages = [e.message for e in result.exclusions]
+    assert any(m.startswith(f"Sentry error kinds of {PROJECT}: 1 of 10 chunks") for m in messages)
+
+    errors = [s for s in result.series if s.signal == "sentry_errors"]
+    assert all(set(s.values[: 3 * 288]) == {None} for s in errors), "unknown, never zero"
+    assert all(None not in s.values[-288:] for s in errors)
+
+
+@pytest.mark.parametrize("rank", ["refused", "ungrouped"])
+async def test_errors_stay_one_series_when_sentry_cannot_split_them(rank: str) -> None:
+    issues = [IssueInfo("SHOP-WEB-1", "KeyError", 40.0)]
+
+    _, result = await collect(FakeApi(issues=issues, rank=rank))
+
+    errors = [s for s in result.series if s.signal == "sentry_errors"]
+    assert [s.entity.display_name for s in errors] == [f"{PROJECT} (production)"]
+    assert None not in errors[0].values
+    assert result.exclusions == []
+
+
 async def test_without_transactions_performance_is_unsupported() -> None:
     caps, result = await collect(FakeApi(transactions=0.0))
 
@@ -556,6 +695,10 @@ async def test_incident_yields_error_and_performance_findings() -> None:
 
     projects = {f.entity.labels["project"] for f in report.findings}
     assert projects == {PROJECT}, "only the first project had the incident"
+
+    spikes = [f.entity for f in report.findings if f.signal == "app_error_rate"]
+    assert [e.labels.get("issue") for e in spikes] == ["SHOP-WEB-4"], "only the new error kind"
+    assert "TypeError" in spikes[0].display_name
 
 
 async def test_healthy_yields_no_findings() -> None:

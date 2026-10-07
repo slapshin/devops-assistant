@@ -17,11 +17,16 @@ from app.domain.common import STEP_SECONDS, format_utc
 from app.domain.interfaces import SourceError, SourceErrorKind
 from app.domain.projects import SentryConnection
 from app.sources.base import ClientLimits
-from app.sources.sentry.api import Chunk, ProjectInfo
+from app.sources.sentry.api import Chunk, IssueInfo, ProjectInfo
 from app.sources.sentry.catalog import (
     BY_SIGNAL,
+    ISSUE_FIELD,
+    ISSUE_ID,
     SPANS_DATASET,
     Query,
+    events_path,
+    issue_rank_params,
+    issue_spec,
     project_path,
     query_spec,
     request_text,
@@ -242,18 +247,54 @@ class SentryClient:
         _transactions(chunk, [axes.get(axis, {}) for axis in spec.y_axes])
         return chunk
 
+    async def top_issues(
+        self, project_ids: Sequence[str], start: int, end: int, limit: int
+    ) -> list[IssueInfo]:
+        tags = [(t.key, t.value) for t in self.conn.tags]
+        params = issue_rank_params(
+            project_ids, self.conn.environment, tags, _utc(start), _utc(end), limit
+        )
+        raw = await self.get(events_path(self.conn.organization), params)
+        rows = raw.get("data") if isinstance(raw, dict) else None
+        if not isinstance(rows, list):
+            raise SourceError(SourceErrorKind.BAD_QUERY, "unexpected events response")
+        issues: dict[str, IssueInfo] = {}
+        for row in rows:
+            issue = str(row.get(ISSUE_FIELD) or "") if isinstance(row, dict) else ""
+            if not ISSUE_ID.fullmatch(issue) or issue in issues:
+                continue  # events without an issue, or another title of a listed one
+            title = str(row.get("title") or issue)
+            issues[issue] = IssueInfo(issue, title, float(row.get("count()") or 0))
+        return list(issues.values())[:limit]
 
-def _axes(raw: Any) -> dict[str, dict[int, float | None]]:
-    """yAxis -> bucket -> value of an ``events-timeseries`` response (ungrouped series).
+    async def issue_series(
+        self, issues: Sequence[str], project_ids: Sequence[str], start: int, end: int
+    ) -> Chunk:
+        spec = issue_spec(issues)
+        tags = [(t.key, t.value) for t in self.conn.tags]
+        args = (spec, project_ids, self.conn.environment, tags, _utc(start), _utc(end))
+        top = len(issues)
+        raw = await self.get(
+            timeseries_path(self.conn.organization), timeseries_params(*args, top=top)
+        )
+        chunk = Chunk(query=request_text(spec, self.conn.organization, *args[1:], top=top))
+        for issue, values in _groups(raw).items():
+            if issue in issues:
+                chunk.groups[issue] = {b: v for b, v in values.items() if v is not None}
+        return chunk
+
+
+def _timeseries(raw: Any) -> list[dict[str, Any]]:
+    """The series of an ``events-timeseries`` response, with their bucket size checked.
 
     Sentry 25.x names the list ``timeseries``; current documentation shows ``timeSeries``.
     """
     found = raw.get("timeSeries", raw.get("timeseries")) if isinstance(raw, dict) else None
     if not isinstance(found, list):
         raise SourceError(SourceErrorKind.BAD_QUERY, "unexpected events-timeseries response")
-    out: dict[str, dict[int, float | None]] = {}
+    out: list[dict[str, Any]] = []
     for series in found:
-        if not isinstance(series, dict) or series.get("groupBy"):
+        if not isinstance(series, dict):
             continue
         interval = (series.get("meta") or {}).get("interval")
         if interval is not None and int(interval) not in ACCEPTED_INTERVALS:
@@ -261,10 +302,44 @@ def _axes(raw: Any) -> dict[str, dict[int, float | None]]:
                 SourceErrorKind.BAD_QUERY,
                 f"Sentry answered with {interval} buckets instead of 5 minutes",
             )
-        values = out.setdefault(str(series.get("yAxis")), {})
-        for point in series.get("values") or []:
-            value = point.get("value")
-            values[_bucket(point["timestamp"])] = None if value is None else float(value)
+        out.append(series)
+    return out
+
+
+def _points(series: dict[str, Any]) -> dict[int, float | None]:
+    values: dict[int, float | None] = {}
+    for point in series.get("values") or []:
+        value = point.get("value")
+        values[_bucket(point["timestamp"])] = None if value is None else float(value)
+    return values
+
+
+def _axes(raw: Any) -> dict[str, dict[int, float | None]]:
+    """yAxis -> bucket -> value of an ``events-timeseries`` response (ungrouped series)."""
+    return {
+        str(series.get("yAxis")): _points(series)
+        for series in _timeseries(raw)
+        if not series.get("groupBy")
+    }
+
+
+def _groups(raw: Any) -> dict[str, dict[int, float | None]]:
+    """Issue -> bucket -> value of a response grouped by issue ("other" is never asked for)."""
+    out: dict[str, dict[int, float | None]] = {}
+    for series in _timeseries(raw):
+        group = series.get("groupBy")
+        if not isinstance(group, list):
+            continue
+        issue = next(
+            (
+                str(g.get("value"))
+                for g in group
+                if isinstance(g, dict) and g.get("key") == ISSUE_FIELD
+            ),
+            None,
+        )
+        if issue is not None:
+            out[issue] = _points(series)
     return out
 
 

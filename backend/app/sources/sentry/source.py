@@ -6,13 +6,19 @@ buckets, well under Sentry's 10,000 points per request), never before the projec
 Inside a chunk that was fetched, a bucket without events is zero for counts and unknown for
 durations; outside fetched chunks values stay unknown (None), so missing data is never
 reported as healthy.
+
+Error events are analysed per error kind: each project's top issues (``catalog.TOP_ISSUES``)
+are their own entities, and the remaining events form an "(other errors)" entity (the
+project's total minus those issues). When Sentry refuses to rank issues, a project's errors
+are analysed together, as one series.
 """
 
 import asyncio
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import partial
 
 from app.domain.common import Entity, EntityKind, Scope, SourceKind
 from app.domain.ids import series_id
@@ -28,15 +34,19 @@ from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.projects import SentryTag
 from app.domain.report import AnalysisWindows, Exclusion, SourceInfo
 from app.sources.base import HISTORY_DAYS
-from app.sources.sentry.api import SECONDS_PER_DAY, Chunk, ProjectInfo, SentryApi
+from app.sources.sentry.api import SECONDS_PER_DAY, Chunk, IssueInfo, ProjectInfo, SentryApi
 from app.sources.sentry.catalog import (
     BY_SIGNAL,
     CATALOG_VERSION,
+    ERRORS_SIGNAL,
+    RECENT_ISSUES,
     SIGNALS,
+    TOP_ISSUES,
     TRANSACTION_DATASETS,
     Query,
     SentrySignal,
     display_query,
+    issue_spec,
     query_spec,
 )
 
@@ -45,6 +55,10 @@ log = logging.getLogger("app.sources.sentry")
 PROBE_SECONDS = SECONDS_PER_DAY
 HISTORY_PROBE_DAYS = 30
 MAX_CHUNK_SECONDS = 7 * SECONDS_PER_DAY
+ISSUE_CHUNK_SECONDS = 3 * SECONDS_PER_DAY
+"""Grouped requests return a series per issue: 10 x 864 buckets stays under 10,000 points."""
+OTHER_ERRORS = "(other errors)"
+MAX_TITLE_CHARS = 120
 UNSUPPORTED_PROBE_KINDS = (SourceErrorKind.AUTH, SourceErrorKind.BAD_QUERY)
 """A refused probe means the plan, version or token lacks that dataset, not that Sentry is
 unreachable (reading the projects already proved access)."""
@@ -64,6 +78,21 @@ def application_entity(
     return Entity(kind=EntityKind.APPLICATION, key=key, display_name=name, labels=labels)
 
 
+def error_kind_entity(project: Entity, issue: str, title: str | None = None) -> Entity:
+    """One error kind (a Sentry issue, or ``OTHER_ERRORS``) of a project's entity."""
+    if title is None:
+        name = issue
+    else:
+        short = title if len(title) <= MAX_TITLE_CHARS else title[: MAX_TITLE_CHARS - 1] + "…"
+        name = f"{short} ({issue})"
+    return Entity(
+        kind=EntityKind.APPLICATION,
+        key=f"{project.key}|issue={issue}",
+        display_name=f"{project.display_name} · {name}",
+        labels={**project.labels, "issue": issue},
+    )
+
+
 def _ts(dt: datetime) -> int:
     return int(dt.timestamp())
 
@@ -81,6 +110,16 @@ class _Fetched:
     planned: int
     chunks: list[tuple[int, int, Chunk]]
     failures: list[SourceError]
+
+    @classmethod
+    def of(cls, plan: list[tuple[int, int]], results: list[Chunk | SourceError]) -> _Fetched:
+        return cls(
+            planned=len(plan),
+            chunks=[
+                (s, e, r) for (s, e), r in zip(plan, results, strict=True) if isinstance(r, Chunk)
+            ],
+            failures=[r for r in results if isinstance(r, SourceError)],
+        )
 
 
 class SentryMetricsSource:
@@ -196,9 +235,28 @@ class SentryMetricsSource:
 
     # --- collection -----------------------------------------------------------------------
 
+    async def _error_kinds(self, info: ProjectInfo, grid_start: int, end: int) -> list[IssueInfo]:
+        """The project's top issues: those of the latest 24 h first, then those of the whole
+        window. None when Sentry cannot rank them; the project's errors are then analysed
+        together, as they are when Sentry refuses every grouped request."""
+        try:
+            recent = await self.api.top_issues([info.id], end - SECONDS_PER_DAY, end, RECENT_ISSUES)
+            window = await self.api.top_issues([info.id], grid_start, end, TOP_ISSUES)
+        except SourceError as exc:
+            log.warning("sentry project %s: error kinds not ranked: %s", info.slug, exc.message)
+            return []
+        picked = {i.issue: i for i in recent}
+        for issue in window:
+            if len(picked) >= TOP_ISSUES:
+                break
+            picked.setdefault(issue.issue, issue)
+        return list(picked.values())
+
     @staticmethod
-    def _chunks(earliest: int, grid_start: int, end: int, step: int) -> list[tuple[int, int]]:
-        size = MAX_CHUNK_SECONDS // step * step
+    def _chunks(
+        earliest: int, grid_start: int, end: int, step: int, max_seconds: int = MAX_CHUNK_SECONDS
+    ) -> list[tuple[int, int]]:
+        size = max_seconds // step * step
         first = -(-earliest // step) * step  # the first whole bucket after creation
         start = max(grid_start, first)
         return [(s, min(s + size, end)) for s in range(start, end, size)]
@@ -223,24 +281,32 @@ class SentryMetricsSource:
         queries = sorted({BY_SIGNAL[s].query for s in supported})
         infos = await self.infos()
         plans = {
+            info.id: self._chunks(self._earliest(info, grid_start), grid_start, end, step)
+            for info in infos
+        }
+        kinds = (
+            {info.id: await self._error_kinds(info, grid_start, end) for info in infos}
+            if ERRORS_SIGNAL in supported
+            else {}
+        )
+        kind_plans = {
             info.id: self._chunks(
-                _ts(info.created) if info.created is not None else grid_start,
-                grid_start,
-                end,
-                step,
+                self._earliest(info, grid_start), grid_start, end, step, ISSUE_CHUNK_SECONDS
             )
             for info in infos
+            if kinds.get(info.id)
         }
 
         total = sum(len(plan) for plan in plans.values()) * len(queries)
+        total += sum(len(plan) for plan in kind_plans.values())
         done = 0
         started = self._now()
 
-        async def fetch(query: Query, pid: str, lo: int, hi: int) -> Chunk | SourceError:
+        async def fetch(what: str, call: Callable[[], Awaitable[Chunk]]) -> Chunk | SourceError:
             nonlocal done
             cancel.raise_if_cancelled()
             try:
-                return await self.api.series(query, [pid], lo, hi)
+                return await call()
             except SourceError as exc:
                 return exc
             finally:
@@ -252,7 +318,7 @@ class SentryMetricsSource:
                         started_at=started,
                         done=done,
                         total=total,
-                        message=f"sentry {query.value}",
+                        message=f"sentry {what}",
                     )
                 )
 
@@ -260,17 +326,32 @@ class SentryMetricsSource:
         for query in queries:
             for info in infos:
                 plan = plans[info.id]
-                results = await asyncio.gather(*(fetch(query, info.id, s, e) for s, e in plan))
-                fetched[(info.id, query)] = _Fetched(
-                    planned=len(plan),
-                    chunks=[
-                        (s, e, r)
-                        for (s, e), r in zip(plan, results, strict=True)
-                        if isinstance(r, Chunk)
-                    ],
-                    failures=[r for r in results if isinstance(r, SourceError)],
+                results = await asyncio.gather(
+                    *(
+                        fetch(query.value, partial(self.api.series, query, [info.id], s, e))
+                        for s, e in plan
+                    )
                 )
+                fetched[(info.id, query)] = _Fetched.of(plan, results)
                 cancel.raise_if_cancelled()
+        fetched_kinds: dict[str, _Fetched] = {}
+        for pid, kind_plan in kind_plans.items():
+            issues = [k.issue for k in kinds[pid]]
+            results = await asyncio.gather(
+                *(
+                    fetch("error kinds", partial(self.api.issue_series, issues, [pid], s, e))
+                    for s, e in kind_plan
+                )
+            )
+            got_kinds = _Fetched.of(kind_plan, results)
+            if not got_kinds.chunks and all(
+                f.kind in UNSUPPORTED_PROBE_KINDS for f in got_kinds.failures
+            ):
+                first = got_kinds.failures[0].message if got_kinds.failures else ""
+                log.warning("sentry project %s: error kinds refused: %s", pid, first)
+                continue  # the project's errors are analysed together
+            fetched_kinds[pid] = got_kinds
+            cancel.raise_if_cancelled()
 
         await progress.update(
             StageProgress(
@@ -286,21 +367,34 @@ class SentryMetricsSource:
         series: list[MetricSeries] = []
         exclusions: list[Exclusion] = []
         tags = [(t.key, t.value) for t in self.tags]
+        grid = _Grid(grid_start, size, step)
         for query in queries:
             signals = [s for s in SIGNALS if s.query is query and s.signal in supported]
             spec = query_spec(query, self.api.transactions_dataset)
             for info in infos:
                 got = fetched[(info.id, query)]
-                exclusions += _exclusions(query, info.slug, got, signals)
+                exclusions += _exclusions(f"{query.value} of {info.slug}", got, signals)
                 if query is Query.TRANSACTIONS and not _traced(got):
                     log.info("sentry project %s has no transactions; skipped", info.slug)
                     continue
-                chunk_seconds = got.chunks[0][1] - got.chunks[0][0] if got.chunks else step
                 text = display_query(
-                    spec, self.organization, info.id, self.environment, tags, chunk_seconds
+                    spec, self.organization, info.id, self.environment, tags, _span(got, step)
                 )
                 entity = self.entity(info.slug)
-                series += [_series(d, entity, got, grid_start, size, step, text) for d in signals]
+                split = info.id in fetched_kinds and query is Query.ERRORS
+                series += [
+                    _series(d, entity, grid.values(d, got.chunks), grid, text)
+                    for d in signals
+                    if not (split and d.signal == ERRORS_SIGNAL)
+                ]
+                if split:
+                    got_kinds = fetched_kinds[info.id]
+                    exclusions += _exclusions(
+                        f"error kinds of {info.slug}", got_kinds, [BY_SIGNAL[ERRORS_SIGNAL]]
+                    )
+                    series += self._kind_series(
+                        info, kinds[info.id], got, got_kinds, grid, text, tags
+                    )
 
         log.info(
             "collected project=%s sentry=%s projects=%d catalog=%s series=%d exclusions=%d "
@@ -315,27 +409,95 @@ class SentryMetricsSource:
         )
         return CollectionResult(series=series, exclusions=exclusions)
 
+    @staticmethod
+    def _earliest(info: ProjectInfo, grid_start: int) -> int:
+        return _ts(info.created) if info.created is not None else grid_start
+
+    def _kind_series(
+        self,
+        info: ProjectInfo,
+        kinds: list[IssueInfo],
+        got: _Fetched,
+        got_kinds: _Fetched,
+        grid: _Grid,
+        total_text: str,
+        tags: list[tuple[str, str]],
+    ) -> list[MetricSeries]:
+        """One error series per issue, and the rest of the project's errors as another."""
+        defn = BY_SIGNAL[ERRORS_SIGNAL]
+        project = self.entity(info.slug)
+        issues = [k.issue for k in kinds]
+        text = display_query(
+            issue_spec(issues),
+            self.organization,
+            info.id,
+            self.environment,
+            tags,
+            _span(got_kinds, grid.step),
+            top=len(issues),
+        )
+        out: list[MetricSeries] = []
+        other = grid.values(defn, got.chunks)
+        for kind in kinds:
+            values = grid.values(
+                defn, [(s, e, c.groups) for s, e, c in got_kinds.chunks], kind.issue
+            )
+            out.append(
+                _series(
+                    defn, error_kind_entity(project, kind.issue, kind.title), values, grid, text
+                )
+            )
+            other = [
+                None if t is None or v is None else max(0.0, t - v)
+                for t, v in zip(other, values, strict=True)
+            ]
+        other_text = f"# All error events minus those of {', '.join(issues)}\n{total_text}"
+        out.append(_series(defn, error_kind_entity(project, OTHER_ERRORS), other, grid, other_text))
+        return out
+
+
+@dataclass(frozen=True)
+class _Grid:
+    start: int
+    size: int
+    step: int
+
+    def values(
+        self,
+        defn: SentrySignal,
+        chunks: Sequence[tuple[int, int, Chunk | dict[str, dict[int, float]]]],
+        key: str | None = None,
+    ) -> list[float | None]:
+        """Event counts (or values) per step of the signal, or of ``key`` of grouped chunks."""
+        values: list[float | None] = [None] * self.size
+        for chunk_start, chunk_end, chunk in chunks:
+            lo = max(0, (chunk_start - self.start) // self.step)
+            hi = min(self.size, (chunk_end - self.start) // self.step)
+            if defn.zero_fill:
+                values[lo:hi] = [0.0] * (hi - lo)
+            found = chunk.values if isinstance(chunk, Chunk) else chunk
+            for bucket, value in found.get(key or defn.signal, {}).items():
+                i = (bucket - self.start) // self.step
+                if lo <= i < hi:
+                    values[i] = value
+        return values
+
+
+def _span(got: _Fetched, step: int) -> int:
+    return got.chunks[0][1] - got.chunks[0][0] if got.chunks else step
+
 
 def _series(
     defn: SentrySignal,
     entity: Entity,
-    got: _Fetched,
-    grid_start: int,
-    size: int,
-    step: int,
+    values: list[float | None],
+    grid: _Grid,
     query: str,
 ) -> MetricSeries:
-    values: list[float | None] = [None] * size
-    for chunk_start, chunk_end, chunk in got.chunks:
-        lo = max(0, (chunk_start - grid_start) // step)
-        hi = min(size, (chunk_end - grid_start) // step)
-        if defn.zero_fill:
-            values[lo:hi] = [0.0] * (hi - lo)
-        for bucket, value in chunk.values.get(defn.signal, {}).items():
-            i = (bucket - grid_start) // step
-            if lo <= i < hi:
-                values[i] = round(value / step if defn.rate else value, 6)
-
+    if defn.rate:
+        values = [None if v is None else round(v / grid.step, 6) for v in values]
+    else:
+        values = [None if v is None else round(v, 6) for v in values]
     observed = sum(v is not None for v in values)
     return MetricSeries(
         series_id=series_id(f"{defn.signal}\n{query}", entity.key),
@@ -345,10 +507,10 @@ def _series(
         labels=dict(entity.labels),
         unit=defn.unit,
         query=query,
-        step_seconds=step,
-        start=datetime.fromtimestamp(grid_start, UTC),
+        step_seconds=grid.step,
+        start=datetime.fromtimestamp(grid.start, UTC),
         values=values,
-        coverage=observed / size if size else 0.0,
+        coverage=observed / grid.size if grid.size else 0.0,
     )
 
 
@@ -360,9 +522,7 @@ def _traced(got: _Fetched) -> bool:
     return any(any(c.values.get(TRANSACTION_COUNT, {}).values()) for _, _, c in got.chunks)
 
 
-def _exclusions(
-    query: Query, project: str, got: _Fetched, signals: list[SentrySignal]
-) -> list[Exclusion]:
+def _exclusions(what: str, got: _Fetched, signals: list[SentrySignal]) -> list[Exclusion]:
     if not got.failures:
         return []
     first = got.failures[0]
@@ -371,7 +531,7 @@ def _exclusions(
         Exclusion(
             code=code,
             family=family,
-            message=f"Sentry {query.value} of {project}: {len(got.failures)} of {got.planned} "
+            message=f"Sentry {what}: {len(got.failures)} of {got.planned} "
             f"chunks failed ({first.kind.value}: {first.message}); those periods are unknown.",
         )
         for family in sorted({s.family for s in signals})

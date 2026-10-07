@@ -14,8 +14,15 @@ import numpy as np
 from app.domain.interfaces import SourceError, SourceErrorKind
 from app.domain.projects import SentryTag
 from app.sources.base import HISTORY_DAYS
-from app.sources.sentry.api import SECONDS_PER_DAY, Chunk, ProjectInfo
-from app.sources.sentry.catalog import BY_SIGNAL, SPANS_DATASET, Query, query_spec, request_text
+from app.sources.sentry.api import SECONDS_PER_DAY, Chunk, IssueInfo, ProjectInfo
+from app.sources.sentry.catalog import (
+    BY_SIGNAL,
+    SPANS_DATASET,
+    Query,
+    issue_spec,
+    query_spec,
+    request_text,
+)
 
 STEP = 300
 DAY = SECONDS_PER_DAY // STEP
@@ -29,8 +36,8 @@ class SentryScenario:
     tracing: bool = True
     """False: the project sends no transactions (tracing is not set up)."""
     bad_deploy: bool = False
-    """A release of the first project crashes for 90 min ending 4 h before T: errors,
-    unhandled errors, affected users, failed and slow transactions climb."""
+    """A release of the first project crashes for 90 min ending 4 h before T: a new error
+    kind appears, unhandled errors, affected users, failed and slow transactions climb."""
     slowdown: bool = False
     """Transactions are three times slower for 2 h ending 7 h before T."""
     traffic_drop: bool = False
@@ -48,6 +55,16 @@ SCENARIOS: dict[str, SentryScenario] = {
 }
 
 SYNTHETIC_ORGANIZATION = "demo"
+
+ERROR_KINDS = (
+    ("TimeoutError: upstream request timed out after 30s", 0.45),
+    ("KeyError: 'currency'", 0.25),
+    ("ValidationError: invalid email address", 0.15),
+)
+"""(title, share of the baseline error events); the rest is a long tail of rare errors."""
+DEPLOY_ERROR = "TypeError: 'NoneType' object is not subscriptable"
+"""The error kind the bad deploy introduces."""
+TAIL_SHARE = 1 - sum(share for _, share in ERROR_KINDS)
 
 
 def _window(end_hours_before: int, hours: float) -> slice:
@@ -75,6 +92,8 @@ class SyntheticSentryApi:
         self.transactions_dataset = SPANS_DATASET
         self._anchor: int | None = None
         self._data: dict[str, dict[str, np.ndarray]] = {}
+        self._issues: dict[str, dict[str, tuple[str, np.ndarray]]] = {}
+        """Project ID -> short issue ID -> (title, error events per bucket)."""
 
     @property
     def base_url(self) -> str:
@@ -88,16 +107,19 @@ class SyntheticSentryApi:
         anchor = int(end_time.timestamp())
         if anchor != self._anchor:
             self._anchor = anchor
-            self._data = {
-                str(i + 1): self._generate(i, incidents=i == 0) for i in range(len(self.slugs))
-            }
+            self._data, self._issues = {}, {}
+            for i in range(len(self.slugs)):
+                pid = str(i + 1)
+                self._data[pid], self._issues[pid] = self._generate(i, incidents=i == 0)
 
     async def aclose(self) -> None:
         pass
 
     # --- generation -----------------------------------------------------------------------
 
-    def _generate(self, index: int, *, incidents: bool) -> dict[str, np.ndarray]:
+    def _generate(
+        self, index: int, *, incidents: bool
+    ) -> tuple[dict[str, np.ndarray], dict[str, tuple[str, np.ndarray]]]:
         sc = self.scenario
         rng = np.random.default_rng(sc.seed + index)
         tod = (np.arange(N) % DAY) / DAY
@@ -114,9 +136,17 @@ class SyntheticSentryApi:
         unhandled = noisy(0.004, 0.0, 0.0015)
         users = noisy(4.0, 2.0, 0.6)
 
+        prefix = self.slugs[index].upper()
+        issues = {
+            f"{prefix}-{n + 1}": (title, np.round(errors * share * STEP))
+            for n, (title, share) in enumerate(ERROR_KINDS)
+        }
+        tail = np.round(errors * TAIL_SHARE * STEP)
         if incidents and sc.bad_deploy:
             w = _window(4, 1.5)
-            errors[w] *= 18
+            deploy = np.zeros(N)
+            deploy[w] = np.round(errors[w] * 17 * STEP)
+            issues[f"{prefix}-{len(ERROR_KINDS) + 1}"] = (DEPLOY_ERROR, deploy)
             unhandled[w] = 0.25
             users[w] *= 10
             failure[w] = 0.09
@@ -127,8 +157,8 @@ class SyntheticSentryApi:
             tps[_window(9, 3)] *= 0.3
 
         transactions = np.round(tps * STEP) if sc.tracing else np.zeros(N)
-        return {
-            "sentry_errors": np.round(errors * STEP),
+        data = {
+            "sentry_errors": tail + sum(counts for _, counts in issues.values()),
             "sentry_error_users": np.round(users),
             "sentry_unhandled": np.round(unhandled * STEP),
             "sentry_transactions": transactions,
@@ -136,6 +166,7 @@ class SyntheticSentryApi:
             "sentry_duration_p95": p95,
             "sentry_duration_p99": p95 * 2.2,
         }
+        return data, issues
 
     def _first_index(self) -> int:
         return N - self.scenario.history_days * DAY
@@ -157,13 +188,60 @@ class SyntheticSentryApi:
             for i, slug in enumerate(self.slugs)
         ]
 
-    async def series(self, query: Query, project_ids: Sequence[str], start: int, end: int) -> Chunk:
-        grid_start = self._grid_start()
+    def _fail_errors(self, start: int, end: int) -> None:
         failing = self.scenario.failing_day
-        if failing is not None and query is not Query.TRANSACTIONS:
-            day_start = grid_start + N * STEP - failing * SECONDS_PER_DAY
+        if failing is not None:
+            day_start = self._grid_start() + N * STEP - failing * SECONDS_PER_DAY
             if start < day_start + SECONDS_PER_DAY and end > day_start:
                 raise SourceError(SourceErrorKind.SERVER_ERROR, "HTTP 503 (synthetic)")
+
+    def _range(self, start: int, end: int) -> range:
+        grid_start = self._grid_start()
+        lo = max((start - grid_start) // STEP, self._first_index(), 0)
+        hi = min((end - grid_start) // STEP, N)
+        return range(lo, max(hi, lo))
+
+    async def top_issues(
+        self, project_ids: Sequence[str], start: int, end: int, limit: int
+    ) -> list[IssueInfo]:
+        span = self._range(start, end)
+        found = [
+            IssueInfo(issue, title, float(counts[span.start : span.stop].sum()))
+            for pid in project_ids
+            for issue, (title, counts) in self._issues[pid].items()
+        ]
+        found = sorted((i for i in found if i.count), key=lambda i: (-i.count, i.issue))
+        return found[:limit]
+
+    async def issue_series(
+        self, issues: Sequence[str], project_ids: Sequence[str], start: int, end: int
+    ) -> Chunk:
+        self._fail_errors(start, end)
+        spec = issue_spec(issues)
+        text = request_text(
+            spec,
+            self.organization,
+            project_ids,
+            self.environment,
+            self.tags,
+            self._iso(start),
+            self._iso(end),
+            top=len(issues),
+        )
+        chunk = Chunk(query=text)
+        grid_start = self._grid_start()
+        for pid in project_ids:
+            for issue, (_, counts) in self._issues[pid].items():
+                if issue in issues:
+                    chunk.groups[issue] = {
+                        grid_start + i * STEP: float(counts[i]) for i in self._range(start, end)
+                    }
+        return chunk
+
+    async def series(self, query: Query, project_ids: Sequence[str], start: int, end: int) -> Chunk:
+        grid_start = self._grid_start()
+        if query is not Query.TRANSACTIONS:
+            self._fail_errors(start, end)
         text = request_text(
             query_spec(query, self.transactions_dataset),
             self.organization,
@@ -176,9 +254,7 @@ class SyntheticSentryApi:
         data = [self._data[pid] for pid in project_ids]
         signals = [s for s in BY_SIGNAL.values() if s.query is query]
         chunk = Chunk(query=text, values={s.signal: {} for s in signals})
-        lo = max((start - grid_start) // STEP, self._first_index(), 0)
-        hi = min((end - grid_start) // STEP, N)
-        for i in range(lo, max(hi, lo)):
+        for i in self._range(start, end):
             bucket = grid_start + i * STEP
             traced = sum(float(d["sentry_transactions"][i]) for d in data)
             for defn in signals:
