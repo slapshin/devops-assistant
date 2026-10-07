@@ -163,6 +163,7 @@ function listSeparator(index: number, length: number): string {
           :start="report.windows.latest_day.start"
           :end="report.windows.latest_day.end"
           :link="link"
+          :full-to="`/reports/${report.analysis_id}/timeline`"
         />
         <FindingCard v-for="f in topFindings" :key="f.finding_id" class="s8" :finding="f" :to="link(f.finding_id)" :evidence="evidenceFor(f.evidence_ids)" />
       </div>

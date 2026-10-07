@@ -965,6 +965,46 @@ describe("report", () => {
     expect(within(timeline).getAllByRole("link")).toHaveLength(anomalies.findings.length);
   });
 
+  it("timeline tab shows every finding with its source", async () => {
+    await renderAt(`${report(anomalies)}/timeline`);
+
+    const timeline = await screen.findByRole("region", { name: "State timeline" });
+
+    expect(within(timeline).getAllByRole("link")).toHaveLength(anomalies.findings.length);
+    expect(within(timeline).getAllByText(/^Prometheus:/)).toHaveLength(anomalies.findings.length);
+    expect(within(screen.getByRole("group", { name: "Sources" })).getByRole("button", { name: /All/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("timeline filters by source through the URL", async () => {
+    const mixed = {
+      ...anomalies,
+      analysis_id: "mixed",
+      findings: [...anomalies.findings, ...sentryReport.findings],
+      capabilities: [...anomalies.capabilities, ...sentryReport.capabilities],
+    };
+    const router = await renderAt(`${report(mixed)}/timeline`);
+    const group = await screen.findByRole("group", { name: "Sources" });
+    const lanes = () => within(screen.getByRole("region", { name: "State timeline" })).queryAllByRole("link");
+
+    expect(lanes()).toHaveLength(mixed.findings.length);
+
+    await fireEvent.click(within(group).getByRole("button", { name: /Prometheus/ }));
+
+    await waitFor(() => expect(router.currentRoute.value.query.source).toBe("sentry"));
+    expect(lanes()).toHaveLength(sentryReport.findings.length);
+    expect(within(group).getByRole("button", { name: /All/ })).toHaveAttribute("aria-pressed", "false");
+
+    await fireEvent.click(within(group).getByRole("button", { name: /Sentry/ }));
+
+    await waitFor(() => expect(router.currentRoute.value.query.source).toBe(""));
+    expect(screen.getByText("No sources selected.")).toBeInTheDocument();
+
+    await fireEvent.click(within(group).getByRole("button", { name: /All/ }));
+
+    await waitFor(() => expect(router.currentRoute.value.query.source).toBeUndefined());
+    expect(lanes()).toHaveLength(mixed.findings.length);
+  });
+
   it("findings filter by recurrence through the URL", async () => {
     const router = await renderAt(`${report(anomalies)}/findings`);
     const group = await screen.findByRole("group", { name: "Recurrence" });

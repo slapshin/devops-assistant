@@ -15,6 +15,7 @@ Interface language: English (default; strings are kept in one module so they can
 | `/reports/:id` | **Overview** (default report tab) |
 | `/reports/:id/findings` | **Findings** list; `?category=&severity=&entity=` filters live in the URL |
 | `/reports/:id/findings/:findingId` | Findings list + **Evidence** detail (a full-width page on narrow screens) |
+| `/reports/:id/timeline` | **Timeline**: the full state timeline; `?source=` (comma-separated source kinds, absent = all) |
 | `/reports/:id/trends` | **Trends**; `?entity=&category=` filters |
 
 Every report URL can be shared and reloaded and works after a process restart, because it is read from the saved snapshot. The browser Back button moves between the list and the detail view without losing filters.
@@ -23,13 +24,13 @@ Every report URL can be shared and reloaded and works after a process restart, b
 
 Visual design: the "DevOps Assistant UI" canvas in Claude Design (Overview, Findings + evidence, Trends boards). It is a dense, Grafana-like dashboard: IBM Plex Sans/Mono (self-hosted via `@fontsource`, no external font requests), panels on a 24-column grid, 4 px radii, solid severity fills for stat panels and chips.
 
-Every page has a left **icon rail** (home, Projects, and Overview / Findings / Trends while a report is open; a top row below 700 px) and a **top bar** with breadcrumbs (`Projects › <project> › <page>`), page badges such as *Synthetic data*, and the theme switch.
+Every page has a left **icon rail** (home, Projects, and Overview / Findings / Timeline / Trends while a report is open; a top row below 700 px) and a **top bar** with breadcrumbs (`Projects › <project> › <page>`), page badges such as *Synthetic data*, and the theme switch.
 
 Report routes add a toolbar and tabs under the top bar:
 
 ```
 [env | production] [project | shop] [baseline | 14 days]   Completed · detectors-2026.09.1 · saved 30 Sep 10:07 UTC   [◷ 29 Sep 10:05 – 30 Sep 10:05 | UTC ▾] [Run again]
-Tabs:  Overview | Findings 12 | Trends
+Tabs:  Overview | Findings 12 | Timeline | Trends
 ```
 
 - The project's label matchers, the longest baseline used, and the frozen latest-day window are always visible. Times are shown in the viewer's local time by default, with a Local/UTC select next to the window; tooltips always include UTC.
@@ -78,7 +79,7 @@ Order (top to bottom). The page answers "what is wrong, how bad, and what is new
 
 1. **Stat panels**: one per severity (Critical, High, Medium always; Low when present), filled with the severity colour when the count is above zero, with the family and new/seen-before note; *New today*; *Signal coverage* (evaluated of total families, with a bar); *Blind spots* (count and family names).
 2. **Summary**: a one-line headline of the most severe finding ("CPU on node · shop-production peaked at 95.4 % over 3 h"), its ratio to the usual value, how many findings are new today versus seen before, a link to the most severe finding, the 14-day trend line, and a warning box naming the families that were not evaluated (unsupported, insufficient data, source error) and saying that problems there would not show up. Beside it, **Check first** (the AI explanation panel, below).
-3. **Episodes** (a collapsible row): a **State timeline** with one lane per finding (at most 8) on the latest-day axis; the lane background is neutral ("No episode"), never "normal", because it does not prove the entity was healthy. Findings that overlap in time are listed as "coincide in time (not established as related)". Below it, the 6 most severe findings as panels: severity, title, New today / Recurring tag, the observed peak with the usual range (or the heuristic), a mini evidence chart with axes, episode span, heuristic line and usual band, the series legend, then time, duration, state and confidence. A "View all findings" link.
+3. **Episodes** (a collapsible row): a compact **State timeline** with one lane per finding (at most 8, with a link to the Timeline tab when there are more) on the latest-day axis; the lane background is neutral ("No episode"), never "normal", because it does not prove the entity was healthy. Findings that overlap in time are listed as "coincide in time (not established as related)". Below it, the 6 most severe findings as panels: severity, title, New today / Recurring tag, the observed peak with the usual range (or the heuristic), a mini evidence chart with axes, episode span, heuristic line and usual band, the series legend, then time, duration, state and confidence. A "View all findings" link.
 4. **Coverage** (a collapsible row): a **Signal families** tile grid (one solid tile per family: red anomalous, amber not evaluated, green no anomaly; each with text and icon), then the coverage table (5).
 5. **Check first** contents:
    - `succeeded`: the summary. Hypotheses are labelled **"Hypothesis — unverified"** with their likelihood, and each links to its referenced finding chips. Investigation steps follow, then the uncertainty note and "Generated by <provider>/<model>".
@@ -123,6 +124,12 @@ Opening a finding expands it in place, accordion-style: a detail row directly be
 5. **Query inspector**: the exact PromQL/MetricsQL, step, and range in a copyable code block (credentials are never shown), and a collapsed *Labels and detector* section with the relevant entity labels (job, instance, route, method, status, device, mountpoint).
 
 Unsupported or insufficient signals have no chart. They show a text block explaining what metric or label is missing, or how much history exists.
+
+## 7a. Timeline
+
+- The full **State timeline** (same lanes, axis, legend and "coincide in time" notes as the Overview one) with a lane for every latest-day finding, sorted by start time; each lane also names its source (icon). Coinciding pairs beyond 8 are summarised as a count.
+- A **Sources** toggle group above it: *All · N* plus one toggle per source kind that produced findings (icon, name, count). Every source is on by default; toggles combine, and *All* turns every source back on. The selection lives in `?source=` (absent when all are on). Turning every source off shows "No sources selected" with *Show all sources*.
+- A report without findings says there are no episodes to place on the timeline.
 
 ## 8. Trends
 

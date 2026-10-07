@@ -37,6 +37,7 @@ provideReport({
 const tabs = computed(() => [
   { name: "overview", label: "Overview", to: `/reports/${props.id}`, count: null },
   { name: "findings", label: "Findings", to: `/reports/${props.id}/findings`, count: query.data.value?.findings.length ?? 0 },
+  { name: "timeline", label: "Timeline", to: `/reports/${props.id}/timeline`, count: null },
   { name: "trends", label: "Trends", to: `/reports/${props.id}/trends`, count: null },
 ]);
 const activeTab = computed(() => (route.name === "evidence" ? "findings" : String(route.name)));

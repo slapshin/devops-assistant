@@ -57,7 +57,7 @@ Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source 
 - `app/ai/` — `providers.py` (provider selection, `fake`), `prompt.py`, `validation.py` (validates model output references real finding IDs), `openai_adapter.py`.
 - `app/storage/` — SQLAlchemy Core (no ORM) + Alembic migrations in `backend/migrations/`, run upgrade-only at startup. Reports are stored as versioned JSON snapshots (`REPORT_SCHEMA_VERSION`).
 - `app/api/` — routes under `/api`; errors are RFC 9457 `application/problem+json` with a stable `code` (`problems.py`).
-- `frontend/src/` — routes `/` (project list), `/analyses/:id` (job progress), `/reports/:id` with `findings`, `findings/:findingId`, `trends` children. Server state via TanStack Vue Query (no Pinia); API client typed from generated `schema.d.ts`; styling is plain CSS: tokens in `styles/tokens.css`, shared dashboard classes (panels, 24-column grid, chips) in `styles/base.css`; fonts are self-hosted IBM Plex via `@fontsource`.
+- `frontend/src/` — routes `/` (project list), `/analyses/:id` (job progress), `/reports/:id` with `findings`, `findings/:findingId`, `timeline`, `trends` children. Server state via TanStack Vue Query (no Pinia); API client typed from generated `schema.d.ts`; styling is plain CSS: tokens in `styles/tokens.css`, shared dashboard classes (panels, 24-column grid, chips) in `styles/base.css`; fonts are self-hosted IBM Plex via `@fontsource`.
 
 ## Invariants to preserve
 

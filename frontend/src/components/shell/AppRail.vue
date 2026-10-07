@@ -28,6 +28,9 @@ const onProjects = computed(() => route.path === "/" || route.path.startsWith("/
       <RouterLink :to="`/reports/${reportId}/findings`" :class="{ on: reportView === 'findings' }" aria-label="Report findings" title="Findings">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5V8a4.5 4.5 0 0 1 9 0v4.5l1.5 1.5H3z" /><path d="M7.5 16h3" /></svg>
       </RouterLink>
+      <RouterLink :to="`/reports/${reportId}/timeline`" :class="{ on: reportView === 'timeline' }" aria-label="Report timeline" title="Timeline">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 4h6M6 9h8M4 14h5" /><path d="M2 16V2" /></svg>
+      </RouterLink>
       <RouterLink :to="`/reports/${reportId}/trends`" :class="{ on: reportView === 'trends' }" aria-label="Report trends" title="Trends">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h12" /><path d="M5 12V9M9 12V5M13 12V7" /></svg>
       </RouterLink>

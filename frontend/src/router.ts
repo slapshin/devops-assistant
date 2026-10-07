@@ -4,6 +4,7 @@ import JobView from "./views/JobView.vue";
 import FindingsView from "./views/report/FindingsView.vue";
 import OverviewView from "./views/report/OverviewView.vue";
 import ReportLayout from "./views/report/ReportLayout.vue";
+import TimelineView from "./views/report/TimelineView.vue";
 import TrendsView from "./views/report/TrendsView.vue";
 import ProjectFormView from "./views/projects/ProjectFormView.vue";
 import ProjectsView from "./views/projects/ProjectsView.vue";
@@ -29,6 +30,7 @@ export const routes: RouteRecordRaw[] = [
       { path: "", name: "overview", component: OverviewView },
       { path: "findings", name: "findings", component: FindingsView, props: true },
       { path: "findings/:findingId", name: "evidence", component: FindingsView, props: true },
+      { path: "timeline", name: "timeline", component: TimelineView },
       { path: "trends", name: "trends", component: TrendsView },
     ],
   },
