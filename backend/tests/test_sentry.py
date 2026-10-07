@@ -118,6 +118,7 @@ def test_source_input_normalises_and_validates() -> None:
             "tags": [{"key": "team", "value": "shop"}, {"key": "server_name", "value": "web 1"}],
         }
     )
+
     assert (source.organization, source.projects, source.environment) == (
         "acme",
         ["api", "shop-web"],
@@ -167,6 +168,7 @@ async def test_errors_request_and_parsing() -> None:
         )
 
     client = make_client(with_project(handler), "https://sentry.example.com/prefix")
+
     chunk = await client.series(
         Query.ERRORS, ["42", "43"], int((END - timedelta(days=1)).timestamp()), int(END.timestamp())
     )
@@ -181,6 +183,7 @@ async def test_errors_request_and_parsing() -> None:
     assert url.params["environment"] == "production"
     assert url.params["interval"] == "5m"
     assert url.params["end"] == "2026-10-06T10:00:00Z"
+
     ts = int(bucket.timestamp())
     assert chunk.values == {"sentry_errors": {ts: 6.0}, "sentry_error_users": {ts: 2.0}}
     assert chunk.query.startswith(f"GET /api/0/organizations/{ORG}/events-timeseries/?")
@@ -205,8 +208,10 @@ async def test_transactions_convert_failures_and_durations() -> None:
         )
 
     client = make_client(with_project(handler))
+
     chunk = await client.series(Query.TRANSACTIONS, ["42"], 0, int(END.timestamp()))
     await client.aclose()
+
     b, i = int(busy.timestamp()), int(idle.timestamp())
     assert chunk.values["sentry_transactions"] == {b: 400.0, i: 0.0}
     assert chunk.values["sentry_transaction_failures"] == {b: 20.0, i: 0.0}
@@ -232,8 +237,10 @@ async def test_self_hosted_25_response_and_transactions_dataset() -> None:
 
     client = make_client(with_project(handler))
     client.transactions_dataset = "transactions"
+
     chunk = await client.series(Query.TRANSACTIONS, ["42"], 0, int(END.timestamp()))
     await client.aclose()
+
     ts = int(bucket.timestamp())
     assert chunk.values["sentry_transactions"] == {ts: 100.0}
     assert chunk.values["sentry_transaction_failures"] == {ts: 10.0}
@@ -248,6 +255,7 @@ async def test_wrong_bucket_size_is_rejected() -> None:
         return httpx.Response(200, json=body)
 
     client = make_client(with_project(handler))
+
     with pytest.raises(SourceError, match="instead of 5 minutes"):
         await client.series(Query.UNHANDLED, ["42"], 0, int(END.timestamp()))
     await client.aclose()
@@ -271,9 +279,11 @@ async def test_errors_are_classified_without_the_token(
     response: httpx.Response, kind: SourceErrorKind, text: str
 ) -> None:
     client = make_client(lambda request: response)
+
     with pytest.raises(SourceError) as caught:
         await client.projects()
     await client.aclose()
+
     assert caught.value.kind is kind
     assert text in caught.value.message
     assert TOKEN not in caught.value.message
@@ -285,6 +295,7 @@ async def test_self_hosted_url_keeps_its_prefix_and_explains_untrusted_certifica
         raise httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] self-signed certificate")
 
     client = make_client(handler, "http://sentry.internal:9000/sentry")
+
     with pytest.raises(SourceError, match="turn off TLS verification"):
         await client.projects()
     await client.aclose()
@@ -292,9 +303,12 @@ async def test_self_hosted_url_keeps_its_prefix_and_explains_untrusted_certifica
 
 def test_tls_verification_is_stored_and_defaults_on(api: TestClient) -> None:
     on = api.post("/api/projects", json=sentry_body(api_url="synthetic://healthy")).json()
+
     assert on["sources"][0]["tls_verify"] is True
+
     body = sentry_body(api_url="https://sentry.internal/sentry", tls_verify=False, auth_token=TOKEN)
     off = api.post("/api/projects", json={**body, "name": "internal"}).json()
+
     assert off["sources"][0]["tls_verify"] is False
     assert off["sources"][0]["api_url"] == "https://sentry.internal/sentry"
 
@@ -310,8 +324,10 @@ async def test_rate_limit_is_retried_once() -> None:
         return httpx.Response(200, json=PROJECT_JSON)
 
     client = make_client(handler)
+
     [info] = await client.projects()
     await client.aclose()
+
     assert calls == 2
     assert (info.id, info.name) == ("42", "Shop web")
     assert info.created == datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
@@ -394,6 +410,7 @@ async def collect(api: FakeApi) -> tuple[list[Any], Any]:
         api, ORG, api.slugs, "production", [SentryTag(key="team", value="shop")]
     )
     windows = AnalysisWindows.for_end(END)
+
     caps = await source.capabilities(SCOPE, windows)
     result = await source.collect(SCOPE, windows, caps, Progress(), CancellationToken())
     return caps, result
@@ -401,16 +418,20 @@ async def collect(api: FakeApi) -> tuple[list[Any], Any]:
 
 async def test_each_project_is_its_own_entity_and_untraced_ones_skip_transactions() -> None:
     api = FakeApi(untraced=True)
+
     _, result = await collect(api)
 
     probes = [ids for q, ids, s, e in api.calls if e - s == 86400 and q is Query.ERRORS]
     assert probes[0] == ("42", "43"), "capability probes cover all projects in one request"
+
     errors = {s.entity.labels["project"] for s in result.series if s.signal == "sentry_errors"}
     assert errors == {PROJECT, "worker"}
+
     traced = {
         s.entity.labels["project"] for s in result.series if s.signal == "sentry_transactions"
     }
     assert traced == {PROJECT}, "a project without transactions has no transaction series"
+
     worker = next(s for s in result.series if s.entity.labels["project"] == "worker")
     assert worker.entity.labels["tags"] == "team=shop"
     assert (
@@ -421,6 +442,7 @@ async def test_each_project_is_its_own_entity_and_untraced_ones_skip_transaction
 
 async def test_collection_chunks_start_at_project_creation() -> None:
     api = FakeApi(created=END - timedelta(days=10, minutes=2))
+
     caps, result = await collect(api)
 
     errors_calls = [(s, e) for q, _, s, e in api.calls if q is Query.ERRORS and e - s > 86400]
@@ -438,19 +460,24 @@ async def test_collection_chunks_start_at_project_creation() -> None:
     assert errors.entity.display_name == f"{PROJECT} (production)"
     assert errors.values[0] is None, "before the project existed: unknown, not zero"
     assert errors.values[-2:] in ([0.01, 0.0], [0.0, 0.01]), "missing buckets are zero"
+
     p95 = next(s for s in result.series if s.signal == "sentry_duration_p95")
     assert None in p95.values[-2:], "a missing duration stays unknown"
     assert "events-timeseries" in errors.query and "$start" in errors.query
+
     assert {c.status for c in caps} == {CapabilityStatus.SUPPORTED}
     assert caps[0].history_days == 10.0
 
 
 async def test_failed_chunks_are_disclosed() -> None:
     fail_at = int((END - timedelta(days=14)).timestamp())  # the third of four 7-day chunks
+
     _, result = await collect(FakeApi(fail_at=fail_at))
+
     codes = {(e.code, e.family) for e in result.exclusions}
     assert ("query_failed", SignalFamily.APP_ERRORS) in codes
     assert ("query_failed", SignalFamily.APP_PERFORMANCE) in codes
+
     errors = next(s for s in result.series if s.signal == "sentry_errors")
     failed = errors.values[-14 * 288 : -7 * 288]
     assert set(failed) == {None}, "a failed chunk is unknown, never zero"
@@ -459,6 +486,7 @@ async def test_failed_chunks_are_disclosed() -> None:
 
 async def test_without_transactions_performance_is_unsupported() -> None:
     caps, result = await collect(FakeApi(transactions=0.0))
+
     perf = [c for c in caps if c.family is SignalFamily.APP_PERFORMANCE]
     assert {c.status for c in perf} == {CapabilityStatus.UNSUPPORTED}
     assert all("tracing" in (c.reason or "") for c in perf)
@@ -468,10 +496,13 @@ async def test_without_transactions_performance_is_unsupported() -> None:
 @pytest.mark.parametrize("spans", ["empty", "refused"])
 async def test_transactions_fall_back_to_the_transactions_dataset(spans: str) -> None:
     api = FakeApi(spans=spans)
+
     caps, result = await collect(api)
+
     perf = [c for c in caps if c.family is SignalFamily.APP_PERFORMANCE]
     assert {c.status for c in perf} == {CapabilityStatus.SUPPORTED}
     assert api.transactions_dataset == "transactions"
+
     duration = next(c for c in caps if c.signal == "sentry_duration_p95")
     assert duration.observed_metrics == ["events-timeseries:transactions:p95(transaction.duration)"]
     assert any(s.signal == "sentry_transactions" for s in result.series)
@@ -479,6 +510,7 @@ async def test_transactions_fall_back_to_the_transactions_dataset(spans: str) ->
 
 async def test_refused_dataset_is_unsupported_with_reason() -> None:
     caps, _ = await collect(FakeApi(refuse=Query.UNHANDLED))
+
     unhandled = next(c for c in caps if c.signal == "sentry_unhandled")
     assert unhandled.status is CapabilityStatus.UNSUPPORTED
     assert "dataset not available" in (unhandled.reason or "")
@@ -498,6 +530,7 @@ async def run(*sources: OpenedSource) -> AnalysisReport:
         detector_version=config.version,
         config_hash=config.config_hash,
     )
+
     return await pipeline.run(
         "01999a2b-0000-7000-8000-0000000000e1", request, Progress(), CancellationToken()
     )
@@ -511,6 +544,7 @@ def synthetic(scenario: str) -> OpenedSource:
 
 async def test_incident_yields_error_and_performance_findings() -> None:
     report = await run(synthetic("incident"))
+
     signals = {f.signal for f in report.findings}
     assert {"app_error_rate", "app_unhandled_error_rate", "app_error_users"} <= signals
     assert {"app_transaction_failure_ratio", "app_duration_p95"} <= signals
@@ -519,18 +553,21 @@ async def test_incident_yields_error_and_performance_findings() -> None:
         SignalFamily.APP_PERFORMANCE,
     }
     assert [s.kind for s in report.sources] == [SourceKind.SENTRY]
+
     projects = {f.entity.labels["project"] for f in report.findings}
     assert projects == {PROJECT}, "only the first project had the incident"
 
 
 async def test_healthy_yields_no_findings() -> None:
     report = await run(synthetic("healthy"))
+
     assert report.findings == []
     assert report.state is ReportState.COMPLETED
 
 
 async def test_degraded_is_partial_with_slow_transactions() -> None:
     report = await run(synthetic("degraded"))
+
     assert report.state is ReportState.PARTIAL
     signals = {f.signal for f in report.findings}
     assert {"app_duration_p95", "app_transaction_rate"} <= signals
@@ -539,13 +576,16 @@ async def test_degraded_is_partial_with_slow_transactions() -> None:
 async def test_sentry_auth_failure_makes_a_mixed_report_partial() -> None:
     conn = SentryConnection(organization=ORG, projects=[PROJECT], auth_token=SecretStr(TOKEN))
     transport = httpx.MockTransport(lambda request: httpx.Response(401))
+
     async with connect_sentry(conn, transport=transport) as sentry:
         report = await run(
             OpenedSource(SourceKind.PROMETHEUS, SyntheticMetricsSource("incident")),
             OpenedSource(SourceKind.SENTRY, sentry),
         )
+
     assert report.state is ReportState.PARTIAL
     assert report.findings
+
     failed = [e for e in report.exclusions if e.code == "source_unavailable"]
     assert {e.family for e in failed} == {SignalFamily.APP_ERRORS, SignalFamily.APP_PERFORMANCE}
     assert TOKEN not in report.model_dump_json()
@@ -553,8 +593,10 @@ async def test_sentry_auth_failure_makes_a_mixed_report_partial() -> None:
 
 async def test_probe_reports_events_and_families() -> None:
     conn = SentryConnection(organization=ORG, projects=[PROJECT], api_url="synthetic://healthy")
+
     async with connect_sentry(conn) as source:
         test = await probe_sentry(source, SCOPE)
+
     assert test.kind is SourceKind.SENTRY
     assert test.reachable and test.auth_ok
     assert test.matched_series and test.matched_series > 0
@@ -564,11 +606,13 @@ async def test_probe_reports_events_and_families() -> None:
     }
 
     transport = httpx.MockTransport(lambda request: httpx.Response(401))
+
     async with connect_sentry(
         SentryConnection(organization=ORG, projects=[PROJECT], auth_token=SecretStr(TOKEN)),
         transport=transport,
     ) as source:
         denied = await probe_sentry(source, SCOPE)
+
     assert denied.reachable and denied.auth_ok is False
     assert TOKEN not in (denied.message or "")
 
@@ -592,6 +636,7 @@ def sentry_body(**source: Any) -> dict[str, Any]:
 
 def test_sentry_project_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
     missing = api.post("/api/projects", json=sentry_body())
+
     assert missing.status_code == 422
     assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth_token"]
 
@@ -602,6 +647,7 @@ def test_sentry_project_token_is_write_only(api: TestClient, tmp_path: Path) -> 
             auth_token=TOKEN, environment="production", projects=["web", "api"], tags=tags
         ),
     )
+
     assert res.status_code == 201, res.text
     project = res.json()
     assert project["sources"] == [
@@ -616,12 +662,15 @@ def test_sentry_project_token_is_write_only(api: TestClient, tmp_path: Path) -> 
             "token_set": True,
         }
     ]
+
     with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
         raw = db.execute("SELECT config, secrets FROM project_sources").fetchone()
+
     assert TOKEN not in raw[0] and TOKEN.encode() not in raw[1]
 
     pid = project["project_id"]
     body = sentry_body(environment="staging")
+
     assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["token_set"]
     clone = api.post(f"/api/projects?clone_of={pid}", json={**body, "name": "copy"})
     assert clone.status_code == 201 and clone.json()["sources"][0]["token_set"]
@@ -642,17 +691,21 @@ def test_single_project_sources_saved_earlier_still_load(api: TestClient, tmp_pa
     )
     with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
         db.execute("UPDATE project_sources SET config = ?", (legacy,))
+
     source = api.get(f"/api/projects/{pid}").json()["sources"][0]
+
     assert (source["projects"], source["tags"]) == ([PROJECT], [])
     assert api.get(f"/api/projects/{pid}/health").json()[0]["reachable"]
 
 
 def test_synthetic_sentry_project_end_to_end(api: TestClient) -> None:
     bad = api.post("/api/projects", json=sentry_body(api_url="synthetic://nope"))
+
     assert [e["field"] for e in bad.json()["errors"]] == ["body.sources.0.api_url"]
 
     project = api.post("/api/projects", json=sentry_body(api_url="synthetic://incident")).json()
     health = api.get(f"/api/projects/{project['project_id']}/health").json()
+
     assert [h["kind"] for h in health] == ["sentry"]
     assert health[0]["reachable"] and health[0]["auth_ok"]
 
@@ -662,7 +715,9 @@ def test_synthetic_sentry_project_end_to_end(api: TestClient) -> None:
     while (job := api.get(f"/api/analyses/{analysis_id}").json())["state"] in ("queued", "running"):
         assert time.monotonic() < deadline
         time.sleep(0.05)
+
     assert job["state"] == "completed", job
+
     report = api.get(f"/api/analyses/{analysis_id}/report").json()
     assert [s["kind"] for s in report["sources"]] == ["sentry"]
     assert any(f["family"] == "app_errors" for f in report["findings"])

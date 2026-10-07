@@ -70,6 +70,10 @@ Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source 
 - API conventions: `snake_case`, RFC 3339 UTC timestamps with `Z`, durations in integer seconds, UUIDv7 IDs.
 - Dependency versions are pinned exactly; TypeScript stays on 6.0.x until typescript-eslint supports 7 (see `docs/DECISIONS.md` §1).
 
+## Test style
+
+Tests (backend pytest and frontend vitest) follow Arrange–Act–Assert, with one blank line between the three blocks: prepare data, call the tested functionality, assert the results. Inside a block, a blank line separates unrelated groups of statements. A test that checks several act/assert steps in sequence separates each step with a blank line. No `# Arrange`/`# Act`/`# Assert` comments; the blank lines carry the structure. One-statement tests (e.g. `assert f(x) == y`) need no split.
+
 ## Docs
 
 `docs/DECISIONS.md` (versions, config, API/job conventions, numerical policy), `docs/ARCHITECTURE.md`, `docs/UI_SPEC.md`, `docs/OPERATIONS.md` (config, Docker networking, backups, troubleshooting), `docs/detection.md`, `docs/metrics-catalog.md`. Task history T001–T010 (all DONE) is in `docs/tasks/`; `docs/tasks/README.md` describes the task workflow if new tasks are added.

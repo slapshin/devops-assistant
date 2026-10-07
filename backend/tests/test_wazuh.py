@@ -90,6 +90,7 @@ def test_source_input_normalises_and_validates() -> None:
             "username": " ",
         }
     )
+
     assert source.api_url == "https://indexer:9200"
     assert source.agents == ["web-1", "web-2"]
     assert [label.key for label in source.labels] == ["env", "project"]
@@ -119,7 +120,9 @@ def test_source_input_normalises_and_validates() -> None:
 
 def test_groups_alone_select_agents_and_are_validated() -> None:
     source = WazuhSourceInput(api_url="https://indexer:9200", groups=["web", " db", "web"])
+
     assert (source.groups, source.monitoring_index_pattern) == (["db", "web"], "wazuh-monitoring-*")
+
     for bad in (["web servers"], [".."], ["a/b"]):
         with pytest.raises(ValidationError, match="invalid group names"):
             WazuhSourceInput(api_url="https://indexer:9200", groups=bad)
@@ -150,6 +153,7 @@ async def test_discovery_request_is_dsl_scoped_to_agents_and_labels() -> None:
         )
 
     client = make_client(handler)
+
     found = await client.agents(["web-1"], int(END.timestamp()) - 86400, int(END.timestamp()))
     await client.aclose()
 
@@ -176,6 +180,7 @@ async def test_group_members_come_from_the_monitoring_index() -> None:
         return ok({"groups": {"buckets": [{"key": "web", "agents": {"buckets": agents}}]}})
 
     client = make_client(handler)
+
     members = await client.group_members(["db", "web"], 0, 86400)
     await client.aclose()
 
@@ -190,6 +195,7 @@ async def test_group_members_come_from_the_monitoring_index() -> None:
 
 async def test_missing_monitoring_index_explains_dashboard_monitoring() -> None:
     client = make_client(lambda request: ok({}, _shards={"total": 0, "failed": 0}))
+
     with pytest.raises(SourceError, match=r"wazuh\.monitoring\.enabled"):
         await client.group_members(["web"], 0, 300)
     await client.aclose()
@@ -200,6 +206,7 @@ async def test_an_empty_selection_never_searches_every_agent() -> None:
         raise AssertionError("no request expected")
 
     client = make_client(handler)
+
     assert await client.agents([], 0, 300) == AgentList([])
     await client.aclose()
 
@@ -244,8 +251,10 @@ async def test_series_parses_counts_per_agent_and_signal() -> None:
 
     client = make_client(handler)
     end = int(END.timestamp())
+
     chunk = await client.series(["web-1"], end - 3600, end)
     await client.aclose()
+
     at = bucket // 1000
     assert chunk.values["wazuh_alerts"] == {"web-1": {at: 9.0}}
     assert chunk.values["wazuh_auth_failures"] == {"web-1": {at: 7.0}}
@@ -311,9 +320,11 @@ async def test_errors_are_classified_without_the_password(
     response: httpx.Response, kind: SourceErrorKind, text: str
 ) -> None:
     client = make_client(lambda request: response)
+
     with pytest.raises(SourceError) as caught:
         await client.agents(None, 0, 300)
     await client.aclose()
+
     assert caught.value.kind is kind
     assert text in caught.value.message
     assert PASSWORD not in caught.value.message
@@ -325,6 +336,7 @@ async def test_url_prefix_is_kept_and_untrusted_certificates_are_explained() -> 
         raise httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] self-signed certificate")
 
     client = make_client(handler, "https://proxy.internal/indexer")
+
     with pytest.raises(SourceError, match="turn off TLS verification"):
         await client.agents(None, 0, 300)
     await client.aclose()
@@ -343,8 +355,10 @@ async def test_server_errors_are_retried_once_and_version_is_best_effort() -> No
         return ok({"agents": {"buckets": []}})
 
     client = make_client(handler)
+
     assert (await client.agents(None, 0, 300)).agents == []
     assert calls == 2
+
     assert await client.version() is None
     await client.aclose()
 
@@ -354,6 +368,7 @@ def test_chunks_stay_within_the_bucket_budget() -> None:
         width = chunk_seconds(agents, 300)
         assert width % 300 == 0
         assert agents * (width // 300) * (1 + len(FILTERED)) <= BUCKET_BUDGET
+
     assert chunk_seconds(1, 300) == 7 * 86400
     assert chunk_seconds(50, 300) == 16 * 3600
 
@@ -383,7 +398,9 @@ async def collect(source: WazuhMetricsSource) -> tuple[Any, list[Any]]:
 
 async def test_each_agent_is_its_own_entity_with_all_signals() -> None:
     api = RecordingApi("healthy", INDEX, ["web-1", "db-1"])
+
     result, caps = await collect(WazuhMetricsSource(api, INDEX, ["web-1", "db-1"]))
+
     assert {c.status for c in caps} == {CapabilityStatus.SUPPORTED}
     assert {c.family for c in caps} == {SignalFamily.HOST_SECURITY, SignalFamily.FILE_INTEGRITY}
     entities = {s.entity.display_name for s in result.series}
@@ -397,7 +414,9 @@ async def test_each_agent_is_its_own_entity_with_all_signals() -> None:
 
 async def test_history_starts_at_the_first_alert() -> None:
     api = RecordingApi("short-history", INDEX, ["web-1"])
+
     result, caps = await collect(WazuhMetricsSource(api, INDEX, ["web-1"]))
+
     assert caps[0].history_days is not None and 4.9 < caps[0].history_days <= 5.0
     series = result.series[0]
     assert series.values[0] is None, "nothing before the first alert is reported as quiet"
@@ -407,7 +426,9 @@ async def test_history_starts_at_the_first_alert() -> None:
 
 async def test_failed_chunks_are_unknown_and_disclosed() -> None:
     api = RecordingApi("healthy", INDEX, ["web-1"], fail=True)
+
     result, _ = await collect(WazuhMetricsSource(api, INDEX, ["web-1"]))
+
     codes = {(e.code, e.family) for e in result.exclusions}
     assert codes == {
         ("query_timeout", SignalFamily.HOST_SECURITY),
@@ -424,7 +445,9 @@ async def test_too_many_agents_are_truncated_and_silent_agents_disclosed() -> No
             return AgentList(found.agents, truncated=True)
 
     many = Many("healthy", INDEX, ["web-1"])
+
     result, _ = await collect(WazuhMetricsSource(many, INDEX, ["web-1"]))
+
     assert [e.code for e in result.exclusions] == ["series_truncated"]
 
     class Quiet(SyntheticWazuhApi):
@@ -433,7 +456,9 @@ async def test_too_many_agents_are_truncated_and_silent_agents_disclosed() -> No
             return AgentList([a for a in found.agents if a.name != "gone"])
 
     quiet = Quiet("healthy", INDEX, ["gone", "web-1"])
+
     result, _ = await collect(WazuhMetricsSource(quiet, INDEX, ["gone", "web-1"]))
+
     assert [(e.code, "gone" in e.message) for e in result.exclusions] == [("no_data", True)]
     assert {s.entity.display_name for s in result.series} == {"web-1"}
 
@@ -441,7 +466,9 @@ async def test_too_many_agents_are_truncated_and_silent_agents_disclosed() -> No
 async def test_group_members_join_named_agents() -> None:
     api = RecordingApi("healthy", INDEX, ["shop-db-1"], groups=["shop-web"])
     source = WazuhMetricsSource(api, INDEX, ["shop-db-1"], groups=["shop-web"])
+
     result, _ = await collect(source)
+
     assert {s.entity.display_name for s in result.series} == {
         "shop-db-1",
         "shop-web-1",
@@ -452,7 +479,9 @@ async def test_group_members_join_named_agents() -> None:
 
 async def test_a_group_without_agents_is_disclosed_and_selects_nothing() -> None:
     api = RecordingApi("healthy", INDEX, groups=["nope"])
+
     result, caps = await collect(WazuhMetricsSource(api, INDEX, groups=["nope"]))
+
     assert result.series == [], "an empty group must not fall back to every agent"
     assert {c.status for c in caps} == {CapabilityStatus.UNSUPPORTED}
     assert [(e.code, "nope" in e.message) for e in result.exclusions] == [("no_data", True)]
@@ -466,7 +495,9 @@ async def test_a_truncated_group_makes_the_report_partial() -> None:
             return GroupMembers(found.members, truncated=True)
 
     big = Big("healthy", INDEX, groups=["shop-web"])
+
     result, _ = await collect(WazuhMetricsSource(big, INDEX, groups=["shop-web"]))
+
     assert [e.code for e in result.exclusions] == ["series_truncated"]
 
 
@@ -476,6 +507,7 @@ async def test_no_alerts_at_all_is_unsupported_not_healthy() -> None:
             return AgentList([])
 
     result, caps = await collect(WazuhMetricsSource(Empty("healthy", INDEX, ["x"]), INDEX, ["x"]))
+
     assert {c.status for c in caps} == {CapabilityStatus.UNSUPPORTED}
     assert caps[0].reason and "No alerts" in caps[0].reason
     assert result.series == []
@@ -508,6 +540,7 @@ def synthetic(scenario: str) -> OpenedSource:
 
 async def test_incident_yields_brute_force_and_fim_findings() -> None:
     report = await run(synthetic("incident"))
+
     by_agent: dict[str, set[str]] = {}
     for f in report.findings:
         by_agent.setdefault(f.entity.display_name, set()).add(f.signal)
@@ -527,6 +560,7 @@ async def test_healthy_and_short_history_yield_no_findings() -> None:
 
 async def test_degraded_is_partial() -> None:
     report = await run(synthetic("degraded"))
+
     assert report.state is ReportState.PARTIAL
     assert {e.code for e in report.exclusions} == {"query_failed"}
 
@@ -536,11 +570,13 @@ async def test_wazuh_auth_failure_makes_a_mixed_report_partial() -> None:
         api_url="https://indexer:9200", agents=["web-1"], username="u", password=SecretStr(PASSWORD)
     )
     transport = httpx.MockTransport(lambda request: httpx.Response(401))
+
     async with connect_wazuh(conn, transport=transport) as wazuh:
         report = await run(
             OpenedSource(SourceKind.PROMETHEUS, SyntheticMetricsSource("incident")),
             OpenedSource(SourceKind.WAZUH, wazuh),
         )
+
     assert report.state is ReportState.PARTIAL
     assert report.findings
     failed = [e for e in report.exclusions if e.code == "source_unavailable"]
@@ -550,8 +586,10 @@ async def test_wazuh_auth_failure_makes_a_mixed_report_partial() -> None:
 
 async def test_probe_reports_alerts_and_families() -> None:
     conn = WazuhConnection(api_url="synthetic://healthy", agents=["web-1"])
+
     async with connect_wazuh(conn) as source:
         test = await probe_wazuh(source, SCOPE)
+
     assert test.kind is SourceKind.WAZUH
     assert test.reachable and test.auth_ok
     assert test.matched_series and test.matched_series > 0
@@ -562,6 +600,7 @@ async def test_probe_reports_alerts_and_families() -> None:
     }
 
     transport = httpx.MockTransport(lambda request: httpx.Response(401))
+
     async with connect_wazuh(
         WazuhConnection(
             api_url="https://indexer:9200", agents=["a"], username="u", password=SecretStr(PASSWORD)
@@ -569,14 +608,17 @@ async def test_probe_reports_alerts_and_families() -> None:
         transport=transport,
     ) as source:
         denied = await probe_wazuh(source, SCOPE)
+
     assert denied.reachable and denied.auth_ok is False
     assert PASSWORD not in (denied.message or "")
 
 
 async def test_probe_lists_group_members() -> None:
     conn = WazuhConnection(api_url="synthetic://healthy", groups=["shop-web", "nope"])
+
     async with connect_wazuh(conn) as source:
         test = await probe_wazuh(source, SCOPE)
+
     assert test.message is not None
     assert test.message.endswith("Groups: nope none, shop-web 2 agents.")
 
@@ -602,14 +644,17 @@ def wazuh_body(**source: Any) -> dict[str, Any]:
 
 def test_wazuh_password_is_write_only(api: TestClient, tmp_path: Path) -> None:
     missing = api.post("/api/projects", json=wazuh_body(username="reader"))
+
     assert missing.status_code == 422
     assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.password"]
 
     labels = [{"key": "project", "value": "shop"}]
+
     res = api.post(
         "/api/projects",
         json=wazuh_body(username="reader", password=PASSWORD, labels=labels, tls_verify=False),
     )
+
     assert res.status_code == 201, res.text
     project = res.json()
     assert project["sources"] == [
@@ -626,19 +671,23 @@ def test_wazuh_password_is_write_only(api: TestClient, tmp_path: Path) -> None:
             "password_set": True,
         }
     ]
+
     with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
         raw = db.execute("SELECT config, secrets FROM project_sources").fetchone()
     assert PASSWORD not in raw[0] and PASSWORD.encode() not in raw[1]
 
     pid = project["project_id"]
     body = wazuh_body(username="reader", agents=["web-1", "web-2"])
+
     assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["password_set"]
+
     clone = api.post(f"/api/projects?clone_of={pid}", json={**body, "name": "copy"})
     assert clone.status_code == 201 and clone.json()["sources"][0]["password_set"]
     assert PASSWORD not in api.get("/api/projects").text
 
     selectless = api.post("/api/projects", json=wazuh_body(agents=[], name="x"))
     assert selectless.status_code == 422
+
     grouped = api.post(
         "/api/projects", json={**wazuh_body(agents=[], groups=["web"]), "name": "by group"}
     )
@@ -648,10 +697,13 @@ def test_wazuh_password_is_write_only(api: TestClient, tmp_path: Path) -> None:
 
 def test_synthetic_wazuh_project_end_to_end(api: TestClient) -> None:
     bad = api.post("/api/projects", json=wazuh_body(api_url="synthetic://nope"))
+
     assert [e["field"] for e in bad.json()["errors"]] == ["body.sources.0.api_url"]
 
     project = api.post("/api/projects", json=wazuh_body(api_url="synthetic://incident")).json()
+
     health = api.get(f"/api/projects/{project['project_id']}/health").json()
+
     assert [h["kind"] for h in health] == ["wazuh"]
     assert health[0]["reachable"] and health[0]["auth_ok"]
 
@@ -661,7 +713,9 @@ def test_synthetic_wazuh_project_end_to_end(api: TestClient) -> None:
     while (job := api.get(f"/api/analyses/{analysis_id}").json())["state"] in ("queued", "running"):
         assert time.monotonic() < deadline
         time.sleep(0.05)
+
     assert job["state"] == "completed", job
+
     report = api.get(f"/api/analyses/{analysis_id}/report").json()
     assert [s["kind"] for s in report["sources"]] == ["wazuh"]
     assert any(f["family"] == "host_security" for f in report["findings"])

@@ -49,6 +49,7 @@ def responses_api(output: dict[str, Any] | None = None, **overrides: Any) -> htt
             }
         ],
     }
+
     body.update(overrides)
     return httpx.Response(200, json=body)
 
@@ -94,13 +95,16 @@ async def test_openai_success_is_validated_and_labelled() -> None:
         return responses_api(good_output())
 
     result = await run(provider(handler))
+
     assert result.status is ExplanationStatus.SUCCEEDED
     assert result.explanation.provider == "openai" and result.explanation.model == "test-model"
     assert result.explanation.hypotheses[0].likelihood is Likelihood.PLAUSIBLE
+
     body = json.loads(seen[0].content)
     assert body["text"]["format"]["type"] == "json_schema" and body["text"]["format"]["strict"]
     assert body["store"] is False and body["instructions"] == INSTRUCTIONS
     assert "sk-test-secret" not in seen[0].content.decode()
+
     payload = json.loads(body["input"])
     assert {f["finding_id"] for f in payload["findings"]} == set(IDS)
     assert "values" not in json.dumps(payload)  # no raw series
@@ -111,7 +115,9 @@ async def test_invented_references_are_rejected() -> None:
     out["hypotheses"].append(
         {"text": "Made up.", "finding_ids": ["fnd_ffffffffffffffff"], "likelihood": "plausible"}
     )
+
     result = await run(provider(lambda r: responses_api(out)))
+
     assert result.status is ExplanationStatus.SUCCEEDED
     assert len(result.explanation.hypotheses) == 1
     assert any("unknown finding IDs" in n for n in result.validation_notes)
@@ -119,7 +125,9 @@ async def test_invented_references_are_rejected() -> None:
 
 async def test_only_invented_references_fail_validation() -> None:
     out = good_output(["fnd_ffffffffffffffff"])
+
     result = await run(provider(lambda r: responses_api(out)))
+
     assert result.status is ExplanationStatus.FAILED and result.reason == "invalid_output"
     assert result.explanation is None
 
@@ -175,11 +183,14 @@ async def test_refusal_incomplete_and_malformed_output() -> None:
             ],
         },
     )
+
     assert (await run(provider(lambda r: refusal))).reason == "refusal"
+
     incomplete = responses_api(
         good_output(), status="incomplete", incomplete_details={"reason": "max_output_tokens"}
     )
     assert (await run(provider(lambda r: incomplete))).reason.startswith("incomplete")
+
     malformed = responses_api({"summary": "x"})  # schema-invalid
     assert (await run(provider(lambda r: malformed))).reason == "invalid_output"
 
@@ -190,18 +201,22 @@ async def test_unexpected_provider_exception_keeps_report_usable() -> None:
             raise RuntimeError("bug")
 
     result = await run(Broken())
+
     assert result.status is ExplanationStatus.FAILED and "RuntimeError" in (result.reason or "")
 
 
 async def test_no_findings_skips_the_provider() -> None:
     fake = FakeExplanationProvider()
+
     result = await run(fake, findings=[])
+
     assert result.status is ExplanationStatus.SKIPPED_NO_FINDINGS and fake.calls == []
 
 
 async def test_disabled_and_not_configured() -> None:
     p, status, reason = provider_from_settings(load_settings(_env_file=None, ai_provider="none"))
     assert p is None and status is ExplanationStatus.DISABLED
+
     p, status, reason = provider_from_settings(
         load_settings(_env_file=None, ai_provider="openai", openai_api_key=None, openai_model=None)
     )
@@ -210,14 +225,17 @@ async def test_disabled_and_not_configured() -> None:
         and status is ExplanationStatus.NOT_CONFIGURED
         and "OPENAI_API_KEY" in (reason or "")
     )
+
     result = await explain_findings(None, status, reason, SCOPE, DAY, FINDINGS, [])
     assert result.status is ExplanationStatus.NOT_CONFIGURED
+
     fake, status, _ = provider_from_settings(load_settings(_env_file=None, ai_provider="fake"))
     assert isinstance(fake, FakeExplanationProvider) and status is ExplanationStatus.PENDING
 
 
 async def test_fake_provider_satisfies_the_interface_and_validation() -> None:
     result = await run(FakeExplanationProvider(invent_ids=True))
+
     assert result.status is ExplanationStatus.SUCCEEDED
     cited = {i for h in result.explanation.hypotheses for i in h.finding_ids}
     assert cited <= set(IDS)
@@ -238,8 +256,10 @@ def test_label_text_is_treated_as_data_and_bounded() -> None:
             ),
         }
     )
+
     payload, _ = build_input(SCOPE, DAY, [FINDINGS[0], hostile], REPORT.coverage)
     text = render(payload)
+
     assert "\x00" not in text and "\x1b" not in text
     assert "hunter2" not in text and "A" * 300 not in text
     assert "Ignore previous instructions" in text  # kept as data, never as instructions
@@ -248,8 +268,10 @@ def test_label_text_is_treated_as_data_and_bounded() -> None:
 
 def test_payload_budget_limits_findings() -> None:
     many = [FINDINGS[0].model_copy(update={"finding_id": f"fnd_{i:016x}"}) for i in range(40)]
+
     payload, notes = build_input(SCOPE, DAY, many, REPORT.coverage)
     assert len(payload.findings) == 20 and notes
+
     small, notes = build_input(SCOPE, DAY, many, REPORT.coverage, max_chars=3000)
     assert len(render(small)) <= 3000 and len(small.findings) < 20
 
@@ -325,6 +347,8 @@ async def test_hostile_labels_never_reach_the_provider_payload() -> None:
             )
         }
     )
+
     await run(provider(handler), findings=[FINDINGS[0], leaky])
+
     body = seen[0].content.decode()
     assert "SECRET" not in body

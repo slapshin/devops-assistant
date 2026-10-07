@@ -94,6 +94,7 @@ async def test_one_failing_source_makes_the_report_partial(during: str) -> None:
     pipeline, request = _pipeline(
         _opened(SyntheticMetricsSource("incident")), _opened(FailingSource(during))
     )
+
     report = await pipeline.run(
         "01999a2b-0000-7000-8000-00000000000b", request, Progress(), CancellationToken()
     )
@@ -111,6 +112,7 @@ async def test_one_failing_source_makes_the_report_partial(during: str) -> None:
 
 async def test_all_sources_failing_fails_the_run() -> None:
     pipeline, request = _pipeline(_opened(FailingSource("capabilities")))
+
     with pytest.raises(SourceError, match="token rejected"):
         await pipeline.run(
             "01999a2b-0000-7000-8000-00000000000c", request, Progress(), CancellationToken()
@@ -119,9 +121,11 @@ async def test_all_sources_failing_fails_the_run() -> None:
 
 async def test_failed_source_families_report_source_error() -> None:
     pipeline, request = _pipeline(_opened(FailingSource("info")), _opened(FailingSource("none")))
+
     report = await pipeline.run(
         "01999a2b-0000-7000-8000-00000000000d", request, Progress(), CancellationToken()
     )
+
     assert {c.status for c in report.coverage} == {SignalStatus.SOURCE_ERROR}
 
 
@@ -139,5 +143,6 @@ def test_schema_2_0_reports_still_load() -> None:
         del cap["source"]
 
     report = AnalysisReport.model_validate(raw)
+
     assert report.sources == []
     assert [s.kind for s in report.all_sources] == [SourceKind.PROMETHEUS]

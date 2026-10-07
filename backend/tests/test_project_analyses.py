@@ -24,6 +24,7 @@ MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value":
 
 def make_client(data_dir: Path, **settings: Any) -> TestClient:
     config = {"_env_file": None, "data_dir": data_dir, "ai_provider": "fake", **settings}
+
     return TestClient(create_app(load_settings(**config)))
 
 
@@ -37,6 +38,7 @@ def create_project(client: TestClient, name: str, url: str) -> str:
         },
     )
     assert res.status_code == 201, res.text
+
     return str(res.json()["project_id"])
 
 
@@ -44,6 +46,7 @@ def run(client: TestClient, project_id: str) -> dict[str, Any]:
     res = client.post("/api/analyses", json={"project_id": project_id})
     assert res.status_code == 202, res.text
     analysis_id = res.json()["analysis"]["analysis_id"]
+
     for _ in range(600):
         job: dict[str, Any] = client.get(f"/api/analyses/{analysis_id}").json()
         if job["state"] not in ("queued", "running"):
@@ -56,13 +59,16 @@ def test_projects_on_different_sources_stay_isolated(tmp_path: Path) -> None:
     with make_client(tmp_path) as client:
         incident = create_project(client, "incident", "synthetic://incident")
         healthy = create_project(client, "healthy", "synthetic://healthy")
+
         a, b = run(client, incident), run(client, healthy)
+
         assert a["scope"]["project_id"] == incident and b["scope"]["project_id"] == healthy
 
         reports = {
             pid: client.get(f"/api/analyses/{job['analysis_id']}/report").json()
             for pid, job in ((incident, a), (healthy, b))
         }
+
         assert len(reports[incident]["findings"]) > len(reports[healthy]["findings"])
         assert reports[incident]["scope"]["project_name"] == "incident"
 
@@ -88,9 +94,12 @@ def test_hard_delete_cascades_and_is_refused_while_active(tmp_path: Path) -> Non
                 "UPDATE analysis_jobs SET state='running' WHERE analysis_id=?",
                 (done["analysis_id"],),
             )
+
         assert client.get(f"/api/projects/{doomed}").json()["report_count"] == 1
+
         res = client.delete(f"/api/projects/{doomed}")
         assert res.status_code == 409 and res.json()["code"] == "project_busy"
+
         with sqlite3.connect(db) as conn:
             conn.execute(
                 "UPDATE analysis_jobs SET state='completed' WHERE analysis_id=?",
@@ -102,6 +111,7 @@ def test_hard_delete_cascades_and_is_refused_while_active(tmp_path: Path) -> Non
         with sqlite3.connect(db) as conn:
             assert conn.execute("SELECT count(*) FROM reports").fetchone()[0] == 1
             assert conn.execute("SELECT count(*) FROM project_sources").fetchone()[0] == 1
+
         report = client.get(f"/api/analyses/{kept_job['analysis_id']}/report")
         assert report.status_code == 200
 
@@ -109,6 +119,7 @@ def test_hard_delete_cascades_and_is_refused_while_active(tmp_path: Path) -> Non
 def test_keep_reports_deletes_older_analyses(tmp_path: Path) -> None:
     def listed(client: TestClient, pid: str) -> list[str]:
         items = client.get("/api/analyses", params={"project_id": pid}).json()["items"]
+
         return [j["analysis_id"] for j in items]
 
     with make_client(tmp_path) as client:
@@ -116,17 +127,20 @@ def test_keep_reports_deletes_older_analyses(tmp_path: Path) -> None:
         other = create_project(client, "other", "synthetic://healthy")
         body = client.get(f"/api/projects/{pid}").json()
         body = {k: body[k] for k in ("name", "matchers", "sources")}
+
         res = client.put(f"/api/projects/{pid}", json={**body, "keep_reports": 2})
         assert res.status_code == 200 and res.json()["keep_reports"] == 2
 
         other_job = run(client, other)
         jobs = [run(client, pid)["analysis_id"] for _ in range(3)]
+
         assert listed(client, pid) == jobs[:0:-1]
         assert client.get(f"/api/analyses/{jobs[0]}/report").status_code == 404
         assert client.get(f"/api/projects/{pid}").json()["report_count"] == 2
 
         # Lowering the limit applies on save; other projects are untouched.
         client.put(f"/api/projects/{pid}", json={**body, "keep_reports": 1})
+
         assert listed(client, pid) == [jobs[2]]
         assert listed(client, other) == [other_job["analysis_id"]]
 
@@ -137,9 +151,12 @@ def test_keep_reports_deletes_older_analyses(tmp_path: Path) -> None:
 def test_demo_projects_are_seeded_once(tmp_path: Path) -> None:
     with make_client(tmp_path, demo_projects=True) as client:
         names = [p["name"] for p in client.get("/api/projects").json()["items"]]
+
         assert names == sorted(f"Demo: {s}" for s in SCENARIOS)
+
         first = client.get("/api/projects").json()["items"][0]["project_id"]
         assert client.delete(f"/api/projects/{first}").status_code == 204
+
     with make_client(tmp_path, demo_projects=True) as client:  # not re-seeded while any exist
         assert len(client.get("/api/projects").json()["items"]) == len(SCENARIOS) - 1
 
@@ -153,6 +170,7 @@ def legacy_database(data_dir: Path) -> tuple[str, dict[str, Any]]:
     engine = make_engine(data_dir / "assistant.sqlite3")
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS))
+
     with engine.begin() as conn:
         config.attributes["connection"] = conn
         command.upgrade(config, "0002")
@@ -160,9 +178,11 @@ def legacy_database(data_dir: Path) -> tuple[str, dict[str, Any]]:
     report = json.loads((FIXTURES / "reports" / "report_anomalies.json").read_text())
     report["scope"] = {"project": "shop", "env": "production"}
     report["schema_version"] = "1.0"
+
     job = json.loads((FIXTURES / "jobs" / "job_completed.json").read_text())
     job["scope"] = {"project": "shop", "env": "production"}
     del job["daily_episodes"]
+
     raw = json.dumps(report).encode()
     with engine.begin() as conn:
         conn.exec_driver_sql(
@@ -181,6 +201,7 @@ def legacy_database(data_dir: Path) -> tuple[str, dict[str, Any]]:
             " VALUES (?, '1.0', ?, ?, ?)",
             (job["analysis_id"], report["generated_at"], len(raw), zlib.compress(raw)),
         )
+
     engine.dispose()
     return job["analysis_id"], report
 
@@ -194,8 +215,10 @@ def test_upgrade_creates_projects_and_keeps_reports(
         "metrics_bearer_token": "legacy-token",
     }
     caplog.set_level(logging.WARNING, logger="app")
+
     with make_client(tmp_path / "data", **legacy_settings) as client:
         [project] = client.get("/api/projects").json()["items"]
+
         assert project["name"] == "shop / production"
         assert project["matchers"] == MATCHERS
         assert project["sources"] == [
@@ -210,6 +233,7 @@ def test_upgrade_creates_projects_and_keeps_reports(
         assert "legacy-token" not in client.get("/api/projects").text
 
         report = client.get(f"/api/analyses/{analysis_id}/report").json()
+
         assert report["schema_version"] == "2.0"
         assert report["scope"] == {
             "project_id": project["project_id"],
@@ -219,8 +243,11 @@ def test_upgrade_creates_projects_and_keeps_reports(
         assert {k: v for k, v in report.items() if k not in ("scope", "schema_version")} == {
             k: v for k, v in legacy.items() if k not in ("scope", "schema_version")
         }
+
         job = client.get(f"/api/analyses/{analysis_id}").json()
+
         assert job["scope"] == report["scope"]
+
         assert "attached METRICS_URL to 1 migrated project" in caplog.text
 
         # The source can be removed deliberately; the one-time import never re-adds it.
@@ -232,7 +259,9 @@ def test_upgrade_creates_projects_and_keeps_reports(
 
     with make_client(tmp_path / "data", **legacy_settings) as client:
         [project] = client.get("/api/projects").json()["items"]
+
         assert project["sources"] == []
+
         with sqlite3.connect(tmp_path / "data" / "assistant.sqlite3") as db:
             assert db.execute("PRAGMA foreign_key_check").fetchall() == []
             assert db.execute("PRAGMA foreign_keys").fetchone() == (0,)  # per-connection default
@@ -243,9 +272,13 @@ def test_upgrade_without_legacy_source_warns(
 ) -> None:
     legacy_database(tmp_path / "data")
     caplog.set_level(logging.WARNING, logger="app")
+
     with make_client(tmp_path / "data") as client:
         [project] = client.get("/api/projects").json()["items"]
+
         assert project["sources"] == []
+
         res = client.post("/api/analyses", json={"project_id": project["project_id"]})
         assert res.status_code == 409 and res.json()["code"] == "source_not_configured"
+
     assert "have no metrics source" in caplog.text

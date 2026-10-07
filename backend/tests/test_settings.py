@@ -11,7 +11,9 @@ def settings(**kw: object) -> Settings:
 def test_defaults_need_no_metrics_connection_or_ai_key(monkeypatch: pytest.MonkeyPatch) -> None:
     for var in ("METRICS_URL", "AI_PROVIDER", "OPENAI_API_KEY", "OPENAI_MODEL"):
         monkeypatch.delenv(var, raising=False)
+
     s = settings()
+
     assert s.metrics_url is None and s.metrics_connection is None
     assert s.explanation_status is ExplanationStatus.NOT_CONFIGURED
     assert s.explanation_hint == "Set OPENAI_API_KEY and OPENAI_MODEL or AI_PROVIDER=none"
@@ -19,6 +21,7 @@ def test_defaults_need_no_metrics_connection_or_ai_key(monkeypatch: pytest.Monke
 
 def test_ai_disabled_and_configured_states() -> None:
     assert settings(ai_provider="none").explanation_status is ExplanationStatus.DISABLED
+
     configured = settings(openai_api_key="sk-test", openai_model="m")
     assert configured.explanation_status is ExplanationStatus.PENDING
 
@@ -31,6 +34,7 @@ def test_path_prefix_is_preserved() -> None:
 def test_credentials_in_url_are_rejected_with_actionable_message() -> None:
     with pytest.raises(ConfigError) as exc:
         settings(metrics_url="http://user:pw@localhost:8428")
+
     assert "METRICS_URL" in str(exc.value)
     assert "must not contain credentials" in str(exc.value)
 

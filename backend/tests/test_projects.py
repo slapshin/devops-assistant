@@ -31,6 +31,7 @@ def make_client(tmp_path: Path, **settings: Any) -> TestClient:
         "ai_provider": "fake",
         **settings,
     }
+
     return TestClient(create_app(load_settings(**config)))
 
 
@@ -59,6 +60,7 @@ def body(**overrides: Any) -> dict[str, Any]:
 def create(client: TestClient, **overrides: Any) -> dict[str, Any]:
     res = client.post("/api/projects", json=body(**overrides))
     assert res.status_code == 201, res.text
+
     data: dict[str, Any] = res.json()
     return data
 
@@ -74,6 +76,7 @@ def raw_secrets(tmp_path: Path) -> list[bytes]:
 def test_crud_round_trip_and_persistence(tmp_path: Path) -> None:
     with make_client(tmp_path) as c:
         project = create(c)
+
         assert project["name"] == "Shop / prod"
         assert project["description"] == "Web shop"
         assert [m["name"] for m in project["matchers"]] == ["env", "project"]  # sorted
@@ -90,6 +93,7 @@ def test_crud_round_trip_and_persistence(tmp_path: Path) -> None:
     with make_client(tmp_path) as c:  # restart
         pid = project["project_id"]
         summary = {**project, "latest_analysis": None, "active_analysis": None, "report_count": 0}
+
         assert c.get("/api/projects").json()["items"] == [summary]
         assert c.get(f"/api/projects/{pid}").json() == summary
 
@@ -108,12 +112,14 @@ def test_crud_round_trip_and_persistence(tmp_path: Path) -> None:
 def test_names_are_unique_case_insensitively(client: TestClient) -> None:
     first = create(client)
     res = client.post("/api/projects", json=body(name="  shop / PROD "))
+
     assert res.status_code == 409
     assert res.json()["code"] == "project_name_taken"
 
     second = create(client, name="Other")
     res = client.put(f"/api/projects/{second['project_id']}", json=body(name="SHOP / prod"))
     assert res.json()["code"] == "project_name_taken"
+
     # Renaming a project to its own name in a different case is fine.
     res = client.put(f"/api/projects/{first['project_id']}", json=body(name="SHOP / PROD"))
     assert res.status_code == 200
@@ -135,6 +141,7 @@ def test_secrets_are_encrypted_and_never_returned(tmp_path: Path, client: TestCl
             }
         ],
     )
+
     assert other["sources"][0]["auth"] == {
         "type": "basic",
         "username": "reader",
@@ -142,9 +149,10 @@ def test_secrets_are_encrypted_and_never_returned(tmp_path: Path, client: TestCl
     }
 
     stored = raw_secrets(tmp_path)
+    key = (tmp_path / "secret.key").read_bytes()
+
     assert len(stored) == 2
     assert not any(TOKEN.encode() in s or PASSWORD.encode() in s for s in stored)
-    key = (tmp_path / "secret.key").read_bytes()
     assert (tmp_path / "secret.key").stat().st_mode & 0o777 == 0o600
     assert {"token": TOKEN} in [SecretBox(key).decrypt(s) for s in stored]
 
@@ -160,10 +168,12 @@ async def test_omitted_secret_keeps_stored_value(tmp_path: Path, client: TestCli
     keep = body(
         sources=[{"kind": "prometheus", "url": "http://vm2.example", "auth": {"type": "bearer"}}]
     )
+
     assert client.put(f"/api/projects/{pid}", json=keep).status_code == 200
 
     repo = client.app.state.services.projects  # type: ignore[attr-defined]
     conn = await repo.prometheus_connection(pid)
+
     assert conn.url == "http://vm2.example"
     assert conn.bearer_token.get_secret_value() == TOKEN
 
@@ -178,12 +188,15 @@ async def test_omitted_secret_keeps_stored_value(tmp_path: Path, client: TestCli
         ]
     )
     res = client.put(f"/api/projects/{pid}", json=switch)
+
     assert res.status_code == 422
     assert res.json()["errors"] == [
         {"field": "body.sources.0.auth.password", "message": "required when no secret is stored"}
     ]
+
     # Creating without a secret is rejected the same way.
     res = client.post("/api/projects", json={**keep, "name": "new"})
+
     assert res.json()["errors"][0]["field"] == "body.sources.0.auth.token"
 
 
@@ -195,11 +208,14 @@ async def test_clone_reuses_stored_secrets(client: TestClient) -> None:
             {"kind": "prometheus", "url": "http://vm.example:8428", "auth": {"type": "bearer"}}
         ],
     )
+
     res = client.post("/api/projects", params={"clone_of": source["project_id"]}, json=clone)
+
     assert res.status_code == 201, res.text
 
     repo = client.app.state.services.projects  # type: ignore[attr-defined]
     conn = await repo.prometheus_connection(res.json()["project_id"])
+
     assert conn.bearer_token.get_secret_value() == TOKEN
 
     # The clone owns its copy: changing the original's secret does not affect it.
@@ -212,6 +228,7 @@ async def test_clone_reuses_stored_secrets(client: TestClient) -> None:
             }
         ]
     )
+
     assert client.put(f"/api/projects/{source['project_id']}", json=replaced).status_code == 200
     conn = await repo.prometheus_connection(res.json()["project_id"])
     assert conn.bearer_token.get_secret_value() == TOKEN
@@ -231,6 +248,7 @@ def test_lost_key_degrades_only_affected_projects(tmp_path: Path) -> None:
     other_key = Fernet.generate_key().decode()
     with make_client(tmp_path, secret_key=other_key) as c:
         by_id = {p["project_id"]: p for p in c.get("/api/projects").json()["items"]}
+
         assert by_id[secret["project_id"]]["credentials_readable"] is False
         assert by_id[plain["project_id"]]["credentials_readable"] is True
 
@@ -242,6 +260,7 @@ def test_lost_key_degrades_only_affected_projects(tmp_path: Path) -> None:
                 "source": {"url": "http://vm.example", "auth": {"type": "bearer"}},
             },
         )
+
         assert res.status_code == 409
         assert res.json()["code"] == "credentials_unreadable"
         assert c.get(f"/api/projects/{secret['project_id']}/health").status_code == 409
@@ -258,6 +277,7 @@ def test_invalid_secret_key_is_a_config_error(tmp_path: Path) -> None:
 
 def test_secret_box_rejects_foreign_ciphertext() -> None:
     blob = SecretBox(Fernet.generate_key()).encrypt({"token": "x"})
+
     with pytest.raises(SecretsUnreadable):
         SecretBox(Fernet.generate_key()).decrypt(blob)
 
@@ -292,6 +312,7 @@ def test_validation_errors_name_the_field(
     client: TestClient, overrides: dict[str, Any], field: str
 ) -> None:
     res = client.post("/api/projects", json=body(**overrides))
+
     assert res.status_code == 422, res.text
     assert res.json()["code"] == "validation_error"
     assert any(e["field"] == field for e in res.json()["errors"]), res.json()["errors"]
@@ -302,10 +323,13 @@ def test_validation_errors_name_the_field(
 
 def test_matchers_are_optional_without_prometheus(client: TestClient) -> None:
     project = create(client, name="no labels", matchers=[], sources=[])
+
     assert project["matchers"] == []
+
     res = client.post("/api/projects", json=body(name="bad", matchers=[]))
     assert res.status_code == 422
     assert [e["field"] for e in res.json()["errors"]] == ["body.matchers"]
+
     res = client.post(
         "/api/projects/test-connection", json={"source": {"url": "synthetic://incident"}}
     )
@@ -318,6 +342,7 @@ def test_connection_test_synthetic_and_health(client: TestClient) -> None:
         "/api/projects/test-connection",
         json={"matchers": body()["matchers"], "source": {"url": "synthetic://incident"}},
     )
+
     assert res.status_code == 200
     assert res.json()["reachable"] is True
     families = {f["family"]: f["status"] for f in res.json()["families"]}
@@ -326,8 +351,10 @@ def test_connection_test_synthetic_and_health(client: TestClient) -> None:
     project = create(client, sources=[{"kind": "prometheus", "url": "synthetic://healthy"}])
     [health] = client.get(f"/api/projects/{project['project_id']}/health").json()
     assert health["kind"] == "prometheus" and health["reachable"] is True
+
     no_source = create(client, name="empty", sources=[])
     assert client.get(f"/api/projects/{no_source['project_id']}/health").json() == []
+
     assert client.get("/api/projects/missing/health").status_code == 404
 
 
@@ -341,11 +368,13 @@ SCOPE = Scope(
 async def run_probe(handler: Any) -> Any:
     conn = PrometheusConnection(url="http://vm.example", bearer_token=SecretStr(TOKEN))
     client = PrometheusClient.from_connection(conn, transport=httpx.MockTransport(handler))
+
     return await probe(PrometheusMetricsSource(client), client, SCOPE)
 
 
 def empty(request: httpx.Request) -> httpx.Response:
     kind = "vector" if request.url.path.endswith("/query") else "matrix"
+
     return httpx.Response(
         200, json={"status": "success", "data": {"resultType": kind, "result": []}}
     )
@@ -381,6 +410,7 @@ async def test_probe_counts_matching_series_and_history() -> None:
         )
 
     result = await run_probe(handler)
+
     assert result.reachable and result.auth_ok
     assert result.matched_series == 42
     assert result.history_days == 29.0
@@ -393,6 +423,7 @@ async def test_probe_counts_matching_series_and_history() -> None:
 
 async def test_probe_reports_auth_failure_and_unreachable() -> None:
     result = await run_probe(lambda _: httpx.Response(401))
+
     assert (result.reachable, result.auth_ok) == (True, False)
     assert TOKEN not in (result.message or "")
 
@@ -400,11 +431,13 @@ async def test_probe_reports_auth_failure_and_unreachable() -> None:
         raise httpx.ConnectError("refused", request=request)
 
     result = await run_probe(refuse)
+
     assert (result.reachable, result.auth_ok) == (False, None)
 
 
 async def test_probe_reports_no_matching_series() -> None:
     result = await run_probe(empty)
+
     assert result.matched_series == 0
     assert result.history_days is None
     assert result.message == "No series currently match these labels."

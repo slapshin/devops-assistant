@@ -120,6 +120,7 @@ THREE = Scope(
 )
 def test_every_catalog_selector_and_gate_is_scoped(defn: Any, scope: Scope) -> None:
     rendered = [defn.query.render(scope)] + [g.template.render(scope) for g in defn.gates]
+
     for query in rendered:
         blocks = re.findall(r"\{[^{}]*\}", re.sub(r'"(?:[^"\\]|\\.)*"', '""', query))
         assert blocks, query
@@ -128,6 +129,7 @@ def test_every_catalog_selector_and_gate_is_scoped(defn: Any, scope: Scope) -> N
 
 def test_unscoped_ratio_operand_is_rejected() -> None:
     bad = QueryTemplate('a{{{s}}} / b{{job="x"}}', ("a", "b"))
+
     with pytest.raises(ScopeViolation, match="not scoped"):
         bad.render(SCOPE)
 
@@ -139,6 +141,7 @@ def test_bare_metric_name_is_rejected() -> None:
 
 def test_string_literal_cannot_fake_scope() -> None:
     query = 'label_replace(up{job="x"}, "l", "{project=\\"shop\\", env=\\"production\\"}", "", "")'
+
     with pytest.raises(ScopeViolation):
         assert_scoped(query, SCOPE, ("up",))
 
@@ -150,7 +153,9 @@ def test_other_project_matcher_does_not_satisfy_scope() -> None:
 
 def test_every_matcher_is_required() -> None:
     full = f"up{{{scope_matchers(THREE)}}}"
+
     assert_scoped(full, THREE, ("up",))
+
     for dropped in THREE.matchers:
         rest = [m for m in THREE.matchers if m != dropped]
         partial = "up{" + ", ".join(f'{m.name}="{escape_label_value(m.value)}"' for m in rest) + "}"
@@ -164,11 +169,13 @@ COUNTER = re.compile(r"\b([a-z_:]+_(?:total|count|sum|bucket))\{")
 @pytest.mark.parametrize("defn", CATALOG, ids=lambda d: d.signal)
 def test_counters_are_rated_before_aggregation(defn: Any) -> None:
     query = defn.query.render(SCOPE)
+
     for m in COUNTER.finditer(query):
         if m.group(1) == "docker_swarm_task_info":
             continue
         head = query[: m.start()].rstrip()
         assert head.endswith(("rate(", "increase(")), f"{m.group(1)} not rated first: {query}"
+
     for m in re.finditer(r'\{__name__=~"[^"]*_total"', query):
         assert query[: m.start()].rstrip().endswith(("rate(", "increase(")), query
 
@@ -193,6 +200,7 @@ UNSUFFIXED_COUNTERS = (
 @pytest.mark.parametrize("defn", CATALOG, ids=lambda d: d.signal)
 def test_unsuffixed_counters_are_rated_before_aggregation(defn: Any) -> None:
     query = defn.query.render(SCOPE)
+
     for name in UNSUFFIXED_COUNTERS:
         for m in re.finditer(rf"\b{name}\{{", query):
             prefix = query[: m.start()].rstrip()
@@ -212,6 +220,7 @@ def test_postgres_entity_names() -> None:
     database = entity_for(
         BY_SIGNAL["pg_transactions"], {"job": "postgres", "instance": "db1:9187", "datname": "app"}
     )
+
     assert server.display_name == "postgres · db1:9187"
     assert database.display_name == "postgres · db1:9187 · app"
     assert server.kind is database.kind is EntityKind.DATABASE
@@ -224,15 +233,18 @@ def test_mysql_replication_signals_cover_both_status_syntaxes() -> None:
     assert BY_SIGNAL["mysql_replica_lag"].required_metrics == (
         "mysql_slave_status_seconds_behind_source",
     )
+
     stopped = BY_SIGNAL["mysql_replica_stopped"].query.render(SCOPE)
     assert "mysql_slave_status_replica_sql_running{" in stopped
     assert "mysql_slave_status_replica_io_running{" in stopped
+
     refused = BY_SIGNAL["mysql_connections_refused"].query.render(SCOPE)
     assert 'error="max_connections"' in refused
 
 
 def test_mysql_entity_names() -> None:
     server = entity_for(BY_SIGNAL["mysql_down"], {"job": "mysql", "instance": "db1:9104"})
+
     assert server.display_name == "mysql · db1:9104"
     assert server.kind is EntityKind.DATABASE
 
@@ -240,10 +252,13 @@ def test_mysql_entity_names() -> None:
 def test_redis_ratios_need_a_configured_limit() -> None:
     clients = BY_SIGNAL["redis_clients_used_ratio"]
     query = clients.query.render(SCOPE)
+
     assert "redis_max_clients{" in query and "redis_config_maxclients{" in query  # INFO or CONFIG
     assert clients.required_metrics == ("redis_connected_clients",)
     assert [g.template.render(SCOPE) for g in clients.gates]
+
     memory = BY_SIGNAL["redis_memory_used_ratio"]
+
     assert "redis_memory_max_bytes{" in memory.gates[0].template.render(SCOPE)
     assert "> 0" in memory.query.render(SCOPE)  # maxmemory 0 means unlimited
 
@@ -252,6 +267,7 @@ def test_redis_entity_names() -> None:
     server = entity_for(
         BY_SIGNAL["redis_down"], {"job": "redis", "instance": "redis://cache1:6379"}
     )
+
     assert server.display_name == "redis · redis://cache1:6379"
     assert server.kind is EntityKind.DATABASE
 
@@ -261,33 +277,44 @@ def test_proxy_entity_names() -> None:
         BY_SIGNAL["angie_peer_unavailable"],
         {"job": "angie", "upstream": "backend", "peer": "10.0.0.2:80"},
     )
+
     assert peer.display_name == "angie · backend → 10.0.0.2:80"
+
     caddy = entity_for(
         BY_SIGNAL["caddy_requests"], {"job": "caddy", "server": "srv0", "handler": "reverse_proxy"}
     )
+
     assert caddy.display_name == "caddy · srv0 · reverse_proxy"
     assert "host" not in caddy.labels  # absent optional label: unchanged key and labels
     assert caddy.key != entity_for(BY_SIGNAL["traefik_requests"], {"job": "caddy"}).key
+
     per_host = entity_for(
         BY_SIGNAL["caddy_requests"],
         {"job": "caddy", "host": "shop.example.com", "server": "srv0", "handler": "rp"},
     )
+
     assert per_host.display_name == "caddy · shop.example.com · srv0 · rp"
     assert per_host.key != caddy.key
+
     router = entity_for(
         BY_SIGNAL["traefik_5xx"],
         {"job": "traefik", "router": "shop@docker", "service": "shop@docker"},
     )
+
     assert router.display_name == "traefik · shop@docker"  # same name shown once
     assert router.labels["router"] == "shop@docker"
 
 
 def test_http_route_names_show_the_served_host() -> None:
     labels = {"job": "api", "http_route": "/orders", "http_request_method": "GET"}
+
     plain = entity_for(BY_SIGNAL["http_requests"], labels)
+
     assert plain.display_name == "api · GET /orders"
     assert "server_address" not in plain.labels
+
     hosted = entity_for(BY_SIGNAL["http_requests"], {**labels, "server_address": "shop.example"})
+
     assert hosted.display_name == "api · GET /orders @ shop.example"
 
 
@@ -339,13 +366,16 @@ async def test_range_queries_are_chunked_contiguously_and_merged() -> None:
     fake = FakeProm(handler)
     client = fake.client()
     start = int(T.timestamp()) - 28 * 86400 + step
+
     res = await client.query_range("up{x}", start, int(T.timestamp()), step)
+
     windows = [(int(p["start"][0]), int(p["end"][0])) for _, p in fake.requests]
     assert len(windows) == 4
     assert windows[0][0] == start and windows[-1][1] == int(T.timestamp())
     for (_, end), (nxt, _) in pairwise(windows):
         assert nxt == end + step
     assert all(path == "/prefix/api/v1/query_range" for path, _ in fake.requests)
+
     assert len(res) == 1 and len(res[0].samples) == 8
     assert res[0].samples[1][1] is None  # NaN -> gap
 
@@ -358,8 +388,10 @@ async def test_transient_failure_is_retried_once_then_reported() -> None:
         return httpx.Response(503, json={"status": "error", "error": "overloaded"})
 
     client = FakeProm(handler).client()
+
     with pytest.raises(SourceError) as exc:
         await client.query("up", 1)
+
     assert exc.value.kind is SourceErrorKind.UNAVAILABLE and calls["n"] == 2
 
 
@@ -372,10 +404,12 @@ async def test_bad_query_and_timeouts_are_not_retried() -> None:
     )
     fake = FakeProm(lambda path, params: next(responses))
     client = fake.client()
+
     with pytest.raises(SourceError) as bad:
         await client.query("up{", 1)
     with pytest.raises(SourceError) as slow:
         await client.query("up", 2)
+
     assert bad.value.kind is SourceErrorKind.BAD_QUERY
     assert slow.value.kind is SourceErrorKind.TIMEOUT
     assert len(fake.requests) == 2
@@ -386,19 +420,26 @@ async def test_unreachable_source_and_auth_errors() -> None:
         raise httpx.ConnectError("connection refused")
 
     client = PrometheusClient("http://x", transport=httpx.MockTransport(refuse))
+
     with pytest.raises(SourceError) as exc:
         await client.query("up", 1)
+
     assert exc.value.kind is SourceErrorKind.UNAVAILABLE
+
     denied = FakeProm(lambda p, q: httpx.Response(401, text="no")).client()
+
     with pytest.raises(SourceError) as auth:
         await denied.query("up", 1)
+
     assert auth.value.kind is SourceErrorKind.AUTH
 
 
 async def test_response_size_limit() -> None:
     big = FakeProm(lambda p, q: ok({"result": [{"metric": {}, "value": [1, "1" * 5000]}]}))
+
     with pytest.raises(SourceError) as exc:
         await big.client(max_response_bytes=1000).query("up", 1)
+
     assert exc.value.kind is SourceErrorKind.TOO_LARGE
 
 
@@ -407,9 +448,11 @@ async def test_cache_is_keyed_by_exact_query() -> None:
     client = fake.client()
     shop = f"up{{{scope_matchers(SCOPE)}}}"
     other = f"up{{{scope_matchers(make_scope('shop-gpu', 'production'))}}}"
+
     await client.query(shop, 10)
     await client.query(shop, 10)
     await client.query(other, 10)
+
     assert [p["query"][0] for _, p in fake.requests] == [shop, other]
 
 
@@ -422,7 +465,9 @@ async def test_bearer_token_is_sent_but_never_in_query() -> None:
 
     conn = PrometheusConnection(url="http://vm.example", bearer_token=SecretStr("tok-123"))
     client = PrometheusClient.from_connection(conn, transport=httpx.MockTransport(record))
+
     await client.query("up", 1)
+
     assert seen[0].headers["Authorization"] == "Bearer tok-123"
     assert "tok-123" not in str(seen[0].url)
 
@@ -435,6 +480,7 @@ def test_grid_places_interval_samples_and_keeps_gaps() -> None:
 
     start, step = 1000 * STEP_SECONDS, STEP_SECONDS
     r = RangeResult(labels={}, samples=[(start + step, 1.0), (start + 3 * step, 3.0), (7, 9.0)])
+
     assert _to_grid(r, start, step, 4) == [1.0, None, 3.0, None]
 
 
@@ -474,7 +520,9 @@ async def test_capabilities_gate_on_presence_and_limits() -> None:
         "http_server_request_duration_seconds_sum",
     }
     source = PrometheusMetricsSource(FakeProm(present_handler(present)).client(), now=lambda: T)
+
     caps = {c.signal: c for c in await source.capabilities(SCOPE, WINDOWS)}
+
     assert caps["cpu_utilization"].status is CapabilityStatus.SUPPORTED
     assert caps["cpu_utilization"].history_days == 20.0
     assert caps["memory_utilization"].status is CapabilityStatus.UNSUPPORTED
@@ -508,8 +556,10 @@ async def test_collect_limits_routes_and_aggregates_the_rest() -> None:
     source = PrometheusMetricsSource(
         FakeProm(handler).client(), CollectionBudget(top_routes_per_service=2), now=lambda: T
     )
+
     caps = await source.capabilities(SCOPE, WINDOWS)
     result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
     reqs = [s for s in result.series if s.signal == "http_requests"]
     routes = sorted(s.entity.labels["http_route"] for s in reqs)
     assert routes == ["(other routes)", "/r3", "/r4"]
@@ -537,11 +587,14 @@ async def test_proxy_services_are_ranked_by_their_own_traffic() -> None:
     source = PrometheusMetricsSource(
         FakeProm(handler).client(), CollectionBudget(top_routes_per_service=2), now=lambda: T
     )
+
     caps = await source.capabilities(SCOPE, WINDOWS)
     result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
     for signal in ("traefik_requests", "traefik_5xx", "traefik_404"):
         kept = sorted(s.entity.labels["service"] for s in result.series if s.signal == signal)
         assert kept == ["(other routes)", "s3@docker", "s4@docker"], signal
+
     other = next(
         s
         for s in result.series
@@ -569,8 +622,10 @@ async def test_traefik_router_series_are_ranked_and_rolled_up() -> None:
     source = PrometheusMetricsSource(
         FakeProm(handler).client(), CollectionBudget(top_routes_per_service=2), now=lambda: T
     )
+
     caps = await source.capabilities(SCOPE, WINDOWS)
     result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
     names = sorted(s.entity.display_name for s in result.series if s.signal == "traefik_requests")
     assert names == [
         "traefik · (other routes)",
@@ -583,8 +638,10 @@ async def test_failing_signal_becomes_exclusion_not_crash() -> None:
     boom = httpx.Response(422, json={"status": "error", "error": "bad"})
     handler = present_handler(NODE_ONLY, {'mode="iowait"': boom})
     source = PrometheusMetricsSource(FakeProm(handler).client(), now=lambda: T)
+
     caps = await source.capabilities(SCOPE, WINDOWS)
     result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
     assert [(e.code, e.family) for e in result.exclusions][:1] == [("query_failed", "cpu")]
     assert "cpu_iowait" in result.exclusions[0].message
 
@@ -596,8 +653,10 @@ async def test_per_query_series_budget_is_disclosed() -> None:
     source = PrometheusMetricsSource(
         FakeProm(handler).client(), CollectionBudget(max_series_per_query=3), now=lambda: T
     )
+
     caps = await source.capabilities(SCOPE, WINDOWS)
     result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
     assert any(e.code == "series_truncated" for e in result.exclusions)
 
 
@@ -614,8 +673,10 @@ async def test_out_of_scope_results_are_dropped() -> None:
     )
     handler = present_handler(NODE_ONLY, {'mode="idle"': leaked})
     source = PrometheusMetricsSource(FakeProm(handler).client(), now=lambda: T)
+
     caps = await source.capabilities(SCOPE, WINDOWS)
     result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
     cpu = [s for s in result.series if s.signal == "cpu_utilization"]
     assert [s.entity.labels["instance"] for s in cpu] == ["a"]
 
@@ -627,8 +688,10 @@ async def test_cancellation_stops_collection() -> None:
     token = CancellationToken()
     token.cancel()
     before = len(fake.requests)
+
     with pytest.raises(Cancelled):
         await source.collect(SCOPE, WINDOWS, caps, Progress(), token)
+
     assert len(fake.requests) == before
 
 
@@ -653,8 +716,10 @@ async def test_service_to_host_mapping_by_container_id_prefix() -> None:
     source = PrometheusMetricsSource(
         FakeProm(present_handler(NODE_ONLY, extra)).client(), now=lambda: T
     )
+
     caps = await source.capabilities(SCOPE, WINDOWS)
     result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
     assert [(m.kind.value, m.service, m.host) for m in result.mappings] == [
         ("otel_service", "checkout-api", "shop-production-2"),
         ("swarm_service", "shop_checkout-api", "shop-production-2"),
