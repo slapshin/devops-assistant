@@ -18,6 +18,7 @@ MAX_ENTITY_KEY_CHARS = 400
 MAX_REASON_CHARS = 160
 MAX_REASONS_PER_SIGNAL = 2
 MAX_COVERAGE_SUMMARY_CHARS = 4000
+MAX_ALERT_INSTANCES = 5
 # Control and format characters (incl. zero-width and bidi overrides) are removed *after*
 # redaction, so they can neither split a secret away from its pattern nor survive into output.
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
@@ -97,6 +98,10 @@ def digest(finding: Finding) -> FindingDigest:
         expected=_expected_text(finding),
         related_finding_ids=list(finding.related_finding_ids),
         host=clean(finding.attributes["host"]) if "host" in finding.attributes else None,
+        alert_instances=[
+            clean(", ".join(f"{k}={v}" for k, v in sorted(i.labels.items())))
+            for i in finding.alert_instances[:MAX_ALERT_INSTANCES]
+        ],
     )
 
 

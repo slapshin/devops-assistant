@@ -18,7 +18,7 @@ from app.domain.common import (
     Unit,
     UtcDatetime,
 )
-from app.domain.metrics import CapabilityStatus, MetricSeries
+from app.domain.metrics import AlertInstanceActivity, CapabilityStatus, MetricSeries
 
 
 class DetectionMethod(StrEnum):
@@ -100,6 +100,11 @@ class Finding(Contract):
     )
     attributes: Labels = Field(
         default_factory=dict, description="Descriptive labels, e.g. error_type; not identity."
+    )
+    alert_instances: list[AlertInstanceActivity] = Field(
+        default_factory=list,
+        description="Alert instances active during the finding (Grafana), with their active "
+        "intervals that overlap it.",
     )
     state: FindingState = FindingState.RESOLVED
     recurrence: Recurrence = Recurrence.NEW

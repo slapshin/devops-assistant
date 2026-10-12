@@ -33,15 +33,13 @@ PAGE_SIZE = 5000
 MAX_TRANSITIONS_PER_RULE = 50_000
 MAX_LISTED = 10
 """Names listed in one exclusion message."""
-MAX_ATTRIBUTE_INSTANCES = 5
-MAX_ATTRIBUTE_VALUE_CHARS = 64
-SYSTEM_LABELS = frozenset({"alertname", "grafana_folder", "__alert_rule_uid__"})
-"""Labels Grafana adds to every instance; they never tell instances apart."""
+MAX_ANNOTATION_CHARS = 1000
+TEMPLATE_MARK = "{{"
 SEVERITY_LABEL = "severity"
 FOLDER_ATTRIBUTE = "alert_folder"
 GROUP_ATTRIBUTE = "alert_group"
-INSTANCES_ATTRIBUTE = "alert_instances"
-ATTRIBUTE_LABELS = (FOLDER_ATTRIBUTE, GROUP_ATTRIBUTE, INSTANCES_ATTRIBUTE)
+SUMMARY_ATTRIBUTE = "alert_summary"
+ATTRIBUTE_LABELS = (FOLDER_ATTRIBUTE, GROUP_ATTRIBUTE, SUMMARY_ATTRIBUTE)
 """Series labels copied into finding attributes."""
 
 
@@ -177,17 +175,14 @@ def tag_labels(tags: Sequence[str]) -> dict[str, str]:
     return labels
 
 
-def instance_summary(labels: Mapping[str, str], hidden: set[str]) -> str:
-    """Short ``name=value`` text of the labels that tell instances apart."""
-    parts = [
-        f"{k}={v}"
-        for k, v in sorted(labels.items())
-        if k not in SYSTEM_LABELS
-        and k not in hidden
-        and "\n" not in v
-        and len(v) <= MAX_ATTRIBUTE_VALUE_CHARS
-    ]
-    return ", ".join(parts) or "(single instance)"
+def shown_annotations(annotations: Mapping[str, str], *, templates: bool = True) -> dict[str, str]:
+    """Annotations worth showing: not internal (``__value_string__``...), not empty, and, with
+    ``templates=False``, without unrendered ``{{ ... }}``; long values are cut."""
+    return {
+        k: v.strip()[:MAX_ANNOTATION_CHARS]
+        for k, v in sorted(annotations.items())
+        if not k.startswith("__") and v.strip() and (templates or TEMPLATE_MARK not in v)
+    }
 
 
 # --- requests ------------------------------------------------------------------------------

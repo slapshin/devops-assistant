@@ -26,7 +26,7 @@ from app.domain.interfaces import (
     SourceErrorKind,
 )
 from app.domain.jobs import StageProgress
-from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
+from app.domain.metrics import ActiveInterval, CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.projects import GrafanaConnection, GrafanaSourceInput
 from app.domain.report import AnalysisReport, AnalysisRequest, AnalysisWindows, ReportState
 from app.main import create_app
@@ -194,10 +194,12 @@ async def test_rules_are_read_with_token_org_and_pagination() -> None:
                     "name": "Site down",
                     "type": "alerting",
                     "labels": {"severity": "critical"},
+                    "annotations": {"summary": "{{ $labels.project }} is down"},
                     "isPaused": token is not None,
                     "alerts": [
                         {
                             "labels": {"alertname": "Site down", "project": "shop"},
+                            "annotations": {"summary": "shop is down"},
                             "state": "Alerting",
                             "activeAt": "2026-10-06T09:00:00Z",
                         },
@@ -225,6 +227,9 @@ async def test_rules_are_read_with_token_org_and_pagination() -> None:
     assert [r.uid for r in rules] == ["r1", "r2"]
     assert rules[0].folder == "Shop" and rules[0].group == "Sites"
     assert rules[0].labels == {"severity": "critical"}
+    assert rules[0].annotations == {"summary": "{{ $labels.project }} is down"}
+    assert rules[0].instances[0].annotations == {"summary": "shop is down"}
+    assert rules[0].instances[1].annotations == {}
     assert rules[1].paused
     assert rules[0].instances[0].active_at == int(datetime(2026, 10, 6, 9, tzinfo=UTC).timestamp())
     assert rules[0].instances[1].active_at is None
@@ -490,10 +495,46 @@ async def test_firing_is_counted_per_instance_and_bucket() -> None:
     assert firing.coverage == 1.0
     assert firing.entity.kind is EntityKind.ALERT_RULE
     assert firing.entity.key == "alert_rule|uid=r1"
-    assert firing.labels["alert_instances"] == "instance=web-1; instance=web-2"
+    assert [(a.labels, a.active) for a in firing.alert_instances] == [
+        (shop_1, [ActiveInterval(start=t0, end=t0 + timedelta(minutes=20))]),
+        (shop_2, [ActiveInterval(start=t0 + timedelta(minutes=2), end=t0 + timedelta(minutes=30))]),
+    ]
     assert firing.labels["severity"] == "critical"
     assert set(series["grafana_alert_nodata"].values) == {0.0}
     assert result.exclusions == []
+
+
+async def test_instances_list_merged_intervals_annotations_and_open_ends() -> None:
+    web = {"alertname": "Rule r1", "instance": "web-1", "project": "shop"}
+    db = {"alertname": "Rule r1", "instance": "db-1", "project": "shop"}
+    t0 = END - timedelta(hours=2)
+    history = History(
+        [
+            change(1, END - timedelta(days=2), "Normal", "Alerting", web),
+            change(2, END - timedelta(days=2, minutes=-5), "Alerting", "Normal", web),
+            change(3, t0, "Normal", "Alerting", web),
+            change(4, t0 + timedelta(minutes=5), "Alerting", "Recovering", web),
+            change(5, t0 + timedelta(minutes=10), "Recovering", "Normal", web),
+            change(6, t0, "Normal", "Alerting", db),
+        ]
+    )
+    current = AlertInstance(db, "Alerting", int(t0.timestamp()), {"summary": "db-1 rebooted"})
+    annotations = {"summary": "Host rebooted", "description": "{{ $labels.instance }} rebooted"}
+    api = FakeApi([rule(annotations=annotations, instances=[current])], {"r1": history})
+
+    result, _ = await collect(GrafanaMetricsSource(api, ["Shop"], instance_labels=SHOP))
+
+    firing = by_signal(result.series)["grafana_alert_firing"]
+    assert [(a.labels["instance"], a.annotations, a.active) for a in firing.alert_instances] == [
+        ("db-1", {"summary": "db-1 rebooted"}, [ActiveInterval(start=t0, end=None)]),
+        (
+            "web-1",
+            {"summary": "Host rebooted"},
+            [ActiveInterval(start=t0, end=t0 + timedelta(minutes=10))],
+        ),
+    ]
+    assert firing.labels["alert_summary"] == "Host rebooted"
+    assert by_signal(result.series)["grafana_alert_nodata"].alert_instances == []
 
 
 async def test_state_before_the_first_change_comes_from_its_previous_state() -> None:
@@ -621,7 +662,14 @@ async def test_incident_yields_alert_findings_by_severity() -> None:
     assert disk.recurrence is Recurrence.RECURRING
     critical = next(f for f in report.findings if f.signal == "alert_firing_critical")
     assert critical.attributes["alert_folder"] == "Shop"
-    assert "blog-web-1" not in critical.attributes["alert_instances"]
+    assert {a.labels["instance"] for a in critical.alert_instances} <= {"shop-web-1", "shop-web-2"}
+    ongoing = next(f for f in report.findings if f.state is FindingState.ONGOING)
+    assert [(a.labels["instance"], a.active[-1].end) for a in ongoing.alert_instances] == [
+        ("shop-web-1", None)
+    ]
+    assert ongoing.alert_instances[0].annotations == {
+        "summary": "shop-web-1 answers more than 5% of requests with 5xx"
+    }
     assert report.state is ReportState.COMPLETED
     assert {t.status.value for t in report.trends} == {"ok"}
 

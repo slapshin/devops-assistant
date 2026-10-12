@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2",
+  "schema_version": "2.3",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e5",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -223,6 +223,7 @@
         "fnd_f90040caae37e21f"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -278,6 +279,7 @@
         "fnd_f90040caae37e21f"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -329,6 +331,7 @@
       ],
       "related_finding_ids": [],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -384,6 +387,7 @@
         "fnd_f90040caae37e21f"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -441,6 +445,7 @@
         "fnd_f90040caae37e21f"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -496,6 +501,7 @@
         "fnd_b379e476d5021645"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -1063,7 +1069,8 @@
           2.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         6.0,
@@ -1657,7 +1664,8 @@
           0.04
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.066667,
@@ -2253,7 +2261,8 @@
           0.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.0,
@@ -2847,7 +2856,8 @@
           0.003333
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.003333,
@@ -3441,7 +3451,8 @@
           0.004038415145805913
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.003984772386220125,
@@ -4035,7 +4046,8 @@
           6.603333
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": null,
       "lower": null,
@@ -4212,7 +4224,8 @@
           0.289459
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.3567445,
@@ -4806,7 +4819,8 @@
           0.636809
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": null,
       "lower": null,
@@ -4983,7 +4997,8 @@
           6.603333
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": null,
       "lower": null,

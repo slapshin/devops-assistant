@@ -25,6 +25,7 @@ export type SignalCoverage = Schemas["SignalCoverage"];
 export type MetricCapability = Schemas["MetricCapability"];
 export type Hypothesis = Schemas["Hypothesis"];
 export type MetricSeries = Schemas["MetricSeries"];
+export type AlertInstanceActivity = Schemas["AlertInstanceActivity"];
 
 /** Error carrying an RFC 9457 problem body, or a synthetic one for network failures. */
 export class ApiError extends Error {

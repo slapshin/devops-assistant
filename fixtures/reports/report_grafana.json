@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2",
+  "schema_version": "2.3",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e7",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -153,9 +153,46 @@
       "related_finding_ids": [],
       "attributes": {
         "alert_folder": "Shop",
-        "alert_group": "Sites",
-        "alert_instances": "env=production, instance=shop-web-1; env=production, instance=shop-web-2"
+        "alert_group": "Sites"
       },
+      "alert_instances": [
+        {
+          "labels": {
+            "alertname": "Checkout 5xx errors",
+            "grafana_folder": "Shop",
+            "env": "production",
+            "instance": "shop-web-1",
+            "project": "shop"
+          },
+          "annotations": {
+            "summary": "shop-web-1 answers more than 5% of requests with 5xx"
+          },
+          "active": [
+            {
+              "start": "2026-09-30T06:35:00Z",
+              "end": "2026-09-30T08:05:00Z"
+            }
+          ]
+        },
+        {
+          "labels": {
+            "alertname": "Checkout 5xx errors",
+            "grafana_folder": "Shop",
+            "env": "production",
+            "instance": "shop-web-2",
+            "project": "shop"
+          },
+          "annotations": {
+            "summary": "shop-web-2 answers more than 5% of requests with 5xx"
+          },
+          "active": [
+            {
+              "start": "2026-09-30T06:55:00Z",
+              "end": "2026-09-30T07:55:00Z"
+            }
+          ]
+        }
+      ],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -199,9 +236,28 @@
       "related_finding_ids": [],
       "attributes": {
         "alert_folder": "Shop",
-        "alert_group": "Sites",
-        "alert_instances": "env=production, instance=shop-web-1; env=production, instance=shop-web-2"
+        "alert_group": "Sites"
       },
+      "alert_instances": [
+        {
+          "labels": {
+            "alertname": "Checkout 5xx errors",
+            "grafana_folder": "Shop",
+            "env": "production",
+            "instance": "shop-web-1",
+            "project": "shop"
+          },
+          "annotations": {
+            "summary": "shop-web-1 answers more than 5% of requests with 5xx"
+          },
+          "active": [
+            {
+              "start": "2026-09-30T09:35:00Z",
+              "end": null
+            }
+          ]
+        }
+      ],
       "state": "ongoing",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -246,8 +302,28 @@
       "attributes": {
         "alert_folder": "Shop",
         "alert_group": "Node",
-        "alert_instances": "env=production, instance=shop-db-1"
+        "alert_summary": "Less than 10% of the data disk is free"
       },
+      "alert_instances": [
+        {
+          "labels": {
+            "alertname": "Disk almost full",
+            "grafana_folder": "Shop",
+            "env": "production",
+            "instance": "shop-db-1",
+            "project": "shop"
+          },
+          "annotations": {
+            "summary": "Less than 10% of the data disk is free"
+          },
+          "active": [
+            {
+              "start": "2026-09-30T06:45:00Z",
+              "end": "2026-09-30T07:05:00Z"
+            }
+          ]
+        }
+      ],
       "state": "resolved",
       "recurrence": "recurring",
       "prior_episode_days": 13
@@ -291,9 +367,26 @@
       "related_finding_ids": [],
       "attributes": {
         "alert_folder": "Shop",
-        "alert_group": "Jobs",
-        "alert_instances": "env=production"
+        "alert_group": "Jobs"
       },
+      "alert_instances": [
+        {
+          "labels": {
+            "alertname": "Worker exceptions",
+            "grafana_folder": "Shop",
+            "env": "production",
+            "exception": "Lost connection to the queue, retrying\n  at consume (worker.js:42)",
+            "project": "shop"
+          },
+          "annotations": {},
+          "active": [
+            {
+              "start": "2026-09-30T01:45:00Z",
+              "end": "2026-09-30T02:05:00Z"
+            }
+          ]
+        }
+      ],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -339,6 +432,24 @@
         "alert_folder": "Shop",
         "alert_group": "Jobs"
       },
+      "alert_instances": [
+        {
+          "labels": {
+            "alertname": "Queue consumer lag",
+            "grafana_folder": "Shop",
+            "env": "production",
+            "project": "shop",
+            "queue": "orders"
+          },
+          "annotations": {},
+          "active": [
+            {
+              "start": "2026-09-30T04:20:00Z",
+              "end": "2026-09-30T05:05:00Z"
+            }
+          ]
+        }
+      ],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -1018,7 +1129,7 @@
           "rule_uid": "shop-disk",
           "alert_folder": "Shop",
           "alert_group": "Node",
-          "alert_instances": "env=production, instance=shop-db-1"
+          "alert_summary": "Less than 10% of the data disk is free"
         },
         "unit": "count",
         "query": "# Grafana alert rule shop-disk: firing instances, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-disk\nGET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end&limit=5000",
@@ -1139,7 +1250,8 @@
           0.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         null,
@@ -1505,8 +1617,7 @@
           "rule_uid": "shop-5xx",
           "alert_folder": "Shop",
           "alert_group": "Sites",
-          "severity": "critical",
-          "alert_instances": "env=production, instance=shop-web-1; env=production, instance=shop-web-2"
+          "severity": "critical"
         },
         "unit": "count",
         "query": "# Grafana alert rule shop-5xx: firing instances of rules labelled severity=critical, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-5xx\nGET /api/annotations?type=alert&alertUID=shop-5xx&from=$start&to=$end&limit=5000",
@@ -1629,7 +1740,8 @@
           1.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         null,
@@ -2001,8 +2113,7 @@
           "rule_uid": "shop-5xx",
           "alert_folder": "Shop",
           "alert_group": "Sites",
-          "severity": "critical",
-          "alert_instances": "env=production, instance=shop-web-1; env=production, instance=shop-web-2"
+          "severity": "critical"
         },
         "unit": "count",
         "query": "# Grafana alert rule shop-5xx: firing instances of rules labelled severity=critical, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-5xx\nGET /api/annotations?type=alert&alertUID=shop-5xx&from=$start&to=$end&limit=5000",
@@ -2089,7 +2200,8 @@
           1.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         null,
@@ -2353,8 +2465,7 @@
           "rule_uid": "shop-worker",
           "alert_folder": "Shop",
           "alert_group": "Jobs",
-          "severity": "info",
-          "alert_instances": "env=production"
+          "severity": "info"
         },
         "unit": "count",
         "query": "# Grafana alert rule shop-worker: firing instances of rules labelled severity=info, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-worker\nGET /api/annotations?type=alert&alertUID=shop-worker&from=$start&to=$end&limit=5000",
@@ -2511,7 +2622,8 @@
           0.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         null,
@@ -3135,7 +3247,8 @@
           0.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         null,

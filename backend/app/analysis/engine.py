@@ -49,7 +49,12 @@ from app.domain.findings import (
 )
 from app.domain.ids import episode_id, evidence_id, finding_id, series_id
 from app.domain.interfaces import CollectionResult, DetectionResult, MappingKind
-from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
+from app.domain.metrics import (
+    AlertInstanceActivity,
+    CapabilityStatus,
+    MetricCapability,
+    MetricSeries,
+)
 from app.domain.report import TREND_DAYS, AnalysisRequest, AnalysisWindows, Exclusion
 
 EVIDENCE_PAD_STEPS = 72  # ± 6 h
@@ -287,6 +292,7 @@ class RobustDetector:
             baseline_mode=base.mode,
             evidence_ids=[e.evidence_id for e in evs],
             attributes=attributes,
+            alert_instances=_active_during(s.source.alert_instances, start, end),
             state=_finding_state(ep, config),
             recurrence=_recurrence(len(prior)),
             prior_episode_days=len(prior),
@@ -822,6 +828,18 @@ def _trend_confidence(ok_buckets: int) -> ConfidenceLevel:
 
 def _sample_coverage(values: list[float | None]) -> float:
     return sum(v is not None for v in values) / len(values) if values else 0.0
+
+
+def _active_during(
+    instances: Sequence[AlertInstanceActivity], start: datetime, end: datetime
+) -> list[AlertInstanceActivity]:
+    """Instances active in [start, end), with only their intervals that overlap it."""
+    out = []
+    for instance in instances:
+        overlap = [i for i in instance.active if i.start < end and (i.end is None or i.end > start)]
+        if overlap:
+            out.append(instance.model_copy(update={"active": overlap}))
+    return out
 
 
 def _slice_series(

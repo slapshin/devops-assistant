@@ -1,6 +1,71 @@
 {
   "components": {
     "schemas": {
+      "ActiveInterval": {
+        "additionalProperties": false,
+        "description": "A time range in which an alert instance was active.",
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null while still active at the analysis end.",
+            "title": "End"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "ActiveInterval",
+        "type": "object"
+      },
+      "AlertInstanceActivity": {
+        "additionalProperties": false,
+        "description": "One alert instance active in the latest 24 h (Grafana): who it is and when it was active.",
+        "properties": {
+          "active": {
+            "items": {
+              "$ref": "#/components/schemas/ActiveInterval"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Active",
+            "type": "array"
+          },
+          "annotations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Rendered annotations (summary, description...) when Grafana still lists the instance; otherwise the rule's annotations that hold no template.",
+            "title": "Annotations",
+            "type": "object"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Every label of the instance, e.g. instance=host-1.",
+            "title": "Labels",
+            "type": "object"
+          }
+        },
+        "required": [
+          "labels",
+          "active"
+        ],
+        "title": "AlertInstanceActivity",
+        "type": "object"
+      },
       "AnalysisJob": {
         "additionalProperties": false,
         "properties": {
@@ -223,11 +288,12 @@
             "type": "string"
           },
           "schema_version": {
-            "default": "2.2",
+            "default": "2.3",
             "enum": [
               "2.0",
               "2.1",
-              "2.2"
+              "2.2",
+              "2.3"
             ],
             "title": "Schema Version",
             "type": "string"
@@ -1306,6 +1372,14 @@
       "Finding": {
         "additionalProperties": false,
         "properties": {
+          "alert_instances": {
+            "description": "Alert instances active during the finding (Grafana), with their active intervals that overlap it.",
+            "items": {
+              "$ref": "#/components/schemas/AlertInstanceActivity"
+            },
+            "title": "Alert Instances",
+            "type": "array"
+          },
           "attributes": {
             "additionalProperties": {
               "type": "string"
@@ -1956,6 +2030,15 @@
         "additionalProperties": false,
         "description": "One scoped series on a regular grid: values[i] is at start + i * step_seconds.\n\n`None` is a gap (no sample), never zero.",
         "properties": {
+          "alert_instances": {
+            "description": "Alert instances counted in the latest 24 h (Grafana only).",
+            "items": {
+              "$ref": "#/components/schemas/AlertInstanceActivity"
+            },
+            "maxItems": 100,
+            "title": "Alert Instances",
+            "type": "array"
+          },
           "coverage": {
             "description": "Share of steps with a sample.",
             "maximum": 1.0,

@@ -16,9 +16,13 @@ from app.domain.common import (
     UtcDatetime,
 )
 
-ATTRIBUTE_LABELS = ("alert_folder", "alert_group", "alert_instances")
+ATTRIBUTE_LABELS = ("alert_folder", "alert_group", "alert_summary")
 """Series labels carried into finding attributes (descriptive, never identity): a Grafana
-rule's folder and group, and its instances that fired in the latest 24 h."""
+rule's folder, group and summary annotation."""
+MAX_ALERT_INSTANCES = 100
+"""Alert instances listed per series; more are disclosed as truncated."""
+MAX_ACTIVE_INTERVALS = 50
+"""Active intervals listed per alert instance (the newest)."""
 
 
 class CapabilityStatus(StrEnum):
@@ -27,6 +31,25 @@ class CapabilityStatus(StrEnum):
     UNSUPPORTED = "unsupported"
     UNVERIFIED = "unverified"
     """Assumed from supplied examples; not observed in the live source (T003)."""
+
+
+class ActiveInterval(Contract):
+    """A time range in which an alert instance was active."""
+
+    start: UtcDatetime
+    end: UtcDatetime | None = Field(description="Null while still active at the analysis end.")
+
+
+class AlertInstanceActivity(Contract):
+    """One alert instance active in the latest 24 h (Grafana): who it is and when it was active."""
+
+    labels: Labels = Field(description="Every label of the instance, e.g. instance=host-1.")
+    annotations: Labels = Field(
+        default_factory=dict,
+        description="Rendered annotations (summary, description...) when Grafana still lists "
+        "the instance; otherwise the rule's annotations that hold no template.",
+    )
+    active: list[ActiveInterval] = Field(min_length=1, max_length=MAX_ACTIVE_INTERVALS)
 
 
 class MetricSeries(Contract):
@@ -53,6 +76,11 @@ class MetricSeries(Contract):
         ge=1,
         description="Mean sampling interval of the source data (1 = every event counted; "
         "Cloudflare adaptive sampling). Null when the source does not sample.",
+    )
+    alert_instances: list[AlertInstanceActivity] = Field(
+        default_factory=list,
+        max_length=MAX_ALERT_INSTANCES,
+        description="Alert instances counted in the latest 24 h (Grafana only).",
     )
 
     @model_validator(mode="after")

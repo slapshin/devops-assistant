@@ -172,6 +172,41 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActiveInterval
+         * @description A time range in which an alert instance was active.
+         */
+        ActiveInterval: {
+            /**
+             * End
+             * @description Null while still active at the analysis end.
+             */
+            end: string | null;
+            /** Start */
+            start: string;
+        };
+        /**
+         * AlertInstanceActivity
+         * @description One alert instance active in the latest 24 h (Grafana): who it is and when it was active.
+         */
+        AlertInstanceActivity: {
+            /** Active */
+            active: components["schemas"]["ActiveInterval"][];
+            /**
+             * Annotations
+             * @description Rendered annotations (summary, description...) when Grafana still lists the instance; otherwise the rule's annotations that hold no template.
+             */
+            annotations?: {
+                [key: string]: string;
+            };
+            /**
+             * Labels
+             * @description Every label of the instance, e.g. instance=host-1.
+             */
+            labels: {
+                [key: string]: string;
+            };
+        };
         /** AnalysisJob */
         AnalysisJob: {
             /** Analysis Id */
@@ -244,10 +279,10 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 2.2
+             * @default 2.3
              * @enum {string}
              */
-            schema_version: "2.0" | "2.1" | "2.2";
+            schema_version: "2.0" | "2.1" | "2.2" | "2.3";
             scope: components["schemas"]["Scope"];
             /** @description Deprecated: the first source; use sources. */
             source?: components["schemas"]["SourceInfo"] | null;
@@ -637,6 +672,11 @@ export interface components {
         /** Finding */
         Finding: {
             /**
+             * Alert Instances
+             * @description Alert instances active during the finding (Grafana), with their active intervals that overlap it.
+             */
+            alert_instances?: components["schemas"]["AlertInstanceActivity"][];
+            /**
              * Attributes
              * @description Descriptive labels, e.g. error_type; not identity.
              */
@@ -929,6 +969,11 @@ export interface components {
          *     `None` is a gap (no sample), never zero.
          */
         MetricSeries: {
+            /**
+             * Alert Instances
+             * @description Alert instances counted in the latest 24 h (Grafana only).
+             */
+            alert_instances?: components["schemas"]["AlertInstanceActivity"][];
             /**
              * Coverage
              * @description Share of steps with a sample.

@@ -68,6 +68,14 @@
       "additionalProperties": false,
       "description": "Bounded, credential-free finding summary sent to a provider (no raw series).",
       "properties": {
+        "alert_instances": {
+          "description": "Label sets of the alert instances active during the finding (Grafana).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Alert Instances",
+          "type": "array"
+        },
         "confidence": {
           "$ref": "#/$defs/ConfidenceLevel"
         },

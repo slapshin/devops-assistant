@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2",
+  "schema_version": "2.3",
   "analysis_id": "01999a2b-0000-7000-8000-000000000003",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -471,6 +471,7 @@
       ],
       "related_finding_ids": [],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -532,6 +533,7 @@
         "http_response_status_code": "404",
         "error_type": "404"
       },
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "recurring",
       "prior_episode_days": 3
@@ -995,7 +997,8 @@
           0.2495
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.22,
@@ -1596,7 +1599,8 @@
           0.9105
         ],
         "coverage": 0.9814814814814815,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.8,

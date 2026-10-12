@@ -18,6 +18,8 @@ class AlertInstance:
     labels: dict[str, str]
     state: str
     active_at: int | None = None
+    annotations: dict[str, str] = field(default_factory=dict)
+    """Rendered with the instance's labels and values."""
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,8 @@ class AlertRule:
     """Folder title."""
     group: str
     labels: dict[str, str] = field(default_factory=dict)
+    annotations: dict[str, str] = field(default_factory=dict)
+    """Annotation templates, e.g. ``summary``; may contain ``{{ $labels.x }}``."""
     paused: bool = False
     instances: list[AlertInstance] = field(default_factory=list)
 

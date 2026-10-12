@@ -6,10 +6,12 @@ import ChartBox from "../../components/ChartBox.vue";
 import DataTable from "../../components/DataTable.vue";
 import ExplanationPanel from "../../components/ExplanationPanel.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
+import { instancesText } from "../../lib/alerts";
 import { evidenceOption, timestamps } from "../../lib/charts";
 import { headline, recurrenceText } from "../../lib/findings";
 import { capitalize, formatDuration, formatTime, formatValue, isLatencyMean, timezone, utcTooltip } from "../../lib/format";
 import { chartPalette } from "../../lib/theme";
+import AlertInstancesPanel from "./AlertInstancesPanel.vue";
 import { useReportContext } from "./context";
 
 const EVIDENCE_COLUMNS = ["Time", "Observed", "Expected", "Lower", "Upper", "Gap"];
@@ -68,6 +70,7 @@ onMounted(async () => {
         <SeverityChip :severity="f.severity" />
         <h2 id="evidence-title" ref="heading" tabindex="-1">{{ f.title }}</h2>
         <span class="sub mono">· {{ f.entity.display_name }}</span>
+        <span v-if="f.alert_instances?.length" class="sub mono">· {{ instancesText(f) }}</span>
         <RouterLink :to="closeTo" class="close" aria-label="Close evidence" title="Close (Esc)">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
         </RouterLink>
@@ -109,6 +112,10 @@ onMounted(async () => {
           <div><dt class="lbl">Duration</dt><dd>{{ formatDuration(f.duration_seconds) }}</dd></div>
         </dl>
         <dl class="kv">
+          <template v-if="f.attributes?.alert_summary">
+            <dt>Summary</dt>
+            <dd>{{ f.attributes.alert_summary }}</dd>
+          </template>
           <dt>Window</dt>
           <dd><span :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</span> – <span :title="utcTooltip(f.end)">{{ formatTime(f.end) }}</span></dd>
           <dt>Peak at</dt>
@@ -145,6 +152,8 @@ onMounted(async () => {
         <ExplanationPanel class="ai" :report="report" :finding-link="findingLink" :only="f.finding_id" />
       </div>
     </section>
+
+    <AlertInstancesPanel v-if="f.alert_instances?.length" :finding="f" />
 
     <section class="panel s24" aria-labelledby="query-title">
       <div class="ph">

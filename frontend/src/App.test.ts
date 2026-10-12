@@ -1052,6 +1052,19 @@ describe("report", () => {
     const row = links[0]?.closest("tr");
     expect(row).toHaveTextContent("Grafana");
     expect(row).toHaveTextContent("Checkout 5xx errors");
+    expect(row).toHaveTextContent("shop-web-1, shop-web-2");
+  });
+
+  it("a Grafana finding lists its alert instances with labels and annotations", async () => {
+    const critical = grafanaReport.findings.find((f) => f.signal === "alert_firing_critical" && f.state === "resolved");
+    await renderAt(`${report(grafanaReport)}/findings/${critical?.finding_id ?? ""}`);
+
+    const panel = await screen.findByRole("region", { name: "Alert instances" });
+    expect(within(panel).getByText("shop-web-1")).toBeInTheDocument();
+    expect(within(panel).getByText("shop-web-1 answers more than 5% of requests with 5xx")).toBeInTheDocument();
+    const labels = within(panel).getByRole("list", { name: "Labels of shop-web-1" });
+    expect(within(labels).getByText("instance=shop-web-1")).toHaveClass("key");
+    expect(within(labels).getByText("env=production")).not.toHaveClass("key");
   });
 
   it("findings show the source each one came from", async () => {

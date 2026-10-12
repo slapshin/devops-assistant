@@ -267,7 +267,10 @@ def _group_rules(group: Any) -> list[AlertRule]:
             continue
         instances = [
             AlertInstance(
-                _labels(a.get("labels")), str(a.get("state") or ""), _epoch(a.get("activeAt"))
+                _labels(a.get("labels")),
+                str(a.get("state") or ""),
+                _epoch(a.get("activeAt")),
+                _labels(a.get("annotations")),
             )
             for a in raw.get("alerts") or []
             if isinstance(a, dict)
@@ -280,6 +283,7 @@ def _group_rules(group: Any) -> list[AlertRule]:
                 folder=str(group.get("file") or ""),
                 group=str(group.get("name") or ""),
                 labels=_labels(raw.get("labels")),
+                annotations=_labels(raw.get("annotations")),
                 paused=bool(raw.get("isPaused")),
                 instances=instances,
             )

@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2",
+  "schema_version": "2.3",
   "analysis_id": "01999a2b-0000-7000-8000-000000000004",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -481,6 +481,7 @@
       ],
       "related_finding_ids": [],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -921,7 +922,8 @@
           0.2495
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.22,

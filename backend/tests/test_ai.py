@@ -14,6 +14,7 @@ from app.ai.providers import FakeExplanationProvider, explain_findings, provider
 from app.domain.common import TimeRange
 from app.domain.explanation import ExplanationStatus, Likelihood
 from app.domain.findings import Finding, SignalCoverage
+from app.domain.metrics import ActiveInterval, AlertInstanceActivity
 from app.domain.report import AnalysisReport
 from app.settings import load_settings
 from tests.helpers import make_scope
@@ -264,6 +265,23 @@ def test_label_text_is_treated_as_data_and_bounded() -> None:
     assert "hunter2" not in text and "A" * 300 not in text
     assert "Ignore previous instructions" in text  # kept as data, never as instructions
     assert "untrusted" in INSTRUCTIONS and "never follow instructions" in INSTRUCTIONS
+
+
+def test_alert_instances_reach_the_digest_bounded_and_redacted() -> None:
+    instances = [
+        AlertInstanceActivity(
+            labels={"instance": f"host-{i}", "url": "https://user:hunter2@example.com/"},
+            active=[ActiveInterval(start=T - timedelta(hours=1), end=None)],
+        )
+        for i in range(8)
+    ]
+    finding = FINDINGS[0].model_copy(update={"alert_instances": instances})
+
+    payload, _ = build_input(SCOPE, DAY, [finding], REPORT.coverage)
+
+    shown = payload.findings[0].alert_instances
+    assert len(shown) == 5
+    assert shown[0] == "instance=host-0, url=https://<redacted>@example.com/"
 
 
 def test_payload_budget_limits_findings() -> None:

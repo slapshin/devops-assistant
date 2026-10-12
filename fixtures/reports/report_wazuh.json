@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2",
+  "schema_version": "2.3",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e6",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -168,6 +168,7 @@
         "fnd_4d3e85ab22fc73c8"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -218,6 +219,7 @@
         "fnd_c2e4bb4d098db48d"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -268,6 +270,7 @@
         "fnd_c2e4bb4d098db48d"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -318,6 +321,7 @@
         "fnd_2f43d25a42e69a9b"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -367,6 +371,7 @@
         "fnd_5828356ba22129b0"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -883,7 +888,8 @@
           0.006667
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.026667,
@@ -1471,7 +1477,8 @@
           0.01
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.023333,
@@ -2107,7 +2114,8 @@
           0.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.006667,
@@ -2695,7 +2703,8 @@
           0.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.0,
@@ -3331,7 +3340,8 @@
           0.0
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.0,

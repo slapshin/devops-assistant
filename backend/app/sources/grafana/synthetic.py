@@ -37,6 +37,8 @@ class _RuleSpec:
     group: str
     labels: dict[str, str]
     instances: tuple[dict[str, str], ...]
+    summary: str = ""
+    """``summary`` annotation; ``{{ $labels.instance }}`` is rendered per instance."""
 
 
 RULES = (
@@ -51,6 +53,7 @@ RULES = (
             {"env": "production", "instance": "shop-web-2", "project": "shop"},
             {"env": "production", "instance": "blog-web-1", "project": "blog"},
         ),
+        "{{ $labels.instance }} answers more than 5% of requests with 5xx",
     ),
     _RuleSpec(
         "shop-disk",
@@ -59,6 +62,7 @@ RULES = (
         "Node",
         {"team": "ops"},
         ({"env": "production", "instance": "shop-db-1", "project": "shop"},),
+        "Less than 10% of the data disk is free",
     ),
     _RuleSpec(
         "shop-queue",
@@ -139,6 +143,15 @@ SCENARIOS: dict[str, GrafanaScenario] = {
 
 def _labels(spec: _RuleSpec, index: int) -> dict[str, str]:
     return {"alertname": spec.title, "grafana_folder": spec.folder[1]} | spec.instances[index]
+
+
+def _annotations(spec: _RuleSpec, labels: dict[str, str] | None = None) -> dict[str, str]:
+    """The rule's template, or rendered with an instance's labels."""
+    if not spec.summary:
+        return {}
+    if labels is None:
+        return {"summary": spec.summary}
+    return {"summary": spec.summary.replace("{{ $labels.instance }}", labels.get("instance", ""))}
 
 
 class SyntheticGrafanaApi:
@@ -233,7 +246,7 @@ class SyntheticGrafanaApi:
             for i in range(len(spec.instances)):
                 labels = _labels(spec, i)
                 state, since = self._state_now(spec.uid, labels)
-                instances.append(AlertInstance(labels, state, since))
+                instances.append(AlertInstance(labels, state, since, _annotations(spec, labels)))
             out.append(
                 AlertRule(
                     uid=spec.uid,
@@ -242,6 +255,7 @@ class SyntheticGrafanaApi:
                     folder=spec.folder[1],
                     group=spec.group,
                     labels=dict(spec.labels),
+                    annotations=_annotations(spec),
                     instances=instances,
                 )
             )

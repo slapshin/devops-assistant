@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import type { Finding } from "../../api/client";
 import SourceIcon from "../../components/projects/SourceIcon.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
+import { instancesText } from "../../lib/alerts";
 import { recurrenceText, sourceByFamily } from "../../lib/findings";
 import { sourceKindLabel } from "../../lib/projects";
 import { FAMILY_LABELS, SEVERITIES, capitalize, formatDuration, formatTime, formatValue, utcTooltip } from "../../lib/format";
@@ -58,8 +59,14 @@ function matchesFilters(f: Finding): boolean {
     (!severity.value || f.severity === severity.value) &&
     (!source.value || sourceOf.value.get(f.family) === source.value) &&
     (!recurrence.value || (recurrence.value === "new") === (f.recurrence === "new")) &&
-    (!entity.value || f.entity.display_name.toLowerCase().includes(entity.value.toLowerCase()))
+    (!entity.value || entityText(f).toLowerCase().includes(entity.value.toLowerCase()))
   );
+}
+
+/** The entity plus the alert instances behind it, so a host name finds its Grafana alerts. */
+function entityText(f: Finding): string {
+  const labels = (f.alert_instances ?? []).flatMap((i) => Object.values(i.labels));
+  return [f.entity.display_name, ...labels].join(" ");
 }
 
 function setFilter(key: string, value: string) {
@@ -194,7 +201,10 @@ watch(
                   <span v-if="sourceOf.get(f.family)" class="source"><SourceIcon :kind="sourceOf.get(f.family)!" />{{ sourceKindLabel(sourceOf.get(f.family)!) }}</span>
                   <span v-else class="muted">—</span>
                 </td>
-                <td class="mono muted">{{ f.entity.display_name }}</td>
+                <td class="mono muted">
+                  {{ f.entity.display_name }}
+                  <span v-if="f.alert_instances?.length" class="instances">· {{ instancesText(f) }}</span>
+                </td>
                 <td :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</td>
                 <td class="num">{{ formatDuration(f.duration_seconds) }}</td>
                 <td class="num peak" :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</td>
@@ -231,6 +241,7 @@ watch(
 .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 0 12px 8px; }
 .var input { min-width: 160px; }
 .empty { margin: 0; padding: 8px 12px 12px; }
+.instances { color: var(--strong); }
 .gt > tbody > tr { cursor: pointer; }
 .gt > tbody > tr.sel > .first { box-shadow: inset 3px 0 0 var(--primary); }
 .toggle { display: inline-flex; align-items: center; gap: 6px; }

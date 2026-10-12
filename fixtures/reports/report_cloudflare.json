@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2",
+  "schema_version": "2.3",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000cf",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000c1",
@@ -295,6 +295,7 @@
         "fnd_8a6aadb6b0165397"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -345,6 +346,7 @@
         "fnd_538c1b2684d66385"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -399,6 +401,7 @@
         "fnd_c8a64804d149b1af"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -452,6 +455,7 @@
         "fnd_c8a64804d149b1af"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -505,6 +509,7 @@
         "fnd_c8a64804d149b1af"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -558,6 +563,7 @@
         "fnd_b88fdd74ad22a087"
       ],
       "attributes": {},
+      "alert_instances": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -1137,7 +1143,8 @@
           0.05
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.093333,
@@ -1847,7 +1854,8 @@
           0.096667
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.17,
@@ -2506,7 +2514,8 @@
           0.0016447518188509541
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.0019773143095970997,
@@ -3012,7 +3021,8 @@
           22.293333
         ],
         "coverage": 1.0,
-        "sample_interval": 1.0
+        "sample_interval": 1.0,
+        "alert_instances": []
       },
       "expected": null,
       "lower": null,
@@ -3164,7 +3174,8 @@
           0.0005980711811912556
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.0005140285080063423,
@@ -3670,7 +3681,8 @@
           22.293333
         ],
         "coverage": 1.0,
-        "sample_interval": 1.0
+        "sample_interval": 1.0,
+        "alert_instances": []
       },
       "expected": null,
       "lower": null,
@@ -3822,7 +3834,8 @@
           0.163485
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.210022,
@@ -4328,7 +4341,8 @@
           0.408713
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": null,
       "lower": null,
@@ -4480,7 +4494,8 @@
           22.293333
         ],
         "coverage": 1.0,
-        "sample_interval": 1.0
+        "sample_interval": 1.0,
+        "alert_instances": []
       },
       "expected": null,
       "lower": null,
@@ -4632,7 +4647,8 @@
           0.300779
         ],
         "coverage": 1.0,
-        "sample_interval": null
+        "sample_interval": null,
+        "alert_instances": []
       },
       "expected": [
         0.3967465,
@@ -5138,7 +5154,8 @@
           22.293333
         ],
         "coverage": 1.0,
-        "sample_interval": 1.0
+        "sample_interval": 1.0,
+        "alert_instances": []
       },
       "expected": null,
       "lower": null,

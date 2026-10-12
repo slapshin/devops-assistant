@@ -105,8 +105,8 @@ Severity chips: Critical / High / Medium / Low, each with a text label (solid fi
 
 ## 6. Findings
 
-- A grid table in one panel (it scrolls horizontally inside its container on narrow screens). Columns: severity, finding, entity (e.g. `node · shop-production` or `checkout-api · GET /api/v1/orders/:order`), started, duration, peak, usual range (or heuristic), confidence, and recurrence state. The open finding's row is highlighted.
-- Default sort is severity, then peak time. Filters are labelled controls (Category, Severity, Entity), and filter state lives in the URL. A **Recurrence** toggle (All / New today / Happened before, `?recurrence=new|seen`) sits on the left of the filter row.
+- A grid table in one panel (it scrolls horizontally inside its container on narrow screens). Columns: severity, finding, entity (e.g. `node · shop-production` or `checkout-api · GET /api/v1/orders/:order`; Grafana findings add their alert instances, e.g. `HostRebooted · gpu-hive-4, gpu-lndvps-12 +1`), started, duration, peak, usual range (or heuristic), confidence, and recurrence state. The open finding's row is highlighted.
+- Default sort is severity, then peak time. Filters are labelled controls (Category, Severity, Entity), and filter state lives in the URL. The Entity filter also matches Grafana alert instance label values, so a host name finds its alerts. A **Recurrence** toggle (All / New today / Happened before, `?recurrence=new|seen`) sits on the left of the filter row.
 - 4xx findings are titled "Client error increase (4xx)" or "404 increase". 5xx findings are titled "Server error rate (5xx)". The two never share a label.
 - An empty list after filtering shows "No findings match these filters" and a Clear filters button.
 
@@ -122,6 +122,7 @@ Opening a finding expands it in place, accordion-style: a detail row directly be
    - Keyboard-accessible dataZoom, plus a generated `aria` description.
 3. A **"Show data" toggle** that renders the same points as a table (time, observed, expected, lower, upper, gap flag). This is the chart alternative.
 4. **AI hypotheses referencing this finding**, if any, each labelled unverified.
+4a. **Alert instances** (Grafana findings, full-width panel above the Query inspector): each instance active during the finding, named by the labels that differ between the instances (or its `instance`/`host`-like label when alone), with its active intervals ("– still firing" when open), its annotations (URLs as links; the rule's summary appears once in *Finding details* instead), and every label as a chip, the distinguishing ones emphasised. Ten are shown, then *Show all N*.
 5. **Query inspector**: the exact PromQL/MetricsQL, step, and range in a copyable code block (credentials are never shown), and a collapsed *Labels and detector* section with the relevant entity labels (job, instance, route, method, status, device, mountpoint).
 
 Unsupported or insufficient signals have no chart. They show a text block explaining what metric or label is missing, or how much history exists.

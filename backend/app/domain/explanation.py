@@ -78,6 +78,10 @@ class FindingDigest(Contract):
     expected: str | None
     related_finding_ids: list[str] = Field(default_factory=list)
     host: str | None = Field(default=None, description="Verified host, if any.")
+    alert_instances: list[str] = Field(
+        default_factory=list,
+        description="Label sets of the alert instances active during the finding (Grafana).",
+    )
 
 
 class ExplanationInput(Contract):
