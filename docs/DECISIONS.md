@@ -206,6 +206,8 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | Wazuh host security (agent) | all alerts; authentication failures (`rule.groups`: `authentication_failed`, `authentication_failures`, `invalid_login`). An alert surge calls for investigation, not an outage: severity ≤ high | up | ×3 and ≥ +0.03/s (9 per 5 min) | — |
 | Wazuh host security (agent) | high-level alerts (`rule.level` ≥ 12; severity ≤ high) | up | ×3 and ≥ +0.005/s | — |
 | Wazuh file integrity (agent) | FIM changes (`rule.groups: syscheck`). Routine updates also change files: severity ≤ medium | up | ×3 and ≥ +0.05/s (15 per 5 min) | — |
+| Grafana alerting (alert rule) | firing instances of the team's own Grafana-managed rules; the rule already encodes a threshold, so there is no baseline. Severity from the rule's `severity` label: `critical`/`high`/`page`/`p1` → high (3 points), `info`/`low`/`none` → low (1 point), anything else or none → medium (2 points) | up | — | any firing instance in a step (event rule) |
+| Grafana alerting (alert rule) | instances in NoData or Error (the rule cannot evaluate; severity low) | up | — | any such instance in a step (event rule, 1 point) |
 | Latency | p95/p99 from verified classic histograms (HTTP and RPC buckets 0.005–10 s; values at the top bucket are reported as "≥ 10 s"); mean from sum/count only | up | ×1.5 and ≥ +50 ms | — |
 
 - Rates are computed before aggregation; ratio numerator and denominator use the same selector scope (project, env, and entity labels).
@@ -216,6 +218,7 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 - Cloudflare data comes from adaptive (sampled) datasets. Counts are Cloudflare's estimates. A mean sampling interval of ≥ 10 lowers a finding's confidence (`sampled`), and ≥ 100 makes it low (`sampled_low`); sampling never changes severity. Inside a fetched chunk a bucket without rows means zero events, while periods outside retention or of failed queries stay unknown.
 - Sentry transaction counts are extrapolated by Sentry from the client's trace sample rate; a changed sample rate shows up as a throughput change. Error events are counted as stored (after inbound filters and rate limits). Before the project's creation date values are unknown, never zero; a project without transactions in the last 24 h has its transaction signals `unsupported` ("tracing not set up").
 - Wazuh alerts are counted as indexed (level ≥ 3 by default, the manager's `log_alert_level`). An agent's values are unknown before its first alert in the 28-day window, never zero, so a new or long-quiet agent gets a short baseline instead of a fake quiet one. A search that timed out or failed on some shards is a failed chunk, never a partial count. Agents are never matched to Prometheus nodes by name.
+- Grafana alert state comes from the annotations state-history backend, replayed per instance: before an instance's first state change its state is that change's previous state, and an instance without changes keeps its current state (rules API) for the whole window. Per bucket a rule counts the matching instances that fired at any time in it. Paused intervals, and the time before the oldest retained change of a history that was truncated or not retained, are unknown, never quiet. Recurrence marks rules that fire every day. Instance labels (e.g. `project=shop`) are read from the annotation text, which keeps values exactly; annotation tags are lossy (`:` becomes `_`, long values are dropped) and only fill in labels when the text has none. Alert rules are never matched to Prometheus entities.
 
 ### Severity (magnitude and duration only)
 
@@ -248,7 +251,7 @@ Findings are grouped only when they share identity labels (same `(job, instance)
 
 ### Trends
 
-Per bucket: `episode_count`, `anomalous_minutes`, `peak_severity`, `affected_entities`, `observed_entity_minutes` (eligible denominator), `anomalous_share = anomalous_minutes / observed_entity_minutes`, `baseline_days_used`, and coverage status. Buckets without enough baseline are marked `insufficient_baseline`, not zero.
+Per bucket: `episode_count`, `anomalous_minutes`, `peak_severity`, `affected_entities`, `observed_entity_minutes` (eligible denominator), `anomalous_share = anomalous_minutes / observed_entity_minutes`, `baseline_days_used`, and coverage status. Buckets without enough baseline are marked `insufficient_baseline`, not zero; a bucket whose observed series are all event rules (e.g. only Grafana alerts) needs no baseline.
 
 ## 6. Query, resource, and storage budgets
 

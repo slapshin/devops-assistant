@@ -16,6 +16,10 @@ from app.domain.common import (
     UtcDatetime,
 )
 
+ATTRIBUTE_LABELS = ("alert_folder", "alert_group", "alert_instances")
+"""Series labels carried into finding attributes (descriptive, never identity): a Grafana
+rule's folder and group, and its instances that fired in the latest 24 h."""
+
 
 class CapabilityStatus(StrEnum):
     SUPPORTED = "supported"

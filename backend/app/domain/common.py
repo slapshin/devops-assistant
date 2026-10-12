@@ -101,6 +101,7 @@ class SourceKind(StrEnum):
     CLOUDFLARE = "cloudflare"
     SENTRY = "sentry"
     WAZUH = "wazuh"
+    GRAFANA = "grafana"
 
 
 class Scope(Contract):
@@ -154,18 +155,24 @@ class SignalFamily(StrEnum):
     """Wazuh HIDS alerts of an agent: all alerts, high-level alerts, authentication failures."""
     FILE_INTEGRITY = "file_integrity"
     """Wazuh file integrity monitoring (syscheck): files added, modified, or deleted."""
+    ALERTING = "alerting"
+    """Grafana alert rules defined by the team: firing instances, rules that cannot evaluate."""
 
 
 _EDGE_FAMILIES = (SignalFamily.EDGE, SignalFamily.SECURITY)
 _APP_FAMILIES = (SignalFamily.APP_ERRORS, SignalFamily.APP_PERFORMANCE)
 _HOST_SECURITY_FAMILIES = (SignalFamily.HOST_SECURITY, SignalFamily.FILE_INTEGRITY)
+_ALERTING_FAMILIES = (SignalFamily.ALERTING,)
 SOURCE_FAMILIES: Final[dict[SourceKind, tuple[SignalFamily, ...]]] = {
     SourceKind.PROMETHEUS: tuple(
-        f for f in SignalFamily if f not in _EDGE_FAMILIES + _APP_FAMILIES + _HOST_SECURITY_FAMILIES
+        f
+        for f in SignalFamily
+        if f not in _EDGE_FAMILIES + _APP_FAMILIES + _HOST_SECURITY_FAMILIES + _ALERTING_FAMILIES
     ),
     SourceKind.CLOUDFLARE: _EDGE_FAMILIES,
     SourceKind.SENTRY: _APP_FAMILIES,
     SourceKind.WAZUH: _HOST_SECURITY_FAMILIES,
+    SourceKind.GRAFANA: _ALERTING_FAMILIES,
 }
 """Families each source kind can provide; a failed source reports these as source errors."""
 
@@ -214,6 +221,8 @@ class EntityKind(StrEnum):
     """A Sentry project, optionally narrowed to one environment."""
     AGENT = "agent"
     """A Wazuh agent (``agent.name``); never matched to Prometheus nodes."""
+    ALERT_RULE = "alert_rule"
+    """A Grafana-managed alert rule (by UID); its instances are counted, not matched to hosts."""
 
 
 class Entity(Contract):

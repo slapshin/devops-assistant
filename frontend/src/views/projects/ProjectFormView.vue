@@ -9,6 +9,8 @@ import AppTopbar from "../../components/shell/AppTopbar.vue";
 import type { Crumb } from "../../components/shell/crumbs";
 import {
   type FieldErrors,
+  MAX_GRAFANA_FOLDERS,
+  MAX_GRAFANA_RULES,
   MAX_KEEP_REPORTS,
   MAX_MATCHERS,
   MAX_SENTRY_PROJECTS,
@@ -24,6 +26,7 @@ import {
   cloudflareInput,
   draftFrom,
   emptyDraft,
+  grafanaInput,
   keepsStoredSecret,
   matchersInput,
   prometheusInput,
@@ -34,6 +37,7 @@ import {
   sourceKinds,
   storedAuth,
   storedCloudflareToken,
+  storedGrafanaToken,
   storedSentryToken,
   storedWazuhPassword,
   testKey,
@@ -41,6 +45,7 @@ import {
   toInput,
   validateCloudflare,
   validateDraft,
+  validateGrafana,
   validateMatchers,
   validateSentry,
   validateSource,
@@ -86,6 +91,23 @@ const keeps = computed(() => keepsStoredSecret(draft.value, stored.value));
 const cfTokenStored = computed(() => storedCloudflareToken(existing.data.value));
 const sentryTokenStored = computed(() => storedSentryToken(existing.data.value));
 const wazuhPasswordStored = computed(() => storedWazuhPassword(existing.data.value));
+const grafanaTokenStored = computed(() => storedGrafanaToken(existing.data.value));
+const GRAFANA_LABEL_LISTS = [
+  {
+    key: "grafanaRuleLabels",
+    field: "grafana.rule_labels",
+    id: "grafana-rule-label",
+    title: "Rule labels",
+    hint: "Only rules with all of these labels, e.g. team = web. Alone, they select every rule with these labels.",
+  },
+  {
+    key: "grafanaInstanceLabels",
+    field: "grafana.instance_labels",
+    id: "grafana-instance-label",
+    title: "Instance labels",
+    hint: "Only alert instances (the series a rule evaluates) with all of these labels count, e.g. project = shop. Rules without such an instance are skipped.",
+  },
+] as const;
 
 // Fill the form once from the stored project; later refetches must not overwrite edits.
 watch(
@@ -98,7 +120,8 @@ watch(
   { immediate: true },
 );
 
-const clientErrors = computed(() => validateDraft(draft.value, stored.value, cfTokenStored.value, sentryTokenStored.value, wazuhPasswordStored.value),
+const clientErrors = computed(() =>
+  validateDraft(draft.value, stored.value, cfTokenStored.value, sentryTokenStored.value, wazuhPasswordStored.value, grafanaTokenStored.value),
 );
 const errors = computed<FieldErrors>(() => ({ ...(submitted.value ? clientErrors.value : {}), ...serverErrors.value }));
 
@@ -110,6 +133,7 @@ const signatures = computed<Record<SourceKind, string>>(() => ({
   cloudflare: JSON.stringify(draft.value.cloudflare ? cloudflareInput(draft.value) : null),
   sentry: JSON.stringify(draft.value.sentry ? sentryInput(draft.value) : null),
   wazuh: JSON.stringify(draft.value.wazuh ? wazuhInput(draft.value) : null),
+  grafana: JSON.stringify(draft.value.grafana ? grafanaInput(draft.value) : null),
 }));
 const isStale = (kind: SourceKind) => {
   const last = lastTests.value[kind];
@@ -167,6 +191,7 @@ async function runTest(kind: SourceKind) {
     cloudflare: () => validateCloudflare(draft.value, cfTokenStored.value),
     sentry: () => validateSentry(draft.value, sentryTokenStored.value),
     wazuh: () => validateWazuh(draft.value, wazuhPasswordStored.value),
+    grafana: () => validateGrafana(draft.value, grafanaTokenStored.value),
   };
   const problems = validators[kind]();
   if (Object.keys(problems).length) {
@@ -741,6 +766,151 @@ async function confirmDelete() {
             </button>
           </div>
           <ConnectionTestResult v-if="lastTests.wazuh" :test="lastTests.wazuh.result" :stale="isStale('wazuh')" />
+        </template>
+      </fieldset>
+
+      <fieldset>
+        <legend>Grafana alerts</legend>
+        <label class="check"><input v-model="draft.grafana" type="checkbox"> Analyse Grafana alert rules</label>
+        <template v-if="draft.grafana">
+          <p class="muted hint">
+            The state history of Grafana-managed alert rules: every firing alert becomes a finding (severity from the rule's
+            <code>severity</code> label), and rules that fire every day are marked as recurring.
+          </p>
+          <div class="field">
+            <label for="grafana-url">Grafana URL</label>
+            <input
+              id="grafana-url"
+              v-model="draft.grafanaUrl"
+              class="mono"
+              placeholder="https://grafana.example.com"
+              autocomplete="off"
+              :aria-invalid="!!errors['grafana.api_url']"
+              :aria-describedby="describedBy('grafana.api_url') ?? 'grafana-url-hint'"
+            >
+            <p id="grafana-url-hint" class="muted hint">Path prefixes are kept (Grafana behind a sub-path).</p>
+            <p v-if="errors['grafana.api_url']" :id="errorId('grafana.api_url')" class="field-error">{{ errors["grafana.api_url"] }}</p>
+          </div>
+          <label class="check"><input v-model="draft.grafanaTlsVerify" type="checkbox"> Verify TLS certificates</label>
+          <div class="field">
+            <label for="grafana-org">Organization ID</label>
+            <input
+              id="grafana-org"
+              v-model.number="draft.grafanaOrgId"
+              type="number"
+              min="1"
+              step="1"
+              class="mono keep"
+              :aria-invalid="!!errors['grafana.org_id']"
+              :aria-describedby="describedBy('grafana.org_id')"
+            >
+            <p v-if="errors['grafana.org_id']" :id="errorId('grafana.org_id')" class="field-error">{{ errors["grafana.org_id"] }}</p>
+          </div>
+          <div class="field">
+            <label for="grafana-folders">Folders <span class="muted">(optional with rule UIDs or labels)</span></label>
+            <input
+              id="grafana-folders"
+              v-model="draft.grafanaFolders"
+              placeholder="Infrastructure, Shop alerts"
+              autocomplete="off"
+              :aria-invalid="!!errors['grafana.folders']"
+              :aria-describedby="describedBy('grafana.folders') ?? 'grafana-folders-hint'"
+            >
+            <p id="grafana-folders-hint" class="muted hint">
+              Up to {{ MAX_GRAFANA_FOLDERS }} folder titles or UIDs, separated with commas. Every alert rule in them is analysed.
+            </p>
+            <p v-if="errors['grafana.folders']" :id="errorId('grafana.folders')" class="field-error">{{ errors["grafana.folders"] }}</p>
+          </div>
+          <div class="field">
+            <label for="grafana-rules">Rule UIDs <span class="muted">(optional)</span></label>
+            <input
+              id="grafana-rules"
+              v-model="draft.grafanaRuleUids"
+              class="mono"
+              placeholder="dfxnb7qy1wlxcc"
+              autocomplete="off"
+              :aria-invalid="!!errors['grafana.rule_uids']"
+              :aria-describedby="describedBy('grafana.rule_uids') ?? 'grafana-rules-hint'"
+            >
+            <p id="grafana-rules-hint" class="muted hint">
+              Up to {{ MAX_GRAFANA_RULES }} rules in addition to the folders, as in <code>/alerting/grafana/&lt;uid&gt;/view</code>.
+            </p>
+            <p v-if="errors['grafana.rule_uids']" :id="errorId('grafana.rule_uids')" class="field-error">{{ errors["grafana.rule_uids"] }}</p>
+          </div>
+          <div
+            v-for="list in GRAFANA_LABEL_LISTS"
+            :key="list.key"
+            class="field"
+            role="group"
+            :aria-labelledby="`${list.id}s-label`"
+            :aria-describedby="`${list.id}s-hint`"
+          >
+            <span :id="`${list.id}s-label`" class="field-label">{{ list.title }} <span class="muted">(optional)</span></span>
+            <p :id="`${list.id}s-hint`" class="muted hint">{{ list.hint }}</p>
+            <div v-for="(m, i) in draft[list.key]" :key="i" class="matcher">
+              <div class="field">
+                <label :for="`${list.id}-name-${i}`" class="sr-only">{{ list.title }} name {{ i + 1 }}</label>
+                <input
+                  :id="`${list.id}-name-${i}`"
+                  v-model="m.name"
+                  class="mono"
+                  placeholder="label"
+                  autocomplete="off"
+                  :aria-invalid="!!errors[`${list.field}.${i}.name`]"
+                  :aria-describedby="describedBy(`${list.field}.${i}.name`)"
+                >
+                <p v-if="errors[`${list.field}.${i}.name`]" :id="errorId(`${list.field}.${i}.name`)" class="field-error">
+                  {{ errors[`${list.field}.${i}.name`] }}
+                </p>
+              </div>
+              <span class="eq mono" aria-hidden="true">=</span>
+              <div class="field">
+                <label :for="`${list.id}-value-${i}`" class="sr-only">{{ list.title }} value {{ i + 1 }}</label>
+                <input
+                  :id="`${list.id}-value-${i}`"
+                  v-model="m.value"
+                  class="mono"
+                  placeholder="value"
+                  autocomplete="off"
+                  :aria-invalid="!!errors[`${list.field}.${i}.value`]"
+                  :aria-describedby="describedBy(`${list.field}.${i}.value`)"
+                >
+                <p v-if="errors[`${list.field}.${i}.value`]" :id="errorId(`${list.field}.${i}.value`)" class="field-error">
+                  {{ errors[`${list.field}.${i}.value`] }}
+                </p>
+              </div>
+              <button type="button" :aria-label="`Remove ${list.title.toLowerCase()} ${i + 1}`" @click="draft[list.key].splice(i, 1)">✕</button>
+            </div>
+            <p v-if="errors[list.field]" class="field-error">{{ errors[list.field] }}</p>
+            <div>
+              <button type="button" :disabled="draft[list.key].length >= MAX_MATCHERS" @click="draft[list.key].push({ name: '', value: '' })">
+                Add {{ list.title.toLowerCase().replace(/s$/, "") }}
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="grafana-token">Service account token</label>
+            <input
+              id="grafana-token"
+              v-model="draft.grafanaToken"
+              type="password"
+              autocomplete="new-password"
+              :placeholder="grafanaTokenStored ? 'Stored — leave empty to keep' : ''"
+              :aria-invalid="!!errors['grafana.token']"
+              :aria-describedby="describedBy('grafana.token') ?? 'grafana-token-hint'"
+            >
+            <p id="grafana-token-hint" class="muted hint">
+              A service account with the <strong>Viewer</strong> role (Administration → Users and access → Service accounts); it
+              reads alert rules and their state history only.
+            </p>
+            <p v-if="errors['grafana.token']" :id="errorId('grafana.token')" class="field-error">{{ errors["grafana.token"] }}</p>
+          </div>
+          <div class="row">
+            <button type="button" :disabled="tester.isPending.value" @click="runTest('grafana')">
+              {{ testing === "grafana" ? "Testing…" : "Test Grafana connection" }}
+            </button>
+          </div>
+          <ConnectionTestResult v-if="lastTests.grafana" :test="lastTests.grafana.result" :stale="isStale('grafana')" />
         </template>
       </fieldset>
 

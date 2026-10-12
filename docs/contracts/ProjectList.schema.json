@@ -260,6 +260,69 @@
       "title": "ExplanationStatus",
       "type": "string"
     },
+    "GrafanaSource": {
+      "additionalProperties": false,
+      "properties": {
+        "api_url": {
+          "title": "Api Url",
+          "type": "string"
+        },
+        "folders": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Folders",
+          "type": "array"
+        },
+        "instance_labels": {
+          "items": {
+            "$ref": "#/$defs/LabelMatcher"
+          },
+          "title": "Instance Labels",
+          "type": "array"
+        },
+        "kind": {
+          "const": "grafana",
+          "default": "grafana",
+          "title": "Kind",
+          "type": "string"
+        },
+        "org_id": {
+          "default": 1,
+          "title": "Org Id",
+          "type": "integer"
+        },
+        "rule_labels": {
+          "items": {
+            "$ref": "#/$defs/LabelMatcher"
+          },
+          "title": "Rule Labels",
+          "type": "array"
+        },
+        "rule_uids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rule Uids",
+          "type": "array"
+        },
+        "tls_verify": {
+          "default": true,
+          "title": "Tls Verify",
+          "type": "boolean"
+        },
+        "token_set": {
+          "title": "Token Set",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "api_url",
+        "token_set"
+      ],
+      "title": "GrafanaSource",
+      "type": "object"
+    },
     "JobError": {
       "additionalProperties": false,
       "properties": {
@@ -449,6 +512,7 @@
             "discriminator": {
               "mapping": {
                 "cloudflare": "#/$defs/CloudflareSource",
+                "grafana": "#/$defs/GrafanaSource",
                 "prometheus": "#/$defs/PrometheusSource",
                 "sentry": "#/$defs/SentrySource",
                 "wazuh": "#/$defs/WazuhSource"
@@ -467,6 +531,9 @@
               },
               {
                 "$ref": "#/$defs/WazuhSource"
+              },
+              {
+                "$ref": "#/$defs/GrafanaSource"
               }
             ]
           },

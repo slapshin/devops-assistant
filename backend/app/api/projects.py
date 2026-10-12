@@ -15,6 +15,8 @@ from app.domain.projects import (
     CloudflareSourceInput,
     ConnectionTest,
     ConnectionTestRequest,
+    GrafanaConnection,
+    GrafanaSourceInput,
     Project,
     ProjectInput,
     ProjectList,
@@ -32,6 +34,8 @@ from app.domain.projects import (
 from app.sources.cloudflare.connect import connect_cloudflare, probe_cloudflare
 from app.sources.cloudflare.synthetic import SCENARIOS as CLOUDFLARE_SCENARIOS
 from app.sources.factory import connect
+from app.sources.grafana.connect import connect_grafana, probe_grafana
+from app.sources.grafana.synthetic import SCENARIOS as GRAFANA_SCENARIOS
 from app.sources.prometheus.probe import probe
 from app.sources.prometheus.synthetic import SCENARIOS
 from app.sources.sentry.connect import connect_sentry, probe_sentry
@@ -83,6 +87,8 @@ def _check_scenario(source: SourceInput, field_prefix: str) -> None:
             field, scenarios = "api_url", sorted(SENTRY_SCENARIOS)
         case WazuhSourceInput(api_url=url):
             field, scenarios = "api_url", sorted(WAZUH_SCENARIOS)
+        case GrafanaSourceInput(api_url=url):
+            field, scenarios = "api_url", sorted(GRAFANA_SCENARIOS)
     scenario = synthetic_url(url)
     if scenario is not None and scenario not in scenarios:
         raise _invalid(
@@ -207,6 +213,9 @@ async def _probe(conn: SourceConnection, scope: Scope) -> ConnectionTest:
         case WazuhConnection():
             async with connect_wazuh(conn) as wazuh:
                 return await probe_wazuh(wazuh, scope)
+        case GrafanaConnection():
+            async with connect_grafana(conn) as grafana:
+                return await probe_grafana(grafana, scope)
 
 
 def _draft_scope(matchers: list[LabelMatcher]) -> Scope:

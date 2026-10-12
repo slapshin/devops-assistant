@@ -58,7 +58,8 @@
         "app_errors",
         "app_performance",
         "host_security",
-        "file_integrity"
+        "file_integrity",
+        "alerting"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -68,7 +69,8 @@
         "prometheus",
         "cloudflare",
         "sentry",
-        "wazuh"
+        "wazuh",
+        "grafana"
       ],
       "title": "SourceKind",
       "type": "string"
@@ -126,7 +128,7 @@
         }
       ],
       "default": null,
-      "description": "Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h. Wazuh: alerts of the selected agents in the last 24 h.",
+      "description": "Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h. Wazuh: alerts of the selected agents in the last 24 h. Grafana: current alert instances of the selected rules that match the instance labels.",
       "title": "Matched Series"
     },
     "message": {

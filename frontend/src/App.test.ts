@@ -10,12 +10,14 @@ import connectionTest from "../../fixtures/api/connection_test.json";
 import cloudflareTest from "../../fixtures/api/connection_test_cloudflare.json";
 import sentryTest from "../../fixtures/api/connection_test_sentry.json";
 import wazuhTest from "../../fixtures/api/connection_test_wazuh.json";
+import grafanaTest from "../../fixtures/api/connection_test_grafana.json";
 import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
 import cloudflareReport from "../../fixtures/reports/report_cloudflare.json";
 import sentryReport from "../../fixtures/reports/report_sentry.json";
 import wazuhReport from "../../fixtures/reports/report_wazuh.json";
+import grafanaReport from "../../fixtures/reports/report_grafana.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
@@ -671,6 +673,95 @@ describe("project form", () => {
     expect(put.sources[1]).not.toHaveProperty("password");
   });
 
+  it("creates a Grafana alerts source and tests it", async () => {
+    routes["POST /api/projects/test-connection"] = () => json(grafanaTest);
+    routes["POST /api/projects"] = () => json({ ...base, project_id: "grafana-id" }, 201);
+    routes["GET /api/projects/grafana-id"] = () => json({ ...base, project_id: "grafana-id" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt("/projects/new");
+
+    await fireEvent.update(await screen.findByLabelText("Name"), "Shop alerts");
+    await fireEvent.click(screen.getByLabelText("Analyse Grafana alert rules"));
+    const group = screen.getByRole("group", { name: "Grafana alerts" });
+
+    await fireEvent.update(within(group).getByLabelText(/^Rule UIDs/), "ok-1 bad/uid");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    expect(within(group).getByLabelText("Grafana URL")).toHaveAttribute("aria-invalid", "true");
+    expect(within(group).getByText("Invalid rule UIDs: bad/uid")).toBeInTheDocument();
+    expect(within(group).getByLabelText("Service account token")).toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(within(group).getByLabelText(/^Rule UIDs/), "");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    expect(within(group).getByText("Select alert rules by folder, UID or rule label")).toBeInTheDocument();
+
+    await fireEvent.update(within(group).getByLabelText("Grafana URL"), "https://grafana.example.com");
+    await fireEvent.update(within(group).getByLabelText(/^Folders/), "Shop alerts, Infrastructure, Shop alerts");
+    await fireEvent.click(within(group).getByRole("button", { name: "Add instance label" }));
+    await fireEvent.update(within(group).getByLabelText("Instance labels name 1"), "project");
+    await fireEvent.update(within(group).getByLabelText("Instance labels value 1"), "shop");
+    await fireEvent.update(within(group).getByLabelText("Service account token"), "glsa_token");
+    await fireEvent.click(screen.getByRole("button", { name: "Test Grafana connection" }));
+
+    const result = await screen.findByRole("region", { name: "Connection test result" });
+    expect(result).toHaveTextContent("Reachable · 6 matching alert instances");
+    expect(within(result).getByRole("row", { name: /Alerting \(Grafana\).*Supported/ })).toBeInTheDocument();
+
+    const source = {
+      kind: "grafana",
+      api_url: "https://grafana.example.com",
+      org_id: 1,
+      folders: ["Infrastructure", "Shop alerts"],
+      rule_uids: [],
+      rule_labels: [],
+      instance_labels: [{ name: "project", value: "shop" }],
+      tls_verify: true,
+      token: "glsa_token",
+    };
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/grafana-id"));
+    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/projects")?.body ?? "{}");
+    expect(sent.sources).toEqual([source]);
+  });
+
+  it("edits a Grafana source and keeps its stored token", async () => {
+    const grafana = {
+      kind: "grafana",
+      api_url: "https://grafana.example.com",
+      org_id: 2,
+      folders: ["Infrastructure"],
+      rule_uids: ["dfxnb7qy1wlxcc"],
+      rule_labels: [{ name: "team", value: "web" }],
+      instance_labels: [{ name: "project", value: "shop" }],
+      tls_verify: true,
+      token_set: true,
+    };
+
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, grafana] } as Summary);
+    routes[`PUT /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, grafana] });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+
+    await renderAt(`/projects/${PID}/edit`);
+
+    const group = await screen.findByRole("group", { name: "Grafana alerts" });
+    expect(within(group).getByLabelText("Service account token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    expect(within(group).getByLabelText(/^Folders/)).toHaveValue("Infrastructure");
+    expect(within(group).getByLabelText("Rule labels value 1")).toHaveValue("web");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
+
+    const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
+    expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "grafana"]);
+    expect(put.sources[1]).toEqual({ ...grafana, token_set: undefined });
+    expect(put.sources[1]).not.toHaveProperty("token");
+  });
+
   it("deletes only after the name is typed and never while an analysis runs", async () => {
     let current: Summary = { ...base, report_count: 3, active_analysis: running };
     routes[`GET /api/projects/${PID}`] = () => json(current);
@@ -923,6 +1014,16 @@ describe("report", () => {
     const link = await screen.findByRole("link", { name: /Surge of authentication failures/ });
     expect(link.closest("tr")).toHaveTextContent("Wazuh");
     expect(link.closest("tr")).toHaveTextContent("shop-db-1");
+  });
+
+  it("renders a Grafana report with alert rule findings", async () => {
+    await renderAt(`${report(grafanaReport)}/findings`);
+
+    const links = await screen.findAllByRole("link", { name: /Critical Grafana alert firing/ });
+    expect(links).toHaveLength(2);
+    const row = links[0]?.closest("tr");
+    expect(row).toHaveTextContent("Grafana");
+    expect(row).toHaveTextContent("Checkout 5xx errors");
   });
 
   it("findings show the source each one came from", async () => {

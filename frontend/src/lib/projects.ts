@@ -30,6 +30,11 @@ export const WAZUH_MONITORING_INDEX_PATTERN = "wazuh-monitoring-*";
 const WAZUH_GROUP = /^[A-Za-z0-9_.-]{1,255}$/;
 export const MAX_WAZUH_GROUPS = 10;
 const MAX_WAZUH_LABEL_VALUE_CHARS = 200;
+/** Mirrors backend/app/domain/projects.py (Grafana). */
+const GRAFANA_UID = /^[A-Za-z0-9_-]{1,40}$/;
+export const MAX_GRAFANA_FOLDERS = 20;
+export const MAX_GRAFANA_RULES = 100;
+const MAX_GRAFANA_FOLDER_CHARS = 255;
 
 export type AuthType = "none" | "bearer" | "basic";
 
@@ -120,6 +125,19 @@ export interface ProjectDraft {
   wazuhUsername: string;
   wazuhPassword: string;
   wazuhTlsVerify: boolean;
+  grafana: boolean;
+  grafanaUrl: string;
+  grafanaOrgId: number;
+  /** Comma- or newline-separated folder titles or UIDs (titles may contain spaces). */
+  grafanaFolders: string;
+  /** Comma- or space-separated alert rule UIDs. */
+  grafanaRuleUids: string;
+  /** Rule label matchers; rows left completely empty are ignored. */
+  grafanaRuleLabels: MatcherDraft[];
+  /** Alert instance label matchers; rows left completely empty are ignored. */
+  grafanaInstanceLabels: MatcherDraft[];
+  grafanaToken: string;
+  grafanaTlsVerify: boolean;
   scheduled: boolean;
   scheduleTime: string;
   scheduleTimezone: string;
@@ -173,6 +191,15 @@ export function emptyDraft(): ProjectDraft {
     wazuhUsername: "",
     wazuhPassword: "",
     wazuhTlsVerify: true,
+    grafana: false,
+    grafanaUrl: "",
+    grafanaOrgId: 1,
+    grafanaFolders: "",
+    grafanaRuleUids: "",
+    grafanaRuleLabels: [],
+    grafanaInstanceLabels: [],
+    grafanaToken: "",
+    grafanaTlsVerify: true,
     scheduled: false,
     scheduleTime: DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: browserTimezone(),
@@ -187,6 +214,7 @@ type PrometheusSource = Extract<StoredSource, { kind: "prometheus" }>;
 type CloudflareSource = Extract<StoredSource, { kind: "cloudflare" }>;
 type SentrySource = Extract<StoredSource, { kind: "sentry" }>;
 type WazuhSource = Extract<StoredSource, { kind: "wazuh" }>;
+type GrafanaSource = Extract<StoredSource, { kind: "grafana" }>;
 
 export const prometheusSource = (project: { sources: StoredSource[] } | null | undefined) =>
   project?.sources.find((s): s is PrometheusSource => s.kind === "prometheus") ?? null;
@@ -196,12 +224,15 @@ export const sentrySource = (project: { sources: StoredSource[] } | null | undef
   project?.sources.find((s): s is SentrySource => s.kind === "sentry") ?? null;
 export const wazuhSource = (project: { sources: StoredSource[] } | null | undefined) =>
   project?.sources.find((s): s is WazuhSource => s.kind === "wazuh") ?? null;
+export const grafanaSource = (project: { sources: StoredSource[] } | null | undefined) =>
+  project?.sources.find((s): s is GrafanaSource => s.kind === "grafana") ?? null;
 
 export function draftFrom(project: ProjectSummary): ProjectDraft {
   const source = prometheusSource(project);
   const cloudflare = cloudflareSource(project);
   const sentry = sentrySource(project);
   const wazuh = wazuhSource(project);
+  const grafana = grafanaSource(project);
   const auth = source?.auth;
   return {
     name: project.name,
@@ -236,6 +267,15 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     wazuhUsername: wazuh?.username ?? "",
     wazuhPassword: "",
     wazuhTlsVerify: wazuh?.tls_verify ?? true,
+    grafana: !!grafana,
+    grafanaUrl: grafana?.api_url ?? "",
+    grafanaOrgId: grafana?.org_id ?? 1,
+    grafanaFolders: grafana?.folders?.join(", ") ?? "",
+    grafanaRuleUids: grafana?.rule_uids?.join(", ") ?? "",
+    grafanaRuleLabels: grafana?.rule_labels?.map((m) => ({ ...m })) ?? [],
+    grafanaInstanceLabels: grafana?.instance_labels?.map((m) => ({ ...m })) ?? [],
+    grafanaToken: "",
+    grafanaTlsVerify: grafana?.tls_verify ?? true,
     scheduled: !!project.schedule,
     scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: project.schedule?.timezone ?? browserTimezone(),
@@ -267,6 +307,9 @@ export const storedSentryToken = (project: ProjectSummary | null | undefined) =>
 /** True when the project stores a Wazuh indexer password an empty password input keeps. */
 export const storedWazuhPassword = (project: ProjectSummary | null | undefined) => !!wazuhSource(project)?.password_set;
 
+/** True when the project stores a Grafana service account token an empty token input keeps. */
+export const storedGrafanaToken = (project: ProjectSummary | null | undefined) => !!grafanaSource(project)?.token_set;
+
 /** True when the empty secret input for the chosen auth type keeps a stored secret. */
 export const keepsStoredSecret = (draft: ProjectDraft, stored: StoredAuth | null) =>
   !!stored && stored.type === draft.authType && stored.secretSet;
@@ -283,6 +326,11 @@ export function parseList(raw: string): string[] {
 /** Unique, sorted items of a comma- or space-separated list, case kept (Wazuh agent names). */
 export function parseNames(raw: string): string[] {
   return [...new Set(raw.split(/[\s,]+/).filter(Boolean))].sort();
+}
+
+/** Unique, sorted items of a comma- or newline-separated list, case and inner spaces kept (Grafana folders). */
+export function parseFolders(raw: string): string[] {
+  return [...new Set(raw.split(/[,\n]+/).map((f) => f.trim()).filter(Boolean))].sort();
 }
 
 export const parseHostnames = (raw: string) => parseList(raw.replace(/\.(?=[\s,]|$)/g, ""));
@@ -434,6 +482,50 @@ export function validateWazuh(draft: ProjectDraft, passwordStored: boolean): Fie
   return errors;
 }
 
+const usedMatchers = (rows: MatcherDraft[]) => rows.filter((m) => m.name.trim() || m.value);
+
+/** Optional label matcher rows of a source, e.g. "grafana.instance_labels". */
+function validateMatcherRows(rows: MatcherDraft[], field: string): FieldErrors {
+  const errors: FieldErrors = {};
+  if (usedMatchers(rows).length > MAX_MATCHERS) errors[field] = `At most ${MAX_MATCHERS} labels`;
+  const seen = new Set<string>();
+  rows.forEach((m, i) => {
+    const name = m.name.trim();
+    if (!name && !m.value) return;
+    if (!LABEL_NAME.test(name)) errors[`${field}.${i}.name`] = "Letters, digits and _; must not start with a digit";
+    else if (name.startsWith(RESERVED_LABEL_PREFIX)) errors[`${field}.${i}.name`] = "Labels starting with __ are reserved";
+    else if (seen.has(name)) errors[`${field}.${i}.name`] = "Duplicate label";
+    seen.add(name);
+    if (!m.value) errors[`${field}.${i}.value`] = "Required";
+    else if (m.value.length > MAX_LABEL_VALUE_CHARS) errors[`${field}.${i}.value`] = `At most ${MAX_LABEL_VALUE_CHARS} characters`;
+  });
+  return errors;
+}
+
+export function validateGrafana(draft: ProjectDraft, tokenStored: boolean): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!draft.grafana) return errors;
+  const apiUrl = draft.grafanaUrl.trim();
+  const badUrl = apiUrl ? urlError(apiUrl) : "Required";
+  if (badUrl) errors["grafana.api_url"] = badUrl;
+  if (!Number.isInteger(draft.grafanaOrgId) || draft.grafanaOrgId < 1) errors["grafana.org_id"] = "A whole number of at least 1";
+  const folders = parseFolders(draft.grafanaFolders);
+  if (folders.some((f) => f.length > MAX_GRAFANA_FOLDER_CHARS)) errors["grafana.folders"] = `At most ${MAX_GRAFANA_FOLDER_CHARS} characters per folder`;
+  else if (folders.length > MAX_GRAFANA_FOLDERS) errors["grafana.folders"] = `At most ${MAX_GRAFANA_FOLDERS} folders`;
+  const uids = parseNames(draft.grafanaRuleUids);
+  const badUids = uids.filter((u) => !GRAFANA_UID.test(u));
+  if (badUids.length) errors["grafana.rule_uids"] = `Invalid rule UIDs: ${badUids.join(", ")}`;
+  else if (uids.length > MAX_GRAFANA_RULES) errors["grafana.rule_uids"] = `At most ${MAX_GRAFANA_RULES} rules`;
+  Object.assign(errors, validateMatcherRows(draft.grafanaRuleLabels, "grafana.rule_labels"));
+  Object.assign(errors, validateMatcherRows(draft.grafanaInstanceLabels, "grafana.instance_labels"));
+  if (!folders.length && !uids.length && !usedMatchers(draft.grafanaRuleLabels).length) {
+    errors["grafana.folders"] ??= "Select alert rules by folder, UID or rule label";
+  }
+  const synthetic = apiUrl.startsWith("synthetic:");
+  if (!draft.grafanaToken && !tokenStored && !synthetic) errors["grafana.token"] = "Required";
+  return errors;
+}
+
 export function validateSchedule(draft: ProjectDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!draft.scheduled) return errors;
@@ -450,12 +542,19 @@ export function validateRetention(draft: ProjectDraft): FieldErrors {
   return {};
 }
 
-export function validateDraft(draft: ProjectDraft, stored: StoredAuth | null, cfTokenStored = false, sentryTokenStored = false, wazuhPasswordStored = false): FieldErrors {
+export function validateDraft(
+  draft: ProjectDraft,
+  stored: StoredAuth | null,
+  cfTokenStored = false,
+  sentryTokenStored = false,
+  wazuhPasswordStored = false,
+  grafanaTokenStored = false,
+): FieldErrors {
   const errors: FieldErrors = {};
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
-  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...validateCloudflare(draft, cfTokenStored), ...validateSentry(draft, sentryTokenStored), ...validateWazuh(draft, wazuhPasswordStored), ...validateSchedule(draft), ...validateRetention(draft) };
+  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...validateCloudflare(draft, cfTokenStored), ...validateSentry(draft, sentryTokenStored), ...validateWazuh(draft, wazuhPasswordStored), ...validateGrafana(draft, grafanaTokenStored), ...validateSchedule(draft), ...validateRetention(draft) };
 }
 
 type SourceInput = NonNullable<ProjectInput["sources"]>[number];
@@ -508,6 +607,21 @@ export function wazuhInput(draft: ProjectDraft): SourceInput {
   };
 }
 
+export function grafanaInput(draft: ProjectDraft): SourceInput {
+  const matchers = (rows: MatcherDraft[]) => usedMatchers(rows).map((m) => ({ name: m.name.trim(), value: m.value }));
+  return {
+    kind: "grafana",
+    api_url: draft.grafanaUrl.trim(),
+    org_id: draft.grafanaOrgId,
+    folders: parseFolders(draft.grafanaFolders),
+    rule_uids: parseNames(draft.grafanaRuleUids),
+    rule_labels: matchers(draft.grafanaRuleLabels),
+    instance_labels: matchers(draft.grafanaInstanceLabels),
+    tls_verify: draft.grafanaTlsVerify,
+    ...(draft.grafanaToken ? { token: draft.grafanaToken } : {}),
+  };
+}
+
 /** The input of one configured source kind. */
 export function sourceInput(draft: ProjectDraft, kind: SourceKind): SourceInput {
   switch (kind) {
@@ -519,6 +633,8 @@ export function sourceInput(draft: ProjectDraft, kind: SourceKind): SourceInput 
       return sentryInput(draft);
     case "wazuh":
       return wazuhInput(draft);
+    case "grafana":
+      return grafanaInput(draft);
   }
 }
 
@@ -529,6 +645,7 @@ export function sourceKinds(draft: ProjectDraft): SourceKind[] {
   if (draft.cloudflare) kinds.push("cloudflare");
   if (draft.sentry) kinds.push("sentry");
   if (draft.wazuh) kinds.push("wazuh");
+  if (draft.grafana) kinds.push("grafana");
   return kinds;
 }
 
@@ -620,16 +737,19 @@ export const SOURCE_KIND_LABELS: Record<SourceKind, string> = {
   cloudflare: "Cloudflare",
   sentry: "Sentry",
   wazuh: "Wazuh",
+  grafana: "Grafana",
 };
 
 export const sourceKindLabel = (kind: SourceKind) => SOURCE_KIND_LABELS[kind];
 
-/** What a connection test counts: matching series (Prometheus), requests (Cloudflare), events (Sentry) or alerts (Wazuh) in 24 h. */
+/** What a connection test counts: matching series (Prometheus), requests (Cloudflare), events (Sentry) or alerts (Wazuh) in 24 h,
+ * or current alert instances (Grafana). */
 export function testVolume(test: ConnectionTest): string | null {
   if (test.matched_series === null || test.matched_series === undefined) return null;
   if (test.kind === "cloudflare") return `${test.matched_series.toLocaleString("en")} requests in 24 h`;
   if (test.kind === "sentry") return `${test.matched_series.toLocaleString("en")} events in 24 h`;
   if (test.kind === "wazuh") return `${test.matched_series.toLocaleString("en")} alerts in 24 h`;
+  if (test.kind === "grafana") return `${test.matched_series.toLocaleString("en")} matching alert instances`;
   return `${test.matched_series} matching series`;
 }
 

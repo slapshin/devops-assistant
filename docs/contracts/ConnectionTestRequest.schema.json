@@ -118,6 +118,93 @@
       "title": "CloudflareSourceInput",
       "type": "object"
     },
+    "GrafanaSourceInput": {
+      "additionalProperties": false,
+      "description": "Grafana-managed alert rules selected by folder, UID and/or rule labels.\n\nThe folders' rules and the listed rules together form the selection; rule label matchers\nnarrow it (or alone select every rule with those labels). Instance label matchers then\nnarrow which alert instances of those rules count, e.g. ``project=shop``.",
+      "properties": {
+        "api_url": {
+          "description": "Grafana URL, e.g. https://grafana.example.com (path prefixes are kept); synthetic://<scenario> for demo data.",
+          "maxLength": 2048,
+          "title": "Api Url",
+          "type": "string"
+        },
+        "folders": {
+          "description": "Folder UIDs or titles whose alert rules are analysed.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Folders",
+          "type": "array"
+        },
+        "instance_labels": {
+          "description": "Alert instance label matchers (e.g. project=shop), all of which must match; instances without them are not counted.",
+          "items": {
+            "$ref": "#/$defs/LabelMatcher"
+          },
+          "maxItems": 10,
+          "title": "Instance Labels",
+          "type": "array"
+        },
+        "kind": {
+          "const": "grafana",
+          "default": "grafana",
+          "title": "Kind",
+          "type": "string"
+        },
+        "org_id": {
+          "default": 1,
+          "description": "Grafana organization of the rules.",
+          "minimum": 1,
+          "title": "Org Id",
+          "type": "integer"
+        },
+        "rule_labels": {
+          "description": "Rule label matchers (e.g. team=web), all of which must match.",
+          "items": {
+            "$ref": "#/$defs/LabelMatcher"
+          },
+          "maxItems": 10,
+          "title": "Rule Labels",
+          "type": "array"
+        },
+        "rule_uids": {
+          "description": "Alert rule UIDs analysed in addition to the folders.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Rule Uids",
+          "type": "array"
+        },
+        "tls_verify": {
+          "default": true,
+          "description": "Verify Grafana's TLS certificate; turn off only for a self-signed or internal certificate.",
+          "title": "Tls Verify",
+          "type": "boolean"
+        },
+        "token": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Service account token (Viewer role). Omit to keep the stored one (update only); not needed for synthetic://.",
+          "title": "Token"
+        }
+      },
+      "required": [
+        "api_url"
+      ],
+      "title": "GrafanaSourceInput",
+      "type": "object"
+    },
     "LabelMatcher": {
       "additionalProperties": false,
       "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
@@ -468,6 +555,9 @@
         },
         {
           "$ref": "#/$defs/WazuhSourceInput"
+        },
+        {
+          "$ref": "#/$defs/GrafanaSourceInput"
         }
       ],
       "title": "Source"

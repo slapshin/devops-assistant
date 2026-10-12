@@ -22,6 +22,9 @@ from app.domain.projects import (
     CloudflareConnection,
     CloudflareSource,
     CloudflareSourceInput,
+    GrafanaConnection,
+    GrafanaSource,
+    GrafanaSourceInput,
     NoAuth,
     Project,
     ProjectInput,
@@ -214,6 +217,8 @@ class SqliteProjectRepository:
                 return self._split_sentry(source, stored)
             case WazuhSourceInput():
                 return self._split_wazuh(source, stored)
+            case GrafanaSourceInput():
+                return self._split_grafana(source, stored)
 
     def _split_prometheus(
         self, source: PrometheusSourceInput, stored: Any
@@ -298,6 +303,26 @@ class SqliteProjectRepository:
         if synthetic_url(source.api_url) or source.username is None:
             return config, {}
         raise SecretRequired("password")
+
+    def _split_grafana(
+        self, source: GrafanaSourceInput, stored: Any
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        config: dict[str, Any] = {
+            "api_url": source.api_url,
+            "org_id": source.org_id,
+            "folders": source.folders,
+            "rule_uids": source.rule_uids,
+            "rule_labels": [m.model_dump() for m in source.rule_labels],
+            "instance_labels": [m.model_dump() for m in source.instance_labels],
+            "tls_verify": source.tls_verify,
+        }
+        if source.token is not None:
+            return config, {"token": source.token.get_secret_value()}
+        if stored is not None and stored.secrets is not None:
+            return config, self.box.decrypt(stored.secrets)
+        if synthetic_url(source.api_url):
+            return config, {}
+        raise SecretRequired("token")
 
     def _write_sources(
         self,
@@ -474,8 +499,21 @@ def _schedule(raw: str | None) -> ReportSchedule | None:
     return ReportSchedule.model_validate_json(raw) if raw else None
 
 
-def _source_view(row: Any) -> PrometheusSource | CloudflareSource | SentrySource | WazuhSource:
+def _source_view(
+    row: Any,
+) -> PrometheusSource | CloudflareSource | SentrySource | WazuhSource | GrafanaSource:
     config = json.loads(row.config)
+    if SourceKind(row.kind) is SourceKind.GRAFANA:
+        return GrafanaSource(
+            api_url=config["api_url"],
+            org_id=config.get("org_id", 1),
+            folders=config.get("folders", []),
+            rule_uids=config.get("rule_uids", []),
+            rule_labels=_matchers(config.get("rule_labels", [])),
+            instance_labels=_matchers(config.get("instance_labels", [])),
+            tls_verify=config.get("tls_verify", True),
+            token_set=row.secrets is not None,
+        )
     if SourceKind(row.kind) is SourceKind.WAZUH:
         return WazuhSource(
             api_url=config["api_url"],
@@ -558,6 +596,22 @@ def _any_connection(
                 password=SecretStr(password) if password else None,
                 tls_verify=config.get("tls_verify", True),
             )
+        case SourceKind.GRAFANA:
+            token = secrets.get("token")
+            return GrafanaConnection(
+                api_url=config["api_url"],
+                org_id=config.get("org_id", 1),
+                folders=config.get("folders", []),
+                rule_uids=config.get("rule_uids", []),
+                rule_labels=_matchers(config.get("rule_labels", [])),
+                instance_labels=_matchers(config.get("instance_labels", [])),
+                token=SecretStr(token) if token else None,
+                tls_verify=config.get("tls_verify", True),
+            )
+
+
+def _matchers(raw: list[dict[str, str]]) -> list[LabelMatcher]:
+    return [LabelMatcher(**m) for m in raw]
 
 
 def _sentry_projects(config: dict[str, Any]) -> list[str]:

@@ -119,6 +119,7 @@ export const FAMILY_LABELS: Record<string, string> = {
   app_performance: "Transactions (Sentry)",
   host_security: "Host security (Wazuh)",
   file_integrity: "File integrity (Wazuh)",
+  alerting: "Alerting (Grafana)",
 };
 
 export const STATUS_LABELS: Record<string, { label: string; icon: string }> = {

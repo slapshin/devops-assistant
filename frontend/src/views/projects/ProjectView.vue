@@ -9,7 +9,16 @@ import SourceHealth from "../../components/projects/SourceHealth.vue";
 import SourceIcon from "../../components/projects/SourceIcon.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import { formatTime, utcTooltip } from "../../lib/format";
-import { WAZUH_INDEX_PATTERN, cloudflareSource, prometheusSource, scheduleSummary, sentrySource, sourceHost, wazuhSource } from "../../lib/projects";
+import {
+  WAZUH_INDEX_PATTERN,
+  cloudflareSource,
+  grafanaSource,
+  prometheusSource,
+  scheduleSummary,
+  sentrySource,
+  sourceHost,
+  wazuhSource,
+} from "../../lib/projects";
 
 const HISTORY_PAGE_SIZE = 20;
 const AUTH_LABELS: Record<string, string> = { none: "No authentication", bearer: "Bearer token", basic: "Basic auth" };
@@ -24,6 +33,13 @@ const prometheus = computed(() => prometheusSource(project.data.value));
 const cloudflare = computed(() => cloudflareSource(project.data.value));
 const sentry = computed(() => sentrySource(project.data.value));
 const wazuh = computed(() => wazuhSource(project.data.value));
+const grafana = computed(() => grafanaSource(project.data.value));
+const grafanaRules = computed(() => {
+  const g = grafana.value;
+  if (!g) return "";
+  const parts = [...(g.folders ?? []).map((f) => `folder ${f}`), ...(g.rule_uids ?? []).map((u) => `rule ${u}`)];
+  return parts.join(", ") || "rules by label";
+});
 const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ?? []);
 </script>
 
@@ -92,6 +108,22 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
               class="chips"
               label="Wazuh agent labels"
               :matchers="wazuh.labels.map((l) => ({ name: l.key, value: l.value }))"
+            />
+          </dd>
+          <dd v-else class="muted">Not configured</dd>
+          <dt class="source-kind"><SourceIcon kind="grafana" />Grafana alerts</dt>
+          <dd v-if="grafana">
+            <SourceHealth :project="project.data.value" kind="grafana" />
+            <span class="mono">{{ sourceHost(grafana.api_url) }}</span>
+            · {{ grafanaRules }}
+            <template v-if="(grafana.org_id ?? 1) !== 1"> · org {{ grafana.org_id }}</template>
+            <template v-if="grafana.tls_verify === false"> · TLS not verified</template>
+            <MatcherChips v-if="grafana.rule_labels?.length" class="chips" label="Grafana rule labels" :matchers="grafana.rule_labels" />
+            <MatcherChips
+              v-if="grafana.instance_labels?.length"
+              class="chips"
+              label="Grafana instance labels"
+              :matchers="grafana.instance_labels"
             />
           </dd>
           <dd v-else class="muted">Not configured</dd>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** Source-kind glyphs: a flame for Prometheus-compatible metrics, a cloud for Cloudflare, a bug for Sentry, a shield for Wazuh. */
+/** Source-kind glyphs: a flame for Prometheus-compatible metrics, a cloud for Cloudflare, a bug for Sentry, a shield for Wazuh, a bell for Grafana alerts. */
 import type { SourceKind } from "../../api/client";
 
 defineProps<{ kind: SourceKind }>();
@@ -19,6 +19,10 @@ defineProps<{ kind: SourceKind }>();
       <path d="M8 1.5 13 3.5v4c0 3.2-2.1 5.6-5 7-2.9-1.4-5-3.8-5-7v-4z" />
       <path d="m5.75 8 1.6 1.6L10.5 6.4" />
     </template>
+    <template v-else-if="kind === 'grafana'">
+      <path d="M4 11.5V7.5a4 4 0 0 1 8 0v4l1.25 1.5H2.75z" />
+      <path d="M6.75 14.25a1.4 1.4 0 0 0 2.5 0M8 2v1.5" />
+    </template>
     <path v-else d="M4.5 12.5a3 3 0 0 1-.4-6A4 4 0 0 1 11.8 6 3.25 3.25 0 0 1 11.5 12.5z" />
   </svg>
 </template>
@@ -29,4 +33,5 @@ defineProps<{ kind: SourceKind }>();
 .cloudflare { color: #f38020; }
 .sentry { color: #7553ff; }
 .wazuh { color: #3595f9; }
+.grafana { color: #f46800; }
 </style>

@@ -29,7 +29,8 @@
         "app_errors",
         "app_performance",
         "host_security",
-        "file_integrity"
+        "file_integrity",
+        "alerting"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -39,7 +40,8 @@
         "prometheus",
         "cloudflare",
         "sentry",
-        "wazuh"
+        "wazuh",
+        "grafana"
       ],
       "title": "SourceKind",
       "type": "string"

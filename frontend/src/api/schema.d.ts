@@ -424,7 +424,7 @@ export interface components {
             kind: components["schemas"]["SourceKind"];
             /**
              * Matched Series
-             * @description Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h. Wazuh: alerts of the selected agents in the last 24 h.
+             * @description Prometheus: series currently matching all matchers. Cloudflare: requests in the last 24 h. Sentry: error events and transactions in the last 24 h. Wazuh: alerts of the selected agents in the last 24 h. Grafana: current alert instances of the selected rules that match the instance labels.
              */
             matched_series?: number | null;
             /** Message */
@@ -448,7 +448,7 @@ export interface components {
              */
             project_id?: string | null;
             /** Source */
-            source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"];
+            source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"] | components["schemas"]["GrafanaSourceInput"];
         };
         /**
          * DailyTrend
@@ -516,7 +516,7 @@ export interface components {
          * EntityKind
          * @enum {string}
          */
-        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone" | "application" | "agent";
+        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone" | "application" | "agent" | "alert_rule";
         /** EpisodeSummary */
         EpisodeSummary: {
             /** End */
@@ -712,6 +712,94 @@ export interface components {
          * @enum {string}
          */
         FindingState: "ongoing" | "resolved";
+        /** GrafanaSource */
+        GrafanaSource: {
+            /** Api Url */
+            api_url: string;
+            /** Folders */
+            folders?: string[];
+            /** Instance Labels */
+            instance_labels?: components["schemas"]["LabelMatcher"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "grafana";
+            /**
+             * Org Id
+             * @default 1
+             */
+            org_id: number;
+            /** Rule Labels */
+            rule_labels?: components["schemas"]["LabelMatcher"][];
+            /** Rule Uids */
+            rule_uids?: string[];
+            /**
+             * Tls Verify
+             * @default true
+             */
+            tls_verify: boolean;
+            /** Token Set */
+            token_set: boolean;
+        };
+        /**
+         * GrafanaSourceInput
+         * @description Grafana-managed alert rules selected by folder, UID and/or rule labels.
+         *
+         *     The folders' rules and the listed rules together form the selection; rule label matchers
+         *     narrow it (or alone select every rule with those labels). Instance label matchers then
+         *     narrow which alert instances of those rules count, e.g. ``project=shop``.
+         */
+        GrafanaSourceInput: {
+            /**
+             * Api Url
+             * @description Grafana URL, e.g. https://grafana.example.com (path prefixes are kept); synthetic://<scenario> for demo data.
+             */
+            api_url: string;
+            /**
+             * Folders
+             * @description Folder UIDs or titles whose alert rules are analysed.
+             */
+            folders?: string[];
+            /**
+             * Instance Labels
+             * @description Alert instance label matchers (e.g. project=shop), all of which must match; instances without them are not counted.
+             */
+            instance_labels?: components["schemas"]["LabelMatcher"][];
+            /**
+             * Kind
+             * @default grafana
+             * @constant
+             */
+            kind: "grafana";
+            /**
+             * Org Id
+             * @description Grafana organization of the rules.
+             * @default 1
+             */
+            org_id: number;
+            /**
+             * Rule Labels
+             * @description Rule label matchers (e.g. team=web), all of which must match.
+             */
+            rule_labels?: components["schemas"]["LabelMatcher"][];
+            /**
+             * Rule Uids
+             * @description Alert rule UIDs analysed in addition to the folders.
+             */
+            rule_uids?: string[];
+            /**
+             * Tls Verify
+             * @description Verify Grafana's TLS certificate; turn off only for a self-signed or internal certificate.
+             * @default true
+             */
+            tls_verify: boolean;
+            /**
+             * Token
+             * @description Service account token (Viewer role). Omit to keep the stored one (update only); not needed for synthetic://.
+             */
+            token?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -935,7 +1023,7 @@ export interface components {
             project_id: string;
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"] | components["schemas"]["WazuhSource"])[];
+            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"] | components["schemas"]["WazuhSource"] | components["schemas"]["GrafanaSource"])[];
             /** Updated At */
             updated_at: string;
         };
@@ -961,7 +1049,7 @@ export interface components {
             /** @description Automatic analyses; null runs analyses on demand only. */
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources?: (components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"])[];
+            sources?: (components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"] | components["schemas"]["GrafanaSourceInput"])[];
         };
         /** ProjectList */
         ProjectList: {
@@ -1011,7 +1099,7 @@ export interface components {
             report_count: number;
             schedule?: components["schemas"]["ReportSchedule"] | null;
             /** Sources */
-            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"] | components["schemas"]["WazuhSource"])[];
+            sources: (components["schemas"]["PrometheusSource"] | components["schemas"]["CloudflareSource"] | components["schemas"]["SentrySource"] | components["schemas"]["WazuhSource"] | components["schemas"]["GrafanaSource"])[];
             /** Updated At */
             updated_at: string;
         };
@@ -1243,7 +1331,7 @@ export interface components {
          * SignalFamily
          * @enum {string}
          */
-        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity";
+        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity" | "alerting";
         /**
          * SignalStatus
          * @enum {string}
@@ -1273,7 +1361,7 @@ export interface components {
          * SourceKind
          * @enum {string}
          */
-        SourceKind: "prometheus" | "cloudflare" | "sentry" | "wazuh";
+        SourceKind: "prometheus" | "cloudflare" | "sentry" | "wazuh" | "grafana";
         /**
          * StageName
          * @enum {string}

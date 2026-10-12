@@ -216,6 +216,22 @@ A project's Wazuh source analyses the security alerts of selected Wazuh agents, 
   - The indexer version is read best-effort from `GET /` (a role limited to the alerts indices may not see it).
 - **Live verification pending**: no live Wazuh indexer was available during T018. Field names follow the Wazuh 4.x alerts template (see the T018 task file).
 
+### Grafana alerts (T019)
+
+A project's Grafana source analyses the state history of Grafana-managed alert rules, each rule as its own entity (kind `alert_rule`, family `alerting`; `app/sources/grafana/`, catalog `grafana-2026.10.12`). Rules are selected by folder (title or UID, up to 20), rule UID (up to 100) and/or rule label matchers (up to 10, all must match); at least one is required. Folders and UIDs together form the selection and rule labels narrow it. **Instance label matchers** (up to 10, e.g. `project = shop`) then narrow which alert instances count; rules without a matching instance in the window are not analysed (`no_data` exclusion). A Viewer-role service account token is enough; every request is a `GET` with `Authorization: Bearer` and `X-Grafana-Org-Id`.
+
+| Signal | Meaning | Unit |
+| --- | --- | --- |
+| `grafana_alert_firing` | instances in `Alerting`/`Recovering` at any time in the bucket (rules without or with another `severity` label) | count |
+| `grafana_alert_firing_critical` | the same for rules labelled `severity` = `critical`, `high`, `page`, `p1` or `emergency` | count |
+| `grafana_alert_firing_info` | the same for rules labelled `severity` = `info`, `informational`, `low`, `none`, `p4` or `p5` | count |
+| `grafana_alert_nodata` | instances in `NoData` or `Error` (the rule cannot evaluate) | count |
+
+- **Rules**: one `GET /api/prometheus/grafana/api/v1/rules` (paged by `group_next_token`) lists every alerting rule with its folder, group, labels, pause flag and current instances (structured labels, state, `activeAt`). More than 100 selected rules keeps the first 100 by folder and title and adds a `series_truncated` exclusion.
+- **History**: per rule, `GET /api/annotations?type=alert&alertUID=<uid>&from=&to=&limit=5000` over the 28-day window, paged backwards by `to` and deduplicated by annotation ID, up to 50,000 changes per rule (more: `series_truncated`, older states unknown). This is the annotations state-history backend, Grafana's default; instance labels are parsed from the annotation text `<title> {a=1, b=2} - A=1.0` (values may contain commas, braces and newlines; only `, name=` starts a new pair). A failed rule becomes a `query_failed`/`query_timeout` exclusion (the report is `partial`); a change without a label set cannot be matched to instance labels and is disclosed as `no_data`.
+- **Replay**: see DECISIONS §5. `Pending` and `Normal (…)` count as not firing; `Normal (Paused)` is unknown.
+- **Verified live (2026-10-12, Grafana 12.4.5)**: the rules API shape, `alertUID` filtering, annotation text and tags (tags sanitise `:` to `_` and leave out long values, so the text is authoritative), and about 28 days of retained history. The parser read all 4,129 alert annotations of a 3.5-day sample. The full client was not yet run with a service account token.
+
 ## Budgets and behaviour
 
 | Aspect | Behaviour |

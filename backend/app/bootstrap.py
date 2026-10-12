@@ -5,6 +5,7 @@ import logging
 from app.domain.common import LabelMatcher
 from app.domain.projects import (
     CloudflareSourceInput,
+    GrafanaSourceInput,
     ProjectInput,
     PrometheusSourceInput,
     SentrySourceInput,
@@ -29,7 +30,7 @@ def demo_projects() -> list[ProjectInput]:
         ProjectInput(
             name=f"Demo: {scenario}",
             description=f"Synthetic data, scenario {scenario!r}. No real metrics, Cloudflare "
-            "analytics, Sentry events or Wazuh alerts are queried.",
+            "analytics, Sentry events, Wazuh alerts or Grafana alerts are queried.",
             matchers=DEMO_MATCHERS,
             sources=[
                 PrometheusSourceInput(url=f"synthetic://{scenario}"),
@@ -45,6 +46,11 @@ def demo_projects() -> list[ProjectInput]:
                     api_url=f"synthetic://{scenario}",
                 ),
                 WazuhSourceInput(api_url=f"synthetic://{scenario}", groups=["shop-db", "shop-web"]),
+                GrafanaSourceInput(
+                    api_url=f"synthetic://{scenario}",
+                    folders=["Shop"],
+                    instance_labels=[LabelMatcher(name="project", value="shop")],
+                ),
             ],
         )
         for scenario in SCENARIOS

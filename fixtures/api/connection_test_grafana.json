@@ -1,0 +1,16 @@
+{
+  "kind": "grafana",
+  "reachable": true,
+  "auth_ok": true,
+  "matched_series": 6,
+  "history_days": null,
+  "families": [
+    {
+      "family": "alerting",
+      "status": "supported",
+      "reason": null
+    }
+  ],
+  "message": "4 alert rules selected, 6 matching instances, 1 rules firing now. Grafana 12.4.5.",
+  "checked_at": "2026-09-30T10:05:00Z"
+}

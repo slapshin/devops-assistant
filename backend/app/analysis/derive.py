@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 from app.analysis.rules import RULES, Rule
 from app.domain.common import Entity, Unit
-from app.domain.metrics import MetricSeries
+from app.domain.metrics import ATTRIBUTE_LABELS, MetricSeries
 
 Array = NDArray[np.float64]
 
@@ -72,6 +72,10 @@ DIRECT: dict[str, str] = {
     "wazuh_high_alerts": "hids_high_alert_rate",
     "wazuh_auth_failures": "hids_auth_failure_rate",
     "wazuh_fim_changes": "fim_change_rate",
+    "grafana_alert_firing": "alert_firing",
+    "grafana_alert_firing_critical": "alert_firing_critical",
+    "grafana_alert_firing_info": "alert_firing_info",
+    "grafana_alert_nodata": "alert_nodata",
 }
 """Collected signal -> rule for signals analysed as collected."""
 
@@ -243,7 +247,12 @@ def _direct_series(by_signal: dict[str, dict[str, MetricSeries]]) -> list[Analys
         for key in sorted(by_signal[name]):
             s = by_signal[name][key]
             rule = RULES[DIRECT[name]]
-            out.append(AnalysisSeries(rule, s.entity, s.unit, to_array(s), s.query, s))
+            attributes = {k: s.labels[k] for k in ATTRIBUTE_LABELS if k in s.labels}
+            out.append(
+                AnalysisSeries(
+                    rule, s.entity, s.unit, to_array(s), s.query, s, attributes=attributes
+                )
+            )
     return out
 
 

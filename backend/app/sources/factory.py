@@ -11,6 +11,7 @@ from app.domain.common import Scope, SourceKind
 from app.domain.interfaces import MetricsSource, OpenedSource
 from app.domain.projects import (
     CloudflareConnection,
+    GrafanaConnection,
     PrometheusConnection,
     SentryConnection,
     SourceConnection,
@@ -18,6 +19,7 @@ from app.domain.projects import (
     synthetic_url,
 )
 from app.sources.cloudflare.connect import connect_cloudflare
+from app.sources.grafana.connect import connect_grafana
 from app.sources.prometheus.client import PrometheusClient
 from app.sources.prometheus.source import PrometheusMetricsSource
 from app.sources.prometheus.synthetic import SyntheticMetricsSource
@@ -62,6 +64,9 @@ async def open_source(conn: SourceConnection) -> AsyncGenerator[MetricsSource]:
         case WazuhConnection():
             async with connect_wazuh(conn) as wazuh:
                 yield wazuh
+        case GrafanaConnection():
+            async with connect_grafana(conn) as grafana:
+                yield grafana
 
 
 class ProjectSources:

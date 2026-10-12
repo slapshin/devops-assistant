@@ -57,6 +57,10 @@ MAX_WAZUH_LABEL_VALUE_CHARS = 200
 WAZUH_MONITORING_INDEX_PATTERN = "wazuh-monitoring-*"
 _WAZUH_GROUP = re.compile(r"^[A-Za-z0-9_.-]{1,255}$")
 MAX_WAZUH_GROUPS = 10
+_GRAFANA_UID = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+MAX_GRAFANA_FOLDERS = 20
+MAX_GRAFANA_RULES = 100
+MAX_GRAFANA_FOLDER_CHARS = 255
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
 )
@@ -419,6 +423,85 @@ class WazuhSourceInput(Contract):
         return self
 
 
+def normalise_grafana_folders(folders: list[str]) -> list[str]:
+    """Unique, sorted folder UIDs or titles (matched exactly, case kept)."""
+    names = sorted({f.strip() for f in folders if f.strip()})
+    if bad := [f for f in names if len(f) > MAX_GRAFANA_FOLDER_CHARS or "\n" in f or "\r" in f]:
+        raise ValueError(f"invalid folder names: {', '.join(bad)}")
+    return names
+
+
+def normalise_grafana_rules(uids: list[str]) -> list[str]:
+    """Unique, sorted alert rule UIDs."""
+    names = sorted({u.strip() for u in uids if u.strip()})
+    if bad := [u for u in names if not _GRAFANA_UID.match(u)]:
+        raise ValueError(f"invalid rule UIDs: {', '.join(bad)}")
+    return names
+
+
+GrafanaFolders = Annotated[
+    list[str], Field(max_length=MAX_GRAFANA_FOLDERS), AfterValidator(normalise_grafana_folders)
+]
+GrafanaRules = Annotated[
+    list[str], Field(max_length=MAX_GRAFANA_RULES), AfterValidator(normalise_grafana_rules)
+]
+
+
+class GrafanaSourceInput(Contract):
+    """Grafana-managed alert rules selected by folder, UID and/or rule labels.
+
+    The folders' rules and the listed rules together form the selection; rule label matchers
+    narrow it (or alone select every rule with those labels). Instance label matchers then
+    narrow which alert instances of those rules count, e.g. ``project=shop``.
+    """
+
+    kind: Literal[SourceKind.GRAFANA] = SourceKind.GRAFANA
+    api_url: str = Field(
+        max_length=2048,
+        description="Grafana URL, e.g. https://grafana.example.com (path prefixes are kept); "
+        "synthetic://<scenario> for demo data.",
+    )
+    org_id: int = Field(default=1, ge=1, description="Grafana organization of the rules.")
+    folders: GrafanaFolders = Field(
+        default_factory=list, description="Folder UIDs or titles whose alert rules are analysed."
+    )
+    rule_uids: GrafanaRules = Field(
+        default_factory=list, description="Alert rule UIDs analysed in addition to the folders."
+    )
+    rule_labels: OptionalMatchers = Field(
+        default_factory=list,
+        description="Rule label matchers (e.g. team=web), all of which must match.",
+    )
+    instance_labels: OptionalMatchers = Field(
+        default_factory=list,
+        description="Alert instance label matchers (e.g. project=shop), all of which must "
+        "match; instances without them are not counted.",
+    )
+    token: SecretStr | None = Field(
+        default=None,
+        description="Service account token (Viewer role). Omit to keep the stored one (update "
+        "only); not needed for synthetic://.",
+    )
+    tls_verify: bool = Field(
+        default=True,
+        description="Verify Grafana's TLS certificate; turn off only for a self-signed or "
+        "internal certificate.",
+    )
+
+    @field_validator("api_url")
+    @classmethod
+    def _valid_url(cls, value: str) -> str:
+        return validate_source_url(value)
+
+    @model_validator(mode="after")
+    def _selects_rules(self) -> GrafanaSourceInput:
+        if not self.folders and not self.rule_uids and not self.rule_labels:
+            raise ValueError(
+                "select alert rules by folder, UID or rule label (at least one is required)"
+            )
+        return self
+
+
 def _source_kind(value: Any) -> str:
     """``kind`` selects the union member; it defaults to prometheus (the only pre-T015 kind)."""
     if isinstance(value, dict):
@@ -430,7 +513,8 @@ SourceInput = Annotated[
     Annotated[PrometheusSourceInput, Tag(SourceKind.PROMETHEUS.value)]
     | Annotated[CloudflareSourceInput, Tag(SourceKind.CLOUDFLARE.value)]
     | Annotated[SentrySourceInput, Tag(SourceKind.SENTRY.value)]
-    | Annotated[WazuhSourceInput, Tag(SourceKind.WAZUH.value)],
+    | Annotated[WazuhSourceInput, Tag(SourceKind.WAZUH.value)]
+    | Annotated[GrafanaSourceInput, Tag(SourceKind.GRAFANA.value)],
     Discriminator(_source_kind),
 ]
 
@@ -549,7 +633,19 @@ class WazuhSource(Contract):
     password_set: bool
 
 
-AnySource = PrometheusSource | CloudflareSource | SentrySource | WazuhSource
+class GrafanaSource(Contract):
+    kind: Literal[SourceKind.GRAFANA] = SourceKind.GRAFANA
+    api_url: str
+    org_id: int = 1
+    folders: list[str] = Field(default_factory=list)
+    rule_uids: list[str] = Field(default_factory=list)
+    rule_labels: list[LabelMatcher] = Field(default_factory=list)
+    instance_labels: list[LabelMatcher] = Field(default_factory=list)
+    tls_verify: bool = True
+    token_set: bool
+
+
+AnySource = PrometheusSource | CloudflareSource | SentrySource | WazuhSource | GrafanaSource
 Source = Annotated[AnySource, Field(discriminator="kind")]
 
 
@@ -628,7 +724,8 @@ class ConnectionTest(Contract):
         default=None,
         description="Prometheus: series currently matching all matchers. Cloudflare: requests "
         "in the last 24 h. Sentry: error events and transactions in the last 24 h. Wazuh: "
-        "alerts of the selected agents in the last 24 h.",
+        "alerts of the selected agents in the last 24 h. Grafana: current alert instances of the "
+        "selected rules that match the instance labels.",
     )
     history_days: float | None = Field(
         default=None, description="Days of matching history found, up to 30."
@@ -699,5 +796,28 @@ class WazuhConnection(Contract):
         return SourceKind.WAZUH
 
 
-SourceConnection = PrometheusConnection | CloudflareConnection | SentryConnection | WazuhConnection
+class GrafanaConnection(Contract):
+    """Resolved Grafana settings including the decrypted token; never serialised to clients."""
+
+    api_url: str
+    org_id: int = 1
+    folders: list[str] = Field(default_factory=list)
+    rule_uids: list[str] = Field(default_factory=list)
+    rule_labels: list[LabelMatcher] = Field(default_factory=list)
+    instance_labels: list[LabelMatcher] = Field(default_factory=list)
+    token: SecretStr | None = None
+    tls_verify: bool = True
+
+    @property
+    def kind(self) -> SourceKind:
+        return SourceKind.GRAFANA
+
+
+SourceConnection = (
+    PrometheusConnection
+    | CloudflareConnection
+    | SentryConnection
+    | WazuhConnection
+    | GrafanaConnection
+)
 """Decrypted connection of any source kind."""

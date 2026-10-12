@@ -484,7 +484,7 @@ class RobustDetector:
                         if activity.observed_minutes
                         else None
                     ),
-                    baseline_days_used=min(used, MAX_REPORTED_BASELINE_DAYS),
+                    baseline_days_used=min(used or 0, MAX_REPORTED_BASELINE_DAYS),
                     coverage=round(min(1.0, coverage), 6),
                     episodes=activity.summaries[:MAX_EPISODES_PER_BUCKET],
                 )
@@ -738,22 +738,27 @@ def _episode_summary(
     )
 
 
-def _median_baseline_days(evaluations: list[SeriesEvaluation], bucket_index: int) -> int:
+def _median_baseline_days(evaluations: list[SeriesEvaluation], bucket_index: int) -> int | None:
+    """Median baseline days of the bucket's level series; None when it has only event series,
+    which need no baseline (a firing Grafana alert, an OOM kill)."""
     lo, hi = _bucket_bounds(bucket_index)
     baseline_days = [
         ev.baselines[bucket_index].days
         for ev in evaluations
         if ev.series.rule.kind is RuleKind.LEVEL and np.any(~np.isnan(ev.values[lo:hi]))
     ]
-    return int(np.median(baseline_days)) if baseline_days else 0
+    if baseline_days:
+        return int(np.median(baseline_days))
+    observed = any(np.any(~np.isnan(ev.values[lo:hi])) for ev in evaluations)
+    return None if observed else 0
 
 
 def _bucket_status(
-    coverage: float, baseline_days: int, config: DetectorConfig
+    coverage: float, baseline_days: int | None, config: DetectorConfig
 ) -> TrendBucketStatus:
     if coverage < config.bucket_min_coverage:
         return TrendBucketStatus.INSUFFICIENT_DATA
-    if baseline_days < config.baseline_min_adequate_days:
+    if baseline_days is not None and baseline_days < config.baseline_min_adequate_days:
         return TrendBucketStatus.INSUFFICIENT_BASELINE
     return TrendBucketStatus.OK
 

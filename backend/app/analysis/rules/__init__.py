@@ -5,6 +5,7 @@ Rules are defined per category in the sibling modules and indexed by name in `RU
 
 from collections.abc import Iterable
 
+from app.analysis.rules.alerting import ALERTING_RULES
 from app.analysis.rules.application import APPLICATION_RULES
 from app.analysis.rules.base import SEVERITY_ORDER, Dir, Rule, RuleKind, format_value
 from app.analysis.rules.container import CONTAINER_RULES
@@ -39,5 +40,6 @@ RULES = _index(
         *SECURITY_RULES,
         *APPLICATION_RULES,
         *HOST_SECURITY_RULES,
+        *ALERTING_RULES,
     ),
 )

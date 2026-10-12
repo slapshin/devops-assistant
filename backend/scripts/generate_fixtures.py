@@ -99,6 +99,8 @@ from app.jobs import daily_episodes
 from app.service import AnalysisPipeline
 from app.sources.cloudflare.source import CloudflareMetricsSource
 from app.sources.cloudflare.synthetic import SyntheticCloudflareApi
+from app.sources.grafana.source import GrafanaMetricsSource
+from app.sources.grafana.synthetic import SyntheticGrafanaApi
 from app.sources.sentry.source import SentryMetricsSource
 from app.sources.sentry.synthetic import SyntheticSentryApi
 from app.sources.wazuh.source import WazuhMetricsSource
@@ -1051,6 +1053,7 @@ def build() -> dict[str, BaseModel]:
         "reports/report_cloudflare.json": cloudflare_report(),
         "reports/report_sentry.json": sentry_report(),
         "reports/report_wazuh.json": wazuh_report(),
+        "reports/report_grafana.json": grafana_report(),
         "jobs/job_running.json": job(
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
@@ -1126,6 +1129,7 @@ def build() -> dict[str, BaseModel]:
         "api/connection_test_cloudflare.json": cloudflare_connection_test(),
         "api/connection_test_sentry.json": sentry_connection_test(),
         "api/connection_test_wazuh.json": wazuh_connection_test(),
+        "api/connection_test_grafana.json": grafana_connection_test(),
         "api/problem_queue_full.json": Problem(
             title="Analysis queue is full",
             status=429,
@@ -1200,6 +1204,21 @@ def wazuh_report() -> AnalysisReport:
     return pipeline_report(OpenedSource(SourceKind.WAZUH, source), project, WAZUH_ANALYSIS_ID)
 
 
+GRAFANA_ANALYSIS_ID = "01999a3c-0000-7000-8000-0000000000e7"
+
+
+def grafana_report() -> AnalysisReport:
+    """A Grafana-only project analysed from the synthetic incident scenario (T019)."""
+    instance_labels = [LabelMatcher(name="project", value="shop")]
+    source = GrafanaMetricsSource(
+        SyntheticGrafanaApi("incident"), ["Shop"], instance_labels=instance_labels
+    )
+    project = Scope(
+        project_id="01999a3c-0000-7000-8000-0000000000e1", project_name="Shop alerts", matchers=[]
+    )
+    return pipeline_report(OpenedSource(SourceKind.GRAFANA, source), project, GRAFANA_ANALYSIS_ID)
+
+
 def pipeline_report(opened: OpenedSource, scope: Scope, analysis_id: str) -> AnalysisReport:
     """A report produced by the real pipeline from one source, with pinned timestamps."""
     config = DetectorConfig()
@@ -1271,6 +1290,20 @@ def wazuh_connection_test() -> ConnectionTest:
             FamilyCapability(family=SignalFamily.FILE_INTEGRITY, status=CapabilityStatus.SUPPORTED),
         ],
         message="8,412 alerts from 3 agents in the last 24 h.",
+        checked_at=T,
+    )
+
+
+def grafana_connection_test() -> ConnectionTest:
+    return ConnectionTest(
+        kind=SourceKind.GRAFANA,
+        reachable=True,
+        auth_ok=True,
+        matched_series=6,
+        families=[
+            FamilyCapability(family=SignalFamily.ALERTING, status=CapabilityStatus.SUPPORTED),
+        ],
+        message="4 alert rules selected, 6 matching instances, 1 rules firing now. Grafana 12.4.5.",
         checked_at=T,
     )
 
