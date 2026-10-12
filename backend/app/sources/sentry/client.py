@@ -265,6 +265,12 @@ class SentryClient:
                 continue  # events without an issue, or another title of a listed one
             title = str(row.get("title") or issue)
             issues[issue] = IssueInfo(issue, title, float(row.get("count()") or 0))
+        if rows and not issues:
+            sample = str(rows[0].get(ISSUE_FIELD) if isinstance(rows[0], dict) else rows[0])
+            raise SourceError(
+                SourceErrorKind.BAD_QUERY,
+                f"no usable issue ID in the events (e.g. {sample[:40]!r})",
+            )
         return list(issues.values())[:limit]
 
     async def issue_series(

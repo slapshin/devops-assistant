@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import partial
 
-from app.domain.common import Entity, EntityKind, Scope, SourceKind
+from app.domain.common import Entity, EntityKind, Scope, SignalFamily, SourceKind
 from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
@@ -72,6 +72,8 @@ UNSUPPORTED_PROBE_KINDS = (SourceErrorKind.AUTH, SourceErrorKind.BAD_QUERY)
 """A refused probe means the plan, version or token lacks that dataset, not that Sentry is
 unreachable (reading the projects already proved access)."""
 TRANSACTION_COUNT = "sentry_transactions"
+NO_BREAKDOWN = "breakdown_unavailable"
+"""Exclusion code: a project's errors are analysed as its total only (not partial)."""
 
 
 def application_entity(
@@ -244,22 +246,24 @@ class SentryMetricsSource:
 
     # --- collection -----------------------------------------------------------------------
 
-    async def _error_kinds(self, info: ProjectInfo, grid_start: int, end: int) -> list[IssueInfo]:
+    async def _error_kinds(
+        self, info: ProjectInfo, grid_start: int, end: int
+    ) -> tuple[list[IssueInfo], str | None]:
         """The project's top issues: those of the latest 24 h first, then those of the whole
-        window. None when Sentry cannot rank them; only the project's total is then analysed,
-        as it is when Sentry refuses every grouped request."""
+        window. None, with the reason, when Sentry cannot rank them; only the project's total
+        is then analysed, as it is when Sentry refuses every grouped request."""
         try:
             recent = await self.api.top_issues([info.id], end - SECONDS_PER_DAY, end, RECENT_ISSUES)
             window = await self.api.top_issues([info.id], grid_start, end, TOP_ISSUES)
         except SourceError as exc:
             log.warning("sentry project %s: error kinds not ranked: %s", info.slug, exc.message)
-            return []
+            return [], f"Sentry refused to rank its issues ({exc.kind.value}: {exc.message})"
         picked = {i.issue: i for i in recent}
         for issue in window:
             if len(picked) >= TOP_ISSUES:
                 break
             picked.setdefault(issue.issue, issue)
-        return list(picked.values())
+        return list(picked.values()), None
 
     @staticmethod
     def _chunks(
@@ -293,11 +297,14 @@ class SentryMetricsSource:
             info.id: self._chunks(self._earliest(info, grid_start), grid_start, end, step)
             for info in infos
         }
-        kinds = (
-            {info.id: await self._error_kinds(info, grid_start, end) for info in infos}
-            if ERRORS_SIGNAL in supported
-            else {}
-        )
+        kinds: dict[str, list[IssueInfo]] = {}
+        no_breakdown: dict[str, str] = {}
+        """Project ID -> why its errors are not split by issue."""
+        if ERRORS_SIGNAL in supported:
+            for info in infos:
+                kinds[info.id], reason = await self._error_kinds(info, grid_start, end)
+                if reason:
+                    no_breakdown[info.id] = reason
         kind_plans = {
             info.id: self._chunks(
                 self._earliest(info, grid_start), grid_start, end, step, ISSUE_CHUNK_SECONDS
@@ -356,8 +363,10 @@ class SentryMetricsSource:
             if not got_kinds.chunks and all(
                 f.kind in UNSUPPORTED_PROBE_KINDS for f in got_kinds.failures
             ):
-                first = got_kinds.failures[0].message if got_kinds.failures else ""
-                log.warning("sentry project %s: error kinds refused: %s", pid, first)
+                first = got_kinds.failures[0] if got_kinds.failures else None
+                message = f"{first.kind.value}: {first.message}" if first else "no response"
+                log.warning("sentry project %s: error kinds refused: %s", pid, message)
+                no_breakdown[pid] = f"Sentry refused to group its errors by issue ({message})"
                 continue  # only the project's total is analysed
             fetched_kinds[pid] = got_kinds
             cancel.raise_if_cancelled()
@@ -375,6 +384,16 @@ class SentryMetricsSource:
 
         series: list[MetricSeries] = []
         exclusions: list[Exclusion] = []
+        exclusions += [
+            Exclusion(
+                code=NO_BREAKDOWN,
+                family=SignalFamily.APP_ERRORS,
+                message=f"Errors of Sentry project {info.slug} are not split by issue: "
+                f"{no_breakdown[info.id]}; only the project's total is analysed.",
+            )
+            for info in infos
+            if info.id in no_breakdown
+        ]
         tags = [(t.key, t.value) for t in self.tags]
         grid = _Grid(grid_start, size, step)
         for query in queries:

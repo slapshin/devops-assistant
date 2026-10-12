@@ -277,6 +277,20 @@ async def test_top_issues_request_and_parsing() -> None:
     ], "one entry per issue; rows without a valid issue ID are dropped"
 
 
+async def test_events_without_any_usable_issue_id_are_refused() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        rows = [{"issue": "unknown", "title": "<no issue>", "count()": 30}]
+        return httpx.Response(200, json={"data": rows, "meta": {}})
+
+    client = make_client(with_project(handler))
+
+    with pytest.raises(SourceError, match="no usable issue ID") as caught:
+        await client.top_issues(["42"], 0, int(END.timestamp()), 10)
+    await client.aclose()
+
+    assert caught.value.kind is SourceErrorKind.BAD_QUERY
+
+
 async def test_issue_series_request_and_parsing() -> None:
     sent: list[httpx.Request] = []
     bucket = END - timedelta(minutes=5)
@@ -625,7 +639,12 @@ async def test_only_the_total_is_analysed_when_sentry_cannot_split_errors(rank: 
     errors = [s for s in result.series if s.signal == "sentry_errors"]
     assert [s.entity.display_name for s in errors] == [f"{PROJECT} (production)"]
     assert None not in errors[0].values
-    assert result.exclusions == []
+    assert [(e.code, e.family) for e in result.exclusions] == [
+        ("breakdown_unavailable", SignalFamily.APP_ERRORS)
+    ], "disclosed, never silent"
+    assert (
+        f"Errors of Sentry project {PROJECT} are not split by issue" in result.exclusions[0].message
+    )
 
 
 async def test_without_transactions_performance_is_unsupported() -> None:

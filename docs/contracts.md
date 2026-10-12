@@ -67,7 +67,7 @@ The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is
 
 ## Exclusion codes
 
-`query_failed`, `query_timeout`, `series_truncated` (per-query or per-job series budget), `evidence_dropped` (report size budget), `label_cardinality` (discovery guard), `source_unavailable` (one of several data sources failed; one exclusion per family it provides, and the report is `partial`), `no_data` (a configured entity, e.g. a Wazuh agent or a Grafana rule without matching instances, had no data in the window and is not analysed; does not make the report `partial`). Each has a `message`, and optionally a `family` or `finding_id`.
+`query_failed`, `query_timeout`, `series_truncated` (per-query or per-job series budget), `evidence_dropped` (report size budget), `label_cardinality` (discovery guard), `source_unavailable` (one of several data sources failed; one exclusion per family it provides, and the report is `partial`), `no_data` (a configured entity, e.g. a Wazuh agent or a Grafana rule without matching instances, had no data in the window and is not analysed; does not make the report `partial`), `breakdown_unavailable` (Sentry refused to rank a project's issues or to group its errors by issue, so only the project's total is analysed and its findings list no `error_kinds`; does not make the report `partial`). Each has a `message`, and optionally a `family` or `finding_id`.
 
 ## Errors and routes
 
