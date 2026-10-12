@@ -1,11 +1,11 @@
 """Scope-enforcing PromQL/MetricsQL construction.
 
 Templates write every metric selector as ``metric{{{s}}}`` or ``metric{{{s}, extra="x"}}``;
-``{s}`` expands to the project's escaped exact label matchers and ``{w}`` to the rate window.
+``{s}`` expands to the project's escaped label matchers and ``{w}`` to the rate window.
 ``render`` enforces two invariants, so a template can never silently leave its scope
 (including both operands of a ratio):
 
-1. every ``{...}`` matcher block contains every one of the project's exact matchers;
+1. every ``{...}`` matcher block contains every one of the project's matchers;
 2. every declared metric name is immediately followed by a matcher block (no bare names).
 """
 
@@ -17,7 +17,7 @@ from app.domain.common import LabelMatcher, Scope
 
 
 class ScopeViolation(ValueError):
-    """A rendered query contains a selector without exact scope matchers."""
+    """A rendered query contains a selector without the scope matchers."""
 
 
 def escape_label_value(value: str) -> str:
@@ -26,15 +26,22 @@ def escape_label_value(value: str) -> str:
 
 
 def render_matchers(matchers: Sequence[LabelMatcher]) -> str:
-    """Exact equality matchers in the given order, e.g. ``project="a", env="b"``."""
-    return ", ".join(f'{m.name}="{escape_label_value(m.value)}"' for m in matchers)
+    """Matchers in the given order, e.g. ``project="a", env=~"b|c"``."""
+    return ", ".join(f'{m.name}{m.op}"{escape_label_value(m.value)}"' for m in matchers)
 
 
 def scope_matchers(scope: Scope) -> str:
-    """The scope's matchers; an empty scope would select every series, so it is refused."""
+    """The scope's matchers; a scope that does not restrict the label set would select every
+    series, so it is refused."""
+    _require_restricting(scope)
+    return render_matchers(scope.matchers)
+
+
+def _require_restricting(scope: Scope) -> None:
     if not scope.matchers:
         raise ScopeViolation(f"project {scope.project_id} has no label matchers")
-    return render_matchers(scope.matchers)
+    if not any(m.restricts for m in scope.matchers):
+        raise ScopeViolation(f"project {scope.project_id} has no restricting label matcher")
 
 
 def selector(metric: str, scope: Scope, extra: str = "") -> str:
@@ -52,8 +59,7 @@ def _mask_strings(query: str) -> str:
 
 
 def assert_scoped(query: str, scope: Scope, metrics: Sequence[str]) -> None:
-    if not scope.matchers:
-        raise ScopeViolation(f"project {scope.project_id} has no label matchers")
+    _require_restricting(scope)
     required = [render_matchers([m]) for m in scope.matchers]
     masked = _mask_strings(query)
     blocks = [(m.start(), m.end()) for m in re.finditer(r"\{[^{}]*\}", masked)]

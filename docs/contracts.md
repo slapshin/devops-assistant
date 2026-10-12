@@ -54,7 +54,7 @@ Interfaces (`domain/interfaces.py`). T004 added `DiscoveredValues` (values plus 
 | `episode_id` | `eps_` + 16 hex | T005 | same inputs as findings |
 | `evidence_id` | `evd_` + 16 hex | T005 | hash of finding ID + series ID |
 
-The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is the project's sorted `name=value` list joined by commas). It deliberately excludes `analysis_id`, so identical inputs yield identical IDs. Report validation rejects any finding, evidence, related-finding, or explanation reference that does not resolve inside the same report.
+The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is the project's sorted `name<op>value` list joined by commas, so `=` matchers keep their pre-operator keys). It deliberately excludes `analysis_id`, so identical inputs yield identical IDs. Report validation rejects any finding, evidence, related-finding, or explanation reference that does not resolve inside the same report.
 
 ## States
 
@@ -77,7 +77,7 @@ Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-ap
 
 ## Schema versions
 
-`AnalysisReport.schema_version = "2.1"`. Adding an optional field is a minor bump. Removing, renaming, or changing the meaning of a field is a major bump and needs a reader migration in T007. `DetectorConfig.version` (`detectors-2026.10.9`) and `config_hash` (the first 12 hex characters of the SHA-256 of the canonical config JSON) identify the calculation.
+`AnalysisReport.schema_version = "2.2"` (2.2 added the optional matcher `op`, default `=`). Adding an optional field is a minor bump. Removing, renaming, or changing the meaning of a field is a major bump and needs a reader migration in T007. `DetectorConfig.version` (`detectors-2026.10.9`) and `config_hash` (the first 12 hex characters of the SHA-256 of the canonical config JSON) identify the calculation.
 
 ## Fixtures
 

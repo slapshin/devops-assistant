@@ -15,10 +15,11 @@ from pydantic import (
     ConfigDict,
     Field,
     PlainSerializer,
+    ValidationInfo,
     field_validator,
 )
 
-REPORT_SCHEMA_VERSION: Final = "2.1"
+REPORT_SCHEMA_VERSION: Final = "2.2"
 STEP_SECONDS = 300
 
 
@@ -59,10 +60,24 @@ RESERVED_LABEL_PREFIX = "__"
 MAX_MATCHERS = 10
 
 
+class MatchOp(StrEnum):
+    """PromQL label matching operator; regular expressions are fully anchored (RE2 syntax)."""
+
+    EQUAL = "="
+    NOT_EQUAL = "!="
+    REGEX = "=~"
+    NOT_REGEX = "!~"
+
+
 class LabelMatcher(Contract):
-    """Exact ``name="value"`` matcher added to every selector of a project's queries."""
+    """``name<op>"value"`` matcher, e.g. ``env="prod"`` or ``env=~"prod|staging"``.
+
+    An absent label matches as the empty string, as in PromQL: ``env!="dev"`` matches series
+    without ``env``.
+    """
 
     name: str = Field(min_length=1, max_length=128)
+    op: MatchOp = MatchOp.EQUAL
     value: LabelValue
 
     @field_validator("name")
@@ -73,6 +88,37 @@ class LabelMatcher(Contract):
         if value.startswith(RESERVED_LABEL_PREFIX):
             raise ValueError("labels starting with '__' are reserved")
         return value
+
+    @field_validator("value")
+    @classmethod
+    def _valid_regex(cls, value: str, info: ValidationInfo) -> str:
+        if info.data.get("op") in (MatchOp.REGEX, MatchOp.NOT_REGEX):
+            try:
+                re.compile(value)
+            except re.error as exc:
+                raise ValueError(f"invalid regular expression: {exc}") from exc
+        return value
+
+    def matches(self, value: str | None) -> bool:
+        """Whether a label value (``None`` when absent) satisfies this matcher."""
+        actual = value or ""
+        match self.op:
+            case MatchOp.EQUAL:
+                return actual == self.value
+            case MatchOp.NOT_EQUAL:
+                return actual != self.value
+            case MatchOp.REGEX:
+                return re.fullmatch(self.value, actual) is not None
+            case MatchOp.NOT_REGEX:
+                return re.fullmatch(self.value, actual) is None
+
+    @property
+    def restricts(self) -> bool:
+        """Selects only series that carry the label, so it narrows a selector on its own."""
+        return self.op in (MatchOp.EQUAL, MatchOp.REGEX) and not self.matches("")
+
+    def __str__(self) -> str:
+        return f'{self.name}{self.op}"{self.value}"'
 
 
 def normalise_matchers(matchers: list[LabelMatcher]) -> list[LabelMatcher]:

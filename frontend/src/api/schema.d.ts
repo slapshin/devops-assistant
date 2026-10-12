@@ -244,10 +244,10 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 2.1
+             * @default 2.2
              * @enum {string}
              */
-            schema_version: "2.0" | "2.1";
+            schema_version: "2.0" | "2.1" | "2.2";
             scope: components["schemas"]["Scope"];
             /** @description Deprecated: the first source; use sources. */
             source?: components["schemas"]["SourceInfo"] | null;
@@ -853,11 +853,16 @@ export interface components {
         JobTrigger: "manual" | "scheduled";
         /**
          * LabelMatcher
-         * @description Exact ``name="value"`` matcher added to every selector of a project's queries.
+         * @description ``name<op>"value"`` matcher, e.g. ``env="prod"`` or ``env=~"prod|staging"``.
+         *
+         *     An absent label matches as the empty string, as in PromQL: ``env!="dev"`` matches series
+         *     without ``env``.
          */
         LabelMatcher: {
             /** Name */
             name: string;
+            /** @default = */
+            op: components["schemas"]["MatchOp"];
             /** Value */
             value: string;
         };
@@ -881,6 +886,12 @@ export interface components {
             /** Report Max Bytes */
             report_max_bytes: number;
         };
+        /**
+         * MatchOp
+         * @description PromQL label matching operator; regular expressions are fully anchored (RE2 syntax).
+         * @enum {string}
+         */
+        MatchOp: "=" | "!=" | "=~" | "!~";
         /**
          * MetricCapability
          * @description Whether a signal family can be analysed for a scope, and why (not).

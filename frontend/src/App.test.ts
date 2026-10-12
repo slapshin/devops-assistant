@@ -182,6 +182,34 @@ describe("projects list", () => {
 });
 
 describe("project form", () => {
+  it("sends regex label matchers and needs a positive one", async () => {
+    routes["POST /api/projects"] = () => json({ ...base, project_id: "new-id" }, 201);
+    routes["GET /api/projects/new-id"] = () => json({ ...base, project_id: "new-id" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt("/projects/new");
+    await fireEvent.update(await screen.findByLabelText("Name"), "Shop");
+    await fireEvent.update(screen.getByLabelText("URL"), "http://vm:8428");
+    await fireEvent.update(screen.getByLabelText("Label operator 1"), "!=");
+    await fireEvent.update(screen.getByLabelText("Label value 1"), "blog");
+    await fireEvent.update(screen.getByLabelText("Label operator 2"), "!~");
+    await fireEvent.update(screen.getByLabelText("Label value 2"), "dev.*");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    expect(screen.getByText("Add at least one = or =~ label")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+
+    await fireEvent.update(screen.getByLabelText("Label operator 1"), "=~");
+    await fireEvent.update(screen.getByLabelText("Label value 1"), "shop|shop-\\d+");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/new-id"));
+    expect(JSON.parse(calls.find((c) => c.method === "POST")?.body ?? "{}").matchers).toEqual([
+      { name: "project", op: "=~", value: "shop|shop-\\d+" },
+      { name: "env", op: "!~", value: "dev.*" },
+    ]);
+  });
+
   it("validates like the server before creating", async () => {
     routes["POST /api/projects"] = () => json({ ...base, project_id: "new-id" }, 201);
     routes["GET /api/projects/new-id"] = () => json({ ...base, project_id: "new-id" });
@@ -229,8 +257,8 @@ describe("project form", () => {
       name: "Shop",
       description: null,
       matchers: [
-        { name: "project", value: "shop" },
-        { name: "env", value: "prod" },
+        { name: "project", op: "=", value: "shop" },
+        { name: "env", op: "=", value: "prod" },
       ],
       sources: [{ kind: "prometheus", url: "http://vm:8428/prom", tls_verify: true, auth: { type: "bearer", token: "tok" } }],
       schedule: null,
@@ -387,8 +415,8 @@ describe("project form", () => {
     expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({
       project_id: null,
       matchers: [
-        { name: "project", value: "shop" },
-        { name: "env", value: "production" },
+        { name: "project", op: "=", value: "shop" },
+        { name: "env", op: "=", value: "production" },
       ],
       source: { kind: "prometheus", url: "http://vm:8428", tls_verify: true, auth: { type: "none" } },
     });
@@ -715,7 +743,7 @@ describe("project form", () => {
       folders: ["Infrastructure", "Shop alerts"],
       rule_uids: [],
       rule_labels: [],
-      instance_labels: [{ name: "project", value: "shop" }],
+      instance_labels: [{ name: "project", op: "=", value: "shop" }],
       tls_verify: true,
       token: "glsa_token",
     };
@@ -735,8 +763,8 @@ describe("project form", () => {
       org_id: 2,
       folders: ["Infrastructure"],
       rule_uids: ["dfxnb7qy1wlxcc"],
-      rule_labels: [{ name: "team", value: "web" }],
-      instance_labels: [{ name: "project", value: "shop" }],
+      rule_labels: [{ name: "team", op: "=", value: "web" }],
+      instance_labels: [{ name: "project", op: "=", value: "shop" }],
       tls_verify: true,
       token_set: true,
     };

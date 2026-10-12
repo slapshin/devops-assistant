@@ -122,15 +122,15 @@ def selects(
     rule_uids: Sequence[str],
     rule_labels: Sequence[LabelMatcher],
 ) -> bool:
-    """Folder or UID listed (or neither configured), and every rule label matcher equal."""
+    """Folder or UID listed (or neither configured), and every rule label matcher matching."""
     listed = rule.uid in rule_uids or rule.folder_uid in folders or rule.folder in folders
     if (folders or rule_uids) and not listed:
         return False
-    return all(rule.labels.get(m.name) == m.value for m in rule_labels)
+    return all(m.matches(rule.labels.get(m.name)) for m in rule_labels)
 
 
 def instance_matches(labels: Mapping[str, str], matchers: Sequence[LabelMatcher]) -> bool:
-    return all(labels.get(m.name) == m.value for m in matchers)
+    return all(m.matches(labels.get(m.name)) for m in matchers)
 
 
 # --- state history text --------------------------------------------------------------------
@@ -203,7 +203,7 @@ def history_path(uid: str, start_ms: int, end_ms: int) -> str:
 
 def display_query(rule: AlertRule, signal: GrafanaSignal, matchers: Sequence[LabelMatcher]) -> str:
     """The requests behind one rule's series (evidence text)."""
-    selection = " AND ".join(f'{m.name}="{m.value}"' for m in matchers) or "every instance"
+    selection = " AND ".join(str(m) for m in matchers) or "every instance"
     return (
         f"# Grafana alert rule {rule.uid}: {signal.description.lower()}, instances: {selection}\n"
         f"GET {RULES_PATH}?rule_uid={rule.uid}\n"

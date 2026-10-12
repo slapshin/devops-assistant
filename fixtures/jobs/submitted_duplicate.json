@@ -7,10 +7,12 @@
       "matchers": [
         {
           "name": "env",
+          "op": "=",
           "value": "production"
         },
         {
           "name": "project",
+          "op": "=",
           "value": "shop"
         }
       ]

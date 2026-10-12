@@ -9,20 +9,21 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from app.domain.common import STEP_SECONDS, EntityKind, LabelMatcher, Scope
+from app.domain.common import STEP_SECONDS, EntityKind, LabelMatcher, MatchOp, Scope
 from app.domain.interfaces import CancellationToken, Cancelled, SourceError, SourceErrorKind
 from app.domain.jobs import StageProgress
 from app.domain.metrics import CapabilityStatus
 from app.domain.projects import PrometheusConnection
-from app.domain.report import AnalysisWindows
+from app.domain.report import AnalysisWindows, Exclusion
 from app.sources.base import ClientLimits
 from app.sources.prometheus.catalog import BY_SIGNAL, CATALOG
-from app.sources.prometheus.client import PrometheusClient
+from app.sources.prometheus.client import PrometheusClient, RangeResult
 from app.sources.prometheus.promql import (
     QueryTemplate,
     ScopeViolation,
     assert_scoped,
     escape_label_value,
+    render_matchers,
     scope_matchers,
 )
 from app.sources.prometheus.source import (
@@ -113,10 +114,22 @@ THREE = Scope(
     ],
 )
 
+REGEX = Scope(
+    project_id="p",
+    project_name="p",
+    matchers=[
+        LabelMatcher(name="project", op=MatchOp.REGEX, value=r"shop|shop-\d+"),
+        LabelMatcher(name="env", op=MatchOp.NOT_REGEX, value="dev.*"),
+        LabelMatcher(name="cluster", op=MatchOp.NOT_EQUAL, value="eu,1}"),
+    ],
+)
+
 
 @pytest.mark.parametrize("defn", CATALOG, ids=lambda d: d.signal)
 @pytest.mark.parametrize(
-    "scope", [SCOPE, WEIRD, ONE, THREE], ids=["plain", "escaped", "one", "three"]
+    "scope",
+    [SCOPE, WEIRD, ONE, THREE, REGEX],
+    ids=["plain", "escaped", "one", "three", "regex"],
 )
 def test_every_catalog_selector_and_gate_is_scoped(defn: Any, scope: Scope) -> None:
     rendered = [defn.query.render(scope)] + [g.template.render(scope) for g in defn.gates]
@@ -161,6 +174,75 @@ def test_every_matcher_is_required() -> None:
         partial = "up{" + ", ".join(f'{m.name}="{escape_label_value(m.value)}"' for m in rest) + "}"
         with pytest.raises(ScopeViolation):
             assert_scoped(partial, THREE, ("up",))
+
+
+def test_matchers_render_with_their_operator() -> None:
+    assert scope_matchers(REGEX) == ('cluster!="eu,1}", env!~"dev.*", project=~"shop|shop-\\\\d+"')
+
+
+def test_regex_matcher_must_appear_with_its_operator() -> None:
+    assert_scoped(f"up{{{scope_matchers(REGEX)}}}", REGEX, ("up",))
+
+    with pytest.raises(ScopeViolation, match="not scoped"):
+        assert_scoped(
+            'up{cluster!="eu,1}", env!~"dev.*", project="shop|shop-\\\\d+"}', REGEX, ("up",)
+        )
+
+
+@pytest.mark.parametrize(
+    "matchers",
+    [
+        [LabelMatcher(name="env", op=MatchOp.NOT_EQUAL, value="dev")],
+        [LabelMatcher(name="env", op=MatchOp.NOT_REGEX, value="dev.*")],
+        [LabelMatcher(name="env", op=MatchOp.REGEX, value=".*")],
+        [LabelMatcher(name="env", op=MatchOp.REGEX, value="prod|")],
+    ],
+    ids=["not-equal", "not-regex", "match-all", "match-empty"],
+)
+def test_scope_without_restricting_matcher_is_refused(matchers: list[LabelMatcher]) -> None:
+    scope = Scope(project_id="p", project_name="p", matchers=matchers)
+
+    with pytest.raises(ScopeViolation, match="no restricting label matcher"):
+        scope_matchers(scope)
+    with pytest.raises(ScopeViolation, match="no restricting label matcher"):
+        assert_scoped(f"up{{{render_matchers(matchers)}}}", scope, ("up",))
+
+
+@pytest.mark.parametrize(
+    ("op", "pattern", "value", "expected"),
+    [
+        (MatchOp.EQUAL, "prod", "prod", True),
+        (MatchOp.EQUAL, "prod", None, False),
+        (MatchOp.NOT_EQUAL, "dev", "prod", True),
+        (MatchOp.NOT_EQUAL, "dev", None, True),
+        (MatchOp.REGEX, "prod|staging", "staging", True),
+        (MatchOp.REGEX, "prod", "production", False),
+        (MatchOp.REGEX, "prod", None, False),
+        (MatchOp.NOT_REGEX, "dev.*", "development", False),
+        (MatchOp.NOT_REGEX, "dev.*", None, True),
+    ],
+)
+def test_label_matcher_follows_promql_semantics(
+    op: MatchOp, pattern: str, value: str | None, expected: bool
+) -> None:
+    assert LabelMatcher(name="env", op=op, value=pattern).matches(value) is expected
+
+
+def test_series_outside_a_regex_scope_are_dropped() -> None:
+    results = [
+        RangeResult({"project": "shop-2", "env": "prod"}, []),
+        RangeResult({"project": "blog", "env": "prod"}, []),
+        RangeResult({"project": "shop", "env": "dev-1"}, []),
+        RangeResult({"instance": "aggregated"}, []),
+    ]
+    exclusions: list[Exclusion] = []
+
+    kept = PrometheusMetricsSource._scoped_results(
+        results, REGEX, BY_SIGNAL["cpu_utilization"], exclusions
+    )
+
+    assert sorted(r.labels.get("project", "") for r in kept) == ["", "shop-2"]
+    assert [e.message for e in exclusions] == ["cpu_utilization: dropped 2 foreign series"]
 
 
 COUNTER = re.compile(r"\b([a-z_:]+_(?:total|count|sum|bucket))\{")

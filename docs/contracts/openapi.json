@@ -223,10 +223,11 @@
             "type": "string"
           },
           "schema_version": {
-            "default": "2.1",
+            "default": "2.2",
             "enum": [
               "2.0",
-              "2.1"
+              "2.1",
+              "2.2"
             ],
             "title": "Schema Version",
             "type": "string"
@@ -1786,13 +1787,17 @@
       },
       "LabelMatcher": {
         "additionalProperties": false,
-        "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
+        "description": "``name<op>\"value\"`` matcher, e.g. ``env=\"prod\"`` or ``env=~\"prod|staging\"``.\n\nAn absent label matches as the empty string, as in PromQL: ``env!=\"dev\"`` matches series\nwithout ``env``.",
         "properties": {
           "name": {
             "maxLength": 128,
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "op": {
+            "$ref": "#/components/schemas/MatchOp",
+            "default": "="
           },
           "value": {
             "maxLength": 256,
@@ -1855,6 +1860,17 @@
         ],
         "title": "Limits",
         "type": "object"
+      },
+      "MatchOp": {
+        "description": "PromQL label matching operator; regular expressions are fully anchored (RE2 syntax).",
+        "enum": [
+          "=",
+          "!=",
+          "=~",
+          "!~"
+        ],
+        "title": "MatchOp",
+        "type": "string"
       },
       "MetricCapability": {
         "additionalProperties": false,

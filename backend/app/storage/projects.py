@@ -611,7 +611,7 @@ def _any_connection(
 
 
 def _matchers(raw: list[dict[str, str]]) -> list[LabelMatcher]:
-    return [LabelMatcher(**m) for m in raw]
+    return [LabelMatcher.model_validate(m) for m in raw]
 
 
 def _sentry_projects(config: dict[str, Any]) -> list[str]:

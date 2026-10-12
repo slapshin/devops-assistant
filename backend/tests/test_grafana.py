@@ -567,7 +567,7 @@ async def test_unmatched_and_failed_rules_are_disclosed() -> None:
 
     assert {s.entity.display_name for s in result.series} == {"Rule r2"}
     messages = [e.message for e in result.exclusions if e.code == "no_data"]
-    assert any('"Rule r1" have no instance matching project=shop' in m for m in messages)
+    assert any('"Rule r1" have no instance matching project="shop"' in m for m in messages)
     assert any("1 Grafana state changes have no readable instance labels" in m for m in messages)
     timeout = next(e for e in result.exclusions if e.code == "query_timeout")
     assert timeout.family is SignalFamily.ALERTING
@@ -727,7 +727,7 @@ def test_grafana_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
     assert missing.status_code == 422
     assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.token"]
 
-    instance_labels = [{"name": "project", "value": "shop"}]
+    instance_labels = [{"name": "project", "op": "=", "value": "shop"}]
 
     res = api.post(
         "/api/projects",

@@ -1,4 +1,4 @@
-import type { AnalysisReport, ConnectionTest, Problem, ProjectInput, ProjectSummary, ReportSchedule, SourceInfo, SourceKind, Weekday } from "../api/client";
+import type { AnalysisReport, ConnectionTest, LabelMatcher, Problem, ProjectInput, ProjectSummary, ReportSchedule, SourceInfo, SourceKind, Weekday } from "../api/client";
 
 /** Mirrors backend/app/domain/common.py and projects.py so most mistakes never reach the server. */
 const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -74,10 +74,23 @@ export function timezoneOptions(): string[] {
   }
 }
 
+export type MatchOp = LabelMatcher["op"];
+
+/** PromQL label matching operators; regular expressions are fully anchored (RE2 syntax). */
+export const MATCH_OPS: { op: MatchOp; label: string }[] = [
+  { op: "=", label: "equals" },
+  { op: "!=", label: "does not equal" },
+  { op: "=~", label: "matches regex" },
+  { op: "!~", label: "does not match regex" },
+];
+
 export interface MatcherDraft {
   name: string;
+  op: MatchOp;
   value: string;
 }
+
+export const emptyMatcher = (name = ""): MatcherDraft => ({ name, op: "=", value: "" });
 
 export interface TagDraft {
   key: string;
@@ -159,8 +172,8 @@ export function emptyDraft(): ProjectDraft {
     name: "",
     description: "",
     matchers: [
-      { name: "project", value: "" },
-      { name: "env", value: "" },
+      emptyMatcher("project"),
+      emptyMatcher("env"),
     ],
     url: "",
     tlsVerify: true,
@@ -355,6 +368,9 @@ export function validateMatchers(matchers: MatcherDraft[], required = true): Fie
   const errors: FieldErrors = {};
   const used = matchers.filter((m) => required || m.value);
   if (used.length === 0 && required) errors.matchers = "Add at least one label";
+  // A negative matcher alone would select nearly every series (the server also rejects a
+  // regex that matches an empty value, which RE2 syntax keeps us from checking here).
+  else if (required && !used.some((m) => m.op === "=" || m.op === "=~")) errors.matchers = "Add at least one = or =~ label";
   if (used.length > MAX_MATCHERS) errors.matchers = `At most ${MAX_MATCHERS} labels`;
 
   const seen = new Set<string>();
@@ -608,7 +624,7 @@ export function wazuhInput(draft: ProjectDraft): SourceInput {
 }
 
 export function grafanaInput(draft: ProjectDraft): SourceInput {
-  const matchers = (rows: MatcherDraft[]) => usedMatchers(rows).map((m) => ({ name: m.name.trim(), value: m.value }));
+  const matchers = (rows: MatcherDraft[]) => usedMatchers(rows).map((m) => ({ name: m.name.trim(), op: m.op, value: m.value }));
   return {
     kind: "grafana",
     api_url: draft.grafanaUrl.trim(),
@@ -651,7 +667,7 @@ export function sourceKinds(draft: ProjectDraft): SourceKind[] {
 
 /** Matchers to send; without a Prometheus URL, rows left without a value are dropped. */
 export const matchersInput = (draft: ProjectDraft) =>
-  draft.matchers.filter((m) => draft.url.trim() || m.value).map((m) => ({ name: m.name.trim(), value: m.value }));
+  draft.matchers.filter((m) => draft.url.trim() || m.value).map((m) => ({ name: m.name.trim(), op: m.op, value: m.value }));
 
 export function toInput(draft: ProjectDraft): ProjectInput {
   return {

@@ -217,13 +217,17 @@
     },
     "LabelMatcher": {
       "additionalProperties": false,
-      "description": "Exact ``name=\"value\"`` matcher added to every selector of a project's queries.",
+      "description": "``name<op>\"value\"`` matcher, e.g. ``env=\"prod\"`` or ``env=~\"prod|staging\"``.\n\nAn absent label matches as the empty string, as in PromQL: ``env!=\"dev\"`` matches series\nwithout ``env``.",
       "properties": {
         "name": {
           "maxLength": 128,
           "minLength": 1,
           "title": "Name",
           "type": "string"
+        },
+        "op": {
+          "$ref": "#/$defs/MatchOp",
+          "default": "="
         },
         "value": {
           "maxLength": 256,
@@ -238,6 +242,17 @@
       ],
       "title": "LabelMatcher",
       "type": "object"
+    },
+    "MatchOp": {
+      "description": "PromQL label matching operator; regular expressions are fully anchored (RE2 syntax).",
+      "enum": [
+        "=",
+        "!=",
+        "=~",
+        "!~"
+      ],
+      "title": "MatchOp",
+      "type": "string"
     },
     "Scope": {
       "additionalProperties": false,

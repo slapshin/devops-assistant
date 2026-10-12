@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import type { LabelMatcher } from "../../api/client";
 
-withDefaults(defineProps<{ matchers: LabelMatcher[]; label?: string }>(), { label: "Label matchers" });
+/** Tag filters of other sources are always equalities, so they may omit the operator. */
+type Chip = Omit<LabelMatcher, "op"> & { op?: LabelMatcher["op"] };
+
+withDefaults(defineProps<{ matchers: Chip[]; label?: string }>(), { label: "Label matchers" });
 </script>
 
 <template>
   <ul class="chips" :aria-label="label">
-    <li v-for="m in matchers" :key="m.name" class="chip mono">{{ m.name }}=<span class="value">"{{ m.value }}"</span></li>
+    <li v-for="m in matchers" :key="m.name" class="chip mono">{{ m.name }}{{ m.op ?? "=" }}<span class="value">"{{ m.value }}"</span></li>
   </ul>
 </template>
 

@@ -106,7 +106,7 @@ _CAPABILITY_RANK = {
 
 def analysis_key(request: AnalysisRequest) -> str:
     """Seed of finding/episode IDs; the project ID keeps projects with equal scopes apart."""
-    scope = ",".join(f"{m.name}={m.value}" for m in request.scope.matchers)
+    scope = ",".join(f"{m.name}{m.op}{m.value}" for m in request.scope.matchers)
     return (
         f"{request.scope.project_id}|{scope}|{request.end_time.isoformat()}|{request.config_hash}"
     )

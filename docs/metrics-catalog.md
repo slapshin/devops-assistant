@@ -4,12 +4,13 @@ The catalog is `catalog-2026.10.6` in `backend/app/sources/prometheus/catalog/` 
 
 ## Scope enforcement
 
-Templates write each selector as `metric{{{s}, …}}`. `{s}` expands to the project's equality matchers sorted by label name, e.g. `env="<e>", project="<p>"` (T012: any 1–10 labels, not only project/env), with `\`, `"` and newlines escaped. `QueryTemplate.render` rejects a query when:
+Templates write each selector as `metric{{{s}, …}}`. `{s}` expands to the project's matchers sorted by label name, e.g. `env="<e>", project=~"<p>"` (T012: any 1–10 labels, not only project/env; operators `=`, `!=`, `=~`, `!~`), with `\`, `"` and newlines escaped. `QueryTemplate.render` rejects a query when:
 
-- any matcher block lacks **any** of the project's exact matchers (this covers both operands of every ratio and every gate query), or
+- the scope has no restricting matcher (`=`, or `=~` not matching an empty value), or
+- any matcher block lacks **any** of the project's matchers with their operators (this covers both operands of every ratio and every gate query), or
 - a declared metric name appears without a matcher block.
 
-String literals are masked before the check, so label values cannot fake a selector. As a second line of defence, the source drops any returned series whose matcher labels differ from the scope and records this in `exclusions`. Every result series is labelled with the scope's matchers. The project connection test (`app/sources/prometheus/probe.py`) uses the same scope rules.
+String literals are masked before the check, so label values cannot fake a selector. As a second line of defence, the source drops any returned series whose matcher labels do not satisfy the scope's matchers and records this in `exclusions`. Every result series is labelled with the scope's `=` matchers. The project connection test (`app/sources/prometheus/probe.py`) uses the same scope rules.
 
 ## Semantics
 
@@ -218,7 +219,7 @@ A project's Wazuh source analyses the security alerts of selected Wazuh agents, 
 
 ### Grafana alerts (T019)
 
-A project's Grafana source analyses the state history of Grafana-managed alert rules, each rule as its own entity (kind `alert_rule`, family `alerting`; `app/sources/grafana/`, catalog `grafana-2026.10.12`). Rules are selected by folder (title or UID, up to 20), rule UID (up to 100) and/or rule label matchers (up to 10, all must match); at least one is required. Folders and UIDs together form the selection and rule labels narrow it. **Instance label matchers** (up to 10, e.g. `project = shop`) then narrow which alert instances count; rules without a matching instance in the window are not analysed (`no_data` exclusion). A Viewer-role service account token is enough; every request is a `GET` with `Authorization: Bearer` and `X-Grafana-Org-Id`.
+A project's Grafana source analyses the state history of Grafana-managed alert rules, each rule as its own entity (kind `alert_rule`, family `alerting`; `app/sources/grafana/`, catalog `grafana-2026.10.12`). Rules are selected by folder (title or UID, up to 20), rule UID (up to 100) and/or rule label matchers (up to 10, all must match; same operators as Prometheus matchers); at least one is required. Folders and UIDs together form the selection and rule labels narrow it. **Instance label matchers** (up to 10, e.g. `project = shop`) then narrow which alert instances count; rules without a matching instance in the window are not analysed (`no_data` exclusion). A Viewer-role service account token is enough; every request is a `GET` with `Authorization: Bearer` and `X-Grafana-Org-Id`.
 
 | Signal | Meaning | Unit |
 | --- | --- | --- |

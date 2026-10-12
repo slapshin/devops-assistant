@@ -6,7 +6,7 @@ import unicodedata
 from collections.abc import Sequence
 
 from app.analysis.rules import format_value
-from app.domain.common import Entity, LabelMatcher, Scope, SignalFamily, TimeRange
+from app.domain.common import Entity, Scope, SignalFamily, TimeRange
 from app.domain.explanation import ExplanationInput, FindingDigest
 from app.domain.findings import Finding, SignalCoverage, SignalStatus
 
@@ -149,7 +149,7 @@ def build_input(
                 project_id=scope.project_id,
                 project_name=clean(scope.project_name),
                 matchers=[
-                    LabelMatcher(name=m.name, value=clean(m.value) or "-") for m in scope.matchers
+                    m.model_copy(update={"value": clean(m.value) or "-"}) for m in scope.matchers
                 ],
             ),
             latest_day=latest_day,

@@ -33,7 +33,10 @@ from app.settings import load_settings
 from app.sources.prometheus.synthetic import SyntheticMetricsSource
 from tests.helpers import StaticSources, make_scope
 
-SHOP_MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "shop"}]
+SHOP_MATCHERS = [
+    {"name": "env", "op": "=", "value": "production"},
+    {"name": "project", "op": "=", "value": "shop"},
+]
 SHOP_NAME = "shop / production"
 
 

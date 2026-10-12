@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from app.domain.common import Entity, EntityKind, Scope, SignalFamily
+from app.domain.common import Entity, EntityKind, MatchOp, Scope, SignalFamily
 from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
@@ -55,7 +55,8 @@ class CollectionBudget:
 
 
 def scope_labels(scope: Scope) -> dict[str, str]:
-    return {m.name: m.value for m in scope.matchers}
+    """Labels every scoped series carries with a known value (the equality matchers)."""
+    return {m.name: m.value for m in scope.matchers if m.op is MatchOp.EQUAL}
 
 
 def entity_for(defn: SignalDef, labels: dict[str, str]) -> Entity:
@@ -356,7 +357,7 @@ class PrometheusMetricsSource:
         kept = [
             r
             for r in results
-            if all(r.labels.get(m.name, m.value) == m.value for m in scope.matchers)
+            if all(m.name not in r.labels or m.matches(r.labels[m.name]) for m in scope.matchers)
         ]
         if len(kept) != len(results):
             exclusions.append(

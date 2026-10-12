@@ -296,6 +296,13 @@ def test_secret_box_rejects_foreign_ciphertext() -> None:
             {"matchers": [{"name": "env", "value": "a"}, {"name": "env", "value": "b"}]},
             "body.matchers",
         ),
+        (
+            {"matchers": [{"name": "env", "op": "=~", "value": "prod("}]},
+            "body.matchers.0.value",
+        ),
+        ({"matchers": [{"name": "env", "op": "~", "value": "prod"}]}, "body.matchers.0.op"),
+        ({"matchers": [{"name": "env", "op": "!=", "value": "dev"}]}, "body.matchers"),
+        ({"matchers": [{"name": "env", "op": "=~", "value": ".*"}]}, "body.matchers"),
         ({"name": "   "}, "body.name"),
         ({"sources": [{"kind": "prometheus", "url": "localhost:8428"}]}, "body.sources.0.url"),
         (
@@ -316,6 +323,24 @@ def test_validation_errors_name_the_field(
     assert res.status_code == 422, res.text
     assert res.json()["code"] == "validation_error"
     assert any(e["field"] == field for e in res.json()["errors"]), res.json()["errors"]
+
+
+def test_regex_matchers_round_trip(client: TestClient) -> None:
+    matchers = [
+        {"name": "env", "op": "!~", "value": "dev.*"},
+        {"name": "project", "op": "=~", "value": "shop|shop-\\d+"},
+    ]
+
+    project = create(client, matchers=matchers)
+
+    assert project["matchers"] == matchers
+    assert client.get(f"/api/projects/{project['project_id']}").json()["matchers"] == matchers
+
+
+def test_equality_is_the_default_operator(client: TestClient) -> None:
+    project = create(client)
+
+    assert [m["op"] for m in project["matchers"]] == ["=", "="]
 
 
 # --- connection test --------------------------------------------------------------------------

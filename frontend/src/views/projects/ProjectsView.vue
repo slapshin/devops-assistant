@@ -17,7 +17,7 @@ const visible = computed(() => {
   return items.value.filter(
     (p) =>
       p.name.toLowerCase().includes(needle) ||
-      p.matchers.some((m) => `${m.name}=${m.value}`.toLowerCase().includes(needle)),
+      p.matchers.some((m) => `${m.name}${m.op}${m.value}`.toLowerCase().includes(needle)),
   );
 });
 </script>

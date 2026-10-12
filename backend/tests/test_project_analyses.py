@@ -19,7 +19,10 @@ from app.sources.prometheus.synthetic import SCENARIOS
 from app.storage.db import MIGRATIONS, make_engine
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures"
-MATCHERS = [{"name": "env", "value": "production"}, {"name": "project", "value": "shop"}]
+MATCHERS = [
+    {"name": "env", "op": "=", "value": "production"},
+    {"name": "project", "op": "=", "value": "shop"},
+]
 
 
 def make_client(data_dir: Path, **settings: Any) -> TestClient:

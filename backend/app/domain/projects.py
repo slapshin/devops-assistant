@@ -571,9 +571,16 @@ class ProjectInput(Contract):
 
 
 def require_matchers(matchers: list[LabelMatcher], kinds: list[SourceKind]) -> list[LabelMatcher]:
-    """Prometheus queries are scoped by the matchers, so that source needs at least one."""
-    if SourceKind.PROMETHEUS in kinds and not matchers:
-        raise ValueError("a Prometheus source needs at least one label matcher")
+    """Prometheus queries are scoped by the matchers, so that source needs at least one that
+    selects only series carrying its label (``=`` or ``=~`` not matching the empty string)."""
+    if SourceKind.PROMETHEUS in kinds:
+        if not matchers:
+            raise ValueError("a Prometheus source needs at least one label matcher")
+        if not any(m.restricts for m in matchers):
+            raise ValueError(
+                "a Prometheus source needs at least one '=' or '=~' label matcher "
+                "that does not match an empty value"
+            )
     return matchers
 
 

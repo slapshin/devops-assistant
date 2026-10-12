@@ -9,6 +9,7 @@ import AppTopbar from "../../components/shell/AppTopbar.vue";
 import type { Crumb } from "../../components/shell/crumbs";
 import {
   type FieldErrors,
+  MATCH_OPS,
   MAX_GRAFANA_FOLDERS,
   MAX_GRAFANA_RULES,
   MAX_KEEP_REPORTS,
@@ -26,6 +27,7 @@ import {
   cloudflareInput,
   draftFrom,
   emptyDraft,
+  emptyMatcher,
   grafanaInput,
   keepsStoredSecret,
   matchersInput,
@@ -98,14 +100,14 @@ const GRAFANA_LABEL_LISTS = [
     field: "grafana.rule_labels",
     id: "grafana-rule-label",
     title: "Rule labels",
-    hint: "Only rules with all of these labels, e.g. team = web. Alone, they select every rule with these labels.",
+    hint: "Only rules matching all of these labels, e.g. team = web or team =~ web|api. Alone, they select every rule with these labels.",
   },
   {
     key: "grafanaInstanceLabels",
     field: "grafana.instance_labels",
     id: "grafana-instance-label",
     title: "Instance labels",
-    hint: "Only alert instances (the series a rule evaluates) with all of these labels count, e.g. project = shop. Rules without such an instance are skipped.",
+    hint: "Only alert instances (the series a rule evaluates) matching all of these labels count, e.g. project = shop. Rules without such an instance are skipped.",
   },
 ] as const;
 
@@ -161,7 +163,7 @@ const errorId = (field: string) => `err-${field.replaceAll(".", "-")}`;
 const describedBy = (field: string) => (errors.value[field] ? errorId(field) : undefined);
 
 function addMatcher() {
-  if (draft.value.matchers.length < MAX_MATCHERS) draft.value.matchers.push({ name: "", value: "" });
+  if (draft.value.matchers.length < MAX_MATCHERS) draft.value.matchers.push(emptyMatcher());
 }
 
 function removeMatcher(index: number) {
@@ -272,7 +274,10 @@ async function confirmDelete() {
         <legend>Prometheus-compatible metrics</legend>
         <p class="muted hint">Host, container, HTTP/RPC, proxy and database metrics from VictoriaMetrics or Prometheus.</p>
         <h2 class="source-title">Labels</h2>
-        <p class="muted hint">Every query is restricted to series with all of these exact label values. Required with a URL.</p>
+        <p class="muted hint">
+          Every query is restricted to series matching all of these labels; regular expressions are fully anchored (RE2 syntax). Required with a URL,
+          including at least one <code>=</code> or <code>=~</code> label.
+        </p>
         <div v-for="(m, i) in draft.matchers" :key="i" class="matcher">
           <div class="field">
             <label :for="`matcher-name-${i}`" class="sr-only">Label name {{ i + 1 }}</label>
@@ -287,7 +292,12 @@ async function confirmDelete() {
             >
             <p v-if="errors[`matchers.${i}.name`]" :id="errorId(`matchers.${i}.name`)" class="field-error">{{ errors[`matchers.${i}.name`] }}</p>
           </div>
-          <span class="eq mono" aria-hidden="true">=</span>
+          <div class="field">
+            <label :for="`matcher-op-${i}`" class="sr-only">Label operator {{ i + 1 }}</label>
+            <select :id="`matcher-op-${i}`" v-model="m.op" class="op mono">
+              <option v-for="o in MATCH_OPS" :key="o.op" :value="o.op" :title="o.label">{{ o.op }}</option>
+            </select>
+          </div>
           <div class="field">
             <label :for="`matcher-value-${i}`" class="sr-only">Label value {{ i + 1 }}</label>
             <input
@@ -863,7 +873,12 @@ async function confirmDelete() {
                   {{ errors[`${list.field}.${i}.name`] }}
                 </p>
               </div>
-              <span class="eq mono" aria-hidden="true">=</span>
+              <div class="field">
+                <label :for="`${list.id}-op-${i}`" class="sr-only">{{ list.title }} operator {{ i + 1 }}</label>
+                <select :id="`${list.id}-op-${i}`" v-model="m.op" class="op mono">
+                  <option v-for="o in MATCH_OPS" :key="o.op" :value="o.op" :title="o.label">{{ o.op }}</option>
+                </select>
+              </div>
               <div class="field">
                 <label :for="`${list.id}-value-${i}`" class="sr-only">{{ list.title }} value {{ i + 1 }}</label>
                 <input
@@ -883,7 +898,7 @@ async function confirmDelete() {
             </div>
             <p v-if="errors[list.field]" class="field-error">{{ errors[list.field] }}</p>
             <div>
-              <button type="button" :disabled="draft[list.key].length >= MAX_MATCHERS" @click="draft[list.key].push({ name: '', value: '' })">
+              <button type="button" :disabled="draft[list.key].length >= MAX_MATCHERS" @click="draft[list.key].push(emptyMatcher())">
                 Add {{ list.title.toLowerCase().replace(/s$/, "") }}
               </button>
             </div>
@@ -1028,7 +1043,7 @@ fieldset > * + * { margin-top: var(--space); }
 legend { font-weight: 500; color: var(--strong); padding: 0 4px; }
 .hint { font-size: 0.85rem; margin: 0; }
 .matcher { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.4fr) auto; gap: var(--space); align-items: start; }
-.eq { padding-top: 6px; }
+.op { width: 4.5rem; }
 .source-title { margin: calc(var(--space) * 2) 0 0; font-size: 0.95rem; }
 fieldset > .hint:first-of-type + .source-title { margin-top: var(--space); }
 details summary { cursor: pointer; color: var(--muted); }

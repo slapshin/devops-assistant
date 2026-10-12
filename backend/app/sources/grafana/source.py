@@ -18,7 +18,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 from numpy.typing import NDArray
 
-from app.domain.common import Entity, EntityKind, LabelMatcher, Scope, SourceKind
+from app.domain.common import Entity, EntityKind, LabelMatcher, MatchOp, Scope, SourceKind
 from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
@@ -303,7 +303,7 @@ class GrafanaMetricsSource:
         known = np.zeros(size, dtype=bool)
         recent: list[str] = []
         day_start = size - SECONDS_PER_DAY // step
-        hidden = {m.name for m in self.instance_labels}
+        hidden = {m.name for m in self.instance_labels if m.op is MatchOp.EQUAL}
         for instance in instances.values():
             fire, missing, seen = _replay(instance, rule, history, grid_start, end, step)
             firing += fire
@@ -392,7 +392,7 @@ class GrafanaMetricsSource:
                 )
             )
         if unmatched:
-            selection_text = ", ".join(f"{m.name}={m.value}" for m in self.instance_labels)
+            selection_text = ", ".join(str(m) for m in self.instance_labels)
             message = (
                 f"Grafana alert rule(s) {_names(unmatched)} have no instance matching "
                 f"{selection_text} in the last {HISTORY_DAYS} days; they are not analysed."
