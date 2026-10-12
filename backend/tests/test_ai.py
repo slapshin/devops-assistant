@@ -14,7 +14,7 @@ from app.ai.providers import FakeExplanationProvider, explain_findings, provider
 from app.domain.common import TimeRange
 from app.domain.explanation import ExplanationStatus, Likelihood
 from app.domain.findings import Finding, SignalCoverage
-from app.domain.metrics import ActiveInterval, AlertInstanceActivity
+from app.domain.metrics import ActiveInterval, AlertInstanceActivity, ErrorKindActivity
 from app.domain.report import AnalysisReport
 from app.settings import load_settings
 from tests.helpers import make_scope
@@ -282,6 +282,19 @@ def test_alert_instances_reach_the_digest_bounded_and_redacted() -> None:
     shown = payload.findings[0].alert_instances
     assert len(shown) == 5
     assert shown[0] == "instance=host-0, url=https://<redacted>@example.com/"
+
+
+def test_error_kinds_reach_the_digest_bounded() -> None:
+    kinds = [
+        ErrorKindActivity(issue=f"SHOP-{i}", title=f"KeyError {i}", events=9 - i) for i in range(7)
+    ]
+    kinds.append(ErrorKindActivity(issue="(other errors)", title=None, events=1))
+    finding = FINDINGS[0].model_copy(update={"error_kinds": kinds})
+
+    payload, _ = build_input(SCOPE, DAY, [finding], REPORT.coverage)
+
+    shown = payload.findings[0].error_kinds
+    assert shown == [f"SHOP-{i}: KeyError {i} ({9 - i} events)" for i in range(5)]
 
 
 def test_payload_budget_limits_findings() -> None:

@@ -359,6 +359,43 @@
       "title": "EpisodeSummary",
       "type": "object"
     },
+    "ErrorKindActivity": {
+      "additionalProperties": false,
+      "description": "One error kind (Sentry issue) and its error events during a finding on its project.",
+      "properties": {
+        "events": {
+          "description": "Error events of this kind during the finding.",
+          "minimum": 0,
+          "title": "Events",
+          "type": "integer"
+        },
+        "issue": {
+          "description": "Short issue ID, or '(other errors)'.",
+          "minLength": 1,
+          "title": "Issue",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The issue's title; null for '(other errors)'.",
+          "title": "Title"
+        }
+      },
+      "required": [
+        "issue",
+        "title",
+        "events"
+      ],
+      "title": "ErrorKindActivity",
+      "type": "object"
+    },
     "Evidence": {
       "additionalProperties": false,
       "description": "Chart data for a finding, persisted so a report reopens without the source.",
@@ -724,6 +761,14 @@
         },
         "entity": {
           "$ref": "#/$defs/Entity"
+        },
+        "error_kinds": {
+          "description": "Error kinds with events during a finding on a Sentry project's errors, most events first.",
+          "items": {
+            "$ref": "#/$defs/ErrorKindActivity"
+          },
+          "title": "Error Kinds",
+          "type": "array"
         },
         "evidence_ids": {
           "items": {
@@ -1571,12 +1616,13 @@
       "type": "string"
     },
     "schema_version": {
-      "default": "2.3",
+      "default": "2.4",
       "enum": [
         "2.0",
         "2.1",
         "2.2",
-        "2.3"
+        "2.3",
+        "2.4"
       ],
       "title": "Schema Version",
       "type": "string"

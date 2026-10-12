@@ -16,9 +16,13 @@ from app.domain.common import (
     UtcDatetime,
 )
 
-ATTRIBUTE_LABELS = ("alert_folder", "alert_group", "alert_summary")
+ERROR_KIND_LABEL = "issue"
+"""Identity label of an error kind's series (a Sentry issue's short ID)."""
+ERROR_TITLE_LABEL = "issue_title"
+"""Series label with an error kind's full title (descriptive, never identity)."""
+ATTRIBUTE_LABELS = ("alert_folder", "alert_group", "alert_summary", ERROR_TITLE_LABEL)
 """Series labels carried into finding attributes (descriptive, never identity): a Grafana
-rule's folder, group and summary annotation."""
+rule's folder, group and summary annotation, and a Sentry error kind's title."""
 MAX_ALERT_INSTANCES = 100
 """Alert instances listed per series; more are disclosed as truncated."""
 MAX_ACTIVE_INTERVALS = 50
@@ -50,6 +54,14 @@ class AlertInstanceActivity(Contract):
         "the instance; otherwise the rule's annotations that hold no template.",
     )
     active: list[ActiveInterval] = Field(min_length=1, max_length=MAX_ACTIVE_INTERVALS)
+
+
+class ErrorKindActivity(Contract):
+    """One error kind (Sentry issue) and its error events during a finding on its project."""
+
+    issue: str = Field(min_length=1, description="Short issue ID, or '(other errors)'.")
+    title: str | None = Field(description="The issue's title; null for '(other errors)'.")
+    events: int = Field(ge=0, description="Error events of this kind during the finding.")
 
 
 class MetricSeries(Contract):

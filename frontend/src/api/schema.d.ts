@@ -279,10 +279,10 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 2.3
+             * @default 2.4
              * @enum {string}
              */
-            schema_version: "2.0" | "2.1" | "2.2" | "2.3";
+            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4";
             scope: components["schemas"]["Scope"];
             /** @description Deprecated: the first source; use sources. */
             source?: components["schemas"]["SourceInfo"] | null;
@@ -582,6 +582,27 @@ export interface components {
          */
         ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
         /**
+         * ErrorKindActivity
+         * @description One error kind (Sentry issue) and its error events during a finding on its project.
+         */
+        ErrorKindActivity: {
+            /**
+             * Events
+             * @description Error events of this kind during the finding.
+             */
+            events: number;
+            /**
+             * Issue
+             * @description Short issue ID, or '(other errors)'.
+             */
+            issue: string;
+            /**
+             * Title
+             * @description The issue's title; null for '(other errors)'.
+             */
+            title: string | null;
+        };
+        /**
          * Evidence
          * @description Chart data for a finding, persisted so a report reopens without the source.
          */
@@ -701,6 +722,11 @@ export interface components {
             /** End */
             end: string;
             entity: components["schemas"]["Entity"];
+            /**
+             * Error Kinds
+             * @description Error kinds with events during a finding on a Sentry project's errors, most events first.
+             */
+            error_kinds?: components["schemas"]["ErrorKindActivity"][];
             /** Evidence Ids */
             evidence_ids: string[];
             /** @description Null for absolute-only findings. */

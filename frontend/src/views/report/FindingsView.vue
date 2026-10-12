@@ -5,6 +5,7 @@ import type { Finding } from "../../api/client";
 import SourceIcon from "../../components/projects/SourceIcon.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
 import { instancesText } from "../../lib/alerts";
+import { errorKindsText } from "../../lib/errors";
 import { recurrenceText, sourceByFamily } from "../../lib/findings";
 import { sourceKindLabel } from "../../lib/projects";
 import { FAMILY_LABELS, SEVERITIES, capitalize, formatDuration, formatTime, formatValue, utcTooltip } from "../../lib/format";
@@ -63,10 +64,12 @@ function matchesFilters(f: Finding): boolean {
   );
 }
 
-/** The entity plus the alert instances behind it, so a host name finds its Grafana alerts. */
+/** The entity plus the alert instances and error kinds behind it, so a host name finds its
+ * Grafana alerts and an error message its Sentry spikes. */
 function entityText(f: Finding): string {
   const labels = (f.alert_instances ?? []).flatMap((i) => Object.values(i.labels));
-  return [f.entity.display_name, ...labels].join(" ");
+  const errors = (f.error_kinds ?? []).flatMap((k) => [k.issue, k.title ?? ""]);
+  return [f.entity.display_name, ...labels, ...errors].join(" ");
 }
 
 function setFilter(key: string, value: string) {
@@ -204,6 +207,7 @@ watch(
                 <td class="mono muted">
                   {{ f.entity.display_name }}
                   <span v-if="f.alert_instances?.length" class="instances">· {{ instancesText(f) }}</span>
+                  <span v-if="f.error_kinds?.length" class="instances" :title="f.error_kinds[0]?.title ?? undefined">· {{ errorKindsText(f) }}</span>
                 </td>
                 <td :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</td>
                 <td class="num">{{ formatDuration(f.duration_seconds) }}</td>

@@ -82,6 +82,11 @@ class FindingDigest(Contract):
         default_factory=list,
         description="Label sets of the alert instances active during the finding (Grafana).",
     )
+    error_kinds: list[str] = Field(
+        default_factory=list,
+        description="Error kinds with the most events during the finding (Sentry), e.g. "
+        "'SHOP-1: KeyError (40 events)'.",
+    )
 
 
 class ExplanationInput(Contract):

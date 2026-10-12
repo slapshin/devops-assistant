@@ -30,7 +30,13 @@ from app.domain.interfaces import (
     SourceErrorKind,
 )
 from app.domain.jobs import StageName, StageProgress, StageStatus
-from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
+from app.domain.metrics import (
+    ERROR_KIND_LABEL,
+    ERROR_TITLE_LABEL,
+    CapabilityStatus,
+    MetricCapability,
+    MetricSeries,
+)
 from app.domain.projects import SentryTag
 from app.domain.report import AnalysisWindows, Exclusion, SourceInfo
 from app.sources.base import HISTORY_DAYS
@@ -59,6 +65,9 @@ ISSUE_CHUNK_SECONDS = 3 * SECONDS_PER_DAY
 """Grouped requests return a series per issue: 10 x 864 buckets stays under 10,000 points."""
 OTHER_ERRORS = "(other errors)"
 MAX_TITLE_CHARS = 120
+"""Of the title in an error kind's display name; the ``issue_title`` label keeps up to
+``MAX_FULL_TITLE_CHARS``."""
+MAX_FULL_TITLE_CHARS = 500
 UNSUPPORTED_PROBE_KINDS = (SourceErrorKind.AUTH, SourceErrorKind.BAD_QUERY)
 """A refused probe means the plan, version or token lacks that dataset, not that Sentry is
 unreachable (reading the projects already proved access)."""
@@ -78,18 +87,18 @@ def application_entity(
     return Entity(kind=EntityKind.APPLICATION, key=key, display_name=name, labels=labels)
 
 
+def _shorten(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
 def error_kind_entity(project: Entity, issue: str, title: str | None = None) -> Entity:
     """One error kind (a Sentry issue, or ``OTHER_ERRORS``) of a project's entity."""
-    if title is None:
-        name = issue
-    else:
-        short = title if len(title) <= MAX_TITLE_CHARS else title[: MAX_TITLE_CHARS - 1] + "…"
-        name = f"{short} ({issue})"
+    name = issue if title is None else f"{_shorten(title, MAX_TITLE_CHARS)} ({issue})"
     return Entity(
         kind=EntityKind.APPLICATION,
-        key=f"{project.key}|issue={issue}",
+        key=f"{project.key}|{ERROR_KIND_LABEL}={issue}",
         display_name=f"{project.display_name} · {name}",
-        labels={**project.labels, "issue": issue},
+        labels={**project.labels, ERROR_KIND_LABEL: issue},
     )
 
 
@@ -439,11 +448,9 @@ class SentryMetricsSource:
             values = grid.values(
                 defn, [(s, e, c.groups) for s, e, c in got_kinds.chunks], kind.issue
             )
-            out.append(
-                _series(
-                    defn, error_kind_entity(project, kind.issue, kind.title), values, grid, text
-                )
-            )
+            entity = error_kind_entity(project, kind.issue, kind.title)
+            title = {ERROR_TITLE_LABEL: _shorten(kind.title, MAX_FULL_TITLE_CHARS)}
+            out.append(_series(defn, entity, values, grid, text, title))
             other = [
                 None if t is None or v is None else max(0.0, t - v)
                 for t, v in zip(other, values, strict=True)
@@ -490,7 +497,9 @@ def _series(
     values: list[float | None],
     grid: _Grid,
     query: str,
+    labels: dict[str, str] | None = None,
 ) -> MetricSeries:
+    """``labels`` are descriptive ones added to the entity's (never identity)."""
     if defn.rate:
         values = [None if v is None else round(v / grid.step, 6) for v in values]
     else:
@@ -501,7 +510,7 @@ def _series(
         family=defn.family,
         signal=defn.signal,
         entity=entity,
-        labels=dict(entity.labels),
+        labels={**entity.labels, **(labels or {})},
         unit=defn.unit,
         query=query,
         step_seconds=grid.step,

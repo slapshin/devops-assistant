@@ -80,7 +80,7 @@ class Exclusion(Reason):
 
 
 class AnalysisReport(Contract):
-    schema_version: Literal["2.0", "2.1", "2.2", "2.3"] = REPORT_SCHEMA_VERSION
+    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4"] = REPORT_SCHEMA_VERSION
     analysis_id: str
     scope: Scope
     windows: AnalysisWindows

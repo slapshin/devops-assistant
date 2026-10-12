@@ -50,8 +50,11 @@ from app.domain.findings import (
 from app.domain.ids import episode_id, evidence_id, finding_id, series_id
 from app.domain.interfaces import CollectionResult, DetectionResult, MappingKind
 from app.domain.metrics import (
+    ERROR_KIND_LABEL,
+    ERROR_TITLE_LABEL,
     AlertInstanceActivity,
     CapabilityStatus,
+    ErrorKindActivity,
     MetricCapability,
     MetricSeries,
 )
@@ -293,6 +296,7 @@ class RobustDetector:
             evidence_ids=[e.evidence_id for e in evs],
             attributes=attributes,
             alert_instances=_active_during(s.source.alert_instances, start, end),
+            error_kinds=_error_kinds_during(s, ev.offset + ep.start, ev.offset + ep.end),
             state=_finding_state(ep, config),
             recurrence=_recurrence(len(prior)),
             prior_episode_days=len(prior),
@@ -840,6 +844,23 @@ def _active_during(
         if overlap:
             out.append(instance.model_copy(update={"active": overlap}))
     return out
+
+
+def _error_kinds_during(s: AnalysisSeries, lo: int, hi: int) -> list[ErrorKindActivity]:
+    """Error kinds with events in steps [lo, hi) of the collected grid, most events first."""
+    out = []
+    for kind in s.error_kinds:
+        rates = to_array(kind)[lo:hi]
+        events = round(float(np.nansum(rates)) * kind.step_seconds)
+        if events > 0:
+            out.append(
+                ErrorKindActivity(
+                    issue=kind.entity.labels[ERROR_KIND_LABEL],
+                    title=kind.labels.get(ERROR_TITLE_LABEL),
+                    events=events,
+                )
+            )
+    return sorted(out, key=lambda k: (-k.events, k.title is None, k.issue))
 
 
 def _slice_series(

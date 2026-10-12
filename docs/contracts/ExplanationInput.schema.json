@@ -86,6 +86,14 @@
         "entity": {
           "$ref": "#/$defs/Entity"
         },
+        "error_kinds": {
+          "description": "Error kinds with the most events during the finding (Sentry), e.g. 'SHOP-1: KeyError (40 events)'.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Error Kinds",
+          "type": "array"
+        },
         "expected": {
           "anyOf": [
             {

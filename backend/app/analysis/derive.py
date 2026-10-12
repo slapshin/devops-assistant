@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 from app.analysis.rules import RULES, Rule
 from app.domain.common import Entity, Unit
-from app.domain.metrics import ATTRIBUTE_LABELS, MetricSeries
+from app.domain.metrics import ATTRIBUTE_LABELS, ERROR_KIND_LABEL, MetricSeries
 
 Array = NDArray[np.float64]
 
@@ -78,6 +78,11 @@ DIRECT: dict[str, str] = {
     "grafana_alert_nodata": "alert_nodata",
 }
 """Collected signal -> rule for signals analysed as collected."""
+
+ERROR_KINDS_SIGNAL = "sentry_errors"
+ERROR_KIND_TOTALS = ("sentry_errors", "sentry_unhandled", "sentry_error_users")
+"""A project's error signals whose findings list the project's error kinds (the issue series
+of ``ERROR_KINDS_SIGNAL``) with their events during the finding."""
 
 SWARM_FAILED_TASKS = "swarm_failed_tasks"
 MEAN_LATENCY_RULE = "latency_mean"
@@ -208,6 +213,8 @@ class AnalysisSeries:
     """Requests per step for volume-guarded rules."""
     extra_evidence: list[MetricSeries] = field(default_factory=list)
     attributes: dict[str, str] = field(default_factory=dict)
+    error_kinds: list[MetricSeries] = field(default_factory=list)
+    """Error-kind series (error events per second) that a project's error total splits into."""
 
     @property
     def key(self) -> tuple[str, str]:
@@ -250,10 +257,27 @@ def _direct_series(by_signal: dict[str, dict[str, MetricSeries]]) -> list[Analys
             attributes = {k: s.labels[k] for k in ATTRIBUTE_LABELS if k in s.labels}
             out.append(
                 AnalysisSeries(
-                    rule, s.entity, s.unit, to_array(s), s.query, s, attributes=attributes
+                    rule,
+                    s.entity,
+                    s.unit,
+                    to_array(s),
+                    s.query,
+                    s,
+                    attributes=attributes,
+                    error_kinds=_error_kinds(by_signal, name, s),
                 )
             )
     return out
+
+
+def _error_kinds(
+    by_signal: dict[str, dict[str, MetricSeries]], name: str, total: MetricSeries
+) -> list[MetricSeries]:
+    if name not in ERROR_KIND_TOTALS or ERROR_KIND_LABEL in total.entity.labels:
+        return []
+    prefix = f"{total.entity.key}|{ERROR_KIND_LABEL}="
+    kinds = by_signal.get(ERROR_KINDS_SIGNAL, {})
+    return [kinds[key] for key in sorted(kinds) if key.startswith(prefix)]
 
 
 def _task_failure_series(by_signal: dict[str, dict[str, MetricSeries]]) -> list[AnalysisSeries]:

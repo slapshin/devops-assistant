@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.3",
+  "schema_version": "2.4",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e7",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -193,6 +193,7 @@
           ]
         }
       ],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -258,6 +259,7 @@
           ]
         }
       ],
+      "error_kinds": [],
       "state": "ongoing",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -324,6 +326,7 @@
           ]
         }
       ],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "recurring",
       "prior_episode_days": 13
@@ -387,6 +390,7 @@
           ]
         }
       ],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -450,6 +454,7 @@
           ]
         }
       ],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0

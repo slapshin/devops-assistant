@@ -7,11 +7,13 @@ import DataTable from "../../components/DataTable.vue";
 import ExplanationPanel from "../../components/ExplanationPanel.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
 import { instancesText } from "../../lib/alerts";
+import { errorKindsText } from "../../lib/errors";
 import { evidenceOption, timestamps } from "../../lib/charts";
 import { headline, recurrenceText } from "../../lib/findings";
 import { capitalize, formatDuration, formatTime, formatValue, isLatencyMean, timezone, utcTooltip } from "../../lib/format";
 import { chartPalette } from "../../lib/theme";
 import AlertInstancesPanel from "./AlertInstancesPanel.vue";
+import ErrorKindsPanel from "./ErrorKindsPanel.vue";
 import { useReportContext } from "./context";
 
 const EVIDENCE_COLUMNS = ["Time", "Observed", "Expected", "Lower", "Upper", "Gap"];
@@ -71,6 +73,7 @@ onMounted(async () => {
         <h2 id="evidence-title" ref="heading" tabindex="-1">{{ f.title }}</h2>
         <span class="sub mono">· {{ f.entity.display_name }}</span>
         <span v-if="f.alert_instances?.length" class="sub mono">· {{ instancesText(f) }}</span>
+        <span v-if="f.error_kinds?.length" class="sub mono">· {{ errorKindsText(f) }}</span>
         <RouterLink :to="closeTo" class="close" aria-label="Close evidence" title="Close (Esc)">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
         </RouterLink>
@@ -154,6 +157,7 @@ onMounted(async () => {
     </section>
 
     <AlertInstancesPanel v-if="f.alert_instances?.length" :finding="f" />
+    <ErrorKindsPanel v-if="f.error_kinds?.length" :finding="f" />
 
     <section class="panel s24" aria-labelledby="query-title">
       <div class="ph">

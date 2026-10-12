@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.3",
+  "schema_version": "2.4",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e5",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -224,6 +224,7 @@
       ],
       "attributes": {},
       "alert_instances": [],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -280,6 +281,33 @@
       ],
       "attributes": {},
       "alert_instances": [],
+      "error_kinds": [
+        {
+          "issue": "SHOP-API-4",
+          "title": "TypeError: 'NoneType' object is not subscriptable",
+          "events": 4967
+        },
+        {
+          "issue": "SHOP-API-1",
+          "title": "TimeoutError: upstream request timed out after 30s",
+          "events": 133
+        },
+        {
+          "issue": "SHOP-API-2",
+          "title": "KeyError: 'currency'",
+          "events": 72
+        },
+        {
+          "issue": "SHOP-API-3",
+          "title": "ValidationError: invalid email address",
+          "events": 44
+        },
+        {
+          "issue": "(other errors)",
+          "title": null,
+          "events": 44
+        }
+      ],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -330,8 +358,11 @@
         "evd_b6f12b8fbbec04da"
       ],
       "related_finding_ids": [],
-      "attributes": {},
+      "attributes": {
+        "issue_title": "TypeError: 'NoneType' object is not subscriptable"
+      },
       "alert_instances": [],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -388,6 +419,33 @@
       ],
       "attributes": {},
       "alert_instances": [],
+      "error_kinds": [
+        {
+          "issue": "SHOP-API-4",
+          "title": "TypeError: 'NoneType' object is not subscriptable",
+          "events": 4967
+        },
+        {
+          "issue": "SHOP-API-1",
+          "title": "TimeoutError: upstream request timed out after 30s",
+          "events": 133
+        },
+        {
+          "issue": "SHOP-API-2",
+          "title": "KeyError: 'currency'",
+          "events": 72
+        },
+        {
+          "issue": "SHOP-API-3",
+          "title": "ValidationError: invalid email address",
+          "events": 44
+        },
+        {
+          "issue": "(other errors)",
+          "title": null,
+          "events": 44
+        }
+      ],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -446,6 +504,7 @@
       ],
       "attributes": {},
       "alert_instances": [],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -502,6 +561,33 @@
       ],
       "attributes": {},
       "alert_instances": [],
+      "error_kinds": [
+        {
+          "issue": "SHOP-API-4",
+          "title": "TypeError: 'NoneType' object is not subscriptable",
+          "events": 4967
+        },
+        {
+          "issue": "SHOP-API-1",
+          "title": "TimeoutError: upstream request timed out after 30s",
+          "events": 133
+        },
+        {
+          "issue": "SHOP-API-2",
+          "title": "KeyError: 'currency'",
+          "events": 72
+        },
+        {
+          "issue": "SHOP-API-3",
+          "title": "ValidationError: invalid email address",
+          "events": 44
+        },
+        {
+          "issue": "(other errors)",
+          "title": null,
+          "events": 44
+        }
+      ],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -2114,7 +2200,8 @@
           "project": "shop-api",
           "environment": "production",
           "tags": "team=shop",
-          "issue": "SHOP-API-4"
+          "issue": "SHOP-API-4",
+          "issue_title": "TypeError: 'NoneType' object is not subscriptable"
         },
         "unit": "per_second",
         "query": "# Sentry events-timeseries, one request per 259200 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=1&environment=production&query=issue:[SHOP-API-4,SHOP-API-1,SHOP-API-2,SHOP-API-3]+team:%22shop%22&yAxis=count()&groupBy=issue&topEvents=4&sort=-count()&excludeOther=1&interval=5m&start=$start&end=$end",

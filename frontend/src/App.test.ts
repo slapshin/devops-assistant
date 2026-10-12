@@ -1051,6 +1051,22 @@ describe("report", () => {
     expect(links.some((link) => link.closest("tr")?.textContent?.includes("TypeError"))).toBe(true);
   });
 
+  it("a Sentry project's error spike names its errors in the row and lists them in the detail", async () => {
+    const total = sentryReport.findings.find((f) => f.signal === "app_error_rate" && !("issue" in f.entity.labels));
+    await renderAt(`${report(sentryReport)}/findings/${total?.finding_id ?? ""}`);
+
+    const link = await screen.findByRole("link", { name: /Error spike/, current: true });
+    expect(link.closest("tr")).toHaveTextContent("shop-api (production) · TypeError: 'NoneType' object is not subscriptable +4");
+
+    const panel = await screen.findByRole("region", { name: "Errors" });
+    const rows = within(panel).getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("TypeError: 'NoneType' object is not subscriptable");
+    expect(rows[1]).toHaveTextContent("SHOP-API-4");
+    expect(rows[1]).toHaveTextContent("94%");
+    expect(rows.at(-1)).toHaveTextContent("Other errors");
+    expect(within(panel).queryByRole("link")).not.toBeInTheDocument();
+  });
+
   it("renders a Wazuh report with agent findings", async () => {
     await renderAt(`${report(wazuhReport)}/findings`);
 

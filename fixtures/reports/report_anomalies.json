@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.3",
+  "schema_version": "2.4",
   "analysis_id": "01999a2b-0000-7000-8000-000000000002",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -472,6 +472,7 @@
       "related_finding_ids": [],
       "attributes": {},
       "alert_instances": [],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
@@ -534,6 +535,7 @@
         "error_type": "404"
       },
       "alert_instances": [],
+      "error_kinds": [],
       "state": "resolved",
       "recurrence": "recurring",
       "prior_episode_days": 3

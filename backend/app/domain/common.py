@@ -19,7 +19,7 @@ from pydantic import (
     field_validator,
 )
 
-REPORT_SCHEMA_VERSION: Final = "2.3"
+REPORT_SCHEMA_VERSION: Final = "2.4"
 STEP_SECONDS = 300
 
 

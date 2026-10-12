@@ -589,6 +589,8 @@ async def test_errors_are_split_by_kind_with_the_rest_as_other_errors() -> None:
         == f"{PROJECT} (production) · KeyError: 'currency' (SHOP-WEB-1)"
     )
     assert currency.entity.key.endswith("|tags=team=shop|issue=SHOP-WEB-1")
+    assert currency.labels["issue_title"] == "KeyError: 'currency'"
+    assert "issue_title" not in currency.entity.labels, "the title is never identity"
     assert "groupBy=issue" in currency.query and "issue:[SHOP-WEB-1,SHOP-WEB-2]" in currency.query
     assert set(currency.values[-2:]) == {0.0, round(1 / 300, 6)}
 
@@ -706,6 +708,25 @@ async def test_incident_yields_error_and_performance_findings() -> None:
     }
     assert set(spikes) == {None, "SHOP-WEB-4"}, "the project's total and only the new error kind"
     assert "TypeError" in spikes["SHOP-WEB-4"].display_name
+
+
+async def test_a_project_error_finding_lists_its_error_kinds() -> None:
+    report = await run(synthetic("incident"))
+
+    total = next(
+        f
+        for f in report.findings
+        if f.signal == "app_error_rate" and "issue" not in f.entity.labels
+    )
+    kinds = total.error_kinds
+    assert kinds[0].issue == "SHOP-WEB-4", "the new error kind drove the spike"
+    assert kinds[0].title is not None and "TypeError" in kinds[0].title
+    assert [k.events for k in kinds] == sorted((k.events for k in kinds), reverse=True)
+    assert all(k.events > 0 for k in kinds)
+
+    kind = next(f for f in report.findings if f.entity.labels.get("issue") == "SHOP-WEB-4")
+    assert kind.error_kinds == [], "an error kind's own finding lists none"
+    assert kind.attributes["issue_title"] == kinds[0].title
 
 
 async def test_healthy_yields_no_findings() -> None:
