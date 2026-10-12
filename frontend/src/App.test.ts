@@ -848,6 +848,21 @@ describe("project page", () => {
     expect(calls.some((c) => c.url.includes(`project_id=${PID}`))).toBe(true);
   });
 
+  it("shows Cloudflare and Sentry filters as matcher chips", async () => {
+    const cloudflare = { kind: "cloudflare", zone_id: "a".repeat(32), hostnames: ["shop.example.com", "api.example.com"], api_url: "https://api.cloudflare.com/client/v4", token_set: true };
+    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: "production", api_url: "https://sentry.io", tls_verify: true, token_set: true };
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, cloudflare, sentry] } as Summary);
+    routes[`GET /api/projects/${PID}/health`] = () => json([reachable]);
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+
+    await renderAt(`/projects/${PID}`);
+
+    const hostnames = await screen.findByRole("list", { name: "Cloudflare hostname filter" });
+    expect(within(hostnames).getAllByRole("listitem").map((li) => li.textContent)).toEqual(['host=~"shop.example.com|api.example.com"']);
+    const filters = screen.getByRole("list", { name: "Sentry filters" });
+    expect(within(filters).getAllByRole("listitem").map((li) => li.textContent)).toEqual(['project="shop-web"', 'environment="production"', 'team="shop"']);
+  });
+
   it("explains a deleted project", async () => {
     routes["GET /api/projects/gone"] = () => problem(404, "project_not_found", "Project not found");
 

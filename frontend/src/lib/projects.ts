@@ -240,6 +240,25 @@ export const wazuhSource = (project: { sources: StoredSource[] } | null | undefi
 export const grafanaSource = (project: { sources: StoredSource[] } | null | undefined) =>
   project?.sources.find((s): s is GrafanaSource => s.kind === "grafana") ?? null;
 
+/** One chip for a filter accepting any of `values`: an equality for one, PromQL-style alternation for several. */
+function anyOfChip(name: string, values: string[]): LabelMatcher {
+  return { name, op: values.length === 1 ? "=" : "=~", value: values.join("|") };
+}
+
+/** A Cloudflare source's hostname filter as matcher chips (none when it analyses every hostname). */
+export function cloudflareFilters(source: CloudflareSource): LabelMatcher[] {
+  return source.hostnames.length ? [anyOfChip("host", source.hostnames)] : [];
+}
+
+/** A Sentry source's project, environment and tag filters as matcher chips. */
+export function sentryFilters(source: SentrySource): LabelMatcher[] {
+  return [
+    anyOfChip("project", source.projects),
+    ...(source.environment ? [{ name: "environment", op: "=" as const, value: source.environment }] : []),
+    ...(source.tags ?? []).map((t) => ({ name: t.key, op: "=" as const, value: t.value })),
+  ];
+}
+
 export function draftFrom(project: ProjectSummary): ProjectDraft {
   const source = prometheusSource(project);
   const cloudflare = cloudflareSource(project);

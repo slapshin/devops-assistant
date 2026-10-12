@@ -11,10 +11,12 @@ import AppTopbar from "../../components/shell/AppTopbar.vue";
 import { formatTime, utcTooltip } from "../../lib/format";
 import {
   WAZUH_INDEX_PATTERN,
+  cloudflareFilters,
   cloudflareSource,
   grafanaSource,
   prometheusSource,
   scheduleSummary,
+  sentryFilters,
   sentrySource,
   sourceHost,
   wazuhSource,
@@ -77,23 +79,19 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
           <dd v-if="cloudflare">
             <SourceHealth :project="project.data.value" kind="cloudflare" />
             zone <span class="mono">{{ cloudflare.zone_id }}</span>
-            · {{ cloudflare.hostnames.length ? cloudflare.hostnames.join(", ") : "all hostnames" }}
             <template v-if="cloudflare.api_url.startsWith('synthetic:')"> · <span class="mono">{{ sourceHost(cloudflare.api_url) }}</span></template>
+            <template v-if="!cloudflare.hostnames.length"> · all hostnames</template>
+            <MatcherChips v-else class="chips" label="Cloudflare hostname filter" :matchers="cloudflareFilters(cloudflare)" />
           </dd>
           <dd v-else class="muted">Not configured</dd>
           <dt class="source-kind"><SourceIcon kind="sentry" />Sentry</dt>
           <dd v-if="sentry">
             <SourceHealth :project="project.data.value" kind="sentry" />
-            <span class="mono">{{ sentry.organization }}: {{ sentry.projects.join(", ") }}</span>
-            · {{ sentry.environment ?? "all environments" }}
-            <template v-if="sentry.api_url !== 'https://sentry.io'"> · <span class="mono">{{ sourceHost(sentry.api_url) }}</span></template>
+            <span class="mono">{{ sourceHost(sentry.api_url) }}</span>
+            · org <span class="mono">{{ sentry.organization }}</span>
+            <template v-if="!sentry.environment"> · all environments</template>
             <template v-if="sentry.tls_verify === false"> · TLS not verified</template>
-            <MatcherChips
-              v-if="sentry.tags?.length"
-              class="chips"
-              label="Sentry tag filters"
-              :matchers="sentry.tags.map((t) => ({ name: t.key, value: t.value }))"
-            />
+            <MatcherChips class="chips" label="Sentry filters" :matchers="sentryFilters(sentry)" />
           </dd>
           <dd v-else class="muted">Not configured</dd>
           <dt class="source-kind"><SourceIcon kind="wazuh" />Wazuh</dt>

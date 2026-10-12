@@ -9,7 +9,7 @@ withDefaults(defineProps<{ matchers: Chip[]; label?: string }>(), { label: "Labe
 
 <template>
   <ul class="chips" :aria-label="label">
-    <li v-for="m in matchers" :key="m.name" class="chip mono">{{ m.name }}{{ m.op ?? "=" }}<span class="value">"{{ m.value }}"</span></li>
+    <li v-for="(m, i) in matchers" :key="i" class="chip mono">{{ m.name }}{{ m.op ?? "=" }}<span class="value">"{{ m.value }}"</span></li>
   </ul>
 </template>
 
