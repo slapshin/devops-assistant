@@ -110,6 +110,15 @@
       "title": "CapabilityStatus",
       "type": "string"
     },
+    "ChangeDirection": {
+      "enum": [
+        "up",
+        "down",
+        "both"
+      ],
+      "title": "ChangeDirection",
+      "type": "string"
+    },
     "ConfidenceLevel": {
       "enum": [
         "low",
@@ -117,6 +126,154 @@
         "high"
       ],
       "title": "ConfidenceLevel",
+      "type": "string"
+    },
+    "CustomRule": {
+      "additionalProperties": false,
+      "properties": {
+        "critical_threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional second threshold that raises the severity.",
+          "title": "Critical Threshold"
+        },
+        "description": {
+          "default": "",
+          "description": "What the value means and why it matters; shown with findings and given to the AI explanation.",
+          "maxLength": 500,
+          "title": "Description",
+          "type": "string"
+        },
+        "direction": {
+          "$ref": "#/$defs/ChangeDirection",
+          "default": "up",
+          "description": "Which baseline deviations count (anomaly/both)."
+        },
+        "identity_labels": {
+          "description": "Labels that identify one analysed series (e.g. job, instance); empty uses every label the query returns except the project's matcher labels.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Identity Labels",
+          "type": "array"
+        },
+        "max_severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Upper bound of finding severity; in event mode the severity of every finding (default high)."
+        },
+        "min_change": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline deviations must also differ from the expected value by at least this much, in the rule's unit.",
+          "title": "Min Change"
+        },
+        "min_change_factor": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline deviations must also be at least this factor of the expected value (default 1.5 when neither this nor min_change is set).",
+          "title": "Min Change Factor"
+        },
+        "min_duration_minutes": {
+          "default": 15,
+          "description": "How long a threshold breach must last.",
+          "maximum": 1440,
+          "minimum": 5,
+          "title": "Min Duration Minutes",
+          "type": "integer"
+        },
+        "mode": {
+          "$ref": "#/$defs/CustomRuleMode",
+          "default": "anomaly"
+        },
+        "query": {
+          "description": "PromQL; the project's label matchers are added to every selector. $__window is replaced by the rate window (5m).",
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "slug": {
+          "description": "Identifier unique within the project, e.g. checkout_failures ([a-z][a-z0-9_]*, at most 40 characters).",
+          "title": "Slug",
+          "type": "string"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required in threshold/both mode.",
+          "title": "Threshold"
+        },
+        "threshold_op": {
+          "$ref": "#/$defs/ThresholdOp",
+          "default": "above"
+        },
+        "title": {
+          "description": "Shown on findings.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit",
+          "default": "count"
+        }
+      },
+      "required": [
+        "slug",
+        "title",
+        "query"
+      ],
+      "title": "CustomRule",
+      "type": "object"
+    },
+    "CustomRuleMode": {
+      "enum": [
+        "anomaly",
+        "threshold",
+        "both",
+        "event"
+      ],
+      "title": "CustomRuleMode",
       "type": "string"
     },
     "DailyTrend": {
@@ -278,7 +435,8 @@
         "zone",
         "application",
         "agent",
-        "alert_rule"
+        "alert_rule",
+        "custom"
       ],
       "title": "EntityKind",
       "type": "string"
@@ -1369,7 +1527,8 @@
         "app_performance",
         "host_security",
         "file_integrity",
-        "alerting"
+        "alerting",
+        "custom"
       ],
       "title": "SignalFamily",
       "type": "string"
@@ -1440,6 +1599,14 @@
         "grafana"
       ],
       "title": "SourceKind",
+      "type": "string"
+    },
+    "ThresholdOp": {
+      "enum": [
+        "above",
+        "below"
+      ],
+      "title": "ThresholdOp",
       "type": "string"
     },
     "TimeRange": {
@@ -1583,6 +1750,14 @@
       "title": "Coverage",
       "type": "array"
     },
+    "custom_rules": {
+      "description": "The project's custom rules as they were when analysed (2.5).",
+      "items": {
+        "$ref": "#/$defs/CustomRule"
+      },
+      "title": "Custom Rules",
+      "type": "array"
+    },
     "detector_version": {
       "title": "Detector Version",
       "type": "string"
@@ -1616,13 +1791,14 @@
       "type": "string"
     },
     "schema_version": {
-      "default": "2.4",
+      "default": "2.5",
       "enum": [
         "2.0",
         "2.1",
         "2.2",
         "2.3",
-        "2.4"
+        "2.4",
+        "2.5"
       ],
       "title": "Schema Version",
       "type": "string"

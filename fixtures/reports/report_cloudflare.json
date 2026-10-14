@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4",
+  "schema_version": "2.5",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000cf",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000c1",
@@ -19,8 +19,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.12",
-  "config_hash": "c4a54d8530cd",
+  "detector_version": "detectors-2026.10.14",
+  "config_hash": "c08803ea6db8",
   "sources": [
     {
       "kind": "cloudflare",
@@ -250,61 +250,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_538c1b2684d66385",
-      "detector": "level:security_blocked_rate",
-      "detector_version": "detectors-2026.10.12",
-      "method": "relative",
-      "family": "security",
-      "signal": "security_blocked_rate",
-      "title": "Surge of blocked requests (WAF/firewall)",
-      "entity": {
-        "kind": "zone",
-        "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
-        "display_name": "shop.example.com",
-        "labels": {
-          "zone_id": "0123456789abcdef0123456789abcdef",
-          "hostnames": "shop.example.com"
-        }
-      },
-      "start": "2026-09-30T02:05:00Z",
-      "end": "2026-09-30T04:05:00Z",
-      "peak_at": "2026-09-30T02:20:00Z",
-      "duration_seconds": 7200,
-      "severity": "high",
-      "severity_points": 5,
-      "confidence": "high",
-      "confidence_reasons": [],
-      "observed": {
-        "value": 3.69,
-        "unit": "per_second"
-      },
-      "expected": {
-        "median": 0.106667,
-        "lower": 0.066667,
-        "upper": 0.146667,
-        "unit": "per_second"
-      },
-      "peak_score": 358.33,
-      "threshold": null,
-      "baseline_days": 14,
-      "baseline_mode": "time_of_day",
-      "evidence_ids": [
-        "evd_1eb1c113adb339e6"
-      ],
-      "related_finding_ids": [
-        "fnd_8a6aadb6b0165397"
-      ],
-      "attributes": {},
-      "alert_instances": [],
-      "error_kinds": [],
-      "state": "resolved",
-      "recurrence": "new",
-      "prior_episode_days": 0
-    },
-    {
-      "finding_id": "fnd_8a6aadb6b0165397",
+      "finding_id": "fnd_59dd02839304192a",
       "detector": "level:security_challenge_rate",
-      "detector_version": "detectors-2026.10.12",
+      "detector_version": "detectors-2026.10.14",
       "method": "relative",
       "family": "security",
       "signal": "security_challenge_rate",
@@ -341,10 +289,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_3a18d6a8a12213bb"
+        "evd_bc7e642c5f382b86"
       ],
       "related_finding_ids": [
-        "fnd_538c1b2684d66385"
+        "fnd_94f37c1a388b980b"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -354,13 +302,13 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_2750cd8e1ed40381",
-      "detector": "level:edge_ttfb_p95",
-      "detector_version": "detectors-2026.10.12",
+      "finding_id": "fnd_94f37c1a388b980b",
+      "detector": "level:security_blocked_rate",
+      "detector_version": "detectors-2026.10.14",
       "method": "relative",
-      "family": "edge",
-      "signal": "edge_ttfb_p95",
-      "title": "Edge time to first byte (p95) above expected range",
+      "family": "security",
+      "signal": "security_blocked_rate",
+      "title": "Surge of blocked requests (WAF/firewall)",
       "entity": {
         "kind": "zone",
         "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -370,37 +318,33 @@
           "hostnames": "shop.example.com"
         }
       },
-      "start": "2026-09-30T06:20:00Z",
-      "end": "2026-09-30T07:05:00Z",
-      "peak_at": "2026-09-30T06:55:00Z",
-      "duration_seconds": 2700,
+      "start": "2026-09-30T02:05:00Z",
+      "end": "2026-09-30T04:05:00Z",
+      "peak_at": "2026-09-30T02:20:00Z",
+      "duration_seconds": 7200,
       "severity": "high",
-      "severity_points": 4,
+      "severity_points": 5,
       "confidence": "high",
       "confidence_reasons": [],
       "observed": {
-        "value": 0.743445,
-        "unit": "seconds"
+        "value": 3.69,
+        "unit": "per_second"
       },
       "expected": {
-        "median": 0.1759825,
-        "lower": 0.1320263752,
-        "upper": 0.21993862479999998,
-        "unit": "seconds"
+        "median": 0.106667,
+        "lower": 0.066667,
+        "upper": 0.146667,
+        "unit": "per_second"
       },
-      "peak_score": 51.64,
+      "peak_score": 358.33,
       "threshold": null,
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_4b76bee0d380f3f5",
-        "evd_cb8c71fc17e5ec5e",
-        "evd_642a3e89123cd14b"
+        "evd_2ed26e7de31f12da"
       ],
       "related_finding_ids": [
-        "fnd_74e47732d5d863c7",
-        "fnd_b88fdd74ad22a087",
-        "fnd_c8a64804d149b1af"
+        "fnd_59dd02839304192a"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -410,64 +354,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_74e47732d5d863c7",
-      "detector": "level:edge_origin_error_ratio",
-      "detector_version": "detectors-2026.10.12",
-      "method": "absolute",
-      "family": "edge",
-      "signal": "edge_origin_error_ratio",
-      "title": "Origin error rate (520-530) at or above 2.0 % (heuristic)",
-      "entity": {
-        "kind": "zone",
-        "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
-        "display_name": "shop.example.com",
-        "labels": {
-          "zone_id": "0123456789abcdef0123456789abcdef",
-          "hostnames": "shop.example.com"
-        }
-      },
-      "start": "2026-09-30T06:20:00Z",
-      "end": "2026-09-30T07:05:00Z",
-      "peak_at": "2026-09-30T06:25:00Z",
-      "duration_seconds": 2700,
-      "severity": "high",
-      "severity_points": 4,
-      "confidence": "high",
-      "confidence_reasons": [],
-      "observed": {
-        "value": 0.12004306585360726,
-        "unit": "ratio"
-      },
-      "expected": {
-        "median": 0.0004960001302568439,
-        "lower": 0.0,
-        "upper": 0.0044960001302568435,
-        "unit": "ratio"
-      },
-      "peak_score": 119.55,
-      "threshold": 0.02,
-      "baseline_days": 14,
-      "baseline_mode": "time_of_day",
-      "evidence_ids": [
-        "evd_a60add22f942a5ce",
-        "evd_aed6b684a909844f"
-      ],
-      "related_finding_ids": [
-        "fnd_2750cd8e1ed40381",
-        "fnd_b88fdd74ad22a087",
-        "fnd_c8a64804d149b1af"
-      ],
-      "attributes": {},
-      "alert_instances": [],
-      "error_kinds": [],
-      "state": "resolved",
-      "recurrence": "new",
-      "prior_episode_days": 0
-    },
-    {
-      "finding_id": "fnd_b88fdd74ad22a087",
+      "finding_id": "fnd_166fffad0d562940",
       "detector": "level:edge_server_error_ratio",
-      "detector_version": "detectors-2026.10.12",
+      "detector_version": "detectors-2026.10.14",
       "method": "absolute",
       "family": "edge",
       "signal": "edge_server_error_ratio",
@@ -504,13 +393,13 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_9316f84451b00eb7",
-        "evd_100746894fc3b6dc"
+        "evd_7fae9d0af806180b",
+        "evd_47279ece96f60321"
       ],
       "related_finding_ids": [
-        "fnd_2750cd8e1ed40381",
-        "fnd_74e47732d5d863c7",
-        "fnd_c8a64804d149b1af"
+        "fnd_96579ca603c5bee6",
+        "fnd_e963fd2949f0f261",
+        "fnd_ecd4bd826568eb6d"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -520,9 +409,64 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_c8a64804d149b1af",
+      "finding_id": "fnd_96579ca603c5bee6",
+      "detector": "level:edge_origin_error_ratio",
+      "detector_version": "detectors-2026.10.14",
+      "method": "absolute",
+      "family": "edge",
+      "signal": "edge_origin_error_ratio",
+      "title": "Origin error rate (520-530) at or above 2.0 % (heuristic)",
+      "entity": {
+        "kind": "zone",
+        "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
+        "display_name": "shop.example.com",
+        "labels": {
+          "zone_id": "0123456789abcdef0123456789abcdef",
+          "hostnames": "shop.example.com"
+        }
+      },
+      "start": "2026-09-30T06:20:00Z",
+      "end": "2026-09-30T07:05:00Z",
+      "peak_at": "2026-09-30T06:25:00Z",
+      "duration_seconds": 2700,
+      "severity": "high",
+      "severity_points": 4,
+      "confidence": "high",
+      "confidence_reasons": [],
+      "observed": {
+        "value": 0.12004306585360726,
+        "unit": "ratio"
+      },
+      "expected": {
+        "median": 0.0004960001302568439,
+        "lower": 0.0,
+        "upper": 0.0044960001302568435,
+        "unit": "ratio"
+      },
+      "peak_score": 119.55,
+      "threshold": 0.02,
+      "baseline_days": 14,
+      "baseline_mode": "time_of_day",
+      "evidence_ids": [
+        "evd_2b3fe2ed6d7cb449",
+        "evd_f597ce4e09c6e7be"
+      ],
+      "related_finding_ids": [
+        "fnd_166fffad0d562940",
+        "fnd_e963fd2949f0f261",
+        "fnd_ecd4bd826568eb6d"
+      ],
+      "attributes": {},
+      "alert_instances": [],
+      "error_kinds": [],
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
+    },
+    {
+      "finding_id": "fnd_e963fd2949f0f261",
       "detector": "level:edge_origin_time_p95",
-      "detector_version": "detectors-2026.10.12",
+      "detector_version": "detectors-2026.10.14",
       "method": "relative",
       "family": "edge",
       "signal": "edge_origin_time_p95",
@@ -559,13 +503,69 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_36bc603222aba68f",
-        "evd_7561ebfa84ddd5d1"
+        "evd_bbf7b65bb0ea2efa",
+        "evd_d0a6eb42309345b4"
       ],
       "related_finding_ids": [
-        "fnd_2750cd8e1ed40381",
-        "fnd_74e47732d5d863c7",
-        "fnd_b88fdd74ad22a087"
+        "fnd_166fffad0d562940",
+        "fnd_96579ca603c5bee6",
+        "fnd_ecd4bd826568eb6d"
+      ],
+      "attributes": {},
+      "alert_instances": [],
+      "error_kinds": [],
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
+    },
+    {
+      "finding_id": "fnd_ecd4bd826568eb6d",
+      "detector": "level:edge_ttfb_p95",
+      "detector_version": "detectors-2026.10.14",
+      "method": "relative",
+      "family": "edge",
+      "signal": "edge_ttfb_p95",
+      "title": "Edge time to first byte (p95) above expected range",
+      "entity": {
+        "kind": "zone",
+        "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
+        "display_name": "shop.example.com",
+        "labels": {
+          "zone_id": "0123456789abcdef0123456789abcdef",
+          "hostnames": "shop.example.com"
+        }
+      },
+      "start": "2026-09-30T06:20:00Z",
+      "end": "2026-09-30T07:05:00Z",
+      "peak_at": "2026-09-30T06:55:00Z",
+      "duration_seconds": 2700,
+      "severity": "high",
+      "severity_points": 4,
+      "confidence": "high",
+      "confidence_reasons": [],
+      "observed": {
+        "value": 0.743445,
+        "unit": "seconds"
+      },
+      "expected": {
+        "median": 0.1759825,
+        "lower": 0.1320263752,
+        "upper": 0.21993862479999998,
+        "unit": "seconds"
+      },
+      "peak_score": 51.64,
+      "threshold": null,
+      "baseline_days": 14,
+      "baseline_mode": "time_of_day",
+      "evidence_ids": [
+        "evd_248d4f22457c9c22",
+        "evd_56d80e14a9b2835e",
+        "evd_aadcef660ef187fc"
+      ],
+      "related_finding_ids": [
+        "fnd_166fffad0d562940",
+        "fnd_96579ca603c5bee6",
+        "fnd_e963fd2949f0f261"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -595,29 +595,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_538c1b2684d66385",
-          "finding_id": "fnd_538c1b2684d66385",
-          "entity": {
-            "kind": "zone",
-            "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
-            "display_name": "shop.example.com",
-            "labels": {
-              "zone_id": "0123456789abcdef0123456789abcdef",
-              "hostnames": "shop.example.com"
-            }
-          },
-          "family": "security",
-          "signal": "security_blocked_rate",
-          "start": "2026-09-30T02:05:00Z",
-          "end": "2026-09-30T04:05:00Z",
-          "severity": "high",
-          "peak_observed": 3.69,
-          "expected_median": 0.106667,
-          "unit": "per_second"
-        },
-        {
-          "episode_id": "eps_8a6aadb6b0165397",
-          "finding_id": "fnd_8a6aadb6b0165397",
+          "episode_id": "eps_59dd02839304192a",
+          "finding_id": "fnd_59dd02839304192a",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -637,8 +616,8 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_2750cd8e1ed40381",
-          "finding_id": "fnd_2750cd8e1ed40381",
+          "episode_id": "eps_94f37c1a388b980b",
+          "finding_id": "fnd_94f37c1a388b980b",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -648,39 +627,18 @@
               "hostnames": "shop.example.com"
             }
           },
-          "family": "edge",
-          "signal": "edge_ttfb_p95",
-          "start": "2026-09-30T06:20:00Z",
-          "end": "2026-09-30T07:05:00Z",
+          "family": "security",
+          "signal": "security_blocked_rate",
+          "start": "2026-09-30T02:05:00Z",
+          "end": "2026-09-30T04:05:00Z",
           "severity": "high",
-          "peak_observed": 0.747338,
-          "expected_median": 0.1759825,
-          "unit": "seconds"
+          "peak_observed": 3.69,
+          "expected_median": 0.106667,
+          "unit": "per_second"
         },
         {
-          "episode_id": "eps_74e47732d5d863c7",
-          "finding_id": "fnd_74e47732d5d863c7",
-          "entity": {
-            "kind": "zone",
-            "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
-            "display_name": "shop.example.com",
-            "labels": {
-              "zone_id": "0123456789abcdef0123456789abcdef",
-              "hostnames": "shop.example.com"
-            }
-          },
-          "family": "edge",
-          "signal": "edge_origin_error_ratio",
-          "start": "2026-09-30T06:20:00Z",
-          "end": "2026-09-30T07:05:00Z",
-          "severity": "high",
-          "peak_observed": 0.12004306585360726,
-          "expected_median": 0.0004960001302568439,
-          "unit": "ratio"
-        },
-        {
-          "episode_id": "eps_b88fdd74ad22a087",
-          "finding_id": "fnd_b88fdd74ad22a087",
+          "episode_id": "eps_166fffad0d562940",
+          "finding_id": "fnd_166fffad0d562940",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -700,8 +658,29 @@
           "unit": "ratio"
         },
         {
-          "episode_id": "eps_c8a64804d149b1af",
-          "finding_id": "fnd_c8a64804d149b1af",
+          "episode_id": "eps_96579ca603c5bee6",
+          "finding_id": "fnd_96579ca603c5bee6",
+          "entity": {
+            "kind": "zone",
+            "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
+            "display_name": "shop.example.com",
+            "labels": {
+              "zone_id": "0123456789abcdef0123456789abcdef",
+              "hostnames": "shop.example.com"
+            }
+          },
+          "family": "edge",
+          "signal": "edge_origin_error_ratio",
+          "start": "2026-09-30T06:20:00Z",
+          "end": "2026-09-30T07:05:00Z",
+          "severity": "high",
+          "peak_observed": 0.12004306585360726,
+          "expected_median": 0.0004960001302568439,
+          "unit": "ratio"
+        },
+        {
+          "episode_id": "eps_e963fd2949f0f261",
+          "finding_id": "fnd_e963fd2949f0f261",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -718,6 +697,27 @@
           "severity": "high",
           "peak_observed": 8.0,
           "expected_median": 0.3422185,
+          "unit": "seconds"
+        },
+        {
+          "episode_id": "eps_ecd4bd826568eb6d",
+          "finding_id": "fnd_ecd4bd826568eb6d",
+          "entity": {
+            "kind": "zone",
+            "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
+            "display_name": "shop.example.com",
+            "labels": {
+              "zone_id": "0123456789abcdef0123456789abcdef",
+              "hostnames": "shop.example.com"
+            }
+          },
+          "family": "edge",
+          "signal": "edge_ttfb_p95",
+          "start": "2026-09-30T06:20:00Z",
+          "end": "2026-09-30T07:05:00Z",
+          "severity": "high",
+          "peak_observed": 0.747338,
+          "expected_median": 0.1759825,
           "unit": "seconds"
         }
       ]
@@ -955,8 +955,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_1eb1c113adb339e6",
-      "finding_id": "fnd_538c1b2684d66385",
+      "evidence_id": "evd_2ed26e7de31f12da",
+      "finding_id": "fnd_94f37c1a388b980b",
       "series": {
         "series_id": "ser_bf75d5337b427a4c",
         "family": "security",
@@ -1666,8 +1666,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_3a18d6a8a12213bb",
-      "finding_id": "fnd_8a6aadb6b0165397",
+      "evidence_id": "evd_bc7e642c5f382b86",
+      "finding_id": "fnd_59dd02839304192a",
       "series": {
         "series_id": "ser_7cd98843d09ca54d",
         "family": "security",
@@ -2377,8 +2377,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_9316f84451b00eb7",
-      "finding_id": "fnd_b88fdd74ad22a087",
+      "evidence_id": "evd_7fae9d0af806180b",
+      "finding_id": "fnd_166fffad0d562940",
       "series": {
         "series_id": "ser_ba0e22a2d5eb20c9",
         "family": "edge",
@@ -2884,8 +2884,8 @@
       "threshold_label": "Edge server error rate (5xx): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_100746894fc3b6dc",
-      "finding_id": "fnd_b88fdd74ad22a087",
+      "evidence_id": "evd_47279ece96f60321",
+      "finding_id": "fnd_166fffad0d562940",
       "series": {
         "series_id": "ser_2764d646d8debc4e",
         "family": "edge",
@@ -3037,8 +3037,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_a60add22f942a5ce",
-      "finding_id": "fnd_74e47732d5d863c7",
+      "evidence_id": "evd_2b3fe2ed6d7cb449",
+      "finding_id": "fnd_96579ca603c5bee6",
       "series": {
         "series_id": "ser_57a76b3822b51dce",
         "family": "edge",
@@ -3544,8 +3544,8 @@
       "threshold_label": "Origin error rate (520-530): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_aed6b684a909844f",
-      "finding_id": "fnd_74e47732d5d863c7",
+      "evidence_id": "evd_f597ce4e09c6e7be",
+      "finding_id": "fnd_96579ca603c5bee6",
       "series": {
         "series_id": "ser_2764d646d8debc4e",
         "family": "edge",
@@ -3697,8 +3697,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_4b76bee0d380f3f5",
-      "finding_id": "fnd_2750cd8e1ed40381",
+      "evidence_id": "evd_248d4f22457c9c22",
+      "finding_id": "fnd_ecd4bd826568eb6d",
       "series": {
         "series_id": "ser_5cc8386789b19d77",
         "family": "edge",
@@ -4204,8 +4204,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_cb8c71fc17e5ec5e",
-      "finding_id": "fnd_2750cd8e1ed40381",
+      "evidence_id": "evd_56d80e14a9b2835e",
+      "finding_id": "fnd_ecd4bd826568eb6d",
       "series": {
         "series_id": "ser_2725f13b4217854b",
         "family": "edge",
@@ -4357,8 +4357,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_642a3e89123cd14b",
-      "finding_id": "fnd_2750cd8e1ed40381",
+      "evidence_id": "evd_aadcef660ef187fc",
+      "finding_id": "fnd_ecd4bd826568eb6d",
       "series": {
         "series_id": "ser_2764d646d8debc4e",
         "family": "edge",
@@ -4510,8 +4510,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_36bc603222aba68f",
-      "finding_id": "fnd_c8a64804d149b1af",
+      "evidence_id": "evd_bbf7b65bb0ea2efa",
+      "finding_id": "fnd_e963fd2949f0f261",
       "series": {
         "series_id": "ser_6ca1d27691083be9",
         "family": "edge",
@@ -5017,8 +5017,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_7561ebfa84ddd5d1",
-      "finding_id": "fnd_c8a64804d149b1af",
+      "evidence_id": "evd_d0a6eb42309345b4",
+      "finding_id": "fnd_e963fd2949f0f261",
       "series": {
         "series_id": "ser_2764d646d8debc4e",
         "family": "edge",
@@ -5174,47 +5174,47 @@
   "explanation": {
     "status": "succeeded",
     "explanation": {
-      "summary": "6 finding(s) in the latest day; most severe: Surge of blocked requests (WAF/firewall) on shop.example.com.",
+      "summary": "6 finding(s) in the latest day; most severe: Surge of challenged requests on shop.example.com.",
       "hypotheses": [
-        {
-          "text": "Surge of blocked requests (WAF/firewall) on shop.example.com may reflect a workload or configuration change around its start time.",
-          "finding_ids": [
-            "fnd_538c1b2684d66385"
-          ],
-          "likelihood": "possible"
-        },
         {
           "text": "Surge of challenged requests on shop.example.com may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_8a6aadb6b0165397"
+            "fnd_59dd02839304192a"
           ],
           "likelihood": "possible"
         },
         {
-          "text": "Edge time to first byte (p95) above expected range on shop.example.com may reflect a workload or configuration change around its start time.",
+          "text": "Surge of blocked requests (WAF/firewall) on shop.example.com may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_2750cd8e1ed40381"
+            "fnd_94f37c1a388b980b"
+          ],
+          "likelihood": "possible"
+        },
+        {
+          "text": "Edge server error rate (5xx) at or above 5.0 % (heuristic) on shop.example.com may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_166fffad0d562940"
           ],
           "likelihood": "possible"
         }
       ],
       "investigation_steps": [
         {
-          "text": "Open the evidence chart for Surge of blocked requests (WAF/firewall) and compare with deploy and log history.",
-          "finding_ids": [
-            "fnd_538c1b2684d66385"
-          ]
-        },
-        {
           "text": "Open the evidence chart for Surge of challenged requests and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_8a6aadb6b0165397"
+            "fnd_59dd02839304192a"
           ]
         },
         {
-          "text": "Open the evidence chart for Edge time to first byte (p95) above expected range and compare with deploy and log history.",
+          "text": "Open the evidence chart for Surge of blocked requests (WAF/firewall) and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_2750cd8e1ed40381"
+            "fnd_94f37c1a388b980b"
+          ]
+        },
+        {
+          "text": "Open the evidence chart for Edge server error rate (5xx) at or above 5.0 % (heuristic) and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_166fffad0d562940"
           ]
         }
       ],
@@ -5225,5 +5225,6 @@
     },
     "reason": null,
     "validation_notes": []
-  }
+  },
+  "custom_rules": []
 }

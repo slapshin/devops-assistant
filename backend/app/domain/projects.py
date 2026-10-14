@@ -30,6 +30,7 @@ from app.domain.common import (
     SourceKind,
     UtcDatetime,
 )
+from app.domain.custom_rules import MAX_CUSTOM_RULES, CustomRule, CustomRules
 from app.domain.jobs import AnalysisJob
 from app.domain.metrics import CapabilityStatus
 from app.domain.schedule import ReportSchedule
@@ -124,6 +125,11 @@ class PrometheusSourceInput(Contract):
     url: str = Field(max_length=2048)
     tls_verify: bool = True
     auth: AuthInput = Field(default_factory=NoAuth)
+    custom_rules: CustomRules = Field(
+        default_factory=list,
+        description=f"User-written PromQL rules analysed with the catalog (at most "
+        f"{MAX_CUSTOM_RULES}).",
+    )
 
     @field_validator("url")
     @classmethod
@@ -606,6 +612,7 @@ class PrometheusSource(Contract):
     url: str
     tls_verify: bool
     auth: Auth
+    custom_rules: list[CustomRule] = Field(default_factory=list)
 
 
 class CloudflareSource(Contract):
@@ -717,6 +724,24 @@ class ConnectionTestRequest(Contract):
         return require_matchers(value, [source.kind] if source else [])
 
 
+class CustomRulePreviewRequest(Contract):
+    """Body of POST /api/projects/custom-rules/preview: one rule against a draft source."""
+
+    project_id: str | None = Field(
+        default=None, description="Reuse this project's stored secrets for omitted ones."
+    )
+    source: PrometheusSourceInput
+    matchers: OptionalMatchers = Field(
+        default_factory=list, validate_default=True, description="The project's label matchers."
+    )
+    rule: CustomRule
+
+    @field_validator("matchers")
+    @classmethod
+    def _restricting(cls, value: list[LabelMatcher]) -> list[LabelMatcher]:
+        return require_matchers(value, [SourceKind.PROMETHEUS])
+
+
 class FamilyCapability(Contract):
     family: SignalFamily
     status: CapabilityStatus
@@ -750,6 +775,7 @@ class PrometheusConnection(Contract):
     bearer_token: SecretStr | None = None
     basic_auth_user: str | None = None
     basic_auth_password: SecretStr | None = None
+    custom_rules: list[CustomRule] = Field(default_factory=list)
 
     @property
     def kind(self) -> SourceKind:

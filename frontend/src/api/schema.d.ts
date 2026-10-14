@@ -109,6 +109,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/custom-rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Custom Rule
+         * @description Run one custom rule's query over the last 24 h; query errors are reported in the body.
+         */
+        post: operations["preview_custom_rule_api_projects_custom_rules_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/test-connection": {
         parameters: {
             query?: never;
@@ -266,6 +286,11 @@ export interface components {
             config_hash: string;
             /** Coverage */
             coverage: components["schemas"]["SignalCoverage"][];
+            /**
+             * Custom Rules
+             * @description The project's custom rules as they were when analysed (2.5).
+             */
+            custom_rules?: components["schemas"]["CustomRule"][];
             /** Detector Version */
             detector_version: string;
             /** Evidence */
@@ -279,10 +304,10 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 2.4
+             * @default 2.5
              * @enum {string}
              */
-            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4";
+            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5";
             scope: components["schemas"]["Scope"];
             /** @description Deprecated: the first source; use sources. */
             source?: components["schemas"]["SourceInfo"] | null;
@@ -385,6 +410,11 @@ export interface components {
          * @enum {string}
          */
         CapabilityStatus: "supported" | "partial" | "unsupported" | "unverified";
+        /**
+         * ChangeDirection
+         * @enum {string}
+         */
+        ChangeDirection: "up" | "down" | "both";
         /** CloudflareSource */
         CloudflareSource: {
             /** Api Url */
@@ -485,6 +515,146 @@ export interface components {
             /** Source */
             source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"] | components["schemas"]["GrafanaSourceInput"];
         };
+        /** CustomRule */
+        CustomRule: {
+            /**
+             * Critical Threshold
+             * @description Optional second threshold that raises the severity.
+             */
+            critical_threshold?: number | null;
+            /**
+             * Description
+             * @description What the value means and why it matters; shown with findings and given to the AI explanation.
+             * @default
+             */
+            description: string;
+            /**
+             * @description Which baseline deviations count (anomaly/both).
+             * @default up
+             */
+            direction: components["schemas"]["ChangeDirection"];
+            /**
+             * Identity Labels
+             * @description Labels that identify one analysed series (e.g. job, instance); empty uses every label the query returns except the project's matcher labels.
+             */
+            identity_labels?: string[];
+            /** @description Upper bound of finding severity; in event mode the severity of every finding (default high). */
+            max_severity?: components["schemas"]["Severity"] | null;
+            /**
+             * Min Change
+             * @description Baseline deviations must also differ from the expected value by at least this much, in the rule's unit.
+             */
+            min_change?: number | null;
+            /**
+             * Min Change Factor
+             * @description Baseline deviations must also be at least this factor of the expected value (default 1.5 when neither this nor min_change is set).
+             */
+            min_change_factor?: number | null;
+            /**
+             * Min Duration Minutes
+             * @description How long a threshold breach must last.
+             * @default 15
+             */
+            min_duration_minutes: number;
+            /** @default anomaly */
+            mode: components["schemas"]["CustomRuleMode"];
+            /**
+             * Query
+             * @description PromQL; the project's label matchers are added to every selector. $__window is replaced by the rate window (5m).
+             */
+            query: string;
+            /**
+             * Slug
+             * @description Identifier unique within the project, e.g. checkout_failures ([a-z][a-z0-9_]*, at most 40 characters).
+             */
+            slug: string;
+            /**
+             * Threshold
+             * @description Required in threshold/both mode.
+             */
+            threshold?: number | null;
+            /** @default above */
+            threshold_op: components["schemas"]["ThresholdOp"];
+            /**
+             * Title
+             * @description Shown on findings.
+             */
+            title: string;
+            /** @default count */
+            unit: components["schemas"]["Unit"];
+        };
+        /**
+         * CustomRuleMode
+         * @enum {string}
+         */
+        CustomRuleMode: "anomaly" | "threshold" | "both" | "event";
+        /**
+         * CustomRulePreview
+         * @description Result of POST /api/projects/custom-rules/preview: what the rule's query returns.
+         */
+        CustomRulePreview: {
+            /** Message */
+            message?: string | null;
+            /**
+             * Ok
+             * @description False when the query could not be scoped or run.
+             */
+            ok: boolean;
+            /**
+             * Query
+             * @description The query as run, with the project's matchers.
+             */
+            query: string | null;
+            /**
+             * Series
+             * @description At most 20 series, ordered by identity.
+             */
+            series: components["schemas"]["CustomRulePreviewSeries"][];
+            /**
+             * Series Count
+             * @description Series the query returned (in scope).
+             */
+            series_count: number;
+            /**
+             * Start
+             * @description Time of the first value of every series.
+             */
+            start: string;
+            /** Step Seconds */
+            step_seconds: number;
+        };
+        /**
+         * CustomRulePreviewRequest
+         * @description Body of POST /api/projects/custom-rules/preview: one rule against a draft source.
+         */
+        CustomRulePreviewRequest: {
+            /**
+             * Matchers
+             * @description The project's label matchers.
+             */
+            matchers?: components["schemas"]["LabelMatcher"][];
+            /**
+             * Project Id
+             * @description Reuse this project's stored secrets for omitted ones.
+             */
+            project_id?: string | null;
+            rule: components["schemas"]["CustomRule"];
+            source: components["schemas"]["PrometheusSourceInput"];
+        };
+        /** CustomRulePreviewSeries */
+        CustomRulePreviewSeries: {
+            entity: components["schemas"]["Entity"];
+            /**
+             * Latest
+             * @description Newest observed value.
+             */
+            latest: number | null;
+            /**
+             * Values
+             * @description The last 24 h on the analysis step grid.
+             */
+            values: (number | null)[];
+        };
         /**
          * DailyTrend
          * @description One 24-hour bucket; bucket_index 0 is the latest day [T-24h, T).
@@ -551,7 +721,7 @@ export interface components {
          * EntityKind
          * @enum {string}
          */
-        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone" | "application" | "agent" | "alert_rule";
+        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone" | "application" | "agent" | "alert_rule" | "custom";
         /** EpisodeSummary */
         EpisodeSummary: {
             /** End */
@@ -1189,6 +1359,8 @@ export interface components {
         PrometheusSource: {
             /** Auth */
             auth: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuth"] | components["schemas"]["BasicAuth"];
+            /** Custom Rules */
+            custom_rules?: components["schemas"]["CustomRule"][];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -1203,6 +1375,11 @@ export interface components {
         PrometheusSourceInput: {
             /** Auth */
             auth?: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuthInput"] | components["schemas"]["BasicAuthInput"];
+            /**
+             * Custom Rules
+             * @description User-written PromQL rules analysed with the catalog (at most 20).
+             */
+            custom_rules?: components["schemas"]["CustomRule"][];
             /**
              * Kind
              * @default prometheus
@@ -1413,7 +1590,7 @@ export interface components {
          * SignalFamily
          * @enum {string}
          */
-        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity" | "alerting";
+        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity" | "alerting" | "custom";
         /**
          * SignalStatus
          * @enum {string}
@@ -1469,6 +1646,11 @@ export interface components {
          * @enum {string}
          */
         StageStatus: "pending" | "running" | "done" | "failed" | "skipped";
+        /**
+         * ThresholdOp
+         * @enum {string}
+         */
+        ThresholdOp: "above" | "below";
         /**
          * TimeRange
          * @description Half-open interval [start, end).
@@ -1983,6 +2165,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    preview_custom_rule_api_projects_custom_rules_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomRulePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRulePreview"];
                 };
             };
             /** @description Problem */

@@ -233,6 +233,17 @@ A project's Grafana source analyses the state history of Grafana-managed alert r
 - **Replay**: see DECISIONS §5. `Pending` and `Normal (…)` count as not firing; `Normal (Paused)` is unknown.
 - **Verified live (2026-10-12, Grafana 12.4.5)**: the rules API shape, `alertUID` filtering, annotation text and tags (tags sanitise `:` to `_` and leave out long values, so the text is authoritative), and about 28 days of retained history. The parser read all 4,129 alert annotations of a 3.5-day sample. The full client was not yet run with a service account token.
 
+### Custom rules (T020)
+
+A project's Prometheus source can hold up to 20 **custom rules**: user-written PromQL analysed with the catalog (`app/domain/custom_rules.py`, `app/domain/user_promql.py`, `app/sources/prometheus/custom.py`). Each rule is one signal `custom_<slug>` of family `custom`; every series it returns is an entity of kind `custom`, identified by the rule's identity labels or, when none are set, by every returned label except `__name__` and the project's matcher labels.
+
+- **Scope injection**: the query is lexed (strings, comments, `[…]` ranges and subqueries, function calls, aggregations, and the label lists of `by`/`without`/`on`/`ignoring`/`group_left`/`group_right`). The project's matchers are inserted into every vector selector, `metric` becomes `metric{<scope>}` and `{…}` becomes `{<scope>, …}`, and the result is a catalog template checked by the same `assert_scoped` with the metric names the lexer found. A selector the lexer missed is refused, not run unscoped, and the source still drops returned series outside the scope.
+- **Rejected**: `@` modifiers and negative `offset` (they read data after the evaluated step, so a baseline could see the future); `or` inside label matchers (MetricsQL alternatives would bypass the scope); a comparison at the top level of the query without `bool` (it filters series out, and filtered-out series look healthy, so a threshold is set on the rule instead); placeholders other than `$__window` (the 5 m rate window); queries without a selector.
+- **Capability**: supported when every named metric exists in scope and an instant query of the rule succeeds; a query error or (for queries without a metric name) an empty result makes it `unsupported` with the reason.
+- **Collection**: as catalog signals, after them, with the same per-query and per-job series budgets and exclusions.
+- **Preview**: `POST /api/projects/custom-rules/preview` runs one rule over the last 24 h on the 5-min grid against a draft source and returns the query as run, the series count and up to 20 series; query errors are returned in the body.
+- **Synthetic**: `synthetic://` invents one series per rule (seeded by its slug, so adding a rule changes no catalog series); the `incident` scenario breaches every rule for 1 h ending 3 h before T. Demo projects carry two example rules.
+
 ## Budgets and behaviour
 
 | Aspect | Behaviour |

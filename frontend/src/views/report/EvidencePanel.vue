@@ -7,6 +7,7 @@ import DataTable from "../../components/DataTable.vue";
 import ExplanationPanel from "../../components/ExplanationPanel.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
 import { instancesText } from "../../lib/alerts";
+import { findingRule, ruleSummary } from "../../lib/customRules";
 import { errorKindsText } from "../../lib/errors";
 import { evidenceOption, timestamps } from "../../lib/charts";
 import { headline, recurrenceText } from "../../lib/findings";
@@ -26,6 +27,9 @@ const heading = ref<HTMLElement | null>(null);
 const copied = ref(false);
 
 const f = computed(() => props.finding);
+const rule = computed(() => findingRule(report.value, f.value));
+/** Custom rules have the user's thresholds; catalog thresholds are diagnostic heuristics. */
+const thresholdLabel = computed(() => (rule.value ? "Threshold" : "Heuristic"));
 const evidence = computed(() =>
   f.value.evidence_ids
     .map((id) => evidenceById.value.get(id))
@@ -109,12 +113,17 @@ onMounted(async () => {
             <dd class="small">{{ formatValue(f.expected.lower, f.expected.unit) }}–{{ formatValue(f.expected.upper, f.expected.unit) }}</dd>
           </div>
           <div v-else-if="f.threshold !== null">
-            <dt class="lbl">Heuristic</dt>
+            <dt class="lbl">{{ thresholdLabel }}</dt>
             <dd class="small">{{ formatValue(f.threshold, f.observed.unit) }}</dd>
           </div>
           <div><dt class="lbl">Duration</dt><dd>{{ formatDuration(f.duration_seconds) }}</dd></div>
         </dl>
+        <p v-if="rule?.description" class="rule-description">{{ rule.description }}</p>
         <dl class="kv">
+          <template v-if="rule">
+            <dt>Custom rule</dt>
+            <dd>{{ rule.title }} · {{ ruleSummary(rule) }}</dd>
+          </template>
           <template v-if="f.attributes?.alert_summary">
             <dt>Summary</dt>
             <dd>{{ f.attributes.alert_summary }}</dd>
@@ -128,8 +137,9 @@ onMounted(async () => {
             <dd>median {{ formatValue(f.expected.median, f.expected.unit) }}</dd>
           </template>
           <template v-if="f.threshold !== null">
-            <dt>Heuristic</dt>
-            <dd>{{ formatValue(f.threshold, f.observed.unit) }} (diagnostic, not an SLO)</dd>
+            <dt>{{ thresholdLabel }}</dt>
+            <dd v-if="rule">{{ formatValue(f.threshold, f.observed.unit) }} (set in the custom rule)</dd>
+            <dd v-else>{{ formatValue(f.threshold, f.observed.unit) }} (diagnostic, not an SLO)</dd>
           </template>
           <dt>Detector</dt>
           <dd class="mono small">{{ f.detector_version }}</dd>
@@ -221,4 +231,5 @@ details summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var
 details > * + * { margin-top: 8px; }
 .query { display: flex; flex-direction: column; gap: 6px; }
 .labels { margin-top: 8px; }
+.rule-description { margin: 0; white-space: pre-line; }
 </style>

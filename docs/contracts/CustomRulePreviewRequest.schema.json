@@ -1,0 +1,404 @@
+{
+  "$defs": {
+    "BasicAuthInput": {
+      "additionalProperties": false,
+      "properties": {
+        "password": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Omit to keep the stored password (update only).",
+          "title": "Password"
+        },
+        "type": {
+          "const": "basic",
+          "default": "basic",
+          "title": "Type",
+          "type": "string"
+        },
+        "username": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username"
+      ],
+      "title": "BasicAuthInput",
+      "type": "object"
+    },
+    "BearerAuthInput": {
+      "additionalProperties": false,
+      "properties": {
+        "token": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Omit to keep the stored token (update only).",
+          "title": "Token"
+        },
+        "type": {
+          "const": "bearer",
+          "default": "bearer",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "BearerAuthInput",
+      "type": "object"
+    },
+    "ChangeDirection": {
+      "enum": [
+        "up",
+        "down",
+        "both"
+      ],
+      "title": "ChangeDirection",
+      "type": "string"
+    },
+    "CustomRule": {
+      "additionalProperties": false,
+      "properties": {
+        "critical_threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional second threshold that raises the severity.",
+          "title": "Critical Threshold"
+        },
+        "description": {
+          "default": "",
+          "description": "What the value means and why it matters; shown with findings and given to the AI explanation.",
+          "maxLength": 500,
+          "title": "Description",
+          "type": "string"
+        },
+        "direction": {
+          "$ref": "#/$defs/ChangeDirection",
+          "default": "up",
+          "description": "Which baseline deviations count (anomaly/both)."
+        },
+        "identity_labels": {
+          "description": "Labels that identify one analysed series (e.g. job, instance); empty uses every label the query returns except the project's matcher labels.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Identity Labels",
+          "type": "array"
+        },
+        "max_severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Upper bound of finding severity; in event mode the severity of every finding (default high)."
+        },
+        "min_change": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline deviations must also differ from the expected value by at least this much, in the rule's unit.",
+          "title": "Min Change"
+        },
+        "min_change_factor": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline deviations must also be at least this factor of the expected value (default 1.5 when neither this nor min_change is set).",
+          "title": "Min Change Factor"
+        },
+        "min_duration_minutes": {
+          "default": 15,
+          "description": "How long a threshold breach must last.",
+          "maximum": 1440,
+          "minimum": 5,
+          "title": "Min Duration Minutes",
+          "type": "integer"
+        },
+        "mode": {
+          "$ref": "#/$defs/CustomRuleMode",
+          "default": "anomaly"
+        },
+        "query": {
+          "description": "PromQL; the project's label matchers are added to every selector. $__window is replaced by the rate window (5m).",
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "slug": {
+          "description": "Identifier unique within the project, e.g. checkout_failures ([a-z][a-z0-9_]*, at most 40 characters).",
+          "title": "Slug",
+          "type": "string"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required in threshold/both mode.",
+          "title": "Threshold"
+        },
+        "threshold_op": {
+          "$ref": "#/$defs/ThresholdOp",
+          "default": "above"
+        },
+        "title": {
+          "description": "Shown on findings.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit",
+          "default": "count"
+        }
+      },
+      "required": [
+        "slug",
+        "title",
+        "query"
+      ],
+      "title": "CustomRule",
+      "type": "object"
+    },
+    "CustomRuleMode": {
+      "enum": [
+        "anomaly",
+        "threshold",
+        "both",
+        "event"
+      ],
+      "title": "CustomRuleMode",
+      "type": "string"
+    },
+    "LabelMatcher": {
+      "additionalProperties": false,
+      "description": "``name<op>\"value\"`` matcher, e.g. ``env=\"prod\"`` or ``env=~\"prod|staging\"``.\n\nAn absent label matches as the empty string, as in PromQL: ``env!=\"dev\"`` matches series\nwithout ``env``.",
+      "properties": {
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "op": {
+          "$ref": "#/$defs/MatchOp",
+          "default": "="
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "LabelMatcher",
+      "type": "object"
+    },
+    "MatchOp": {
+      "description": "PromQL label matching operator; regular expressions are fully anchored (RE2 syntax).",
+      "enum": [
+        "=",
+        "!=",
+        "=~",
+        "!~"
+      ],
+      "title": "MatchOp",
+      "type": "string"
+    },
+    "NoAuth": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "none",
+          "default": "none",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "NoAuth",
+      "type": "object"
+    },
+    "PrometheusSourceInput": {
+      "additionalProperties": false,
+      "properties": {
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "basic": "#/$defs/BasicAuthInput",
+              "bearer": "#/$defs/BearerAuthInput",
+              "none": "#/$defs/NoAuth"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuth"
+            },
+            {
+              "$ref": "#/$defs/BearerAuthInput"
+            },
+            {
+              "$ref": "#/$defs/BasicAuthInput"
+            }
+          ],
+          "title": "Auth"
+        },
+        "custom_rules": {
+          "description": "User-written PromQL rules analysed with the catalog (at most 20).",
+          "items": {
+            "$ref": "#/$defs/CustomRule"
+          },
+          "maxItems": 20,
+          "title": "Custom Rules",
+          "type": "array"
+        },
+        "kind": {
+          "const": "prometheus",
+          "default": "prometheus",
+          "title": "Kind",
+          "type": "string"
+        },
+        "tls_verify": {
+          "default": true,
+          "title": "Tls Verify",
+          "type": "boolean"
+        },
+        "url": {
+          "maxLength": 2048,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "PrometheusSourceInput",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "ThresholdOp": {
+      "enum": [
+        "above",
+        "below"
+      ],
+      "title": "ThresholdOp",
+      "type": "string"
+    },
+    "Unit": {
+      "enum": [
+        "ratio",
+        "bytes",
+        "bytes_per_second",
+        "requests_per_second",
+        "per_second",
+        "seconds",
+        "count"
+      ],
+      "title": "Unit",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Body of POST /api/projects/custom-rules/preview: one rule against a draft source.",
+  "properties": {
+    "matchers": {
+      "description": "The project's label matchers.",
+      "items": {
+        "$ref": "#/$defs/LabelMatcher"
+      },
+      "maxItems": 10,
+      "title": "Matchers",
+      "type": "array"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Reuse this project's stored secrets for omitted ones.",
+      "title": "Project Id"
+    },
+    "rule": {
+      "$ref": "#/$defs/CustomRule"
+    },
+    "source": {
+      "$ref": "#/$defs/PrometheusSourceInput"
+    }
+  },
+  "required": [
+    "source",
+    "rule"
+  ],
+  "title": "CustomRulePreviewRequest",
+  "type": "object"
+}

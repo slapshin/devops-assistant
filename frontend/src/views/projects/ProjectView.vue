@@ -4,6 +4,7 @@ import { ApiError } from "../../api/client";
 import { useAnalyses, useProject } from "../../api/queries";
 import AnalysesTable from "../../components/AnalysesTable.vue";
 import MatcherChips from "../../components/projects/MatcherChips.vue";
+import { ruleSummary } from "../../lib/customRules";
 import RunAnalysis from "../../components/projects/RunAnalysis.vue";
 import SourceHealth from "../../components/projects/SourceHealth.vue";
 import SourceIcon from "../../components/projects/SourceIcon.vue";
@@ -73,6 +74,11 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
             <span class="mono">{{ sourceHost(prometheus.url) }}</span>
             · {{ AUTH_LABELS[prometheus.auth.type] }}<template v-if="!prometheus.tls_verify"> · TLS not verified</template>
             <MatcherChips class="chips" :matchers="project.data.value.matchers" />
+            <ul v-if="prometheus.custom_rules?.length" class="custom-rules" aria-label="Custom rules">
+              <li v-for="r in prometheus.custom_rules" :key="r.slug">
+                <strong>{{ r.title }}</strong> <span class="muted">· {{ ruleSummary(r) }}</span>
+              </li>
+            </ul>
           </dd>
           <dd v-else class="muted">Not configured</dd>
           <dt class="source-kind"><SourceIcon kind="cloudflare" />Cloudflare</dt>
@@ -172,4 +178,5 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
   .facts { grid-template-columns: minmax(0, 1fr); }
   .facts dd { margin-bottom: var(--space); }
 }
+.custom-rules { margin: 6px 0 0; padding-left: 18px; font-size: 0.9rem; }
 </style>

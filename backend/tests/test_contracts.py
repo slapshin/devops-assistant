@@ -8,6 +8,7 @@ import jsonschema
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from app.domain.custom_rules import CustomRulePreview
 from app.domain.jobs import (
     AnalysisJob,
     AnalysisSubmitted,
@@ -41,6 +42,7 @@ def fixture_model(rel: str) -> type[BaseModel] | None:
         "projects.json": ProjectList,
         "connection_test.json": ConnectionTest,
         "connection_test_cloudflare.json": ConnectionTest,
+        "custom_rule_preview.json": CustomRulePreview,
         "config.json": RuntimeConfig,
     }
     return discovery.get(name)

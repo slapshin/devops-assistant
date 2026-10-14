@@ -11,6 +11,8 @@ import {
   type AnalysisSubmitted,
   type ConnectionTest,
   type ConnectionTestRequest,
+  type CustomRulePreview,
+  type CustomRulePreviewRequest,
   type ProjectInput,
   type ProjectList,
   type ProjectSummary,
@@ -98,6 +100,12 @@ export const useDeleteProject = () =>
 export function useTestConnection() {
   return useMutation({
     mutationFn: (body: ConnectionTestRequest) => apiPost<ConnectionTest>("/api/projects/test-connection", body),
+  });
+}
+
+export function usePreviewCustomRule() {
+  return useMutation({
+    mutationFn: (body: CustomRulePreviewRequest) => apiPost<CustomRulePreview>("/api/projects/custom-rules/preview", body),
   });
 }
 

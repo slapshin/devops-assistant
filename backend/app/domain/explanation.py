@@ -87,6 +87,10 @@ class FindingDigest(Contract):
         description="Error kinds with the most events during the finding (Sentry), e.g. "
         "'SHOP-1: KeyError (40 events)'.",
     )
+    rule_description: str | None = Field(
+        default=None,
+        description="What the project's custom rule measures, as its author described it.",
+    )
 
 
 class ExplanationInput(Contract):

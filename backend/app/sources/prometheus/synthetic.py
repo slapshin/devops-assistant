@@ -6,13 +6,21 @@ synthetic. The source reports ``backend="synthetic"`` so reports can never be mi
 data.
 """
 
+import zlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import numpy as np
 
-from app.domain.common import STEP_SECONDS, Scope, SignalFamily
+from app.domain.common import STEP_SECONDS, Scope, SignalFamily, Unit
+from app.domain.custom_rules import (
+    ChangeDirection,
+    CustomRule,
+    CustomRuleMode,
+    CustomRulePreview,
+    ThresholdOp,
+)
 from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
@@ -25,8 +33,9 @@ from app.domain.jobs import StageName, StageProgress, StageStatus
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.report import AnalysisWindows, SourceInfo
 from app.sources.base import HISTORY_DAYS
-from app.sources.prometheus.catalog import BY_SIGNAL, CATALOG
-from app.sources.prometheus.source import entity_for, scope_labels
+from app.sources.prometheus.catalog import BY_SIGNAL, CATALOG, SignalDef
+from app.sources.prometheus.custom import custom_signal
+from app.sources.prometheus.source import entity_for, preview_from_grids, scope_labels
 
 DAY = 288
 """Steps per day."""
@@ -103,6 +112,8 @@ class Scenario:
     keyspace miss share climbs and commands slow down."""
     recurring_404_days: tuple[int, ...] = ()
     """Trend buckets (1..13) with an extra 404 burst, for recurrence."""
+    custom_incident: bool = False
+    """Every custom rule breaches (anomaly, threshold or event) for 1 h, ending 3 h before T."""
     seed: int = 7
     extra: dict[str, float] = field(default_factory=dict)
 
@@ -118,6 +129,7 @@ SCENARIOS: dict[str, Scenario] = {
         database_pileup=True,
         mysql_contention=True,
         redis_eviction_storm=True,
+        custom_incident=True,
     ),
     "short-history": Scenario(history_days=5, cpu_load=True, histogram=False),
     "degraded": Scenario(
@@ -156,9 +168,15 @@ class _SeriesBuilder:
         self.start = windows.end_time - timedelta(days=HISTORY_DAYS)
         self.series: list[MetricSeries] = []
 
-    def add(self, signal: str, labels: dict[str, str], values: np.ndarray) -> None:
-        defn = BY_SIGNAL[signal]
-        entity = entity_for(defn, labels)
+    def add(
+        self,
+        signal: str,
+        labels: dict[str, str],
+        values: np.ndarray,
+        defn: SignalDef | None = None,
+    ) -> None:
+        defn = defn or BY_SIGNAL[signal]
+        entity = entity_for(defn, labels, self.scope)
         query = defn.query.render(self.scope)
         vals = [None if np.isnan(v) else round(float(v), 6) for v in values]
         self.series.append(
@@ -179,7 +197,10 @@ class _SeriesBuilder:
 
 
 def build_series(
-    scenario: Scenario, scope: Scope, windows: AnalysisWindows
+    scenario: Scenario,
+    scope: Scope,
+    windows: AnalysisWindows,
+    custom_rules: Sequence[CustomRule] = (),
 ) -> tuple[list[MetricSeries], list[EntityMapping]]:
     # Generation order matters: every series draws from one seeded RNG.
     gen = _Gen(scenario)
@@ -208,6 +229,8 @@ def build_series(
         _add_mysql_series(builder, gen)
     if scenario.redis:
         _add_redis_series(builder, gen)
+    for rule in custom_rules:
+        _add_custom_series(builder, scenario, rule)
 
     mappings = [
         EntityMapping(
@@ -396,15 +419,104 @@ def _add_redis_series(builder: _SeriesBuilder, gen: _Gen) -> None:
     builder.add("redis_replica_link_down", REDIS_REPLICA, gen.available(np.zeros(N)))
 
 
+DEMO_CUSTOM_RULES = [
+    CustomRule(
+        slug="checkout_failures",
+        title="Checkout failures",
+        description="Orders the payment provider rejected; a rise usually means the provider or "
+        "our card form is failing.",
+        query="sum by (job) (rate(shop_orders_failed_total[$__window]))",
+        unit=Unit.PER_SECOND,
+        min_change=0.05,
+    ),
+    CustomRule(
+        slug="email_queue",
+        title="E-mail queue depth",
+        description="Messages waiting for the mail relay; above 500 customers get order "
+        "confirmations late.",
+        query="max by (job) (shop_email_queue_messages)",
+        unit=Unit.COUNT,
+        mode=CustomRuleMode.THRESHOLD,
+        threshold=500,
+        critical_threshold=2000,
+        min_duration_minutes=10,
+    ),
+]
+"""Example custom rules of the demo projects (the synthetic source invents their series)."""
+
+CUSTOM_INCIDENT = slice(N - 48, N - 36)
+_SYNTHETIC_LABEL_VALUES = {"job": SERVICE_JOB, "instance": INCIDENT_HOST}
+
+
+def custom_labels(rule: CustomRule) -> dict[str, str]:
+    """One synthetic series per rule, labelled with its identity labels (or the service job)."""
+    names = rule.identity_labels or ["job"]
+    return {k: _SYNTHETIC_LABEL_VALUES.get(k, f"{k}-1") for k in names}
+
+
+def _custom_level(rule: CustomRule) -> float:
+    """A normal value well inside the rule's threshold."""
+    if rule.threshold is None:
+        return 0.2 if rule.unit is Unit.RATIO else 10.0
+    t = rule.threshold
+    if rule.threshold_op is ThresholdOp.ABOVE:
+        return t * 0.5 if t > 0 else t - 1.0
+    return t * 2.0 if t > 0 else t + 1.0
+
+
+def _custom_breach(rule: CustomRule, level: float) -> float:
+    if rule.mode is CustomRuleMode.EVENT:
+        return 3.0
+    if rule.threshold is None:
+        return level * 0.1 if rule.direction is ChangeDirection.DOWN else level * 4.0
+    t = rule.critical_threshold if rule.critical_threshold is not None else rule.threshold
+    if rule.threshold_op is ThresholdOp.ABOVE:
+        return t * 1.2 if t > 0 else t + 1.0
+    return t * 0.5 if t > 0 else t - 1.0
+
+
+def _add_custom_series(builder: _SeriesBuilder, scenario: Scenario, rule: CustomRule) -> None:
+    # Each rule has its own generator, so adding a rule never changes the catalog's series.
+    rng = np.random.default_rng(zlib.crc32(rule.slug.encode()))
+    tod = (np.arange(N) % DAY) / DAY
+    level = 0.0 if rule.mode is CustomRuleMode.EVENT else _custom_level(rule)
+    spread = max(abs(level), 1e-3) if level else 0.0
+    values = level + 0.05 * spread * np.sin(2 * np.pi * (tod - 0.35))
+    values = values + rng.normal(0, 0.01 * spread, N) if spread else values
+    if scenario.custom_incident:
+        values[CUSTOM_INCIDENT] = _custom_breach(rule, level)
+    values[: max(0, N - scenario.history_days * DAY)] = np.nan
+    builder.add(rule.signal, custom_labels(rule), values, custom_signal(rule))
+
+
 class SyntheticMetricsSource:
-    def __init__(self, scenario: Scenario | str = "incident") -> None:
+    def __init__(
+        self, scenario: Scenario | str = "incident", custom_rules: Sequence[CustomRule] = ()
+    ) -> None:
         self.scenario = SCENARIOS[scenario] if isinstance(scenario, str) else scenario
+        self.custom_rules = list(custom_rules)
 
     def with_scenario(self, **changes: object) -> SyntheticMetricsSource:
-        return SyntheticMetricsSource(replace(self.scenario, **changes))  # type: ignore[arg-type]
+        return SyntheticMetricsSource(
+            replace(self.scenario, **changes),  # type: ignore[arg-type]
+            self.custom_rules,
+        )
 
     async def source_info(self) -> SourceInfo:
         return SourceInfo(base_url="synthetic://fixtures", backend="synthetic", version=None)
+
+    async def preview_rule(
+        self, rule: CustomRule, scope: Scope, end_time: datetime, step: int
+    ) -> CustomRulePreview:
+        """The latest day of the rule's synthetic series (always on the 5-min grid)."""
+        windows = AnalysisWindows.for_end(end_time)
+        builder = _SeriesBuilder(scope, windows)
+        _add_custom_series(builder, self.scenario, rule)
+        (series,) = builder.series
+        defn = custom_signal(rule)
+        grids = [(dict(series.entity.labels), series.values[LATEST:])]
+        start = end_time - timedelta(days=1)
+        return preview_from_grids(defn, scope, series.query, start, STEP_SECONDS, grids)
 
     async def capabilities(self, scope: Scope, windows: AnalysisWindows) -> list[MetricCapability]:
         scenario = self.scenario
@@ -482,6 +594,20 @@ class SyntheticMetricsSource:
                     history_days=float(scenario.history_days) if supported else None,
                 )
             )
+        for rule in self.custom_rules:
+            defn = custom_signal(rule)
+            caps.append(
+                MetricCapability(
+                    family=defn.family,
+                    signal=defn.signal,
+                    status=CapabilityStatus.SUPPORTED,
+                    verified=True,
+                    required_metrics=list(defn.required_metrics),
+                    required_labels=[*scope.label_names, *defn.identity],
+                    observed_metrics=list(defn.required_metrics),
+                    history_days=float(scenario.history_days),
+                )
+            )
         return caps
 
     async def collect(
@@ -496,9 +622,14 @@ class SyntheticMetricsSource:
         await progress.update(
             StageProgress(stage=StageName.COLLECTION, status=StageStatus.RUNNING, done=0, total=1)
         )
-        series, mappings = build_series(self.scenario, scope, windows)
+        series, mappings = build_series(self.scenario, scope, windows, self.custom_rules)
         cancel.raise_if_cancelled()
         await progress.update(
             StageProgress(stage=StageName.COLLECTION, status=StageStatus.DONE, done=1, total=1)
         )
-        return CollectionResult(series=series, exclusions=[], mappings=mappings)
+        return CollectionResult(
+            series=series,
+            exclusions=[],
+            mappings=mappings,
+            custom_rules=self.custom_rules,
+        )

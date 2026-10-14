@@ -12,6 +12,7 @@ from typing import Protocol
 from pydantic import Field
 
 from app.domain.common import Contract, Scope, Severity, SourceKind, UtcDatetime
+from app.domain.custom_rules import CustomRule
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import Explanation, ExplanationInput, ExplanationStatus
 from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
@@ -98,6 +99,10 @@ class CollectionResult(Contract):
     series: list[MetricSeries]
     exclusions: list[Exclusion]
     mappings: list[EntityMapping] = Field(default_factory=list)
+    custom_rules: list[CustomRule] = Field(
+        default_factory=list,
+        description="Custom rules the source collected; their series carry the rules' signals.",
+    )
 
 
 class MetricsSource(Protocol):

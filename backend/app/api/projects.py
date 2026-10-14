@@ -1,6 +1,7 @@
 """Project management routes (T011): CRUD, connection test, and cached per-project health."""
 
 import time
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Response
@@ -8,13 +9,15 @@ from fastapi import APIRouter, Query, Response
 from app.api.problems import ProblemError, problem_responses
 from app.api.routes import ServicesDep
 from app.container import Services
-from app.domain.common import LabelMatcher, Scope
+from app.domain.common import STEP_SECONDS, LabelMatcher, Scope, floor_to_step
+from app.domain.custom_rules import CustomRulePreview
 from app.domain.jobs import ErrorCode
 from app.domain.projects import (
     CloudflareConnection,
     CloudflareSourceInput,
     ConnectionTest,
     ConnectionTestRequest,
+    CustomRulePreviewRequest,
     GrafanaConnection,
     GrafanaSourceInput,
     Project,
@@ -234,6 +237,31 @@ async def test_connection(body: ConnectionTestRequest, services: ServicesDep) ->
     except (SecretRequired, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.source") from None
     return await _probe(conn, _draft_scope(body.matchers))
+
+
+@router.post(
+    "/custom-rules/preview",
+    response_model=CustomRulePreview,
+    responses=problem_responses(404, 409, 422),
+)
+async def preview_custom_rule(
+    body: CustomRulePreviewRequest, services: ServicesDep
+) -> CustomRulePreview:
+    """Run one custom rule's query over the last 24 h; query errors are reported in the body."""
+    _check_scenario(body.source, "body.source")
+    if body.project_id is not None and await services.projects.get(body.project_id) is None:
+        raise _not_found(body.project_id)
+    try:
+        conn = await services.projects.resolve_connection(body.source, body.project_id)
+    except (SecretRequired, SecretsUnreadable) as exc:
+        raise _write_error(exc, "body.source") from None
+    if not isinstance(conn, PrometheusConnection):  # pragma: no cover - the body is Prometheus
+        raise _invalid("body.source.kind", "custom rules need a Prometheus source")
+    end_time = floor_to_step(datetime.now(UTC))
+    async with connect(conn) as (source, _):
+        return await source.preview_rule(
+            body.rule, _draft_scope(body.matchers), end_time, STEP_SECONDS
+        )
 
 
 async def project_health(services: Services, project: Project) -> list[ConnectionTest]:

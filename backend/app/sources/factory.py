@@ -35,15 +35,17 @@ class SourceNotConfigured(Exception):
 @asynccontextmanager
 async def connect(
     conn: PrometheusConnection,
-) -> AsyncGenerator[tuple[MetricsSource, PrometheusClient | None]]:
+) -> AsyncGenerator[
+    tuple[PrometheusMetricsSource | SyntheticMetricsSource, PrometheusClient | None]
+]:
     """The source for a connection, plus its HTTP client (None for synthetic sources)."""
     if (scenario := synthetic_url(conn.url)) is not None:
-        yield SyntheticMetricsSource(scenario), None
+        yield SyntheticMetricsSource(scenario, conn.custom_rules), None
         return
 
     client = PrometheusClient.from_connection(conn)
     try:
-        yield PrometheusMetricsSource(client), client
+        yield PrometheusMetricsSource(client, custom_rules=conn.custom_rules), client
     finally:
         await client.aclose()
 

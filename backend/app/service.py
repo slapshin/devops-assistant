@@ -113,6 +113,7 @@ class AnalysisPipeline:
             windows.latest_day,
             result.findings,
             result.coverage,
+            collection.custom_rules,
         )
         await stage(
             StageName.EXPLANATION,
@@ -141,6 +142,7 @@ class AnalysisPipeline:
             evidence=result.evidence,
             exclusions=exclusions,
             explanation=explanation,
+            custom_rules=collection.custom_rules,
         )
         return self._fit(report)
 
@@ -200,7 +202,7 @@ async def _gather(
         )
     )
 
-    series, exclusions, mappings = [], [], []
+    series, exclusions, mappings, custom_rules = [], [], [], []
     for item, caps in discovered:
         try:
             collected = await item.source.collect(scope, windows, caps, progress, cancel)
@@ -210,6 +212,7 @@ async def _gather(
         series += collected.series
         exclusions += collected.exclusions
         mappings += collected.mappings
+        custom_rules += collected.custom_rules
         cancel.raise_if_cancelled()
 
     if failures and len(failures) == len(opened):
@@ -224,7 +227,9 @@ async def _gather(
             )
             for family in SOURCE_FAMILIES[item.kind]
         ]
-    result.collection = CollectionResult(series=series, exclusions=exclusions, mappings=mappings)
+    result.collection = CollectionResult(
+        series=series, exclusions=exclusions, mappings=mappings, custom_rules=custom_rules
+    )
     return result
 
 

@@ -9,6 +9,7 @@ from app.ai.openai_adapter import OpenAIExplanationProvider
 from app.ai.prompt import build_input
 from app.ai.validation import validate
 from app.domain.common import Scope, TimeRange
+from app.domain.custom_rules import CustomRule
 from app.domain.explanation import (
     Explanation,
     ExplanationInput,
@@ -128,6 +129,7 @@ async def explain_findings(
     latest_day: TimeRange,
     findings: Sequence[Finding],
     coverage: Sequence[SignalCoverage],
+    custom_rules: Sequence[CustomRule] = (),
 ) -> ExplanationResult:
     """Never raises: every provider problem becomes an explanation status."""
     if provider is None:
@@ -135,7 +137,7 @@ async def explain_findings(
     if not findings:
         return ExplanationResult(status=ExplanationStatus.SKIPPED_NO_FINDINGS)
 
-    payload, notes = build_input(scope, latest_day, findings, coverage)
+    payload, notes = build_input(scope, latest_day, findings, coverage, custom_rules=custom_rules)
     try:
         explanation = await asyncio.wait_for(provider.explain(payload), OVERALL_TIMEOUT_SECONDS)
     except TimeoutError:

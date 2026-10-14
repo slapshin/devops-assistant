@@ -11,6 +11,7 @@ import cloudflareTest from "../../fixtures/api/connection_test_cloudflare.json";
 import sentryTest from "../../fixtures/api/connection_test_sentry.json";
 import wazuhTest from "../../fixtures/api/connection_test_wazuh.json";
 import grafanaTest from "../../fixtures/api/connection_test_grafana.json";
+import customRulePreview from "../../fixtures/api/custom_rule_preview.json";
 import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
@@ -18,6 +19,7 @@ import cloudflareReport from "../../fixtures/reports/report_cloudflare.json";
 import sentryReport from "../../fixtures/reports/report_sentry.json";
 import wazuhReport from "../../fixtures/reports/report_wazuh.json";
 import grafanaReport from "../../fixtures/reports/report_grafana.json";
+import customRulesReport from "../../fixtures/reports/report_custom_rules.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
@@ -790,6 +792,82 @@ describe("project form", () => {
     expect(put.sources[1]).not.toHaveProperty("token");
   });
 
+  it("adds a custom rule, previews it and sends it with the Prometheus source", async () => {
+    let attempts = 0;
+    routes["POST /api/projects/custom-rules/preview"] = () => json(customRulePreview);
+    routes["POST /api/projects"] = () =>
+      ++attempts === 1
+        ? json(
+            {
+              type: "about:blank",
+              title: "Request validation failed",
+              status: 422,
+              code: "validation_error",
+              errors: [{ field: "body.sources.0.custom_rules.0.query", message: "the @ modifier is not allowed" }],
+            },
+            422,
+          )
+        : json({ ...base, project_id: "rules-id" }, 201);
+    routes["GET /api/projects/rules-id"] = () => json({ ...base, project_id: "rules-id" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt("/projects/new");
+
+    await fireEvent.update(await screen.findByLabelText("Name"), "Shop");
+    await fireEvent.update(screen.getByLabelText("Label value 1"), "shop");
+    await fireEvent.update(screen.getByLabelText("Label value 2"), "production");
+    expect(screen.queryByRole("button", { name: "Add custom rule" })).not.toBeInTheDocument();
+    await fireEvent.update(screen.getByLabelText("URL"), "http://vm.example:8428");
+    await fireEvent.click(screen.getByRole("button", { name: "Add custom rule" }));
+    const group = screen.getByRole("group", { name: "Prometheus-compatible metrics" });
+
+    await fireEvent.update(within(group).getByLabelText("Title"), "E-mail queue depth");
+    expect(within(group).getByLabelText("Identifier")).toHaveValue("e_mail_queue_depth");
+
+    await fireEvent.update(within(group).getByLabelText("PromQL query"), "max by (job) (shop_email_queue_messages)");
+    await fireEvent.update(within(group).getByLabelText("Finding when"), "threshold");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    expect(within(group).getByLabelText("Threshold")).toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(within(group).getByLabelText("Threshold"), "500");
+    await fireEvent.click(within(group).getByRole("button", { name: "Preview last 24 h" }));
+
+    const preview = await within(group).findByRole("status");
+    expect(preview).toHaveTextContent('max by (job) (shop_email_queue_messages{project="shop"})');
+    expect(within(preview).getByRole("row", { name: /checkout-api/ })).toBeInTheDocument();
+    const rule = {
+      slug: "e_mail_queue_depth",
+      title: "E-mail queue depth",
+      description: "",
+      query: "max by (job) (shop_email_queue_messages)",
+      unit: "count",
+      mode: "threshold",
+      direction: "up",
+      threshold: 500,
+      critical_threshold: null,
+      threshold_op: "above",
+      min_duration_minutes: 15,
+      min_change_factor: null,
+      min_change: null,
+      max_severity: null,
+      identity_labels: [],
+    };
+    const previewed = JSON.parse(calls.find((c) => c.url.includes("custom-rules/preview"))?.body ?? "{}");
+    expect(previewed.rule).toEqual(rule);
+    expect(previewed.source.custom_rules).toEqual([]);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    expect(await within(group).findByText("the @ modifier is not allowed")).toBeInTheDocument();
+
+    await fireEvent.update(within(group).getByLabelText("PromQL query"), "max by (job) (shop_email_queue_messages)");
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/rules-id"));
+    const sent = JSON.parse(calls.filter((c) => c.method === "POST" && c.url === "/api/projects").at(-1)?.body ?? "{}");
+    expect(sent.sources[0].custom_rules).toEqual([rule]);
+  });
+
   it("deletes only after the name is typed and never while an analysis runs", async () => {
     let current: Summary = { ...base, report_count: 3, active_analysis: running };
     routes[`GET /api/projects/${PID}`] = () => json(current);
@@ -1096,6 +1174,17 @@ describe("report", () => {
     const labels = within(panel).getByRole("list", { name: "Labels of shop-web-1" });
     expect(within(labels).getByText("instance=shop-web-1")).toHaveClass("key");
     expect(within(labels).getByText("env=production")).not.toHaveClass("key");
+  });
+
+  it("a custom rule finding shows the rule, its description and its threshold", async () => {
+    const queue = customRulesReport.findings.find((f) => f.signal === "custom_email_queue");
+    await renderAt(`${report(customRulesReport)}/findings/${queue?.finding_id ?? ""}`);
+
+    const details = await screen.findByRole("region", { name: "Finding details" });
+    expect(details).toHaveTextContent("Messages waiting for the mail relay");
+    expect(details).toHaveTextContent("E-mail queue depth · ≥ 500 for 10 min");
+    expect(details).toHaveTextContent("2000 (set in the custom rule)");
+    expect(details).not.toHaveTextContent("not an SLO");
   });
 
   it("findings show the source each one came from", async () => {

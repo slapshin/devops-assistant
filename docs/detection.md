@@ -1,6 +1,6 @@
 # Detection engine (T005)
 
-`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.9`, identified by `config_hash`). Every threshold is a provisional diagnostic heuristic, not an SLO.
+`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.14`, identified by `config_hash`). Every catalog threshold is a provisional diagnostic heuristic, not an SLO; custom rules (T020) carry the user's own thresholds.
 
 ## Pipeline
 
@@ -18,6 +18,7 @@
    - Grafana (kind `alert_rule`, one entity per alert rule, family `alerting`): firing instances pass through onto the event rules `alert_firing` (medium), `alert_firing_critical` (high) or `alert_firing_info` (low), chosen by the rule's `severity` label; instances in NoData/Error onto `alert_nodata` (low). Any firing step is a finding; recurrence tells chronic alerts from new ones. The rule's folder, group and plain (untemplated) `summary` annotation become finding attributes (`alert_folder`, `alert_group`, `alert_summary`). Each finding lists in `alert_instances` the instances active during it (up to 100 per rule; more are disclosed as `series_truncated`): every label, the rendered annotations when Grafana still lists the instance (otherwise the rule's untemplated ones), and the exact active intervals overlapping the finding (open end = still active).
    - Latency uses p95 (with p99 kept as evidence), or mean when histograms are absent. It carries the same volume guard.
    - Swarm failed-task counts become **positive deltas**: new failures.
+   - Custom rules (T020, kind `custom`, family `custom`) pass through onto a rule built from their definition (`rules/custom.py`) with their own thresholds instead of a named entry in `DetectorConfig`: *anomaly* uses the baseline with the rule's direction and minimum change (default factor 1.5); *threshold* uses only the fixed threshold (at or above, or at or below) held for the rule's minimum minutes, and no baseline, so it neither lowers confidence nor makes coverage insufficient for a short history; *both* combines them; *event* flags any value ≥ 0.5 per step with the rule's severity (default high). The scale floor is 0.005 for ratios, 0.001 for seconds and 0.01 otherwise. The rules are taken from the collection result, so a report is analysed with the rules its data was collected for; the report keeps a copy (`custom_rules`).
 2. **Baseline** (`baseline.py`): computed for each trend bucket *b* from `[start_b − 14 d, start_b)` only.
    - Days with ≥ 70 % coverage are adequate.
    - With fewer than 3 adequate days, relative detection is unavailable and only absolute checks run.
@@ -25,7 +26,7 @@
    - Scale = `max(1.4826·MAD, abs_floor, 5 % · |median|)`, so a zero MAD is handled explicitly.
 3. **Flags** (`detect.py`): a step is anomalous when any of these holds:
    - `|z| ≥ 4` in the rule direction plus the minimum effect (absolute difference and/or relative factor);
-   - the value is at or above the absolute heuristic;
+   - the value is at or above the absolute heuristic (at or below it for custom rules with a lower threshold);
    - an event count is > 0 (OOM, new task failures);
    - a replica shortfall, an unavailable upstream, an unreadable proxy status, an unreachable database, stopped replication, a broken replica link or failing persistence of ≥ 1 persists for ≥ 15 min.
 4. **Episodes**: flagged steps separated by ≤ 2 steps are merged. A level episode needs ≥ 3 relative steps, or an absolute run of at least the signal's minimum minutes. Episodes are built over the continuous 14-day range, so they can cross bucket boundaries. Trends clip them per bucket, while findings keep the whole episode.
@@ -56,7 +57,7 @@
    The status is `insufficient_data` when coverage < 50 %, and `insufficient_baseline` when the median baseline days of its level series are < 3 (a bucket with only event series, such as Grafana alerts, needs no baseline). The **trend summary** compares the anomalous share of buckets 0–6 with 7–13 (worsening/improving needs ≥ 1.5× and ≥ 0.5 pp). With fewer than 4 OK buckets on either side it is `inconclusive`.
 8. **Coverage rows** per family: `unsupported` (capabilities), `anomalous`, `source_error` (collection exclusions), `insufficient_data` (latest-day coverage < 50 % or no baseline), or `no_anomaly`.
 
-IDs are derived from `project|env|T|config_hash` plus entity, signal and start time, so identical inputs give identical findings, episodes and evidence IDs.
+IDs are derived from `project|env|T|config_hash` (plus a hash of the custom rules when the project has any, so an edited rule starts new IDs) plus entity, signal and start time, so identical inputs give identical findings, episodes and evidence IDs.
 
 ## Verification
 

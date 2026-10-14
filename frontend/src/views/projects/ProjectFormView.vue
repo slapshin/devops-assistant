@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { ApiError, type ConnectionTest, type SourceKind } from "../../api/client";
 import { useCreateProject, useDeleteProject, useProject, useTestConnection, useUpdateProject } from "../../api/queries";
 import ConnectionTestResult from "../../components/projects/ConnectionTestResult.vue";
+import CustomRulesEditor from "../../components/projects/CustomRulesEditor.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import type { Crumb } from "../../components/shell/crumbs";
 import {
@@ -130,8 +131,10 @@ const errors = computed<FieldErrors>(() => ({ ...(submitted.value ? clientErrors
 // A server error belongs to the value it was about; editing anything clears them.
 watch(draft, () => (serverErrors.value = {}), { deep: true });
 
+/** The connection without its custom rules: editing rules does not make a connection test stale. */
+const prometheusConnection = () => ({ ...prometheusInput(draft.value), custom_rules: [] });
 const signatures = computed<Record<SourceKind, string>>(() => ({
-  prometheus: JSON.stringify([matchersInput(draft.value), draft.value.url.trim() ? prometheusInput(draft.value) : null]),
+  prometheus: JSON.stringify([matchersInput(draft.value), draft.value.url.trim() ? prometheusConnection() : null]),
   cloudflare: JSON.stringify(draft.value.cloudflare ? cloudflareInput(draft.value) : null),
   sentry: JSON.stringify(draft.value.sentry ? sentryInput(draft.value) : null),
   wazuh: JSON.stringify(draft.value.wazuh ? wazuhInput(draft.value) : null),
@@ -153,6 +156,12 @@ const saveWarning = computed(() => {
     else if (testKey(last.result) !== "ok") return `The last ${label} connection test did not succeed.`;
   }
   return null;
+});
+
+const previewBase = computed(() => {
+  const usable = !Object.keys({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, stored.value, true) }).length;
+  if (!usable) return null;
+  return { project_id: sourceId.value, matchers: matchersInput(draft.value), source: prometheusConnection() };
 });
 
 const saving = computed(() => create.isPending.value || update.isPending.value);
@@ -399,6 +408,15 @@ async function confirmDelete() {
           </button>
         </div>
         <ConnectionTestResult v-if="lastTests.prometheus" :test="lastTests.prometheus.result" :stale="isStale('prometheus')" />
+
+        <template v-if="draft.url.trim()">
+          <h2 class="source-title">Custom rules</h2>
+          <p class="muted hint">
+            Your own PromQL, analysed like the built-in signals: against its usual values on preceding days, a fixed threshold, or
+            both. Findings appear under “Custom rules”.
+          </p>
+          <CustomRulesEditor v-model="draft.customRules" :errors="errors" :preview-base="previewBase" />
+        </template>
       </fieldset>
 
       <fieldset>

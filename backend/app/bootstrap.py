@@ -13,7 +13,7 @@ from app.domain.projects import (
 )
 from app.settings import Settings
 from app.sources.cloudflare.synthetic import SYNTHETIC_ZONE_ID
-from app.sources.prometheus.synthetic import SCENARIOS
+from app.sources.prometheus.synthetic import DEMO_CUSTOM_RULES, SCENARIOS
 from app.sources.sentry.synthetic import SYNTHETIC_ORGANIZATION
 from app.storage.projects import SqliteProjectRepository
 
@@ -33,7 +33,9 @@ def demo_projects() -> list[ProjectInput]:
             "analytics, Sentry events, Wazuh alerts or Grafana alerts are queried.",
             matchers=DEMO_MATCHERS,
             sources=[
-                PrometheusSourceInput(url=f"synthetic://{scenario}"),
+                PrometheusSourceInput(
+                    url=f"synthetic://{scenario}", custom_rules=DEMO_CUSTOM_RULES
+                ),
                 CloudflareSourceInput(
                     zone_id=SYNTHETIC_ZONE_ID,
                     hostnames=["shop.example.com"],

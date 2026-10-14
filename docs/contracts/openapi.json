@@ -255,6 +255,14 @@
             "title": "Coverage",
             "type": "array"
           },
+          "custom_rules": {
+            "description": "The project's custom rules as they were when analysed (2.5).",
+            "items": {
+              "$ref": "#/components/schemas/CustomRule"
+            },
+            "title": "Custom Rules",
+            "type": "array"
+          },
           "detector_version": {
             "title": "Detector Version",
             "type": "string"
@@ -288,13 +296,14 @@
             "type": "string"
           },
           "schema_version": {
-            "default": "2.4",
+            "default": "2.5",
             "enum": [
               "2.0",
               "2.1",
               "2.2",
               "2.3",
-              "2.4"
+              "2.4",
+              "2.5"
             ],
             "title": "Schema Version",
             "type": "string"
@@ -564,6 +573,15 @@
         "title": "CapabilityStatus",
         "type": "string"
       },
+      "ChangeDirection": {
+        "enum": [
+          "up",
+          "down",
+          "both"
+        ],
+        "title": "ChangeDirection",
+        "type": "string"
+      },
       "CloudflareSource": {
         "additionalProperties": false,
         "properties": {
@@ -793,6 +811,297 @@
         "title": "ConnectionTestRequest",
         "type": "object"
       },
+      "CustomRule": {
+        "additionalProperties": false,
+        "properties": {
+          "critical_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional second threshold that raises the severity.",
+            "title": "Critical Threshold"
+          },
+          "description": {
+            "default": "",
+            "description": "What the value means and why it matters; shown with findings and given to the AI explanation.",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/ChangeDirection",
+            "default": "up",
+            "description": "Which baseline deviations count (anomaly/both)."
+          },
+          "identity_labels": {
+            "description": "Labels that identify one analysed series (e.g. job, instance); empty uses every label the query returns except the project's matcher labels.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Identity Labels",
+            "type": "array"
+          },
+          "max_severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upper bound of finding severity; in event mode the severity of every finding (default high)."
+          },
+          "min_change": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Baseline deviations must also differ from the expected value by at least this much, in the rule's unit.",
+            "title": "Min Change"
+          },
+          "min_change_factor": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Baseline deviations must also be at least this factor of the expected value (default 1.5 when neither this nor min_change is set).",
+            "title": "Min Change Factor"
+          },
+          "min_duration_minutes": {
+            "default": 15,
+            "description": "How long a threshold breach must last.",
+            "maximum": 1440.0,
+            "minimum": 5.0,
+            "title": "Min Duration Minutes",
+            "type": "integer"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/CustomRuleMode",
+            "default": "anomaly"
+          },
+          "query": {
+            "description": "PromQL; the project's label matchers are added to every selector. $__window is replaced by the rate window (5m).",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "slug": {
+            "description": "Identifier unique within the project, e.g. checkout_failures ([a-z][a-z0-9_]*, at most 40 characters).",
+            "title": "Slug",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required in threshold/both mode.",
+            "title": "Threshold"
+          },
+          "threshold_op": {
+            "$ref": "#/components/schemas/ThresholdOp",
+            "default": "above"
+          },
+          "title": {
+            "description": "Shown on findings.",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/Unit",
+            "default": "count"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "query"
+        ],
+        "title": "CustomRule",
+        "type": "object"
+      },
+      "CustomRuleMode": {
+        "enum": [
+          "anomaly",
+          "threshold",
+          "both",
+          "event"
+        ],
+        "title": "CustomRuleMode",
+        "type": "string"
+      },
+      "CustomRulePreview": {
+        "additionalProperties": false,
+        "description": "Result of POST /api/projects/custom-rules/preview: what the rule's query returns.",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "ok": {
+            "description": "False when the query could not be scoped or run.",
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The query as run, with the project's matchers.",
+            "title": "Query"
+          },
+          "series": {
+            "description": "At most 20 series, ordered by identity.",
+            "items": {
+              "$ref": "#/components/schemas/CustomRulePreviewSeries"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "series_count": {
+            "description": "Series the query returned (in scope).",
+            "minimum": 0.0,
+            "title": "Series Count",
+            "type": "integer"
+          },
+          "start": {
+            "description": "Time of the first value of every series.",
+            "title": "Start",
+            "type": "string"
+          },
+          "step_seconds": {
+            "title": "Step Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "query",
+          "start",
+          "step_seconds",
+          "series_count",
+          "series"
+        ],
+        "title": "CustomRulePreview",
+        "type": "object"
+      },
+      "CustomRulePreviewRequest": {
+        "additionalProperties": false,
+        "description": "Body of POST /api/projects/custom-rules/preview: one rule against a draft source.",
+        "properties": {
+          "matchers": {
+            "description": "The project's label matchers.",
+            "items": {
+              "$ref": "#/components/schemas/LabelMatcher"
+            },
+            "maxItems": 10,
+            "title": "Matchers",
+            "type": "array"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reuse this project's stored secrets for omitted ones.",
+            "title": "Project Id"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/CustomRule"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PrometheusSourceInput"
+          }
+        },
+        "required": [
+          "source",
+          "rule"
+        ],
+        "title": "CustomRulePreviewRequest",
+        "type": "object"
+      },
+      "CustomRulePreviewSeries": {
+        "additionalProperties": false,
+        "properties": {
+          "entity": {
+            "$ref": "#/components/schemas/Entity"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Newest observed value.",
+            "title": "Latest"
+          },
+          "values": {
+            "description": "The last 24 h on the analysis step grid.",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entity",
+          "values",
+          "latest"
+        ],
+        "title": "CustomRulePreviewSeries",
+        "type": "object"
+      },
       "DailyTrend": {
         "additionalProperties": false,
         "description": "One 24-hour bucket; bucket_index 0 is the latest day [T-24h, T).",
@@ -952,7 +1261,8 @@
           "zone",
           "application",
           "agent",
-          "alert_rule"
+          "alert_rule",
+          "custom"
         ],
         "title": "EntityKind",
         "type": "string"
@@ -2670,6 +2980,13 @@
             ],
             "title": "Auth"
           },
+          "custom_rules": {
+            "items": {
+              "$ref": "#/components/schemas/CustomRule"
+            },
+            "title": "Custom Rules",
+            "type": "array"
+          },
           "kind": {
             "const": "prometheus",
             "default": "prometheus",
@@ -2717,6 +3034,15 @@
               }
             ],
             "title": "Auth"
+          },
+          "custom_rules": {
+            "description": "User-written PromQL rules analysed with the catalog (at most 20).",
+            "items": {
+              "$ref": "#/components/schemas/CustomRule"
+            },
+            "maxItems": 20,
+            "title": "Custom Rules",
+            "type": "array"
           },
           "kind": {
             "const": "prometheus",
@@ -3165,7 +3491,8 @@
           "app_performance",
           "host_security",
           "file_integrity",
-          "alerting"
+          "alerting",
+          "custom"
         ],
         "title": "SignalFamily",
         "type": "string"
@@ -3331,6 +3658,14 @@
           "skipped"
         ],
         "title": "StageStatus",
+        "type": "string"
+      },
+      "ThresholdOp": {
+        "enum": [
+          "above",
+          "below"
+        ],
+        "title": "ThresholdOp",
         "type": "string"
       },
       "TimeRange": {
@@ -4159,6 +4494,71 @@
           }
         },
         "summary": "Create Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/custom-rules/preview": {
+      "post": {
+        "description": "Run one custom rule's query over the last 24 h; query errors are reported in the body.",
+        "operationId": "preview_custom_rule_api_projects_custom_rules_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomRulePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomRulePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Preview Custom Rule",
         "tags": [
           "projects"
         ]

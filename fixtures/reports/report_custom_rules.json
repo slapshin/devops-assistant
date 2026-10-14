@@ -1,0 +1,3605 @@
+{
+  "schema_version": "2.5",
+  "analysis_id": "01999a3c-0000-7000-8000-0000000000e8",
+  "scope": {
+    "project_id": "01999a3c-0000-7000-8000-0000000000e1",
+    "project_name": "Shop custom rules",
+    "matchers": [
+      {
+        "name": "project",
+        "op": "=",
+        "value": "shop"
+      }
+    ]
+  },
+  "windows": {
+    "end_time": "2026-09-30T10:05:00Z",
+    "latest_day": {
+      "start": "2026-09-29T10:05:00Z",
+      "end": "2026-09-30T10:05:00Z"
+    },
+    "trend": {
+      "start": "2026-09-16T10:05:00Z",
+      "end": "2026-09-30T10:05:00Z"
+    },
+    "step_seconds": 300
+  },
+  "generated_at": "2026-09-30T10:05:00Z",
+  "detector_version": "detectors-2026.10.14",
+  "config_hash": "c08803ea6db8",
+  "sources": [
+    {
+      "kind": "prometheus",
+      "base_url": "synthetic://fixtures",
+      "backend": "synthetic",
+      "version": null
+    }
+  ],
+  "source": {
+    "kind": "prometheus",
+    "base_url": "synthetic://fixtures",
+    "backend": "synthetic",
+    "version": null
+  },
+  "state": "completed",
+  "capabilities": [
+    {
+      "source": "prometheus",
+      "family": "cpu",
+      "signal": "cpu_utilization",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "cpu",
+      "signal": "cpu_iowait",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_cpu_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "memory",
+      "signal": "memory_utilization",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_memory_MemAvailable_bytes",
+        "node_memory_MemTotal_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "node_memory_MemAvailable_bytes",
+        "node_memory_MemTotal_bytes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "memory",
+      "signal": "memory_pressure",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_pressure_memory_waiting_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "memory",
+      "signal": "node_oom_kills",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_vmstat_oom_kill"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "disk_io",
+      "signal": "io_pressure",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_pressure_io_waiting_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "filesystem",
+      "signal": "filesystem_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "node_filesystem_avail_bytes",
+        "node_filesystem_size_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "device",
+        "mountpoint"
+      ],
+      "observed_metrics": [
+        "node_filesystem_avail_bytes",
+        "node_filesystem_size_bytes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "filesystem",
+      "signal": "filesystem_inodes_used_ratio",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_filesystem_files_free",
+        "node_filesystem_files"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "device",
+        "mountpoint"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "disk_io",
+      "signal": "disk_busy_ratio",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_disk_io_time_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "device"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "disk_io",
+      "signal": "disk_io_bytes",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_disk_read_bytes_total",
+        "node_disk_written_bytes_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "device"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "network",
+      "signal": "network_receive_bytes",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_network_receive_bytes_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "device"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "network",
+      "signal": "network_transmit_bytes",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_network_transmit_bytes_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "device"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "network",
+      "signal": "network_errors",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "node_network_receive_errs_total",
+        "node_network_transmit_errs_total",
+        "node_network_receive_drop_total",
+        "node_network_transmit_drop_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "device"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "container",
+      "signal": "container_cpu",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "container_cpu_usage_seconds_total"
+      ],
+      "required_labels": [
+        "project",
+        "instance",
+        "container"
+      ],
+      "observed_metrics": [
+        "container_cpu_usage_seconds_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "container",
+      "signal": "container_memory_working_set",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "container_memory_working_set_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "instance",
+        "container"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "container",
+      "signal": "container_memory_limit_ratio",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "container_memory_working_set_bytes",
+        "container_spec_memory_limit_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "instance",
+        "container"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "container",
+      "signal": "container_throttling_ratio",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "container_cpu_cfs_throttled_periods_total",
+        "container_cpu_cfs_periods_total"
+      ],
+      "required_labels": [
+        "project",
+        "instance",
+        "container"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "container",
+      "signal": "container_oom",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "container_oom_events_total"
+      ],
+      "required_labels": [
+        "project",
+        "instance",
+        "container"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "container",
+      "signal": "swarm_failed_tasks",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "docker_swarm_task_info"
+      ],
+      "required_labels": [
+        "project",
+        "service_name"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "container",
+      "signal": "swarm_replica_shortfall",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "docker_swarm_service_replicas_desired",
+        "docker_swarm_service_replicas_running",
+        "docker_swarm_service_info"
+      ],
+      "required_labels": [
+        "project",
+        "service_name"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "http_requests",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "http_route",
+        "http_request_method",
+        "server_address"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "http_5xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "http_route",
+        "http_request_method",
+        "server_address"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "http_4xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "http_route",
+        "http_request_method",
+        "server_address"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "http_404",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "http_route",
+        "http_request_method",
+        "server_address"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_count"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "http_latency_p95",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "http_route",
+        "http_request_method",
+        "server_address"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "http_latency_p99",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "http_route",
+        "http_request_method",
+        "server_address"
+      ],
+      "observed_metrics": [
+        "http_server_request_duration_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "http_latency_mean",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "http_server_request_duration_seconds_sum",
+        "http_server_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "http_route",
+        "http_request_method",
+        "server_address"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "rpc_requests",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "rpc_server_call_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "rpc_method"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "rpc_errors",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "rpc_server_call_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "rpc_method"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "rpc_latency_p95",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "rpc_server_call_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "rpc_method"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "nginx_requests",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "nginx_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "nginx_connections_active",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "nginx_connections_active"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "nginx_connections_dropped",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "nginx_connections_accepted",
+        "nginx_connections_handled"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "nginx_down",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "nginx_up"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "angie_requests",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "angie_http_server_zones_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "zone"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "angie_5xx",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "angie_http_server_zones_responses"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "zone"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "angie_4xx",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "angie_http_server_zones_responses"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "zone"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "angie_404",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "angie_http_server_zones_responses"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "zone"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "angie_connections_active",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "angie_connections_active"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "angie_connections_dropped",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "angie_connections_dropped"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "angie_peer_unavailable",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "angie_http_upstreams_peers_state"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "upstream",
+        "peer"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "caddy_requests",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "caddy_http_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "host",
+        "server",
+        "handler"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "caddy_5xx",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "caddy_http_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "host",
+        "server",
+        "handler"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "caddy_4xx",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "caddy_http_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "host",
+        "server",
+        "handler"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "caddy_404",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "caddy_http_request_duration_seconds_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "host",
+        "server",
+        "handler"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "caddy_latency_p95",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "caddy_http_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "host",
+        "server",
+        "handler"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "caddy_latency_p99",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "caddy_http_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "host",
+        "server",
+        "handler"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "caddy_upstream_unhealthy",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "caddy_reverse_proxy_upstreams_healthy"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "upstream"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "traefik_requests",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "traefik_service_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "router",
+        "service"
+      ],
+      "observed_metrics": [
+        "traefik_service_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "traefik_5xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "traefik_service_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "router",
+        "service"
+      ],
+      "observed_metrics": [
+        "traefik_service_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "traefik_4xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "traefik_service_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "router",
+        "service"
+      ],
+      "observed_metrics": [
+        "traefik_service_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "traefik_404",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "traefik_service_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "router",
+        "service"
+      ],
+      "observed_metrics": [
+        "traefik_service_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "traefik_latency_p95",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "traefik_service_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "router",
+        "service"
+      ],
+      "observed_metrics": [
+        "traefik_service_request_duration_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "traefik_latency_p99",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "traefik_service_request_duration_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "router",
+        "service"
+      ],
+      "observed_metrics": [
+        "traefik_service_request_duration_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "traefik_connections_active",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "traefik_open_connections"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "entrypoint"
+      ],
+      "observed_metrics": [
+        "traefik_open_connections"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "proxy",
+      "signal": "traefik_server_down",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "traefik_service_server_up"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "service",
+        "url"
+      ],
+      "observed_metrics": [
+        "traefik_service_server_up"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "pg_down",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "pg_up"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "pg_up"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "pg_connections_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "pg_stat_database_numbackends",
+        "pg_settings_max_connections"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "pg_stat_database_numbackends",
+        "pg_settings_max_connections"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "pg_replication_lag",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "pg_replication_lag_seconds"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "pg_replication_lag_seconds"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "pg_transactions",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "pg_stat_database_xact_commit",
+        "pg_stat_database_xact_rollback"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "datname"
+      ],
+      "observed_metrics": [
+        "pg_stat_database_xact_commit",
+        "pg_stat_database_xact_rollback"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "pg_rollbacks",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "pg_stat_database_xact_rollback"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "datname"
+      ],
+      "observed_metrics": [
+        "pg_stat_database_xact_rollback"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "pg_deadlocks",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "pg_stat_database_deadlocks"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "datname"
+      ],
+      "observed_metrics": [
+        "pg_stat_database_deadlocks"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "pg_temp_bytes",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "pg_stat_database_temp_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "datname"
+      ],
+      "observed_metrics": [
+        "pg_stat_database_temp_bytes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "pg_longest_transaction",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "pg_stat_activity_max_tx_duration"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "datname"
+      ],
+      "observed_metrics": [
+        "pg_stat_activity_max_tx_duration"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_down",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_up"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_up"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_connections_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_global_status_threads_connected",
+        "mysql_global_variables_max_connections"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_global_status_threads_connected",
+        "mysql_global_variables_max_connections"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_connections_refused",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_global_status_connection_errors_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_global_status_connection_errors_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_slave_lag",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_slave_status_seconds_behind_master"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_slave_status_seconds_behind_master"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_slave_stopped",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_slave_status_slave_sql_running",
+        "mysql_slave_status_slave_io_running"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_slave_status_slave_sql_running",
+        "mysql_slave_status_slave_io_running"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_replica_lag",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_slave_status_seconds_behind_source"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_replica_stopped",
+      "status": "unsupported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_slave_status_replica_sql_running",
+        "mysql_slave_status_replica_io_running"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [],
+      "reason": "Not present in the synthetic scenario.",
+      "history_days": null
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_queries",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_global_status_questions"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_global_status_questions"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_slow_queries",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_global_status_slow_queries"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_global_status_slow_queries"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_row_lock_waits",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_global_status_innodb_row_lock_waits"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_global_status_innodb_row_lock_waits"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "mysql_tmp_disk_tables",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "mysql_global_status_created_tmp_disk_tables"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "mysql_global_status_created_tmp_disk_tables"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_down",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_up"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_up"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_clients_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_connected_clients"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_connected_clients"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_rejected_connections",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_rejected_connections_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_rejected_connections_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_memory_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_memory_used_bytes",
+        "redis_memory_max_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_memory_used_bytes",
+        "redis_memory_max_bytes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_evictions",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_evicted_keys_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_evicted_keys_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_replica_link_down",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_master_link_up"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_master_link_up"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_persistence_failed",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_rdb_last_bgsave_status",
+        "redis_aof_last_write_status"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_rdb_last_bgsave_status",
+        "redis_aof_last_write_status"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_commands",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_commands_processed_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_commands_processed_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_command_latency_mean",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_commands_duration_seconds_total",
+        "redis_commands_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_commands_duration_seconds_total",
+        "redis_commands_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_keyspace_lookups",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_keyspace_hits_total",
+        "redis_keyspace_misses_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_keyspace_hits_total",
+        "redis_keyspace_misses_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "database",
+      "signal": "redis_keyspace_misses",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "redis_keyspace_misses_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "redis_keyspace_misses_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "custom",
+      "signal": "custom_checkout_failures",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "shop_orders_failed_total"
+      ],
+      "required_labels": [
+        "project"
+      ],
+      "observed_metrics": [
+        "shop_orders_failed_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "custom",
+      "signal": "custom_email_queue",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "shop_email_queue_messages"
+      ],
+      "required_labels": [
+        "project"
+      ],
+      "observed_metrics": [
+        "shop_email_queue_messages"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    }
+  ],
+  "coverage": [
+    {
+      "family": "cpu",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "cpu_iowait: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "memory",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "memory_pressure: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "node_oom_kills: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "filesystem",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "filesystem_inodes_used_ratio: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "disk_io",
+      "status": "unsupported",
+      "capability": "unsupported",
+      "evaluated_series": 0,
+      "total_series": 0,
+      "baseline_days": null,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "io_pressure: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "disk_busy_ratio: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "disk_io_bytes: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "network",
+      "status": "unsupported",
+      "capability": "unsupported",
+      "evaluated_series": 0,
+      "total_series": 0,
+      "baseline_days": null,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "network_receive_bytes: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "network_transmit_bytes: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "network_errors: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "container",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "container_memory_working_set: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "container_memory_limit_ratio: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "container_throttling_ratio: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "container_oom: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "swarm_failed_tasks: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "swarm_replica_shortfall: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "request_traffic",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 3,
+      "total_series": 3,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "rpc_requests: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "nginx_requests: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "angie_requests: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "caddy_requests: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "request_failures",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 2,
+      "total_series": 3,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "rpc_errors: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "angie_5xx: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "caddy_5xx: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "client_errors",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 6,
+      "total_series": 6,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "angie_4xx: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "angie_404: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "caddy_4xx: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "caddy_404: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "latency",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 2,
+      "total_series": 3,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "http_latency_mean: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "rpc_latency_p95: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "caddy_latency_p95: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "caddy_latency_p99: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "proxy",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "nginx_connections_active: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "nginx_connections_dropped: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "nginx_down: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "angie_connections_active: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "angie_connections_dropped: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "angie_peer_unavailable: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "caddy_upstream_unhealthy: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "database",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 43,
+      "total_series": 43,
+      "baseline_days": 14,
+      "reasons": [
+        {
+          "code": "capability",
+          "message": "mysql_replica_lag: Not present in the synthetic scenario."
+        },
+        {
+          "code": "capability",
+          "message": "mysql_replica_stopped: Not present in the synthetic scenario."
+        }
+      ]
+    },
+    {
+      "family": "custom",
+      "status": "anomalous",
+      "capability": "supported",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "fnd_f43c93bc1b235b5e",
+      "detector": "level:custom_email_queue",
+      "detector_version": "detectors-2026.10.14",
+      "method": "absolute",
+      "family": "custom",
+      "signal": "custom_email_queue",
+      "title": "E-mail queue depth at or above 2000 (threshold)",
+      "entity": {
+        "kind": "custom",
+        "key": "custom|job=checkout-api",
+        "display_name": "checkout-api",
+        "labels": {
+          "job": "checkout-api"
+        }
+      },
+      "start": "2026-09-30T06:05:00Z",
+      "end": "2026-09-30T07:05:00Z",
+      "peak_at": "2026-09-30T06:05:00Z",
+      "duration_seconds": 3600,
+      "severity": "critical",
+      "severity_points": 5,
+      "confidence": "high",
+      "confidence_reasons": [],
+      "observed": {
+        "value": 2400.0,
+        "unit": "count"
+      },
+      "expected": {
+        "median": 251.1582345,
+        "lower": 200.9265876,
+        "upper": 301.3898814,
+        "unit": "count"
+      },
+      "peak_score": 171.11,
+      "threshold": 2000.0,
+      "baseline_days": 14,
+      "baseline_mode": "time_of_day",
+      "evidence_ids": [
+        "evd_a760fbcd380c29e2"
+      ],
+      "related_finding_ids": [
+        "fnd_f5226c9499daf431"
+      ],
+      "attributes": {},
+      "alert_instances": [],
+      "error_kinds": [],
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
+    },
+    {
+      "finding_id": "fnd_f5226c9499daf431",
+      "detector": "level:custom_checkout_failures",
+      "detector_version": "detectors-2026.10.14",
+      "method": "relative",
+      "family": "custom",
+      "signal": "custom_checkout_failures",
+      "title": "Checkout failures above expected range",
+      "entity": {
+        "kind": "custom",
+        "key": "custom|job=checkout-api",
+        "display_name": "checkout-api",
+        "labels": {
+          "job": "checkout-api"
+        }
+      },
+      "start": "2026-09-30T06:05:00Z",
+      "end": "2026-09-30T07:05:00Z",
+      "peak_at": "2026-09-30T07:00:00Z",
+      "duration_seconds": 3600,
+      "severity": "high",
+      "severity_points": 4,
+      "confidence": "high",
+      "confidence_reasons": [],
+      "observed": {
+        "value": 40.0,
+        "unit": "per_second"
+      },
+      "expected": {
+        "median": 9.926672499999999,
+        "lower": 7.941337999999999,
+        "upper": 11.912007,
+        "unit": "per_second"
+      },
+      "peak_score": 60.59,
+      "threshold": null,
+      "baseline_days": 14,
+      "baseline_mode": "time_of_day",
+      "evidence_ids": [
+        "evd_9d2201a53901a8f5"
+      ],
+      "related_finding_ids": [
+        "fnd_f43c93bc1b235b5e"
+      ],
+      "attributes": {},
+      "alert_instances": [],
+      "error_kinds": [],
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
+    }
+  ],
+  "trends": [
+    {
+      "bucket_index": 0,
+      "window": {
+        "start": "2026-09-29T10:05:00Z",
+        "end": "2026-09-30T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 2,
+      "anomalous_minutes": 60,
+      "peak_severity": "critical",
+      "affected_entities": [
+        "custom|job=checkout-api"
+      ],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.002315,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": [
+        {
+          "episode_id": "eps_f43c93bc1b235b5e",
+          "finding_id": "fnd_f43c93bc1b235b5e",
+          "entity": {
+            "kind": "custom",
+            "key": "custom|job=checkout-api",
+            "display_name": "checkout-api",
+            "labels": {
+              "job": "checkout-api"
+            }
+          },
+          "family": "custom",
+          "signal": "custom_email_queue",
+          "start": "2026-09-30T06:05:00Z",
+          "end": "2026-09-30T07:05:00Z",
+          "severity": "critical",
+          "peak_observed": 2400.0,
+          "expected_median": 251.1582345,
+          "unit": "count"
+        },
+        {
+          "episode_id": "eps_f5226c9499daf431",
+          "finding_id": "fnd_f5226c9499daf431",
+          "entity": {
+            "kind": "custom",
+            "key": "custom|job=checkout-api",
+            "display_name": "checkout-api",
+            "labels": {
+              "job": "checkout-api"
+            }
+          },
+          "family": "custom",
+          "signal": "custom_checkout_failures",
+          "start": "2026-09-30T06:05:00Z",
+          "end": "2026-09-30T07:05:00Z",
+          "severity": "high",
+          "peak_observed": 40.0,
+          "expected_median": 9.926672499999999,
+          "unit": "per_second"
+        }
+      ]
+    },
+    {
+      "bucket_index": 1,
+      "window": {
+        "start": "2026-09-28T10:05:00Z",
+        "end": "2026-09-29T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 2,
+      "window": {
+        "start": "2026-09-27T10:05:00Z",
+        "end": "2026-09-28T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 3,
+      "window": {
+        "start": "2026-09-26T10:05:00Z",
+        "end": "2026-09-27T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 4,
+      "window": {
+        "start": "2026-09-25T10:05:00Z",
+        "end": "2026-09-26T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 5,
+      "window": {
+        "start": "2026-09-24T10:05:00Z",
+        "end": "2026-09-25T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 6,
+      "window": {
+        "start": "2026-09-23T10:05:00Z",
+        "end": "2026-09-24T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 7,
+      "window": {
+        "start": "2026-09-22T10:05:00Z",
+        "end": "2026-09-23T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 8,
+      "window": {
+        "start": "2026-09-21T10:05:00Z",
+        "end": "2026-09-22T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 9,
+      "window": {
+        "start": "2026-09-20T10:05:00Z",
+        "end": "2026-09-21T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 10,
+      "window": {
+        "start": "2026-09-19T10:05:00Z",
+        "end": "2026-09-20T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 11,
+      "window": {
+        "start": "2026-09-18T10:05:00Z",
+        "end": "2026-09-19T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 12,
+      "window": {
+        "start": "2026-09-17T10:05:00Z",
+        "end": "2026-09-18T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    },
+    {
+      "bucket_index": 13,
+      "window": {
+        "start": "2026-09-16T10:05:00Z",
+        "end": "2026-09-17T10:05:00Z"
+      },
+      "status": "ok",
+      "episode_count": 0,
+      "anomalous_minutes": 0,
+      "peak_severity": null,
+      "affected_entities": [],
+      "observed_entity_minutes": 25920,
+      "anomalous_share": 0.0,
+      "baseline_days_used": 14,
+      "coverage": 1.0,
+      "episodes": []
+    }
+  ],
+  "trend_summary": {
+    "direction": "stable",
+    "confidence": "high",
+    "recent_share": 0.000331,
+    "previous_share": 0.0,
+    "recent_episodes": 2,
+    "previous_episodes": 0,
+    "reason": "Anomalous share 0.03% over the last 7 days vs 0.00% over the previous 7 (similar); 2 vs 0 episodes."
+  },
+  "evidence": [
+    {
+      "evidence_id": "evd_9d2201a53901a8f5",
+      "finding_id": "fnd_f5226c9499daf431",
+      "series": {
+        "series_id": "ser_f310787fa4200236",
+        "family": "custom",
+        "signal": "custom_checkout_failures",
+        "entity": {
+          "kind": "custom",
+          "key": "custom|job=checkout-api",
+          "display_name": "checkout-api",
+          "labels": {
+            "job": "checkout-api"
+          }
+        },
+        "labels": {
+          "project": "shop",
+          "job": "checkout-api"
+        },
+        "unit": "per_second",
+        "query": "sum by (job) (rate(shop_orders_failed_total{project=\"shop\"}[5m]))",
+        "step_seconds": 300,
+        "start": "2026-09-30T00:05:00Z",
+        "values": [
+          10.559245,
+          10.480915,
+          10.530882,
+          10.438273,
+          10.767146,
+          10.264685,
+          10.447416,
+          10.314596,
+          10.474501,
+          10.569388,
+          10.346475,
+          10.585667,
+          10.397342,
+          10.439706,
+          10.373641,
+          10.468182,
+          10.463583,
+          10.501667,
+          10.590056,
+          10.319454,
+          10.430274,
+          10.333456,
+          10.518133,
+          10.488675,
+          10.449452,
+          10.30303,
+          10.481312,
+          10.52216,
+          10.585886,
+          10.518484,
+          10.318084,
+          10.447223,
+          10.451804,
+          10.420996,
+          10.221986,
+          10.42108,
+          10.39506,
+          10.3808,
+          10.310089,
+          10.142929,
+          10.402198,
+          10.478231,
+          10.334709,
+          10.241432,
+          10.092688,
+          10.530968,
+          10.338485,
+          10.240107,
+          10.206554,
+          10.297246,
+          10.070472,
+          10.394529,
+          10.225562,
+          10.066355,
+          10.199811,
+          10.456417,
+          10.32696,
+          9.926801,
+          10.190721,
+          10.190059,
+          10.349019,
+          10.200141,
+          10.078609,
+          10.441604,
+          10.02777,
+          10.202634,
+          10.148693,
+          10.239459,
+          10.200345,
+          10.153335,
+          9.889224,
+          10.032957,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          40.0,
+          9.855401,
+          9.870669,
+          9.797155,
+          9.976446,
+          9.775094,
+          9.880115,
+          9.992438,
+          9.761284,
+          9.894814,
+          9.786062,
+          9.962337,
+          9.897103,
+          9.724902,
+          9.755848,
+          9.775493,
+          9.616681,
+          9.747565,
+          9.602979,
+          9.886721,
+          9.809546,
+          9.749011,
+          9.597601,
+          9.631227,
+          9.675736,
+          9.634807,
+          9.710696,
+          9.622207,
+          9.602897,
+          9.632648,
+          9.677823,
+          9.583455,
+          9.604112,
+          9.510339,
+          9.522143,
+          9.778251,
+          9.535869
+        ],
+        "coverage": 1.0,
+        "sample_interval": null,
+        "alert_instances": []
+      },
+      "expected": [
+        10.485808500000001,
+        10.489331,
+        10.489783,
+        10.4903175,
+        10.4903635,
+        10.492114,
+        10.4903635,
+        10.489331,
+        10.489331,
+        10.4886205,
+        10.487285499999999,
+        10.483965999999999,
+        10.480708499999999,
+        10.47274,
+        10.4700895,
+        10.468567499999999,
+        10.4655865,
+        10.4641545,
+        10.4616475,
+        10.462969000000001,
+        10.462969000000001,
+        10.4617825,
+        10.4589125,
+        10.454805499999999,
+        10.449732000000001,
+        10.4445105,
+        10.438357499999999,
+        10.435703,
+        10.434505000000001,
+        10.432899500000001,
+        10.427991,
+        10.4233285,
+        10.419836,
+        10.41045,
+        10.405339999999999,
+        10.403926,
+        10.3952335,
+        10.387222000000001,
+        10.379006,
+        10.374741499999999,
+        10.368519,
+        10.365745,
+        10.357161999999999,
+        10.344197999999999,
+        10.3356955,
+        10.3266225,
+        10.321798999999999,
+        10.3145415,
+        10.305961,
+        10.29702,
+        10.282384,
+        10.273651000000001,
+        10.2600455,
+        10.2504825,
+        10.2400225,
+        10.226973000000001,
+        10.215307,
+        10.210013,
+        10.198608499999999,
+        10.1921185,
+        10.186023,
+        10.1770395,
+        10.156461499999999,
+        10.1508865,
+        10.1427555,
+        10.130938,
+        10.122370499999999,
+        10.11069,
+        10.104782,
+        10.0943325,
+        10.0850855,
+        10.0786825,
+        10.062444,
+        10.0494825,
+        10.0369515,
+        10.021891,
+        10.006386,
+        9.995923,
+        9.982884,
+        9.974458,
+        9.9647455,
+        9.9565175,
+        9.944009,
+        9.926672499999999,
+        9.913758999999999,
+        9.903041,
+        9.89304,
+        9.886768,
+        9.867143500000001,
+        9.8602515,
+        9.8485675,
+        9.8322045,
+        9.822274499999999,
+        9.81862,
+        9.8117375,
+        9.801053,
+        9.7883935,
+        9.778399,
+        9.7715955,
+        9.761394500000002,
+        9.7535885,
+        9.74955,
+        9.7407035,
+        9.7313775,
+        9.723397,
+        9.714313,
+        9.7092955,
+        9.698591,
+        9.6872235,
+        9.681542499999999,
+        9.666878,
+        9.6590095,
+        9.6526575,
+        9.648403,
+        9.638314,
+        9.631058,
+        9.6239755,
+        9.617763499999999,
+        9.6124055,
+        9.6043165
+      ],
+      "lower": [
+        8.3886468,
+        8.3914648,
+        8.3918264,
+        8.392254,
+        8.392290800000001,
+        8.393691200000001,
+        8.392290800000001,
+        8.3914648,
+        8.3914648,
+        8.390896399999999,
+        8.389828399999999,
+        8.387172799999998,
+        8.384566799999998,
+        8.378192,
+        8.3760716,
+        8.374854,
+        8.372469200000001,
+        8.3713236,
+        8.369318,
+        8.370375200000002,
+        8.370375200000002,
+        8.369426,
+        8.36713,
+        8.3638444,
+        8.3597856,
+        8.3556084,
+        8.350686,
+        8.3485624,
+        8.347604,
+        8.346319600000001,
+        8.3423928,
+        8.3386628,
+        8.3358688,
+        8.32836,
+        8.324271999999999,
+        8.323140800000001,
+        8.3161868,
+        8.3097776,
+        8.3032048,
+        8.2997932,
+        8.294815199999999,
+        8.292596,
+        8.2857296,
+        8.275358399999998,
+        8.2685564,
+        8.261298,
+        8.257439199999999,
+        8.2516332,
+        8.2447688,
+        8.237616,
+        8.2259072,
+        8.218920800000001,
+        8.208036400000001,
+        8.200386,
+        8.192018000000001,
+        8.181578400000001,
+        8.1722456,
+        8.1680104,
+        8.1588868,
+        8.1536948,
+        8.1488184,
+        8.1416316,
+        8.125169199999998,
+        8.1207092,
+        8.1142044,
+        8.1047504,
+        8.0978964,
+        8.088552,
+        8.0838256,
+        8.075466,
+        8.0680684,
+        8.062946,
+        8.0499552,
+        8.039586,
+        8.0295612,
+        8.0175128,
+        8.005108799999999,
+        7.9967384,
+        7.986307200000001,
+        7.9795664,
+        7.9717964,
+        7.9652140000000005,
+        7.955207199999999,
+        7.941337999999999,
+        7.931007199999999,
+        7.9224328,
+        7.914432,
+        7.9094144,
+        7.893714800000001,
+        7.8882012,
+        7.878854,
+        7.865763599999999,
+        7.857819599999999,
+        7.854895999999999,
+        7.84939,
+        7.8408424,
+        7.8307148,
+        7.8227192,
+        7.8172764,
+        7.809115600000001,
+        7.802870799999999,
+        7.799639999999999,
+        7.792562800000001,
+        7.785102,
+        7.7787176,
+        7.771450400000001,
+        7.767436399999999,
+        7.758872800000001,
+        7.7497788,
+        7.745233999999999,
+        7.733502400000001,
+        7.7272076,
+        7.722126,
+        7.7187224,
+        7.710651199999999,
+        7.704846399999999,
+        7.6991804,
+        7.694210799999999,
+        7.6899244,
+        7.6834532
+      ],
+      "upper": [
+        12.582970200000002,
+        12.5871972,
+        12.587739599999999,
+        12.588381,
+        12.5884362,
+        12.5905368,
+        12.5884362,
+        12.5871972,
+        12.5871972,
+        12.5863446,
+        12.584742599999998,
+        12.5807592,
+        12.576850199999999,
+        12.567288,
+        12.564107400000001,
+        12.562280999999999,
+        12.5587038,
+        12.556985399999999,
+        12.553977,
+        12.5555628,
+        12.5555628,
+        12.554139,
+        12.550695000000001,
+        12.545766599999999,
+        12.539678400000001,
+        12.5334126,
+        12.526028999999998,
+        12.5228436,
+        12.521406000000002,
+        12.519479400000002,
+        12.5135892,
+        12.5079942,
+        12.5038032,
+        12.492540000000002,
+        12.486407999999999,
+        12.4847112,
+        12.474280199999999,
+        12.464666400000002,
+        12.454807200000001,
+        12.449689799999998,
+        12.4422228,
+        12.438894000000001,
+        12.428594399999998,
+        12.4130376,
+        12.4028346,
+        12.391946999999998,
+        12.386158799999999,
+        12.3774498,
+        12.3671532,
+        12.356424,
+        12.3388608,
+        12.3283812,
+        12.3120546,
+        12.300579,
+        12.288027,
+        12.2723676,
+        12.258368399999998,
+        12.2520156,
+        12.238330199999998,
+        12.230542199999999,
+        12.223227600000001,
+        12.212447399999999,
+        12.1877538,
+        12.1810638,
+        12.1713066,
+        12.1571256,
+        12.146844599999998,
+        12.132828,
+        12.1257384,
+        12.113199,
+        12.1021026,
+        12.094418999999998,
+        12.0749328,
+        12.059379,
+        12.044341800000002,
+        12.0262692,
+        12.0076632,
+        11.995107599999999,
+        11.9794608,
+        11.969349600000001,
+        11.9576946,
+        11.947821000000001,
+        11.932810799999999,
+        11.912007,
+        11.896510799999998,
+        11.8836492,
+        11.871647999999999,
+        11.8641216,
+        11.8405722,
+        11.8323018,
+        11.818280999999999,
+        11.7986454,
+        11.786729399999999,
+        11.782343999999998,
+        11.774085,
+        11.7612636,
+        11.7460722,
+        11.7340788,
+        11.7259146,
+        11.713673400000001,
+        11.7043062,
+        11.699459999999998,
+        11.6888442,
+        11.677653000000001,
+        11.6680764,
+        11.6571756,
+        11.6511546,
+        11.6383092,
+        11.6246682,
+        11.617850999999998,
+        11.6002536,
+        11.5908114,
+        11.583189,
+        11.5780836,
+        11.5659768,
+        11.5572696,
+        11.548770600000001,
+        11.541316199999999,
+        11.5348866,
+        11.5251798
+      ],
+      "threshold": null,
+      "threshold_label": null
+    },
+    {
+      "evidence_id": "evd_a760fbcd380c29e2",
+      "finding_id": "fnd_f43c93bc1b235b5e",
+      "series": {
+        "series_id": "ser_f5978005d3905001",
+        "family": "custom",
+        "signal": "custom_email_queue",
+        "entity": {
+          "kind": "custom",
+          "key": "custom|job=checkout-api",
+          "display_name": "checkout-api",
+          "labels": {
+            "job": "checkout-api"
+          }
+        },
+        "labels": {
+          "project": "shop",
+          "job": "checkout-api"
+        },
+        "unit": "count",
+        "query": "max by (job) (shop_email_queue_messages{project=\"shop\"})",
+        "step_seconds": 300,
+        "start": "2026-09-30T00:05:00Z",
+        "values": [
+          269.514424,
+          262.308979,
+          264.037147,
+          261.624111,
+          257.317975,
+          261.764643,
+          263.282656,
+          261.95812,
+          268.946244,
+          262.026955,
+          264.684986,
+          265.711981,
+          262.50312,
+          262.791612,
+          262.780586,
+          262.375631,
+          261.77619,
+          259.533872,
+          258.924839,
+          258.965693,
+          261.598469,
+          261.981313,
+          257.981471,
+          262.722628,
+          265.865612,
+          261.883503,
+          262.070434,
+          258.313025,
+          260.470094,
+          257.810349,
+          261.938031,
+          261.659133,
+          262.92513,
+          257.410728,
+          261.057648,
+          256.822377,
+          266.352914,
+          257.852748,
+          259.499342,
+          258.341974,
+          258.278189,
+          256.652994,
+          259.595476,
+          258.527565,
+          258.09063,
+          258.035662,
+          254.009623,
+          256.201307,
+          257.009216,
+          252.245955,
+          261.392987,
+          257.322662,
+          256.483266,
+          255.222926,
+          256.511908,
+          256.175564,
+          254.34536,
+          259.03841,
+          256.495289,
+          260.616359,
+          253.568774,
+          255.523832,
+          251.492838,
+          248.483049,
+          253.667577,
+          250.803097,
+          252.862681,
+          255.788562,
+          257.375483,
+          252.287015,
+          250.088955,
+          250.744879,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          2400.0,
+          253.701262,
+          246.092705,
+          247.879699,
+          251.460455,
+          251.268247,
+          246.928373,
+          249.887226,
+          245.306195,
+          248.224387,
+          249.863697,
+          244.120007,
+          241.12598,
+          247.202917,
+          242.702827,
+          246.730793,
+          245.02383,
+          244.207076,
+          244.865672,
+          244.82535,
+          243.603126,
+          241.993869,
+          245.277334,
+          243.004429,
+          246.44954,
+          245.599314,
+          240.513493,
+          239.870564,
+          240.929938,
+          245.788315,
+          239.570596,
+          241.214408,
+          240.072526,
+          244.112099,
+          241.306398,
+          238.709025,
+          238.294129
+        ],
+        "coverage": 1.0,
+        "sample_interval": null,
+        "alert_instances": []
+      },
+      "expected": [
+        261.9798415,
+        261.9798415,
+        261.984278,
+        262.0052365,
+        262.06011950000004,
+        262.05192150000005,
+        262.0092505,
+        262.05192150000005,
+        262.0513705,
+        262.0092505,
+        262.0350165,
+        261.9952355,
+        261.990141,
+        261.9952355,
+        261.9470455,
+        261.928494,
+        261.91537500000004,
+        261.888837,
+        261.8550065,
+        261.79109900000003,
+        261.59096250000005,
+        261.546599,
+        261.410043,
+        261.326998,
+        261.129723,
+        261.10258050000004,
+        261.08437200000003,
+        260.88165300000003,
+        260.7269945,
+        260.5264915,
+        260.410731,
+        260.13760549999995,
+        260.0337185,
+        259.98490449999997,
+        259.8611105,
+        259.60432749999995,
+        259.379835,
+        259.144806,
+        259.075467,
+        258.953971,
+        258.794766,
+        258.5496225,
+        258.2862745,
+        258.0719615,
+        257.9637255,
+        257.7366865,
+        257.5097185,
+        257.2860375,
+        257.037009,
+        256.81928700000003,
+        256.5931055,
+        256.249179,
+        256.1366015,
+        255.887426,
+        255.6506795,
+        255.3958295,
+        255.07713,
+        254.83307,
+        254.6229735,
+        254.351414,
+        254.155757,
+        253.835105,
+        253.5762815,
+        253.358654,
+        253.1053655,
+        252.863684,
+        252.7233555,
+        252.5355685,
+        252.34494999999998,
+        252.02838400000002,
+        251.7159935,
+        251.421622,
+        251.1582345,
+        250.986584,
+        250.8762565,
+        250.6331945,
+        250.308226,
+        249.83156,
+        249.545769,
+        249.31347599999998,
+        248.9778355,
+        248.5690795,
+        248.29671050000002,
+        248.0359005,
+        247.8157055,
+        247.64968,
+        247.291587,
+        246.9027195,
+        246.6729735,
+        246.53323699999999,
+        246.36676,
+        246.12316149999998,
+        245.95221049999998,
+        245.774854,
+        245.49061849999998,
+        245.16045,
+        244.901662,
+        244.58292849999998,
+        244.34916299999998,
+        244.1386715,
+        243.725487,
+        243.484539,
+        243.31373000000002,
+        243.08431000000002,
+        242.9064765,
+        242.6933585,
+        242.5154105,
+        242.32651049999998,
+        242.221146,
+        241.86559849999998,
+        241.670479,
+        241.61874,
+        241.4562175,
+        241.3448495,
+        241.1398155,
+        241.023302,
+        240.632769,
+        240.4808095,
+        240.19458600000002,
+        239.97698100000002
+      ],
+      "lower": [
+        209.58387320000003,
+        209.58387320000003,
+        209.5874224,
+        209.6041892,
+        209.64809560000003,
+        209.64153720000004,
+        209.60740040000002,
+        209.64153720000004,
+        209.6410964,
+        209.60740040000002,
+        209.6280132,
+        209.5961884,
+        209.5921128,
+        209.5961884,
+        209.5576364,
+        209.5427952,
+        209.53230000000002,
+        209.5110696,
+        209.4840052,
+        209.43287920000003,
+        209.27277000000004,
+        209.23727920000002,
+        209.1280344,
+        209.0615984,
+        208.90377840000002,
+        208.88206440000005,
+        208.86749760000004,
+        208.70532240000003,
+        208.58159559999999,
+        208.4211932,
+        208.3285848,
+        208.11008439999995,
+        208.0269748,
+        207.9879236,
+        207.88888839999998,
+        207.68346199999996,
+        207.503868,
+        207.3158448,
+        207.2603736,
+        207.16317680000003,
+        207.03581279999997,
+        206.839698,
+        206.6290196,
+        206.4575692,
+        206.3709804,
+        206.1893492,
+        206.00777480000002,
+        205.82883,
+        205.6296072,
+        205.45542960000003,
+        205.27448439999998,
+        204.99934320000003,
+        204.90928119999998,
+        204.7099408,
+        204.5205436,
+        204.3166636,
+        204.06170400000002,
+        203.866456,
+        203.6983788,
+        203.4811312,
+        203.32460559999998,
+        203.068084,
+        202.8610252,
+        202.6869232,
+        202.48429240000002,
+        202.2909472,
+        202.1786844,
+        202.02845480000002,
+        201.87596,
+        201.6227072,
+        201.3727948,
+        201.1372976,
+        200.9265876,
+        200.78926719999998,
+        200.7010052,
+        200.5065556,
+        200.2465808,
+        199.865248,
+        199.6366152,
+        199.4507808,
+        199.1822684,
+        198.8552636,
+        198.6373684,
+        198.4287204,
+        198.2525644,
+        198.119744,
+        197.8332696,
+        197.5221756,
+        197.33837880000002,
+        197.22658959999998,
+        197.093408,
+        196.89852919999998,
+        196.7617684,
+        196.6198832,
+        196.39249479999998,
+        196.12836,
+        195.92132959999998,
+        195.6663428,
+        195.47933039999998,
+        195.31093719999998,
+        194.9803896,
+        194.78763120000002,
+        194.65098400000002,
+        194.46744800000002,
+        194.3251812,
+        194.15468679999998,
+        194.0123284,
+        193.86120839999998,
+        193.7769168,
+        193.4924788,
+        193.3363832,
+        193.294992,
+        193.164974,
+        193.0758796,
+        192.9118524,
+        192.8186416,
+        192.50621519999999,
+        192.3846476,
+        192.1556688,
+        191.9815848
+      ],
+      "upper": [
+        314.3758098,
+        314.3758098,
+        314.3811336,
+        314.40628380000004,
+        314.47214340000005,
+        314.4623058000001,
+        314.4111006,
+        314.4623058000001,
+        314.4616446,
+        314.4111006,
+        314.44201979999997,
+        314.3942826,
+        314.3881692,
+        314.3942826,
+        314.3364546,
+        314.3141928,
+        314.29845000000006,
+        314.2666044,
+        314.2260078,
+        314.14931880000006,
+        313.90915500000006,
+        313.85591880000004,
+        313.69205159999996,
+        313.5923976,
+        313.3556676,
+        313.32309660000004,
+        313.3012464,
+        313.05798360000006,
+        312.87239339999996,
+        312.63178980000004,
+        312.4928772,
+        312.16512659999995,
+        312.04046220000004,
+        311.98188539999995,
+        311.8333326,
+        311.52519299999994,
+        311.255802,
+        310.9737672,
+        310.8905604,
+        310.7447652,
+        310.5537192,
+        310.259547,
+        309.9435294,
+        309.6863538,
+        309.5564706,
+        309.2840238,
+        309.01166220000005,
+        308.743245,
+        308.4444108,
+        308.18314440000006,
+        307.91172659999995,
+        307.49901480000005,
+        307.36392179999996,
+        307.0649112,
+        306.7808154,
+        306.4749954,
+        306.092556,
+        305.799684,
+        305.5475682,
+        305.2216968,
+        304.9869084,
+        304.602126,
+        304.2915378,
+        304.0303848,
+        303.7264386,
+        303.4364208,
+        303.2680266,
+        303.0426822,
+        302.81394,
+        302.4340608,
+        302.0591922,
+        301.7059464,
+        301.3898814,
+        301.1839008,
+        301.0515078,
+        300.7598334,
+        300.3698712,
+        299.797872,
+        299.4549228,
+        299.1761712,
+        298.7734026,
+        298.2828954,
+        297.9560526,
+        297.6430806,
+        297.37884660000003,
+        297.179616,
+        296.7499044,
+        296.2832634,
+        296.00756820000004,
+        295.83988439999996,
+        295.640112,
+        295.3477938,
+        295.14265259999996,
+        294.9298248,
+        294.58874219999996,
+        294.19254,
+        293.8819944,
+        293.49951419999996,
+        293.21899559999997,
+        292.96640579999996,
+        292.4705844,
+        292.1814468,
+        291.97647600000005,
+        291.70117200000004,
+        291.4877718,
+        291.2320302,
+        291.0184926,
+        290.79181259999996,
+        290.6653752,
+        290.2387182,
+        290.0045748,
+        289.942488,
+        289.74746100000004,
+        289.6138194,
+        289.3677786,
+        289.2279624,
+        288.7593228,
+        288.5769714,
+        288.23350320000003,
+        287.97237720000004
+      ],
+      "threshold": 2000.0,
+      "threshold_label": "E-mail queue depth: custom rule threshold"
+    }
+  ],
+  "exclusions": [],
+  "explanation": {
+    "status": "succeeded",
+    "explanation": {
+      "summary": "2 finding(s) in the latest day; most severe: E-mail queue depth at or above 2000 (threshold) on checkout-api.",
+      "hypotheses": [
+        {
+          "text": "E-mail queue depth at or above 2000 (threshold) on checkout-api may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_f43c93bc1b235b5e"
+          ],
+          "likelihood": "possible"
+        },
+        {
+          "text": "Checkout failures above expected range on checkout-api may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_f5226c9499daf431"
+          ],
+          "likelihood": "possible"
+        }
+      ],
+      "investigation_steps": [
+        {
+          "text": "Open the evidence chart for E-mail queue depth at or above 2000 (threshold) and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_f43c93bc1b235b5e"
+          ]
+        },
+        {
+          "text": "Open the evidence chart for Checkout failures above expected range and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_f5226c9499daf431"
+          ]
+        }
+      ],
+      "uncertainty": "Template explanation; causes are not inferred from data.",
+      "provider": "fake",
+      "model": "deterministic-template",
+      "generated_at": "2026-09-30T10:05:00Z"
+    },
+    "reason": null,
+    "validation_notes": []
+  },
+  "custom_rules": [
+    {
+      "slug": "checkout_failures",
+      "title": "Checkout failures",
+      "description": "Orders the payment provider rejected; a rise usually means the provider or our card form is failing.",
+      "query": "sum by (job) (rate(shop_orders_failed_total[$__window]))",
+      "unit": "per_second",
+      "mode": "anomaly",
+      "direction": "up",
+      "threshold": null,
+      "critical_threshold": null,
+      "threshold_op": "above",
+      "min_duration_minutes": 15,
+      "min_change_factor": null,
+      "min_change": 0.05,
+      "max_severity": null,
+      "identity_labels": []
+    },
+    {
+      "slug": "email_queue",
+      "title": "E-mail queue depth",
+      "description": "Messages waiting for the mail relay; above 500 customers get order confirmations late.",
+      "query": "max by (job) (shop_email_queue_messages)",
+      "unit": "count",
+      "mode": "threshold",
+      "direction": "up",
+      "threshold": 500.0,
+      "critical_threshold": 2000.0,
+      "threshold_op": "above",
+      "min_duration_minutes": 10,
+      "min_change_factor": null,
+      "min_change": null,
+      "max_severity": null,
+      "identity_labels": []
+    }
+  ]
+}

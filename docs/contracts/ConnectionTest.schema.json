@@ -59,7 +59,8 @@
         "app_performance",
         "host_security",
         "file_integrity",
-        "alerting"
+        "alerting",
+        "custom"
       ],
       "title": "SignalFamily",
       "type": "string"

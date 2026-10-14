@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from app.domain.custom_rules import CustomRulePreview
 from app.domain.explanation import ExplanationInput
 from app.domain.jobs import (
     AnalysisJob,
@@ -20,7 +21,13 @@ from app.domain.jobs import (
     RuntimeConfig,
 )
 from app.domain.metrics import MetricCapability, MetricSeries
-from app.domain.projects import ConnectionTest, ConnectionTestRequest, ProjectInput, ProjectList
+from app.domain.projects import (
+    ConnectionTest,
+    ConnectionTestRequest,
+    CustomRulePreviewRequest,
+    ProjectInput,
+    ProjectList,
+)
 from app.domain.report import AnalysisReport, AnalysisRequest
 from app.main import create_app
 from app.settings import load_settings
@@ -41,6 +48,8 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "ProjectInput": ProjectInput,
     "ConnectionTestRequest": ConnectionTestRequest,
     "ConnectionTest": ConnectionTest,
+    "CustomRulePreviewRequest": CustomRulePreviewRequest,
+    "CustomRulePreview": CustomRulePreview,
     "RuntimeConfig": RuntimeConfig,
 }
 

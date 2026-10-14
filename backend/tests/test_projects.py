@@ -86,6 +86,7 @@ def test_crud_round_trip_and_persistence(tmp_path: Path) -> None:
                 "url": "http://vm.example:8428/select/0/prometheus",
                 "tls_verify": True,
                 "auth": {"type": "bearer", "token_set": True},
+                "custom_rules": [],
             }
         ]
         assert project["credentials_readable"] is True

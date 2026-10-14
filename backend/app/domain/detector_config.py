@@ -10,7 +10,7 @@ from pydantic import Field
 
 from app.domain.common import STEP_SECONDS, Contract
 
-DETECTOR_VERSION = "detectors-2026.10.12"
+DETECTOR_VERSION = "detectors-2026.10.14"
 CONFIG_HASH_HEX_CHARS = 12
 
 

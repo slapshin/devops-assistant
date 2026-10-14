@@ -1,5 +1,7 @@
 """RobustDetector: deterministic, AI-free implementation of the Detector interface (T005)."""
 
+import hashlib
+import json
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -18,8 +20,10 @@ from app.analysis.detect import (
     Episode,
     SeriesEvaluation,
     evaluate,
+    rule_thresholds,
 )
-from app.analysis.rules import SEVERITY_ORDER, Dir, RuleKind, format_value
+from app.analysis.rules import SEVERITY_ORDER, Dir, Rule, RuleKind, format_value
+from app.analysis.rules.custom import custom_rules as build_custom_rules
 from app.domain.common import (
     ConfidenceLevel,
     Entity,
@@ -30,6 +34,7 @@ from app.domain.common import (
     TimeRange,
     Unit,
 )
+from app.domain.custom_rules import CustomRule
 from app.domain.detector_config import DetectorConfig, SignalThresholds
 from app.domain.findings import (
     DailyTrend,
@@ -112,12 +117,15 @@ _CAPABILITY_RANK = {
 }
 
 
-def analysis_key(request: AnalysisRequest) -> str:
-    """Seed of finding/episode IDs; the project ID keeps projects with equal scopes apart."""
+def analysis_key(request: AnalysisRequest, custom_rules: Sequence[CustomRule] = ()) -> str:
+    """Seed of finding/episode IDs; the project ID keeps projects with equal scopes apart, and
+    the custom rules' definitions keep runs with edited rules apart."""
     scope = ",".join(f"{m.name}{m.op}{m.value}" for m in request.scope.matchers)
-    return (
-        f"{request.scope.project_id}|{scope}|{request.end_time.isoformat()}|{request.config_hash}"
-    )
+    key = f"{request.scope.project_id}|{scope}|{request.end_time.isoformat()}|{request.config_hash}"
+    if custom_rules:
+        payload = json.dumps([r.model_dump(mode="json") for r in custom_rules], sort_keys=True)
+        key += f"|custom={hashlib.sha256(payload.encode()).hexdigest()[:16]}"
+    return key
 
 
 def severity_from_points(points: int, cap: Severity | None) -> Severity:
@@ -148,6 +156,7 @@ def hosts_for(entity: Entity, mappings: dict[str, set[str]]) -> set[str]:
             | EntityKind.DISK
             | EntityKind.NETWORK_INTERFACE
             | EntityKind.CONTAINER
+            | EntityKind.CUSTOM
         ):
             return {labels["instance"]} if labels.get("instance") else set()
         case EntityKind.SERVICE:
@@ -195,9 +204,14 @@ class RobustDetector:
         collection: CollectionResult,
         config: DetectorConfig,
     ) -> DetectionResult:
-        key = analysis_key(request)
+        key = analysis_key(request, collection.custom_rules)
         step = windows.step_seconds
-        analysed = derive(collection.series, step, config.min_ratio_requests_per_step)
+        analysed = derive(
+            collection.series,
+            step,
+            config.min_ratio_requests_per_step,
+            build_custom_rules(collection.custom_rules),
+        )
         evaluations = [evaluate(s, config) for s in analysed]
 
         mappings: dict[str, set[str]] = defaultdict(set)
@@ -252,7 +266,7 @@ class RobustDetector:
     ) -> tuple[Finding, list[Evidence]]:
         s = ev.series
         rule = s.rule
-        th = config.signals.get(rule.thresholds) if rule.thresholds else None
+        th = rule_thresholds(rule, config)
         base = ev.baseline_for_step(ep.peak)
         start, end = at(ep.start), at(ep.end)
         fid = finding_id(key, s.entity.key, rule.name, start.isoformat())
@@ -269,7 +283,7 @@ class RobustDetector:
         if rule.name.endswith("latency_p95") and peak_value >= LATENCY_HISTOGRAM_TOP_SECONDS:
             attributes["latency_bound"] = ">= 10 s (top histogram bucket)"
 
-        evs = self._evidence(fid, ev, ep, windows, threshold, rule.label, config.z_threshold)
+        evs = self._evidence(fid, ev, ep, windows, threshold, rule, config.z_threshold)
         finding = Finding(
             finding_id=fid,
             detector=f"{rule.kind.value}:{rule.name}",
@@ -317,7 +331,7 @@ class RobustDetector:
     ) -> list[Reason]:
         reasons: list[Reason] = []
         base = ev.baseline_for_step(ep.peak)
-        is_level = ev.series.rule.kind is RuleKind.LEVEL
+        is_level = ev.series.rule.kind is RuleKind.LEVEL and ev.series.rule.relative
 
         if is_level and not baseline_ok:
             min_days = config.baseline_min_adequate_days
@@ -384,7 +398,7 @@ class RobustDetector:
         ep: Episode,
         windows: AnalysisWindows,
         threshold: float | None,
-        label: str,
+        rule: Rule,
         z_threshold: float,
     ) -> list[Evidence]:
         lo = max(0, ep.start - EVIDENCE_PAD_STEPS)
@@ -406,9 +420,7 @@ class RobustDetector:
                 lower=band(np.maximum(0.0, ev.median - spread)),
                 upper=band(ev.median + spread),
                 threshold=threshold,
-                threshold_label=(
-                    f"{label}: diagnostic heuristic (not an SLO)" if threshold is not None else None
-                ),
+                threshold_label=_threshold_label(rule, threshold),
             )
         ]
 
@@ -530,7 +542,11 @@ class RobustDetector:
                 for ev in fam_evs
                 if np.mean(~np.isnan(ev.values[LATEST_START:])) >= config.bucket_min_coverage
             ]
-            level_evaluated = [ev for ev in evaluated if ev.series.rule.kind is RuleKind.LEVEL]
+            level_evaluated = [
+                ev
+                for ev in evaluated
+                if ev.series.rule.kind is RuleKind.LEVEL and ev.series.rule.relative
+            ]
             days = [ev.baselines[0].days for ev in level_evaluated]
             baseline_days = int(np.median(days)) if days else None
 
@@ -588,6 +604,14 @@ class RobustDetector:
 
 
 # --- finding helpers ----------------------------------------------------------------------
+
+
+def _threshold_label(rule: Rule, threshold: float | None) -> str | None:
+    if threshold is None:
+        return None
+    if rule.custom:
+        return f"{rule.label}: custom rule threshold"
+    return f"{rule.label}: diagnostic heuristic (not an SLO)"
 
 
 def _finding_threshold(

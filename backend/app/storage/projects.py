@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from pydantic import SecretStr
 
 from app.domain.common import LabelMatcher, SourceKind, format_utc
+from app.domain.custom_rules import CustomRule
 from app.domain.ids import new_project_id
 from app.domain.projects import (
     WAZUH_MONITORING_INDEX_PATTERN,
@@ -229,6 +230,8 @@ class SqliteProjectRepository:
             "tls_verify": source.tls_verify,
             "auth": {"type": auth.type.value},
         }
+        if source.custom_rules:
+            config["custom_rules"] = [r.model_dump(mode="json") for r in source.custom_rules]
 
         def kept(field: str) -> dict[str, str]:
             stored_type = json.loads(stored.config)["auth"]["type"] if stored else None
@@ -553,7 +556,12 @@ def _source_view(
             view = BasicAuth(username=auth["username"], password_set=row.secrets is not None)
         case AuthType.NONE:
             view = NoAuth()
-    return PrometheusSource(url=config["url"], tls_verify=config["tls_verify"], auth=view)
+    return PrometheusSource(
+        url=config["url"],
+        tls_verify=config["tls_verify"],
+        auth=view,
+        custom_rules=_custom_rules(config),
+    )
 
 
 def _any_connection(
@@ -628,4 +636,9 @@ def _connection(config: dict[str, Any], secrets: dict[str, str]) -> PrometheusCo
         bearer_token=SecretStr(token) if token else None,
         basic_auth_user=auth.get("username"),
         basic_auth_password=SecretStr(password) if password else None,
+        custom_rules=_custom_rules(config),
     )
+
+
+def _custom_rules(config: dict[str, Any]) -> list[CustomRule]:
+    return [CustomRule.model_validate(r) for r in config.get("custom_rules", [])]

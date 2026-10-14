@@ -77,7 +77,7 @@ Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-ap
 
 ## Schema versions
 
-`AnalysisReport.schema_version = "2.4"` (2.2 added the optional matcher `op`, default `=`; 2.3 the optional `alert_instances` of series and findings; 2.4 the optional `error_kinds` of findings). Adding an optional field is a minor bump. Removing, renaming, or changing the meaning of a field is a major bump and needs a reader migration in T007. `DetectorConfig.version` (`detectors-2026.10.9`) and `config_hash` (the first 12 hex characters of the SHA-256 of the canonical config JSON) identify the calculation.
+`AnalysisReport.schema_version = "2.5"` (2.2 added the optional matcher `op`, default `=`; 2.3 the optional `alert_instances` of series and findings; 2.4 the optional `error_kinds` of findings; 2.5 the optional `custom_rules` the project's Prometheus source had when analysed). Adding an optional field is a minor bump. Removing, renaming, or changing the meaning of a field is a major bump and needs a reader migration in T007. `DetectorConfig.version` (`detectors-2026.10.14`) and `config_hash` (the first 12 hex characters of the SHA-256 of the canonical config JSON) identify the calculation.
 
 ## Fixtures
 

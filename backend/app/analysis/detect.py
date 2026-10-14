@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from app.analysis.baseline import STEPS_PER_DAY, Baseline, bucket_baseline
 from app.analysis.derive import AnalysisSeries, Array
-from app.analysis.rules import Dir, RuleKind
+from app.analysis.rules import Dir, Rule, RuleKind
 from app.domain.common import STEP_SECONDS
 from app.domain.detector_config import DetectorConfig, SignalThresholds
 from app.domain.findings import BaselineMode
@@ -78,9 +78,15 @@ class Episode:
         return {TREND_DAYS - 1 - t // STEPS_PER_DAY for t in range(self.start, self.end)}
 
 
+def rule_thresholds(rule: Rule, config: DetectorConfig) -> SignalThresholds | None:
+    """A custom rule's own thresholds, or the catalog rule's from the detector config."""
+    if rule.own_thresholds is not None:
+        return rule.own_thresholds
+    return config.signals.get(rule.thresholds) if rule.thresholds else None
+
+
 def _thresholds(series: AnalysisSeries, config: DetectorConfig) -> SignalThresholds | None:
-    key = series.rule.thresholds
-    return config.signals.get(key) if key else None
+    return rule_thresholds(series.rule, config)
 
 
 def _minutes_to_steps(minutes: int) -> int:
@@ -158,23 +164,33 @@ def _flags(
     abs_level = np.zeros(TREND_STEPS, dtype=np.int8)
     event = np.zeros(TREND_STEPS, dtype=bool)
     observed = ~np.isnan(values)
-    kind = series.rule.kind
+    rule = series.rule
+    kind = rule.kind
 
     if kind is RuleKind.EVENT:
         event = observed & (np.nan_to_num(values) >= EVENT_MIN_VALUE)
     elif kind is RuleKind.SHORTFALL:
         event = observed & (np.nan_to_num(values) >= SHORTFALL_MIN_VALUE)
     elif th is not None:
-        with np.errstate(invalid="ignore"):
-            up = _effect(values, median, z, th, config, up=True)
-            down = _effect(values, median, z, th, config, up=False)
-        rel = observed & ~np.isnan(z) & _directional(up, down, series.rule.direction)
+        if rule.relative:
+            with np.errstate(invalid="ignore"):
+                up = _effect(values, median, z, th, config, up=True)
+                down = _effect(values, median, z, th, config, up=False)
+            rel = observed & ~np.isnan(z) & _directional(up, down, rule.direction)
         if th.absolute_high is not None:
-            abs_level[observed & (np.nan_to_num(values) >= th.absolute_high)] = ABS_LEVEL_HIGH
+            abs_level[observed & _breached(values, th.absolute_high, rule)] = ABS_LEVEL_HIGH
         if th.absolute_critical is not None:
-            critical = observed & (np.nan_to_num(values) >= th.absolute_critical)
+            critical = observed & _breached(values, th.absolute_critical, rule)
             abs_level[critical] = ABS_LEVEL_CRITICAL
     return rel, abs_level, event
+
+
+def _breached(values: Array, threshold: float, rule: Rule) -> NDArray[np.bool_]:
+    """Observed steps at or beyond an absolute threshold (NaN steps never breach)."""
+    with np.errstate(invalid="ignore"):
+        if rule.absolute_below:
+            return np.asarray(values <= threshold, dtype=bool)
+        return np.asarray(values >= threshold, dtype=bool)
 
 
 def _directional(
@@ -241,10 +257,13 @@ def _episodes(
             idx = np.where(rel[seg], np.abs(np.nan_to_num(zs)), -1.0)
             peak = s + int(np.argmax(idx))
             peak_z: float | None = float(ev.z[peak])
+        elif ev.series.rule.absolute_below:
+            peak = s + int(np.nanargmin(np.nan_to_num(ev.values[seg], nan=np.inf)))
+            peak_z = None if np.isnan(ev.z[peak]) else float(ev.z[peak])
         else:
             peak = s + int(np.nanargmax(np.nan_to_num(ev.values[seg], nan=-np.inf)))
             peak_z = None if np.isnan(ev.z[peak]) else float(ev.z[peak])
-        up = peak_z is None or peak_z >= 0
+        up = peak_z >= 0 if peak_z is not None else not ev.series.rule.absolute_below
         episodes.append(Episode(s, e, n_flag, peak, n_rel, level, peak_z, up))
 
     for ep in episodes:

@@ -17,6 +17,7 @@ from app.domain.common import (
     TimeRange,
     UtcDatetime,
 )
+from app.domain.custom_rules import CustomRule
 from app.domain.explanation import ExplanationResult
 from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
 from app.domain.metrics import MetricCapability
@@ -80,7 +81,7 @@ class Exclusion(Reason):
 
 
 class AnalysisReport(Contract):
-    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4"] = REPORT_SCHEMA_VERSION
+    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4", "2.5"] = REPORT_SCHEMA_VERSION
     analysis_id: str
     scope: Scope
     windows: AnalysisWindows
@@ -102,6 +103,10 @@ class AnalysisReport(Contract):
     evidence: list[Evidence]
     exclusions: list[Exclusion]
     explanation: ExplanationResult
+    custom_rules: list[CustomRule] = Field(
+        default_factory=list,
+        description="The project's custom rules as they were when analysed (2.5).",
+    )
 
     @property
     def all_sources(self) -> list[SourceInfo]:

@@ -27,6 +27,9 @@ export type Hypothesis = Schemas["Hypothesis"];
 export type MetricSeries = Schemas["MetricSeries"];
 export type AlertInstanceActivity = Schemas["AlertInstanceActivity"];
 export type ErrorKindActivity = Schemas["ErrorKindActivity"];
+export type CustomRule = Schemas["CustomRule"];
+export type CustomRulePreview = Schemas["CustomRulePreview"];
+export type CustomRulePreviewRequest = Schemas["CustomRulePreviewRequest"];
 
 /** Error carrying an RFC 9457 problem body, or a synthetic one for network failures. */
 export class ApiError extends Error {

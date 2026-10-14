@@ -93,6 +93,7 @@ All settings come from environment (optionally the repository-root `config.env`,
 | `POST /api/projects` | Body `ProjectInput {name, description?, matchers: [{name, op, value}] (1–10; `op` is `=` (default), `!=`, `=~` or `!~`, regexes fully anchored RE2; at least one `=`/`=~` matcher that does not match an empty value), sources: [{kind: "prometheus", url, tls_verify, auth}]}` → `201 Project`. Name is unique case-insensitively → `409 project_name_taken`. |
 | `GET / PUT / DELETE /api/projects/{id}` | Read, full replace, hard delete (`204`; also deletes the project's analyses and reports; `409 project_busy` while one is queued or running). On PUT an omitted secret keeps the stored one when the auth type is unchanged; otherwise `422` names the missing field. |
 | `POST /api/projects/test-connection` | Body `{project_id?, matchers, source}` → `ConnectionTest {reachable, auth_ok, matched_series, history_days, families, message, checked_at}`. Bounded (20 s), read-only; `project_id` fills omitted secrets from the stored project. |
+| `POST /api/projects/custom-rules/preview` | Body `{project_id?, matchers, source, rule}` (Prometheus source) → `CustomRulePreview {ok, query, start, step_seconds, series_count, series[≤ 20], message}`: the rule over the last 24 h. Read-only; query errors are `ok: false` with the message, not a problem response. |
 | `GET /api/projects/{id}/health` | Cached (60 s, reset on update) connection test of the stored project; `null` without a metrics source. |
 | `POST /api/analyses` | Body `{project_id, end_time?}` → `202 {analysis}`; duplicate active job → `200 {analysis, duplicate_of_active: true}`. `409 source_not_configured` / `credentials_unreadable` when the project cannot be analysed. Jobs carry `daily_episodes` (14 values, oldest first) once a report is saved. |
 | `GET /api/analyses?project_id=&limit=&cursor=` | Saved/recent analyses, newest first (reopening reports). Default limit 20, max 100. |
@@ -128,7 +129,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 
 **Report schema version:** `schema_version: "1.0"`. Minor bumps add optional fields; major bumps require a reader migration. Readers must open every saved major version they claim to support, or return `report_unavailable` with `code=schema_unsupported` — never a crash.
 
-## 5. Numerical policy (detector config `detectors-2026.10.9`)
+## 5. Numerical policy (detector config `detectors-2026.10.14`)
 
 All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
@@ -219,6 +220,7 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 - Sentry transaction counts are extrapolated by Sentry from the client's trace sample rate; a changed sample rate shows up as a throughput change. Error events are counted as stored (after inbound filters and rate limits). Before the project's creation date values are unknown, never zero; a project without transactions in the last 24 h has its transaction signals `unsupported` ("tracing not set up").
 - Wazuh alerts are counted as indexed (level ≥ 3 by default, the manager's `log_alert_level`). An agent's values are unknown before its first alert in the 28-day window, never zero, so a new or long-quiet agent gets a short baseline instead of a fake quiet one. A search that timed out or failed on some shards is a failed chunk, never a partial count. Agents are never matched to Prometheus nodes by name.
 - Grafana alert state comes from the annotations state-history backend, replayed per instance: before an instance's first state change its state is that change's previous state, and an instance without changes keeps its current state (rules API) for the whole window. Per bucket a rule counts the matching instances that fired at any time in it. Paused intervals, and the time before the oldest retained change of a history that was truncated or not retained, are unknown, never quiet. Recurrence marks rules that fire every day. Instance labels (e.g. `project=shop`) are read from the annotation text, which keeps values exactly; annotation tags are lossy (`:` becomes `_`, long values are dropped) and only fill in labels when the text has none. Alert rules are never matched to Prometheus entities.
+- Custom rules (T020) are the project's own PromQL with the project's matchers injected into every selector. Their thresholds are the user's, not heuristics: findings say "(threshold)" and the evidence line is labelled as the rule's threshold. A threshold-only rule has no baseline, like a Grafana alert rule. Findings never depend on the rule's description; it only goes to the AI explanation as untrusted text.
 
 ### Severity (magnitude and duration only)
 

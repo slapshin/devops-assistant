@@ -19,7 +19,7 @@ from pydantic import (
     field_validator,
 )
 
-REPORT_SCHEMA_VERSION: Final = "2.4"
+REPORT_SCHEMA_VERSION: Final = "2.5"
 STEP_SECONDS = 300
 
 
@@ -203,17 +203,26 @@ class SignalFamily(StrEnum):
     """Wazuh file integrity monitoring (syscheck): files added, modified, or deleted."""
     ALERTING = "alerting"
     """Grafana alert rules defined by the team: firing instances, rules that cannot evaluate."""
+    CUSTOM = "custom"
+    """User-written PromQL rules of a project's Prometheus source (custom rules)."""
 
 
 _EDGE_FAMILIES = (SignalFamily.EDGE, SignalFamily.SECURITY)
 _APP_FAMILIES = (SignalFamily.APP_ERRORS, SignalFamily.APP_PERFORMANCE)
 _HOST_SECURITY_FAMILIES = (SignalFamily.HOST_SECURITY, SignalFamily.FILE_INTEGRITY)
 _ALERTING_FAMILIES = (SignalFamily.ALERTING,)
+# Custom rules are optional per project, so a failed source does not report them by default.
+_OPTIONAL_FAMILIES = (SignalFamily.CUSTOM,)
 SOURCE_FAMILIES: Final[dict[SourceKind, tuple[SignalFamily, ...]]] = {
     SourceKind.PROMETHEUS: tuple(
         f
         for f in SignalFamily
-        if f not in _EDGE_FAMILIES + _APP_FAMILIES + _HOST_SECURITY_FAMILIES + _ALERTING_FAMILIES
+        if f
+        not in _EDGE_FAMILIES
+        + _APP_FAMILIES
+        + _HOST_SECURITY_FAMILIES
+        + _ALERTING_FAMILIES
+        + _OPTIONAL_FAMILIES
     ),
     SourceKind.CLOUDFLARE: _EDGE_FAMILIES,
     SourceKind.SENTRY: _APP_FAMILIES,
@@ -269,6 +278,8 @@ class EntityKind(StrEnum):
     """A Wazuh agent (``agent.name``); never matched to Prometheus nodes."""
     ALERT_RULE = "alert_rule"
     """A Grafana-managed alert rule (by UID); its instances are counted, not matched to hosts."""
+    CUSTOM = "custom"
+    """A series of a custom rule, identified by the labels its query returns."""
 
 
 class Entity(Contract):

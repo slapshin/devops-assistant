@@ -230,6 +230,7 @@ def test_upgrade_creates_projects_and_keeps_reports(
                 "url": "https://vm.example/prometheus",
                 "tls_verify": True,
                 "auth": {"type": "bearer", "token_set": True},
+                "custom_rules": [],
             }
         ]
         assert project["latest_analysis"]["analysis_id"] == analysis_id

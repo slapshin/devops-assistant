@@ -1,6 +1,7 @@
 """Turn collected series into analysable series (ratios, event deltas, volume guards)."""
 
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -235,25 +236,32 @@ def _zero_where_observed(numerator: Array | None, denominator: Array) -> Array:
 
 
 def derive(
-    series: list[MetricSeries], step_seconds: int, min_requests: int
+    series: list[MetricSeries],
+    step_seconds: int,
+    min_requests: int,
+    custom: Mapping[str, Rule] | None = None,
 ) -> list[AnalysisSeries]:
+    """``custom``: a project's custom rules by signal name, analysed as collected."""
     by_signal: dict[str, dict[str, MetricSeries]] = defaultdict(dict)
     for s in series:
         by_signal[s.signal][s.entity.key] = s
 
-    out = _direct_series(by_signal)
+    out = _direct_series(by_signal, custom or {})
     out += _task_failure_series(by_signal)
     for spec in _TRAFFIC_SPECS:
         out += _traffic_series(by_signal, spec, step_seconds, min_requests)
     return out
 
 
-def _direct_series(by_signal: dict[str, dict[str, MetricSeries]]) -> list[AnalysisSeries]:
+def _direct_series(
+    by_signal: dict[str, dict[str, MetricSeries]], custom: Mapping[str, Rule]
+) -> list[AnalysisSeries]:
+    rules = {name: RULES[rule] for name, rule in DIRECT.items()} | dict(custom)
     out: list[AnalysisSeries] = []
-    for name in sorted(DIRECT.keys() & by_signal.keys()):
+    for name in sorted(rules.keys() & by_signal.keys()):
         for key in sorted(by_signal[name]):
             s = by_signal[name][key]
-            rule = RULES[DIRECT[name]]
+            rule = rules[name]
             attributes = {k: s.labels[k] for k in ATTRIBUTE_LABELS if k in s.labels}
             out.append(
                 AnalysisSeries(

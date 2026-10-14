@@ -1,4 +1,5 @@
 import type { AnalysisReport, ConnectionTest, LabelMatcher, Problem, ProjectInput, ProjectSummary, ReportSchedule, SourceInfo, SourceKind, Weekday } from "../api/client";
+import { type CustomRuleDraft, ruleDraftFrom, ruleInput, validateCustomRules } from "./customRules";
 
 /** Mirrors backend/app/domain/common.py and projects.py so most mistakes never reach the server. */
 const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -108,6 +109,8 @@ export interface ProjectDraft {
   token: string;
   username: string;
   password: string;
+  /** Custom rules of the Prometheus source, in collection order. */
+  customRules: CustomRuleDraft[];
   cloudflare: boolean;
   zoneId: string;
   /** Comma- or space-separated; empty analyses the whole zone. */
@@ -181,6 +184,7 @@ export function emptyDraft(): ProjectDraft {
     token: "",
     username: "",
     password: "",
+    customRules: [],
     cloudflare: false,
     zoneId: "",
     hostnames: "",
@@ -276,6 +280,7 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     token: "",
     username: auth?.type === "basic" ? auth.username : "",
     password: "",
+    customRules: (source?.custom_rules ?? []).map(ruleDraftFrom),
     cloudflare: !!cloudflare,
     zoneId: cloudflare?.zone_id ?? "",
     hostnames: cloudflare?.hostnames.join(", ") ?? "",
@@ -589,19 +594,29 @@ export function validateDraft(
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
-  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...validateCloudflare(draft, cfTokenStored), ...validateSentry(draft, sentryTokenStored), ...validateWazuh(draft, wazuhPasswordStored), ...validateGrafana(draft, grafanaTokenStored), ...validateSchedule(draft), ...validateRetention(draft) };
+  const rules = draft.url.trim() ? validateCustomRules(draft.customRules) : {};
+  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...rules, ...validateCloudflare(draft, cfTokenStored), ...validateSentry(draft, sentryTokenStored), ...validateWazuh(draft, wazuhPasswordStored), ...validateGrafana(draft, grafanaTokenStored), ...validateSchedule(draft), ...validateRetention(draft) };
 }
 
 type SourceInput = NonNullable<ProjectInput["sources"]>[number];
 
-export function prometheusInput(draft: ProjectDraft): SourceInput {
+type PrometheusSourceInput = Extract<SourceInput, { kind: "prometheus" }>;
+
+export function prometheusInput(draft: ProjectDraft): PrometheusSourceInput {
   const auth =
     draft.authType === "bearer"
       ? { type: "bearer" as const, ...(draft.token ? { token: draft.token } : {}) }
       : draft.authType === "basic"
         ? { type: "basic" as const, username: draft.username.trim(), ...(draft.password ? { password: draft.password } : {}) }
         : { type: "none" as const };
-  return { kind: "prometheus", url: draft.url.trim(), tls_verify: draft.tlsVerify, auth };
+  return {
+    kind: "prometheus",
+    url: draft.url.trim(),
+    tls_verify: draft.tlsVerify,
+    auth,
+    // Omitted is the same as none, so drafts without rules send what they always did.
+    ...(draft.customRules.length ? { custom_rules: draft.customRules.map(ruleInput) } : {}),
+  };
 }
 
 export function cloudflareInput(draft: ProjectDraft): SourceInput {

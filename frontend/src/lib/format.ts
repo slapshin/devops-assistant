@@ -30,10 +30,17 @@ export function formatValue(value: number | null | undefined, unit: string): str
     case "requests_per_second":
       return `${value.toFixed(2)} req/s`;
     case "per_second":
-      return `${value.toPrecision(3)}/s`;
+      return `${formatNumber(value)}/s`;
     default:
-      return value.toPrecision(3);
+      return formatNumber(value);
   }
+}
+
+/** From here on, numbers are shown whole instead of in exponent notation (2000, not 2.00e+3). */
+const LARGE_NUMBER = 1000;
+
+function formatNumber(value: number): string {
+  return Math.abs(value) >= LARGE_NUMBER ? value.toFixed(0) : value.toPrecision(3);
 }
 
 function formatBytes(value: number): string {
@@ -120,6 +127,7 @@ export const FAMILY_LABELS: Record<string, string> = {
   host_security: "Host security (Wazuh)",
   file_integrity: "File integrity (Wazuh)",
   alerting: "Alerting (Grafana)",
+  custom: "Custom rules",
 };
 
 export const STATUS_LABELS: Record<string, { label: string; icon: string }> = {

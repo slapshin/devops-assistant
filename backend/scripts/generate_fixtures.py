@@ -14,6 +14,7 @@ import random
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -36,6 +37,7 @@ from app.domain.common import (
     Unit,
     format_utc,
 )
+from app.domain.custom_rules import CustomRulePreview
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import (
     Explanation,
@@ -101,6 +103,8 @@ from app.sources.cloudflare.source import CloudflareMetricsSource
 from app.sources.cloudflare.synthetic import SyntheticCloudflareApi
 from app.sources.grafana.source import GrafanaMetricsSource
 from app.sources.grafana.synthetic import SyntheticGrafanaApi
+from app.sources.prometheus.synthetic import DEMO_CUSTOM_RULES, SyntheticMetricsSource
+from app.sources.prometheus.synthetic import SCENARIOS as PROMETHEUS_SCENARIOS
 from app.sources.sentry.source import SentryMetricsSource
 from app.sources.sentry.synthetic import SyntheticSentryApi
 from app.sources.wazuh.source import WazuhMetricsSource
@@ -1054,6 +1058,7 @@ def build() -> dict[str, BaseModel]:
         "reports/report_sentry.json": sentry_report(),
         "reports/report_wazuh.json": wazuh_report(),
         "reports/report_grafana.json": grafana_report(),
+        "reports/report_custom_rules.json": custom_rules_report(),
         "jobs/job_running.json": job(
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
@@ -1130,6 +1135,7 @@ def build() -> dict[str, BaseModel]:
         "api/connection_test_sentry.json": sentry_connection_test(),
         "api/connection_test_wazuh.json": wazuh_connection_test(),
         "api/connection_test_grafana.json": grafana_connection_test(),
+        "api/custom_rule_preview.json": custom_rule_preview(),
         "api/problem_queue_full.json": Problem(
             title="Analysis queue is full",
             status=429,
@@ -1217,6 +1223,34 @@ def grafana_report() -> AnalysisReport:
         project_id="01999a3c-0000-7000-8000-0000000000e1", project_name="Shop alerts", matchers=[]
     )
     return pipeline_report(OpenedSource(SourceKind.GRAFANA, source), project, GRAFANA_ANALYSIS_ID)
+
+
+CUSTOM_RULES_ANALYSIS_ID = "01999a3c-0000-7000-8000-0000000000e8"
+
+
+def custom_rules_report() -> AnalysisReport:
+    """A Prometheus project with the demo custom rules breaching, otherwise healthy (T020)."""
+    scenario = replace(PROMETHEUS_SCENARIOS["healthy"], custom_incident=True)
+    source = SyntheticMetricsSource(scenario, DEMO_CUSTOM_RULES)
+    project = Scope(
+        project_id="01999a3c-0000-7000-8000-0000000000e1",
+        project_name="Shop custom rules",
+        matchers=[LabelMatcher(name="project", value="shop")],
+    )
+    return pipeline_report(
+        OpenedSource(SourceKind.PROMETHEUS, source), project, CUSTOM_RULES_ANALYSIS_ID
+    )
+
+
+def custom_rule_preview() -> CustomRulePreview:
+    """Preview of the demo e-mail queue rule against the synthetic incident scenario (T020)."""
+    scope = Scope(
+        project_id="draft",
+        project_name="Connection test",
+        matchers=[LabelMatcher(name="project", value="shop")],
+    )
+    source = SyntheticMetricsSource("incident")
+    return asyncio.run(source.preview_rule(DEMO_CUSTOM_RULES[1], scope, T, STEP_SECONDS))
 
 
 def pipeline_report(opened: OpenedSource, scope: Scope, analysis_id: str) -> AnalysisReport:

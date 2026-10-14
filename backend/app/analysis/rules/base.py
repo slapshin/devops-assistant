@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.common import Severity, SignalFamily, Unit
+from app.domain.detector_config import SignalThresholds
 
 
 class RuleKind(StrEnum):
@@ -36,10 +37,20 @@ class Rule:
     event_points: int = 0
     title_up: str | None = None
     title_down: str | None = None
+    own_thresholds: SignalThresholds | None = None
+    """Thresholds of a custom rule; catalog rules name theirs in the detector config."""
+    relative: bool = True
+    """Whether baseline deviations count; False for threshold-only custom rules."""
+    absolute_below: bool = False
+    """The absolute thresholds are breached at or below the value (custom rules)."""
+    custom: bool = False
+    """A user-defined rule: its thresholds are the user's, not diagnostic heuristics."""
 
     def title(self, *, up: bool, threshold: float | None, unit: Unit) -> str:
         if threshold is not None and self.kind is RuleKind.LEVEL:
-            return f"{self.label} at or above {format_value(threshold, unit)} (heuristic)"
+            side = "below" if self.absolute_below else "above"
+            note = "threshold" if self.custom else "heuristic"
+            return f"{self.label} at or {side} {format_value(threshold, unit)} ({note})"
         if self.kind is not RuleKind.LEVEL:
             return self.title_up or self.label
         custom = self.title_up if up else self.title_down
@@ -65,9 +76,17 @@ def format_value(value: float, unit: Unit) -> str:
         case Unit.REQUESTS_PER_SECOND:
             return f"{value:.2f} req/s"
         case Unit.PER_SECOND:
-            return f"{value:.3g}/s"
+            return f"{_number(value)}/s"
         case _:
-            return f"{value:.3g}"
+            return _number(value)
+
+
+LARGE_NUMBER = 1000
+"""From here on, numbers are shown whole instead of in exponent notation (2000, not 2e+03)."""
+
+
+def _number(value: float) -> str:
+    return f"{value:.0f}" if abs(value) >= LARGE_NUMBER else f"{value:.3g}"
 
 
 def _bytes(value: float) -> str:

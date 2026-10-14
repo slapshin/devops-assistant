@@ -8,6 +8,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.domain.common import Entity, EntityKind, MatchOp, Scope, SignalFamily
+from app.domain.custom_rules import (
+    PREVIEW_MAX_SERIES,
+    CustomRule,
+    CustomRulePreview,
+    CustomRulePreviewSeries,
+)
 from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
@@ -24,14 +30,14 @@ from app.domain.report import AnalysisWindows, Exclusion, SourceInfo
 from app.sources.base import HISTORY_DAYS
 from app.sources.prometheus.catalog import (
     ALL_REQUIRED_METRICS,
-    BY_SIGNAL,
     CATALOG,
     CATALOG_VERSION,
     TRAFFIC_SIGNALS,
     SignalDef,
 )
 from app.sources.prometheus.client import PrometheusClient, RangeResult
-from app.sources.prometheus.promql import assert_scoped, scope_matchers
+from app.sources.prometheus.custom import custom_identity, custom_signal, custom_signals
+from app.sources.prometheus.promql import ScopeViolation, assert_scoped, scope_matchers
 
 log = logging.getLogger("app.sources.prometheus")
 
@@ -59,12 +65,14 @@ def scope_labels(scope: Scope) -> dict[str, str]:
     return {m.name: m.value for m in scope.matchers if m.op is MatchOp.EQUAL}
 
 
-def entity_for(defn: SignalDef, labels: dict[str, str]) -> Entity:
+def entity_for(defn: SignalDef, labels: dict[str, str], scope: Scope | None = None) -> Entity:
+    """``scope`` is needed for custom rules without identity labels (their labels minus it)."""
+    identity = defn.identity
+    if defn.entity_kind is EntityKind.CUSTOM and scope is not None:
+        identity = custom_identity(defn, labels, scope)
     # Absent optional labels are left out, so entities without them keep their key and labels.
     ident = {
-        k: labels.get(k, "")
-        for k in defn.identity
-        if k not in defn.optional_labels or labels.get(k)
+        k: labels.get(k, "") for k in identity if k not in defn.optional_labels or labels.get(k)
     }
     key = f"{defn.entity_kind.value}|" + "|".join(f"{k}={v}" for k, v in ident.items())
     match defn.entity_kind:
@@ -81,6 +89,8 @@ def entity_for(defn: SignalDef, labels: dict[str, str]) -> Entity:
         case EntityKind.PROXY | EntityKind.DATABASE:
             # Traefik routers and services are often named alike; show each value once.
             name = " · ".join(dict.fromkeys(v for v in ident.values() if v))
+        case EntityKind.CUSTOM:
+            name = " · ".join(v for v in ident.values() if v) or defn.description or defn.signal
         case EntityKind.UPSTREAM:
             name = f"{ident['job']} · " + " → ".join(v for k, v in ident.items() if k != "job")
         case EntityKind.ROUTE if "rpc_method" in ident:
@@ -102,10 +112,14 @@ class PrometheusMetricsSource:
         client: PrometheusClient,
         budget: CollectionBudget | None = None,
         now: Callable[[], datetime] | None = None,
+        custom_rules: Sequence[CustomRule] = (),
     ) -> None:
         self.client = client
         self.budget = budget or CollectionBudget()
         self._now = now or (lambda: datetime.now(UTC))
+        self.custom_rules = list(custom_rules)
+        self.custom = custom_signals(self.custom_rules)
+        self.catalog = (*CATALOG, *self.custom)
 
     # --- discovery ------------------------------------------------------------------------
 
@@ -122,7 +136,8 @@ class PrometheusMetricsSource:
     async def capabilities(self, scope: Scope, windows: AnalysisWindows) -> list[MetricCapability]:
         at = _ts(windows.end_time)
         s = scope_matchers(scope)
-        names_regex = "|".join(ALL_REQUIRED_METRICS)
+        custom_metrics = {m for d in self.custom for m in d.required_metrics}
+        names_regex = "|".join(sorted({*ALL_REQUIRED_METRICS, *custom_metrics}))
         present = {
             r.labels.get("__name__", "")
             for r in await self._instant(
@@ -135,6 +150,8 @@ class PrometheusMetricsSource:
         caps: list[MetricCapability] = []
         for defn in CATALOG:
             caps.append(await self._capability(defn, scope, at, present, history_days, gate_cache))
+        for defn in self.custom:
+            caps.append(await self._custom_capability(defn, scope, at, present, history_days))
         return _mark_mean_latency_fallback(caps)
 
     async def _history_days(self, scope: Scope, at: int) -> float | None:
@@ -193,6 +210,43 @@ class PrometheusMetricsSource:
             history_days=history_days,
         )
 
+    async def _custom_capability(
+        self,
+        defn: SignalDef,
+        scope: Scope,
+        at: int,
+        present: set[str],
+        history_days: float | None,
+    ) -> MetricCapability:
+        """A custom rule is supported when its metrics exist and its query runs."""
+        base = {
+            "family": defn.family,
+            "signal": defn.signal,
+            "verified": True,
+            "required_metrics": list(defn.required_metrics),
+            "required_labels": [*scope.label_names, *defn.identity],
+        }
+
+        def unsupported(reason: str) -> MetricCapability:
+            return MetricCapability(**base, status=CapabilityStatus.UNSUPPORTED, reason=reason)
+
+        if missing := [m for m in defn.required_metrics if m not in present]:
+            return unsupported(f"Not found in this scope: {', '.join(missing)}.")
+        try:
+            results = await self._instant(defn.query.render(scope), scope, at)
+        except ScopeViolation as exc:
+            return unsupported(f"Query cannot be scoped: {exc}")
+        except SourceError as exc:
+            return unsupported(f"Query failed: {exc.message}")
+        if not results and not defn.required_metrics:
+            return unsupported("The query returned no series.")
+        return MetricCapability(
+            **base,
+            status=CapabilityStatus.SUPPORTED,
+            observed_metrics=list(defn.required_metrics),
+            history_days=history_days,
+        )
+
     async def _container_coverage(
         self, scope: Scope, at: int
     ) -> tuple[CapabilityStatus, str | None]:
@@ -217,6 +271,26 @@ class PrometheusMetricsSource:
             )
         return CapabilityStatus.SUPPORTED, None
 
+    async def preview_rule(
+        self, rule: CustomRule, scope: Scope, end_time: datetime, step: int
+    ) -> CustomRulePreview:
+        """The rule's series over the 24 h before ``end_time``; errors become a message."""
+        defn = custom_signal(rule)
+        start = end_time - timedelta(days=1)
+        try:
+            query = defn.query.render(scope)
+        except ScopeViolation as exc:
+            return failed_preview(None, start, step, f"Query cannot be scoped: {exc}")
+        try:
+            results = await self.client.query_range(query, _ts(start) + step, _ts(end_time), step)
+        except SourceError as exc:
+            return failed_preview(query, start, step, exc.message)
+
+        results = self._scoped_results(results, scope, defn, [])
+        size = SECONDS_PER_DAY // step
+        grids = [(dict(r.labels), _to_grid(r, _ts(start), step, size)) for r in results]
+        return preview_from_grids(defn, scope, query, start, step, grids)
+
     # --- collection -----------------------------------------------------------------------
 
     async def collect(
@@ -234,7 +308,7 @@ class PrometheusMetricsSource:
             step=step,
             size=int((windows.end_time - grid_start).total_seconds()) // step,
         )
-        plan = _collection_plan(capabilities)
+        plan = _collection_plan(capabilities, self.catalog)
 
         exclusions: list[Exclusion] = []
         series: list[MetricSeries] = []
@@ -287,7 +361,12 @@ class PrometheusMetricsSource:
             len(exclusions),
             self.client.request_count,
         )
-        return CollectionResult(series=series, exclusions=exclusions, mappings=mappings)
+        return CollectionResult(
+            series=series,
+            exclusions=exclusions,
+            mappings=mappings,
+            custom_rules=self.custom_rules,
+        )
 
     async def _collect_signal(
         self,
@@ -331,7 +410,7 @@ class PrometheusMetricsSource:
 
         out: list[MetricSeries] = []
         for labels, values in grids:
-            entity = entity_for(defn, dict(labels))
+            entity = entity_for(defn, dict(labels), scope)
             out.append(
                 MetricSeries(
                     series_id=series_id(query, entity.key),
@@ -367,6 +446,8 @@ class PrometheusMetricsSource:
                     message=f"{defn.signal}: dropped {len(results) - len(kept)} foreign series",
                 )
             )
+        if not defn.identity:  # a custom rule identified by all its labels
+            return sorted(kept, key=lambda r: sorted(r.labels.items()))
         return sorted(kept, key=lambda r: tuple(r.labels.get(k, "") for k in defn.identity))
 
     def _limit_routes(
@@ -493,6 +574,55 @@ class PrometheusMetricsSource:
         }
 
 
+def failed_preview(
+    query: str | None, start: datetime, step: int, message: str
+) -> CustomRulePreview:
+    return CustomRulePreview(
+        ok=False,
+        query=query,
+        start=start,
+        step_seconds=step,
+        series_count=0,
+        series=[],
+        message=message,
+    )
+
+
+def preview_from_grids(
+    defn: SignalDef,
+    scope: Scope,
+    query: str,
+    start: datetime,
+    step: int,
+    grids: Sequence[tuple[dict[str, str], list[float | None]]],
+) -> CustomRulePreview:
+    series = []
+    for labels, values in grids[:PREVIEW_MAX_SERIES]:
+        observed = [v for v in values if v is not None]
+        series.append(
+            CustomRulePreviewSeries(
+                entity=entity_for(defn, labels, scope),
+                values=values,
+                latest=observed[-1] if observed else None,
+            )
+        )
+    if not grids:
+        message: str | None = "The query returned no series in the last 24 h."
+    elif len(grids) > PREVIEW_MAX_SERIES:
+        message = f"Showing {PREVIEW_MAX_SERIES} of {len(grids)} series."
+    else:
+        message = None
+    return CustomRulePreview(
+        ok=True,
+        query=query,
+        start=start,
+        step_seconds=step,
+        series_count=len(grids),
+        series=series,
+        message=message,
+    )
+
+
 @dataclass(frozen=True)
 class _Grid:
     """The regular collection grid: ``size`` steps of ``step`` seconds from ``start``."""
@@ -502,21 +632,20 @@ class _Grid:
     size: int
 
 
-def _collection_plan(capabilities: Sequence[MetricCapability]) -> list[SignalDef]:
+def _collection_plan(
+    capabilities: Sequence[MetricCapability], catalog: Sequence[SignalDef] = CATALOG
+) -> list[SignalDef]:
     """Signals to query, traffic first: traffic decides which routes are analysed individually."""
+    by_signal = {d.signal: d for d in catalog}
     plan = [
-        BY_SIGNAL[c.signal]
+        by_signal[c.signal]
         for c in capabilities
         if c.status in (CapabilityStatus.SUPPORTED, CapabilityStatus.PARTIAL)
-        and c.signal in BY_SIGNAL
+        and c.signal in by_signal
         and not _is_mean_latency_fallback(c)
     ]
-    plan.sort(
-        key=lambda d: (
-            d.signal not in TRAFFIC_SIGNALS,
-            CATALOG.index(d),
-        )
-    )
+    order = {d.signal: i for i, d in enumerate(catalog)}
+    plan.sort(key=lambda d: (d.signal not in TRAFFIC_SIGNALS, order[d.signal]))
     return plan
 
 

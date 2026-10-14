@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "CustomRulePreviewSeries": {
+      "additionalProperties": false,
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/Entity"
+        },
+        "latest": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Newest observed value.",
+          "title": "Latest"
+        },
+        "values": {
+          "description": "The last 24 h on the analysis step grid.",
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "entity",
+        "values",
+        "latest"
+      ],
+      "title": "CustomRulePreviewSeries",
+      "type": "object"
+    },
+    "Entity": {
+      "additionalProperties": false,
+      "description": "Resource identity built from actual labels only; never inferred across namespaces.",
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "key": {
+          "description": "Stable canonical key, e.g. 'node|job=node|instance=shop-production'.",
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntityKind"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Identity labels only (no scope matchers).",
+          "title": "Labels",
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "display_name",
+        "labels"
+      ],
+      "title": "Entity",
+      "type": "object"
+    },
+    "EntityKind": {
+      "enum": [
+        "node",
+        "filesystem",
+        "disk",
+        "network_interface",
+        "container",
+        "service",
+        "route",
+        "proxy",
+        "upstream",
+        "database",
+        "zone",
+        "application",
+        "agent",
+        "alert_rule",
+        "custom"
+      ],
+      "title": "EntityKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of POST /api/projects/custom-rules/preview: what the rule's query returns.",
+  "properties": {
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "ok": {
+      "description": "False when the query could not be scoped or run.",
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "query": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The query as run, with the project's matchers.",
+      "title": "Query"
+    },
+    "series": {
+      "description": "At most 20 series, ordered by identity.",
+      "items": {
+        "$ref": "#/$defs/CustomRulePreviewSeries"
+      },
+      "title": "Series",
+      "type": "array"
+    },
+    "series_count": {
+      "description": "Series the query returned (in scope).",
+      "minimum": 0,
+      "title": "Series Count",
+      "type": "integer"
+    },
+    "start": {
+      "description": "Time of the first value of every series.",
+      "title": "Start",
+      "type": "string"
+    },
+    "step_seconds": {
+      "title": "Step Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "ok",
+    "query",
+    "start",
+    "step_seconds",
+    "series_count",
+    "series"
+  ],
+  "title": "CustomRulePreview",
+  "type": "object"
+}

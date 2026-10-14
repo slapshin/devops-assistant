@@ -3,10 +3,11 @@
 import json
 import re
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from app.analysis.rules import format_value
 from app.domain.common import Entity, Scope, SignalFamily, TimeRange
+from app.domain.custom_rules import CustomRule, ThresholdOp
 from app.domain.explanation import ExplanationInput, FindingDigest
 from app.domain.findings import Finding, SignalCoverage, SignalStatus
 
@@ -20,6 +21,7 @@ MAX_REASONS_PER_SIGNAL = 2
 MAX_COVERAGE_SUMMARY_CHARS = 4000
 MAX_ALERT_INSTANCES = 5
 MAX_ERROR_KINDS = 5
+MAX_RULE_DESCRIPTION_CHARS = 500
 # Control and format characters (incl. zero-width and bidi overrides) are removed *after*
 # redaction, so they can neither split a secret away from its pattern nor survive into output.
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
@@ -84,7 +86,9 @@ def _entity(entity: Entity) -> Entity:
     )
 
 
-def digest(finding: Finding) -> FindingDigest:
+def digest(finding: Finding, rules: Mapping[str, CustomRule] | None = None) -> FindingDigest:
+    """``rules``: the project's custom rules by signal, for their descriptions."""
+    rule = (rules or {}).get(finding.signal)
     unit = finding.observed.unit
     return FindingDigest(
         finding_id=finding.finding_id,
@@ -96,7 +100,7 @@ def digest(finding: Finding) -> FindingDigest:
         start=finding.start,
         end=finding.end,
         observed=format_value(finding.observed.value, unit),
-        expected=_expected_text(finding),
+        expected=_expected_text(finding, rule),
         related_finding_ids=list(finding.related_finding_ids),
         host=clean(finding.attributes["host"]) if "host" in finding.attributes else None,
         alert_instances=[
@@ -111,10 +115,15 @@ def digest(finding: Finding) -> FindingDigest:
             )
             for k in finding.error_kinds[:MAX_ERROR_KINDS]
         ],
+        rule_description=(
+            clean(rule.description, MAX_RULE_DESCRIPTION_CHARS)
+            if rule is not None and rule.description
+            else None
+        ),
     )
 
 
-def _expected_text(finding: Finding) -> str | None:
+def _expected_text(finding: Finding, rule: CustomRule | None = None) -> str | None:
     unit = finding.observed.unit
     if finding.expected is not None:
         expected = finding.expected
@@ -122,6 +131,9 @@ def _expected_text(finding: Finding) -> str | None:
             f"{format_value(expected.median, unit)} (normal range "
             f"{format_value(expected.lower, unit)}-{format_value(expected.upper, unit)})"
         )
+    if finding.threshold is not None and rule is not None:
+        side = "above" if rule.threshold_op is ThresholdOp.BELOW else "below"
+        return f"{side} custom rule threshold {format_value(finding.threshold, unit)}"
     if finding.threshold is not None:
         return f"below heuristic threshold {format_value(finding.threshold, unit)}"
     return None
@@ -148,12 +160,14 @@ def build_input(
     coverage: Sequence[SignalCoverage],
     max_findings: int = MAX_FINDINGS,
     max_chars: int = MAX_INPUT_CHARS,
+    custom_rules: Sequence[CustomRule] = (),
 ) -> tuple[ExplanationInput, list[str]]:
     """Return the bounded input plus notes about anything omitted to fit the budget."""
     notes: list[str] = []
     if len(findings) > max_findings:
         notes.append(f"Only the {max_findings} most severe of {len(findings)} findings were sent.")
-    digests = [digest(f) for f in list(findings)[:max_findings]]
+    rules = {r.signal: r for r in custom_rules}
+    digests = [digest(f, rules) for f in list(findings)[:max_findings]]
     summary = coverage_summary(coverage)
 
     # Drop the least severe findings until the rendered input fits the character budget.

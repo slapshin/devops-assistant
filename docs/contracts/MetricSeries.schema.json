@@ -115,7 +115,8 @@
         "zone",
         "application",
         "agent",
-        "alert_rule"
+        "alert_rule",
+        "custom"
       ],
       "title": "EntityKind",
       "type": "string"
@@ -140,7 +141,8 @@
         "app_performance",
         "host_security",
         "file_integrity",
-        "alerting"
+        "alerting",
+        "custom"
       ],
       "title": "SignalFamily",
       "type": "string"

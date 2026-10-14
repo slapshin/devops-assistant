@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4",
+  "schema_version": "2.5",
   "analysis_id": "01999a2b-0000-7000-8000-000000000001",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -30,8 +30,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.12",
-  "config_hash": "c4a54d8530cd",
+  "detector_version": "detectors-2026.10.14",
+  "config_hash": "c08803ea6db8",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -424,6 +424,15 @@
       "total_series": 2,
       "baseline_days": 14,
       "reasons": []
+    },
+    {
+      "family": "custom",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
     }
   ],
   "findings": [],
@@ -683,5 +692,6 @@
     "explanation": null,
     "reason": null,
     "validation_notes": []
-  }
+  },
+  "custom_rules": []
 }
