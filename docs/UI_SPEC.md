@@ -11,6 +11,7 @@ Interface language: English (default; strings are kept in one module so they can
 | `/` | **Projects**: one card per project with health, latest report, 14-day trend and Run (T013) |
 | `/projects/new`, `/projects/new?from=:projectId`, `/projects/:projectId/edit` | **Project form**: labels, source, Test connection, clone, delete |
 | `/projects/:projectId` | **Project**: configuration, Run, analysis history |
+| `/credentials` | **Shared credentials**: secrets used by sources of many projects (T021) |
 | `/analyses/:id` | **Job progress**; switches to the report route when a report exists |
 | `/reports/:id` | **Overview** (default report tab) |
 | `/reports/:id/findings` | **Findings** list; `?category=&severity=&entity=` filters live in the URL |
@@ -58,6 +59,7 @@ Replaces the original start view (project/env selectors). Screenshots: `docs/scr
 
 - Name and optional description.
 - **Prometheus-compatible metrics** — **Labels**: rows of `name <op> value`, with an operator select (`=`, `!=`, `=~`, `!~`; default `=`) (add/remove, up to 10; at least one once a URL is set, and rows without a value are ignored while there is no URL). Client validation mirrors the server: label name syntax, reserved `__` prefix, duplicates, required values, and at least one `=`/`=~` row; regex syntax (RE2) and regexes matching an empty value are checked by the server (shown on the row and under the labels respectively). URL (no credentials, query or fragment; `synthetic://<scenario>` allowed; empty means no source), TLS verification, and authentication (none, bearer, basic). Secret inputs are write-only. When a secret of the chosen type is stored, the placeholder reads "Stored — leave empty to keep" and an empty input keeps it. Switching the type requires the new secret.
+- **Authentication of every source** (T021) is one editor showing the kind's own mechanisms. Prometheus: none, bearer, basic. Cloudflare: API token. Sentry: auth token. Wazuh: username and password, empty for none. Grafana: service account token. Once a credential of the kind exists, the editor also offers *Shared credential*: choose one from a list, with a link to the credentials page. *Save as shared credential…* next to a typed secret asks for a name, creates the credential and switches the source to it.
 - **Cloudflare**: *Analyse a Cloudflare zone* reveals Zone ID (32 hex), optional hostnames (comma/space separated, normalised to lower case), the write-only API token ("Stored — leave empty to keep"; not needed for `synthetic://`), and an *Advanced* API URL. Server `422` errors on `sources.<i>` map back to the source they belong to.
 - **Sentry**: *Analyse a Sentry project* reveals Organization, *Sentry projects* (up to 10 slugs, comma/space separated, normalised to lower case), an optional Environment (empty = all), optional *Tag filters* as `key = value` rows (add/remove, up to 10; key syntax, duplicates and required values are checked; completely empty rows are ignored), the write-only Auth token ("Stored — leave empty to keep"; not needed for `synthetic://`), and an *Advanced* Sentry URL (`https://de.sentry.io` for EU organizations, or self-hosted).
 - **Wazuh**: *Analyse Wazuh agents* reveals the Indexer URL, TLS verification, *Agents* (up to 50 names, comma/space separated, case kept), *Agent groups* (up to 10, resolved from the dashboard's monitoring index; a *Monitoring index pattern* field appears once a group is entered), *Agent labels* as `key = value` rows (up to 10; at least one agent, group or label is required), the alerts index pattern, Username and the write-only Password ("Stored — leave empty to keep"; not needed for `synthetic://`).
@@ -67,6 +69,17 @@ Replaces the original start view (project/env selectors). Screenshots: `docs/scr
 - **Schedule**: *Generate a report automatically* reveals a time (`HH:MM`), a time zone (IANA name with suggestions; defaults to the browser's zone) and weekday checkboxes (all checked by default; at least one required). Server `422` errors (e.g. an unknown time zone) map back to the field. Without a source a note says scheduled runs are skipped.
 - **Report retention**: *Keep only the latest reports* reveals *Reports to keep* (1–1000, default 10). Older analyses and their reports are deleted automatically after each analysis; saving a lower number deletes the excess right away.
 - **Delete** (edit only): states how many saved reports will be removed, is disabled while an analysis is queued or running, and requires typing the project name before *Delete permanently* is enabled.
+
+### Shared credentials (T021)
+
+*Shared credentials* in the rail opens `/credentials`.
+- **Table**: name (with description), source kind, mechanism (with the basic-auth username), the projects using it (links), and when it was last updated.
+- ***New credential* / *Edit***: an inline form with name, optional description, source kind and the kind's secret mechanisms (the same editor as in project sources, without *None* or *Shared credential*).
+  - On edit, an empty secret keeps the stored one ("Stored — leave empty to keep").
+  - The kind is locked while the credential is in use.
+- ***Delete…***: asks for confirmation; a credential in use shows the server's reason, naming the projects.
+- **Unreadable**: a credential that cannot be decrypted says so in its row.
+- **Empty state**: points to *Save as shared credential…* in a project's source.
 
 ## 4. Job progress view
 

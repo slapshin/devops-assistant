@@ -571,9 +571,9 @@ def test_cloudflare_project_token_is_write_only(api: TestClient, tmp_path: Path)
     missing = api.post("/api/projects", json=cloudflare_body())
 
     assert missing.status_code == 422
-    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.api_token"]
+    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth"]
 
-    res = api.post("/api/projects", json=cloudflare_body(api_token=TOKEN))
+    res = api.post("/api/projects", json=cloudflare_body(auth={"type": "token", "token": TOKEN}))
 
     assert res.status_code == 201, res.text
     project = res.json()
@@ -584,7 +584,7 @@ def test_cloudflare_project_token_is_write_only(api: TestClient, tmp_path: Path)
             "zone_id": ZONE,
             "hostnames": ["shop.example.com"],
             "api_url": "https://api.cloudflare.com/client/v4/graphql",
-            "token_set": True,
+            "auth": {"type": "token", "token_set": True},
         }
     ]
 
@@ -595,11 +595,11 @@ def test_cloudflare_project_token_is_write_only(api: TestClient, tmp_path: Path)
 
     # an omitted token is kept on update and on clone
     pid = project["project_id"]
-    body = cloudflare_body(hostnames=["api.example.com"])
+    body = cloudflare_body(hostnames=["api.example.com"], auth={"type": "token"})
 
-    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["token_set"]
+    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["auth"]["token_set"]
     clone = api.post(f"/api/projects?clone_of={pid}", json={**body, "name": "copy"})
-    assert clone.status_code == 201 and clone.json()["sources"][0]["token_set"]
+    assert clone.status_code == 201 and clone.json()["sources"][0]["auth"]["token_set"]
     assert TOKEN not in api.get("/api/projects").text
 
 

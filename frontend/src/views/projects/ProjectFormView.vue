@@ -4,6 +4,7 @@ import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ApiError, type ConnectionTest, type SourceKind } from "../../api/client";
 import { useCreateProject, useDeleteProject, useProject, useTestConnection, useUpdateProject } from "../../api/queries";
+import AuthEditor from "../../components/projects/AuthEditor.vue";
 import ConnectionTestResult from "../../components/projects/ConnectionTestResult.vue";
 import CustomRulesEditor from "../../components/projects/CustomRulesEditor.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
@@ -30,7 +31,6 @@ import {
   emptyDraft,
   emptyMatcher,
   grafanaInput,
-  keepsStoredSecret,
   matchersInput,
   prometheusInput,
   sentryInput,
@@ -38,11 +38,6 @@ import {
   sourceInput,
   sourceKindLabel,
   sourceKinds,
-  storedAuth,
-  storedCloudflareToken,
-  storedGrafanaToken,
-  storedSentryToken,
-  storedWazuhPassword,
   testKey,
   timezoneOptions,
   toInput,
@@ -89,12 +84,6 @@ const testing = ref<SourceKind | null>(null);
 const confirmingDelete = ref(false);
 const deleteName = ref("");
 
-const stored = computed(() => storedAuth(existing.data.value));
-const keeps = computed(() => keepsStoredSecret(draft.value, stored.value));
-const cfTokenStored = computed(() => storedCloudflareToken(existing.data.value));
-const sentryTokenStored = computed(() => storedSentryToken(existing.data.value));
-const wazuhPasswordStored = computed(() => storedWazuhPassword(existing.data.value));
-const grafanaTokenStored = computed(() => storedGrafanaToken(existing.data.value));
 const GRAFANA_LABEL_LISTS = [
   {
     key: "grafanaRuleLabels",
@@ -123,9 +112,7 @@ watch(
   { immediate: true },
 );
 
-const clientErrors = computed(() =>
-  validateDraft(draft.value, stored.value, cfTokenStored.value, sentryTokenStored.value, wazuhPasswordStored.value, grafanaTokenStored.value),
-);
+const clientErrors = computed(() => validateDraft(draft.value));
 const errors = computed<FieldErrors>(() => ({ ...(submitted.value ? clientErrors.value : {}), ...serverErrors.value }));
 
 // A server error belongs to the value it was about; editing anything clears them.
@@ -159,7 +146,7 @@ const saveWarning = computed(() => {
 });
 
 const previewBase = computed(() => {
-  const usable = !Object.keys({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, stored.value, true) }).length;
+  const usable = !Object.keys({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, true) }).length;
   if (!usable) return null;
   return { project_id: sourceId.value, matchers: matchersInput(draft.value), source: prometheusConnection() };
 });
@@ -198,11 +185,11 @@ function applyServerError(error: unknown, tested?: SourceKind) {
 async function runTest(kind: SourceKind) {
   formError.value = null;
   const validators: Record<SourceKind, () => FieldErrors> = {
-    prometheus: () => ({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, stored.value, true) }),
-    cloudflare: () => validateCloudflare(draft.value, cfTokenStored.value),
-    sentry: () => validateSentry(draft.value, sentryTokenStored.value),
-    wazuh: () => validateWazuh(draft.value, wazuhPasswordStored.value),
-    grafana: () => validateGrafana(draft.value, grafanaTokenStored.value),
+    prometheus: () => ({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, true) }),
+    cloudflare: () => validateCloudflare(draft.value),
+    sentry: () => validateSentry(draft.value),
+    wazuh: () => validateWazuh(draft.value),
+    grafana: () => validateGrafana(draft.value),
   };
   const problems = validators[kind]();
   if (Object.keys(problems).length) {
@@ -351,57 +338,7 @@ async function confirmDelete() {
           <p v-if="errors['prometheus.url']" :id="errorId('prometheus.url')" class="field-error">{{ errors["prometheus.url"] }}</p>
         </div>
         <label class="check"><input v-model="draft.tlsVerify" type="checkbox"> Verify TLS certificates</label>
-        <div class="field">
-          <label for="source-auth">Authentication</label>
-          <select id="source-auth" v-model="draft.authType">
-            <option value="none">None</option>
-            <option value="bearer">Bearer token</option>
-            <option value="basic">Basic auth</option>
-          </select>
-        </div>
-        <div v-if="draft.authType === 'bearer'" class="field">
-          <label for="source-token">Token</label>
-          <input
-            id="source-token"
-            v-model="draft.token"
-            type="password"
-            autocomplete="new-password"
-            :placeholder="keeps ? 'Stored — leave empty to keep' : ''"
-            :aria-invalid="!!errors['prometheus.auth.token']"
-            :aria-describedby="describedBy('prometheus.auth.token')"
-          >
-          <p v-if="errors['prometheus.auth.token']" :id="errorId('prometheus.auth.token')" class="field-error">{{ errors["prometheus.auth.token"] }}</p>
-        </div>
-        <template v-if="draft.authType === 'basic'">
-          <div class="field">
-            <label for="source-username">Username</label>
-            <input
-              id="source-username"
-              v-model="draft.username"
-              autocomplete="off"
-              :aria-invalid="!!errors['prometheus.auth.username']"
-              :aria-describedby="describedBy('prometheus.auth.username')"
-            >
-            <p v-if="errors['prometheus.auth.username']" :id="errorId('prometheus.auth.username')" class="field-error">
-              {{ errors["prometheus.auth.username"] }}
-            </p>
-          </div>
-          <div class="field">
-            <label for="source-password">Password</label>
-            <input
-              id="source-password"
-              v-model="draft.password"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="keeps ? 'Stored — leave empty to keep' : ''"
-              :aria-invalid="!!errors['prometheus.auth.password']"
-              :aria-describedby="describedBy('prometheus.auth.password')"
-            >
-            <p v-if="errors['prometheus.auth.password']" :id="errorId('prometheus.auth.password')" class="field-error">
-              {{ errors["prometheus.auth.password"] }}
-            </p>
-          </div>
-        </template>
+        <AuthEditor v-model="draft.auth.prometheus" kind="prometheus" id-prefix="source" :errors="errors" />
         <div class="row">
           <button type="button" :disabled="tester.isPending.value" @click="runTest('prometheus')">
             {{ testing === "prometheus" ? "Testing…" : "Test Prometheus connection" }}
@@ -455,20 +392,11 @@ async function confirmDelete() {
             <p id="cf-hostnames-hint" class="muted hint">Separate with commas or spaces. Empty analyses the whole zone.</p>
             <p v-if="errors['cloudflare.hostnames']" :id="errorId('cloudflare.hostnames')" class="field-error">{{ errors["cloudflare.hostnames"] }}</p>
           </div>
-          <div class="field">
-            <label for="cf-token">API token</label>
-            <input
-              id="cf-token"
-              v-model="draft.cfToken"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="cfTokenStored ? 'Stored — leave empty to keep' : ''"
-              :aria-invalid="!!errors['cloudflare.api_token']"
-              :aria-describedby="describedBy('cloudflare.api_token') ?? 'cf-token-hint'"
-            >
-            <p id="cf-token-hint" class="muted hint">A custom token with the permission <strong>Zone → Analytics → Read</strong> for this zone. Add <strong>Zone → Zone → Read</strong> to show the zone’s domain in findings.</p>
-            <p v-if="errors['cloudflare.api_token']" :id="errorId('cloudflare.api_token')" class="field-error">{{ errors["cloudflare.api_token"] }}</p>
-          </div>
+          <AuthEditor v-model="draft.auth.cloudflare" kind="cloudflare" id-prefix="cf" :errors="errors">
+            <template #hint>
+              A custom token with the permission <strong>Zone → Analytics → Read</strong> for this zone. Add <strong>Zone → Zone → Read</strong> to show the zone’s domain in findings.
+            </template>
+          </AuthEditor>
           <details :open="!!errors['cloudflare.api_url']">
             <summary>Advanced</summary>
             <div class="field">
@@ -609,23 +537,12 @@ async function confirmDelete() {
               <button type="button" :disabled="draft.sentryTags.length >= MAX_SENTRY_TAGS" @click="draft.sentryTags.push({ key: '', value: '' })">Add tag</button>
             </div>
           </div>
-          <div class="field">
-            <label for="sentry-token">Auth token</label>
-            <input
-              id="sentry-token"
-              v-model="draft.sentryToken"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="sentryTokenStored ? 'Stored — leave empty to keep' : ''"
-              :aria-invalid="!!errors['sentry.auth_token']"
-              :aria-describedby="describedBy('sentry.auth_token') ?? 'sentry-token-hint'"
-            >
-            <p id="sentry-token-hint" class="muted hint">
+          <AuthEditor v-model="draft.auth.sentry" kind="sentry" id-prefix="sentry" :errors="errors">
+            <template #hint>
               A personal token or internal integration with the scopes <strong>org:read</strong> and <strong>project:read</strong>.
               Organization tokens (for CI) cannot read events.
-            </p>
-            <p v-if="errors['sentry.auth_token']" :id="errorId('sentry.auth_token')" class="field-error">{{ errors["sentry.auth_token"] }}</p>
-          </div>
+            </template>
+          </AuthEditor>
           <div class="row">
             <button type="button" :disabled="tester.isPending.value" @click="runTest('sentry')">
               {{ testing === "sentry" ? "Testing…" : "Test Sentry connection" }}
@@ -761,33 +678,12 @@ async function confirmDelete() {
               {{ errors["wazuh.monitoring_index_pattern"] }}
             </p>
           </div>
-          <div class="field">
-            <label for="wazuh-username">Username</label>
-            <input
-              id="wazuh-username"
-              v-model="draft.wazuhUsername"
-              autocomplete="off"
-              :aria-invalid="!!errors['wazuh.username']"
-              :aria-describedby="describedBy('wazuh.username') ?? 'wazuh-username-hint'"
-            >
-            <p id="wazuh-username-hint" class="muted hint">
-              An indexer user that may only read <code>wazuh-alerts-*</code> (and <code>wazuh-monitoring-*</code> with groups).
-            </p>
-            <p v-if="errors['wazuh.username']" :id="errorId('wazuh.username')" class="field-error">{{ errors["wazuh.username"] }}</p>
-          </div>
-          <div class="field">
-            <label for="wazuh-password">Password</label>
-            <input
-              id="wazuh-password"
-              v-model="draft.wazuhPassword"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="wazuhPasswordStored ? 'Stored — leave empty to keep' : ''"
-              :aria-invalid="!!errors['wazuh.password']"
-              :aria-describedby="describedBy('wazuh.password')"
-            >
-            <p v-if="errors['wazuh.password']" :id="errorId('wazuh.password')" class="field-error">{{ errors["wazuh.password"] }}</p>
-          </div>
+          <AuthEditor v-model="draft.auth.wazuh" kind="wazuh" id-prefix="wazuh" :errors="errors">
+            <template #hint>
+              An indexer user that may only read <code>wazuh-alerts-*</code> (and <code>wazuh-monitoring-*</code> with groups); leave empty
+              when the indexer needs no authentication.
+            </template>
+          </AuthEditor>
           <div class="row">
             <button type="button" :disabled="tester.isPending.value" @click="runTest('wazuh')">
               {{ testing === "wazuh" ? "Testing…" : "Test Wazuh connection" }}
@@ -921,23 +817,12 @@ async function confirmDelete() {
               </button>
             </div>
           </div>
-          <div class="field">
-            <label for="grafana-token">Service account token</label>
-            <input
-              id="grafana-token"
-              v-model="draft.grafanaToken"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="grafanaTokenStored ? 'Stored — leave empty to keep' : ''"
-              :aria-invalid="!!errors['grafana.token']"
-              :aria-describedby="describedBy('grafana.token') ?? 'grafana-token-hint'"
-            >
-            <p id="grafana-token-hint" class="muted hint">
+          <AuthEditor v-model="draft.auth.grafana" kind="grafana" id-prefix="grafana" :errors="errors">
+            <template #hint>
               A service account with the <strong>Viewer</strong> role (Administration → Users and access → Service accounts); it
               reads alert rules and their state history only.
-            </p>
-            <p v-if="errors['grafana.token']" :id="errorId('grafana.token')" class="field-error">{{ errors["grafana.token"] }}</p>
-          </div>
+            </template>
+          </AuthEditor>
           <div class="row">
             <button type="button" :disabled="tester.isPending.value" @click="runTest('grafana')">
               {{ testing === "grafana" ? "Testing…" : "Test Grafana connection" }}

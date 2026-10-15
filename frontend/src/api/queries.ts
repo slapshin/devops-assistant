@@ -10,6 +10,9 @@ import {
   type AnalysisReport,
   type AnalysisSubmitted,
   type ConnectionTest,
+  type Credential,
+  type CredentialInput,
+  type CredentialList,
   type ConnectionTestRequest,
   type CustomRulePreview,
   type CustomRulePreviewRequest,
@@ -79,6 +82,7 @@ function useProjectMutation<A, T>(fn: (args: A) => Promise<T>, removes?: (args: 
       void client.invalidateQueries({ queryKey: ["projects"] });
       void client.invalidateQueries({ queryKey: ["project"] });
       void client.invalidateQueries({ queryKey: ["project-health"] });
+      void client.invalidateQueries({ queryKey: ["credentials"] });
     },
   });
 }
@@ -96,6 +100,33 @@ export const useDeleteProject = () =>
     (id: string) => apiDelete<void>(projectPath(id)),
     (id) => id,
   );
+
+const credentialPath = (id: string) => `/api/credentials/${encodeURIComponent(id)}` as const;
+
+export function useCredentials() {
+  return useQuery({ queryKey: ["credentials"], queryFn: () => apiGet<CredentialList>("/api/credentials") });
+}
+
+/** Credentials change what projects show (their names) and how their sources connect. */
+function useCredentialMutation<A, T>(fn: (args: A) => Promise<T>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["credentials"] });
+      void client.invalidateQueries({ queryKey: ["projects"] });
+      void client.invalidateQueries({ queryKey: ["project"] });
+      void client.invalidateQueries({ queryKey: ["project-health"] });
+    },
+  });
+}
+
+export const useCreateCredential = () => useCredentialMutation((body: CredentialInput) => apiPost<Credential>("/api/credentials", body));
+
+export const useUpdateCredential = () =>
+  useCredentialMutation(({ id, body }: { id: string; body: CredentialInput }) => apiPut<Credential>(credentialPath(id), body));
+
+export const useDeleteCredential = () => useCredentialMutation((id: string) => apiDelete<void>(credentialPath(id)));
 
 export function useTestConnection() {
   return useMutation({

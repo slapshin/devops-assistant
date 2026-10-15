@@ -15,6 +15,7 @@ from pydantic import SecretStr, ValidationError
 
 from app.ai.providers import FakeExplanationProvider
 from app.analysis.engine import RobustDetector
+from app.domain.auth import NoAuth
 from app.domain.common import EntityKind, LabelMatcher, Scope, Severity, SignalFamily, SourceKind
 from app.domain.detector_config import DetectorConfig
 from app.domain.findings import FindingState, Recurrence
@@ -111,7 +112,7 @@ def test_source_input_normalises_and_validates() -> None:
     assert source.folders == ["Infrastructure", "Shop"]
     assert source.rule_uids == ["a1", "b2"]
     assert [m.name for m in source.instance_labels] == ["env", "project"]
-    assert (source.org_id, source.tls_verify, source.token) == (1, True, None)
+    assert (source.org_id, source.tls_verify, source.auth) == (1, True, NoAuth())
 
     with pytest.raises(ValidationError, match="at least one is required"):
         GrafanaSourceInput(api_url="https://g", instance_labels=SHOP)
@@ -773,13 +774,18 @@ def test_grafana_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
     missing = api.post("/api/projects", json=grafana_body())
 
     assert missing.status_code == 422
-    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.token"]
+    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth"]
 
     instance_labels = [{"name": "project", "op": "=", "value": "shop"}]
 
     res = api.post(
         "/api/projects",
-        json=grafana_body(token=TOKEN, instance_labels=instance_labels, org_id=2, tls_verify=False),
+        json=grafana_body(
+            auth={"type": "token", "token": TOKEN},
+            instance_labels=instance_labels,
+            org_id=2,
+            tls_verify=False,
+        ),
     )
 
     assert res.status_code == 201, res.text
@@ -794,7 +800,7 @@ def test_grafana_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
             "rule_labels": [],
             "instance_labels": instance_labels,
             "tls_verify": False,
-            "token_set": True,
+            "auth": {"type": "token", "token_set": True},
         }
     ]
 
@@ -803,15 +809,18 @@ def test_grafana_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
     assert TOKEN not in raw[0] and TOKEN.encode() not in raw[1]
 
     pid = project["project_id"]
-    body = grafana_body(folders=["Shop", "Infra"])
+    body = grafana_body(folders=["Shop", "Infra"], auth={"type": "token"})
 
-    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["token_set"]
+    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["auth"]["token_set"]
 
     clone = api.post(f"/api/projects?clone_of={pid}", json={**body, "name": "copy"})
-    assert clone.status_code == 201 and clone.json()["sources"][0]["token_set"]
+    assert clone.status_code == 201 and clone.json()["sources"][0]["auth"]["token_set"]
     assert TOKEN not in api.get("/api/projects").text
 
-    selectless = api.post("/api/projects", json=grafana_body(folders=[], name="x", token=TOKEN))
+    selectless = api.post(
+        "/api/projects",
+        json=grafana_body(folders=[], name="x", auth={"type": "token", "token": TOKEN}),
+    )
     assert selectless.status_code == 422
 
 

@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from app.ai.providers import FakeExplanationProvider
 from app.analysis.engine import RobustDetector, trend_summary
+from app.domain.auth import BearerAuth, TokenAuth
 from app.domain.common import (
     STEP_SECONDS,
     ConfidenceLevel,
@@ -37,6 +38,7 @@ from app.domain.common import (
     Unit,
     format_utc,
 )
+from app.domain.credentials import Credential, CredentialList, CredentialUsage
 from app.domain.custom_rules import CustomRulePreview
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import (
@@ -78,7 +80,6 @@ from app.domain.jobs import (
 )
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.projects import (
-    BearerAuth,
     ConnectionTest,
     FamilyCapability,
     ProjectList,
@@ -1113,6 +1114,20 @@ def build() -> dict[str, BaseModel]:
                     updated_at=T,
                     latest_analysis=completed,
                     report_count=1,
+                )
+            ]
+        ),
+        "api/credentials.json": CredentialList(
+            items=[
+                Credential(
+                    credential_id="01999a3c-0000-7000-8000-0000000000c1",
+                    name="Grafana production",
+                    description="Viewer service account shared by the shop projects.",
+                    kind=SourceKind.GRAFANA,
+                    auth=TokenAuth(token_set=True),
+                    used_by=[CredentialUsage(project_id=PROJECT_ID, name=SCOPE.project_name)],
+                    created_at=T,
+                    updated_at=T,
                 )
             ]
         ),

@@ -202,6 +202,28 @@
           "title": "Api Url",
           "type": "string"
         },
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "credential": "#/$defs/CredentialAuth",
+              "none": "#/$defs/NoAuth",
+              "token": "#/$defs/TokenAuth"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuth"
+            },
+            {
+              "$ref": "#/$defs/TokenAuth"
+            },
+            {
+              "$ref": "#/$defs/CredentialAuth"
+            }
+          ],
+          "title": "Auth"
+        },
         "hostnames": {
           "items": {
             "type": "string"
@@ -215,10 +237,6 @@
           "title": "Kind",
           "type": "string"
         },
-        "token_set": {
-          "title": "Token Set",
-          "type": "boolean"
-        },
         "zone_id": {
           "title": "Zone Id",
           "type": "string"
@@ -228,9 +246,35 @@
         "zone_id",
         "hostnames",
         "api_url",
-        "token_set"
+        "auth"
       ],
       "title": "CloudflareSource",
+      "type": "object"
+    },
+    "CredentialAuth": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_id": {
+          "title": "Credential Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "The shared credential's name.",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "const": "credential",
+          "default": "credential",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credential_id",
+        "name"
+      ],
+      "title": "CredentialAuth",
       "type": "object"
     },
     "CustomRule": {
@@ -389,6 +433,9 @@
         "project_busy",
         "source_not_configured",
         "credentials_unreadable",
+        "credential_not_found",
+        "credential_name_taken",
+        "credential_in_use",
         "analysis_not_found",
         "report_not_ready",
         "report_unavailable",
@@ -423,6 +470,28 @@
         "api_url": {
           "title": "Api Url",
           "type": "string"
+        },
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "credential": "#/$defs/CredentialAuth",
+              "none": "#/$defs/NoAuth",
+              "token": "#/$defs/TokenAuth"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuth"
+            },
+            {
+              "$ref": "#/$defs/TokenAuth"
+            },
+            {
+              "$ref": "#/$defs/CredentialAuth"
+            }
+          ],
+          "title": "Auth"
         },
         "folders": {
           "items": {
@@ -467,15 +536,11 @@
           "default": true,
           "title": "Tls Verify",
           "type": "boolean"
-        },
-        "token_set": {
-          "title": "Token Set",
-          "type": "boolean"
         }
       },
       "required": [
         "api_url",
-        "token_set"
+        "auth"
       ],
       "title": "GrafanaSource",
       "type": "object"
@@ -736,6 +801,7 @@
             "mapping": {
               "basic": "#/$defs/BasicAuth",
               "bearer": "#/$defs/BearerAuth",
+              "credential": "#/$defs/CredentialAuth",
               "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
@@ -749,6 +815,9 @@
             },
             {
               "$ref": "#/$defs/BasicAuth"
+            },
+            {
+              "$ref": "#/$defs/CredentialAuth"
             }
           ],
           "title": "Auth"
@@ -856,6 +925,28 @@
           "title": "Api Url",
           "type": "string"
         },
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "credential": "#/$defs/CredentialAuth",
+              "none": "#/$defs/NoAuth",
+              "token": "#/$defs/TokenAuth"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuth"
+            },
+            {
+              "$ref": "#/$defs/TokenAuth"
+            },
+            {
+              "$ref": "#/$defs/CredentialAuth"
+            }
+          ],
+          "title": "Auth"
+        },
         "environment": {
           "anyOf": [
             {
@@ -896,17 +987,13 @@
           "default": true,
           "title": "Tls Verify",
           "type": "boolean"
-        },
-        "token_set": {
-          "title": "Token Set",
-          "type": "boolean"
         }
       },
       "required": [
         "organization",
         "projects",
         "api_url",
-        "token_set"
+        "auth"
       ],
       "title": "SentrySource",
       "type": "object"
@@ -1054,6 +1141,26 @@
       "title": "ThresholdOp",
       "type": "string"
     },
+    "TokenAuth": {
+      "additionalProperties": false,
+      "properties": {
+        "token_set": {
+          "title": "Token Set",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "token",
+          "default": "token",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "token_set"
+      ],
+      "title": "TokenAuth",
+      "type": "object"
+    },
     "Unit": {
       "enum": [
         "ratio",
@@ -1104,6 +1211,28 @@
           "title": "Api Url",
           "type": "string"
         },
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "basic": "#/$defs/BasicAuth",
+              "credential": "#/$defs/CredentialAuth",
+              "none": "#/$defs/NoAuth"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuth"
+            },
+            {
+              "$ref": "#/$defs/BasicAuth"
+            },
+            {
+              "$ref": "#/$defs/CredentialAuth"
+            }
+          ],
+          "title": "Auth"
+        },
         "groups": {
           "items": {
             "type": "string"
@@ -1134,31 +1263,15 @@
           "title": "Monitoring Index Pattern",
           "type": "string"
         },
-        "password_set": {
-          "title": "Password Set",
-          "type": "boolean"
-        },
         "tls_verify": {
           "default": true,
           "title": "Tls Verify",
           "type": "boolean"
-        },
-        "username": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Username"
         }
       },
       "required": [
         "api_url",
-        "password_set"
+        "auth"
       ],
       "title": "WazuhSource",
       "type": "object"

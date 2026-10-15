@@ -39,6 +39,7 @@
     },
     "BearerAuthInput": {
       "additionalProperties": false,
+      "description": "``Authorization: Bearer <token>``.",
       "properties": {
         "token": {
           "anyOf": [
@@ -73,6 +74,29 @@
       ],
       "title": "ChangeDirection",
       "type": "string"
+    },
+    "CredentialRef": {
+      "additionalProperties": false,
+      "description": "Use a shared credential of the source's kind; its secret is resolved at each use.",
+      "properties": {
+        "credential_id": {
+          "maxLength": 36,
+          "minLength": 1,
+          "title": "Credential Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "credential",
+          "default": "credential",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credential_id"
+      ],
+      "title": "CredentialRef",
+      "type": "object"
     },
     "CustomRule": {
       "additionalProperties": false,
@@ -282,6 +306,7 @@
             "mapping": {
               "basic": "#/$defs/BasicAuthInput",
               "bearer": "#/$defs/BearerAuthInput",
+              "credential": "#/$defs/CredentialRef",
               "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
@@ -295,6 +320,9 @@
             },
             {
               "$ref": "#/$defs/BasicAuthInput"
+            },
+            {
+              "$ref": "#/$defs/CredentialRef"
             }
           ],
           "title": "Auth"

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from app.domain.credentials import CredentialInput, CredentialList
 from app.domain.custom_rules import CustomRulePreview
 from app.domain.explanation import ExplanationInput
 from app.domain.jobs import (
@@ -46,6 +47,8 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "Problem": Problem,
     "ProjectList": ProjectList,
     "ProjectInput": ProjectInput,
+    "CredentialList": CredentialList,
+    "CredentialInput": CredentialInput,
     "ConnectionTestRequest": ConnectionTestRequest,
     "ConnectionTest": ConnectionTest,
     "CustomRulePreviewRequest": CustomRulePreviewRequest,

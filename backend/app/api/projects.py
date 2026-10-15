@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, Response
 
-from app.api.problems import ProblemError, problem_responses
+from app.api.problems import ProblemError, problem_responses, validation_problem
 from app.api.routes import ServicesDep
 from app.container import Services
 from app.domain.common import STEP_SECONDS, LabelMatcher, Scope, floor_to_step
@@ -45,7 +45,7 @@ from app.sources.sentry.connect import connect_sentry, probe_sentry
 from app.sources.sentry.synthetic import SCENARIOS as SENTRY_SCENARIOS
 from app.sources.wazuh.connect import connect_wazuh, probe_wazuh
 from app.sources.wazuh.synthetic import SCENARIOS as WAZUH_SCENARIOS
-from app.storage.projects import ProjectNameTaken, SecretRequired
+from app.storage.projects import CredentialInvalid, ProjectNameTaken, SecretRequired
 from app.storage.secrets import SecretsUnreadable
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -60,11 +60,7 @@ def _not_found(project_id: str) -> ProblemError:
 
 
 def _invalid(field: str, message: str) -> ProblemError:
-    error = ProblemError(422, ErrorCode.VALIDATION_ERROR, "Request validation failed")
-    error.problem = error.problem.model_copy(
-        update={"errors": [{"field": field, "message": message}]}
-    )
-    return error
+    return validation_problem(field, message)
 
 
 def _unreadable() -> ProblemError:
@@ -116,6 +112,8 @@ def _write_error(exc: Exception, field_prefix: str) -> ProblemError:
             )
         case SecretRequired(field=field):
             return _invalid(f"{field_prefix}.{field}", "required when no secret is stored")
+        case CredentialInvalid(field=field, message=message):
+            return _invalid(f"{field_prefix}.{field}", message)
         case SecretsUnreadable():
             return _unreadable()
     raise exc
@@ -155,7 +153,7 @@ async def create_project(
         raise _not_found(clone_of)
     try:
         return await services.projects.create(data, secrets_from=clone_of)
-    except (ProjectNameTaken, SecretRequired, SecretsUnreadable) as exc:
+    except (ProjectNameTaken, SecretRequired, CredentialInvalid, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.sources") from None
 
 
@@ -172,7 +170,7 @@ async def update_project(project_id: str, data: ProjectInput, services: Services
     _validate(data)
     try:
         project = await services.projects.update(project_id, data)
-    except (ProjectNameTaken, SecretRequired, SecretsUnreadable) as exc:
+    except (ProjectNameTaken, SecretRequired, CredentialInvalid, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.sources") from None
     if project is None:
         raise _not_found(project_id)
@@ -234,7 +232,7 @@ async def test_connection(body: ConnectionTestRequest, services: ServicesDep) ->
         raise _not_found(body.project_id)
     try:
         conn = await services.projects.resolve_connection(body.source, body.project_id)
-    except (SecretRequired, SecretsUnreadable) as exc:
+    except (SecretRequired, CredentialInvalid, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.source") from None
     return await _probe(conn, _draft_scope(body.matchers))
 
@@ -253,7 +251,7 @@ async def preview_custom_rule(
         raise _not_found(body.project_id)
     try:
         conn = await services.projects.resolve_connection(body.source, body.project_id)
-    except (SecretRequired, SecretsUnreadable) as exc:
+    except (SecretRequired, CredentialInvalid, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.source") from None
     if not isinstance(conn, PrometheusConnection):  # pragma: no cover - the body is Prometheus
         raise _invalid("body.source.kind", "custom rules need a Prometheus source")

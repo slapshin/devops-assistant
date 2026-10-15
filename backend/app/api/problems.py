@@ -36,6 +36,15 @@ def problem_response(problem: Problem, headers: dict[str, str] | None = None) ->
     )
 
 
+def validation_problem(field: str, message: str) -> ProblemError:
+    """A 422 for one field that request validation cannot check (e.g. stored state)."""
+    error = ProblemError(422, ErrorCode.VALIDATION_ERROR, "Request validation failed")
+    error.problem = error.problem.model_copy(
+        update={"errors": [{"field": field, "message": message}]}
+    )
+    return error
+
+
 def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
     """OpenAPI documentation for problem responses."""
     return {

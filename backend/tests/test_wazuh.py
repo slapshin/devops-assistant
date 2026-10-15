@@ -15,6 +15,7 @@ from pydantic import SecretStr, ValidationError
 
 from app.ai.providers import FakeExplanationProvider
 from app.analysis.engine import RobustDetector
+from app.domain.auth import NoAuth
 from app.domain.common import EntityKind, Scope, SignalFamily, SourceKind
 from app.domain.detector_config import DetectorConfig
 from app.domain.interfaces import CancellationToken, OpenedSource, SourceError, SourceErrorKind
@@ -87,14 +88,13 @@ def test_source_input_normalises_and_validates() -> None:
             "api_url": "https://indexer:9200/",
             "agents": [" web-2", "web-1", "web-2"],
             "labels": [{"key": "project", "value": "shop"}, {"key": "env", "value": "prod"}],
-            "username": " ",
         }
     )
 
     assert source.api_url == "https://indexer:9200"
     assert source.agents == ["web-1", "web-2"]
     assert [label.key for label in source.labels] == ["env", "project"]
-    assert (source.index_pattern, source.username, source.tls_verify) == (INDEX, None, True)
+    assert (source.index_pattern, source.auth, source.tls_verify) == (INDEX, NoAuth(), True)
 
     with pytest.raises(ValidationError, match="at least one is required"):
         WazuhSourceInput(api_url="https://indexer:9200")
@@ -643,16 +643,20 @@ def wazuh_body(**source: Any) -> dict[str, Any]:
 
 
 def test_wazuh_password_is_write_only(api: TestClient, tmp_path: Path) -> None:
-    missing = api.post("/api/projects", json=wazuh_body(username="reader"))
+    missing = api.post("/api/projects", json=wazuh_body(auth={"type": "basic", "username": "r"}))
 
     assert missing.status_code == 422
-    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.password"]
+    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth.password"]
 
     labels = [{"key": "project", "value": "shop"}]
 
     res = api.post(
         "/api/projects",
-        json=wazuh_body(username="reader", password=PASSWORD, labels=labels, tls_verify=False),
+        json=wazuh_body(
+            auth={"type": "basic", "username": "reader", "password": PASSWORD},
+            labels=labels,
+            tls_verify=False,
+        ),
     )
 
     assert res.status_code == 201, res.text
@@ -666,9 +670,8 @@ def test_wazuh_password_is_write_only(api: TestClient, tmp_path: Path) -> None:
             "groups": [],
             "labels": labels,
             "monitoring_index_pattern": "wazuh-monitoring-*",
-            "username": "reader",
             "tls_verify": False,
-            "password_set": True,
+            "auth": {"type": "basic", "username": "reader", "password_set": True},
         }
     ]
 
@@ -677,12 +680,12 @@ def test_wazuh_password_is_write_only(api: TestClient, tmp_path: Path) -> None:
     assert PASSWORD not in raw[0] and PASSWORD.encode() not in raw[1]
 
     pid = project["project_id"]
-    body = wazuh_body(username="reader", agents=["web-1", "web-2"])
+    body = wazuh_body(auth={"type": "basic", "username": "reader"}, agents=["web-1", "web-2"])
 
-    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["password_set"]
+    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["auth"]["password_set"]
 
     clone = api.post(f"/api/projects?clone_of={pid}", json={**body, "name": "copy"})
-    assert clone.status_code == 201 and clone.json()["sources"][0]["password_set"]
+    assert clone.status_code == 201 and clone.json()["sources"][0]["auth"]["password_set"]
     assert PASSWORD not in api.get("/api/projects").text
 
     selectless = api.post("/api/projects", json=wazuh_body(agents=[], name="x"))

@@ -33,6 +33,19 @@ projects = sa.Table(
     sa.Column("keep_reports", sa.Integer, nullable=True, comment="Newest reports kept"),
 )
 
+credentials = sa.Table(
+    "credentials",
+    metadata,
+    sa.Column("credential_id", sa.String(36), primary_key=True),
+    sa.Column("name", sa.String(100, collation="NOCASE"), nullable=False, unique=True),
+    sa.Column("description", sa.Text, nullable=True),
+    sa.Column("kind", sa.String(32), nullable=False),
+    sa.Column("auth", sa.Text, nullable=False, comment="JSON mechanism without secrets"),
+    sa.Column("secrets", sa.LargeBinary, nullable=False, comment="Fernet-encrypted JSON"),
+    sa.Column("created_at", sa.String(20), nullable=False),
+    sa.Column("updated_at", sa.String(20), nullable=False),
+)
+
 project_sources = sa.Table(
     "project_sources",
     metadata,
@@ -46,6 +59,13 @@ project_sources = sa.Table(
     sa.Column("config", sa.Text, nullable=False, comment="JSON without secrets"),
     sa.Column("secrets", sa.LargeBinary, nullable=True, comment="Fernet-encrypted JSON"),
     sa.Column("updated_at", sa.String(20), nullable=False),
+    sa.Column(
+        "credential_id",
+        sa.String(36),
+        sa.ForeignKey("credentials.credential_id", ondelete="RESTRICT"),
+        nullable=True,
+        comment="Shared credential used instead of inline secrets",
+    ),
 )
 
 analysis_jobs = sa.Table(

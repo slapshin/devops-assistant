@@ -74,6 +74,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Credentials */
+        get: operations["list_credentials_api_credentials_get"];
+        put?: never;
+        /** Create Credential */
+        post: operations["create_credential_api_credentials_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Credential */
+        get: operations["get_credential_api_credentials__credential_id__get"];
+        /**
+         * Update Credential
+         * @description Rotating the secret applies to every source using the credential at its next use.
+         */
+        put: operations["update_credential_api_credentials__credential_id__put"];
+        post?: never;
+        /**
+         * Delete Credential
+         * @description Only an unused credential can be deleted.
+         */
+        delete: operations["delete_credential_api_credentials__credential_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -392,7 +435,10 @@ export interface components {
              */
             type: "bearer";
         };
-        /** BearerAuthInput */
+        /**
+         * BearerAuthInput
+         * @description ``Authorization: Bearer <token>``.
+         */
         BearerAuthInput: {
             /**
              * Token
@@ -419,6 +465,8 @@ export interface components {
         CloudflareSource: {
             /** Api Url */
             api_url: string;
+            /** Auth */
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuth"] | components["schemas"]["CredentialAuth"];
             /** Hostnames */
             hostnames: string[];
             /**
@@ -426,8 +474,6 @@ export interface components {
              * @enum {string}
              */
             kind: "cloudflare";
-            /** Token Set */
-            token_set: boolean;
             /** Zone Id */
             zone_id: string;
         };
@@ -437,16 +483,16 @@ export interface components {
          */
         CloudflareSourceInput: {
             /**
-             * Api Token
-             * @description API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain). Omit to keep the stored one (update only); not needed for synthetic://.
-             */
-            api_token?: string | null;
-            /**
              * Api Url
              * @description GraphQL endpoint; synthetic://<scenario> for demo data.
              * @default https://api.cloudflare.com/client/v4/graphql
              */
             api_url: string;
+            /**
+             * Auth
+             * @description API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain), inline or as a shared credential; not needed for synthetic://.
+             */
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuthInput"] | components["schemas"]["CredentialRef"];
             /**
              * Hostnames
              * @description Analyse only these hostnames; empty analyses the whole zone.
@@ -514,6 +560,90 @@ export interface components {
             project_id?: string | null;
             /** Source */
             source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"] | components["schemas"]["GrafanaSourceInput"];
+        };
+        /** Credential */
+        Credential: {
+            /** Auth */
+            auth: components["schemas"]["BearerAuth"] | components["schemas"]["BasicAuth"] | components["schemas"]["TokenAuth"];
+            /** Created At */
+            created_at: string;
+            /** Credential Id */
+            credential_id: string;
+            /** Description */
+            description?: string | null;
+            kind: components["schemas"]["SourceKind"];
+            /** Name */
+            name: string;
+            /**
+             * Readable
+             * @description False when the stored secret cannot be decrypted (lost or changed key).
+             * @default true
+             */
+            readable: boolean;
+            /** Updated At */
+            updated_at: string;
+            /**
+             * Used By
+             * @description Projects whose sources use the credential.
+             */
+            used_by?: components["schemas"]["CredentialUsage"][];
+        };
+        /** CredentialAuth */
+        CredentialAuth: {
+            /** Credential Id */
+            credential_id: string;
+            /**
+             * Name
+             * @description The shared credential's name.
+             */
+            name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "credential";
+        };
+        /**
+         * CredentialInput
+         * @description Body of POST /api/credentials and PUT /api/credentials/{credential_id}.
+         */
+        CredentialInput: {
+            /**
+             * Auth
+             * @description Prometheus: bearer or basic; Wazuh: basic; Cloudflare, Sentry and Grafana: token. Omit the secret on update to keep the stored one.
+             */
+            auth: components["schemas"]["BearerAuthInput"] | components["schemas"]["BasicAuthInput"] | components["schemas"]["TokenAuthInput"];
+            /** Description */
+            description?: string | null;
+            /** @description Only sources of this kind can use the credential. */
+            kind: components["schemas"]["SourceKind"];
+            /** Name */
+            name: string;
+        };
+        /** CredentialList */
+        CredentialList: {
+            /** Items */
+            items: components["schemas"]["Credential"][];
+        };
+        /**
+         * CredentialRef
+         * @description Use a shared credential of the source's kind; its secret is resolved at each use.
+         */
+        CredentialRef: {
+            /** Credential Id */
+            credential_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "credential";
+        };
+        /** CredentialUsage */
+        CredentialUsage: {
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: string;
         };
         /** CustomRule */
         CustomRule: {
@@ -750,7 +880,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
+        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "credential_not_found" | "credential_name_taken" | "credential_in_use" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
         /**
          * ErrorKindActivity
          * @description One error kind (Sentry issue) and its error events during a finding on its project.
@@ -952,6 +1082,8 @@ export interface components {
         GrafanaSource: {
             /** Api Url */
             api_url: string;
+            /** Auth */
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuth"] | components["schemas"]["CredentialAuth"];
             /** Folders */
             folders?: string[];
             /** Instance Labels */
@@ -975,8 +1107,6 @@ export interface components {
              * @default true
              */
             tls_verify: boolean;
-            /** Token Set */
-            token_set: boolean;
         };
         /**
          * GrafanaSourceInput
@@ -992,6 +1122,11 @@ export interface components {
              * @description Grafana URL, e.g. https://grafana.example.com (path prefixes are kept); synthetic://<scenario> for demo data.
              */
             api_url: string;
+            /**
+             * Auth
+             * @description Service account token (Viewer role), inline or as a shared credential; not needed for synthetic://.
+             */
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuthInput"] | components["schemas"]["CredentialRef"];
             /**
              * Folders
              * @description Folder UIDs or titles whose alert rules are analysed.
@@ -1030,11 +1165,6 @@ export interface components {
              * @default true
              */
             tls_verify: boolean;
-            /**
-             * Token
-             * @description Service account token (Viewer role). Omit to keep the stored one (update only); not needed for synthetic://.
-             */
-            token?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1358,7 +1488,7 @@ export interface components {
         /** PrometheusSource */
         PrometheusSource: {
             /** Auth */
-            auth: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuth"] | components["schemas"]["BasicAuth"];
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuth"] | components["schemas"]["BasicAuth"] | components["schemas"]["CredentialAuth"];
             /** Custom Rules */
             custom_rules?: components["schemas"]["CustomRule"][];
             /**
@@ -1374,7 +1504,7 @@ export interface components {
         /** PrometheusSourceInput */
         PrometheusSourceInput: {
             /** Auth */
-            auth?: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuthInput"] | components["schemas"]["BasicAuthInput"];
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuthInput"] | components["schemas"]["BasicAuthInput"] | components["schemas"]["CredentialRef"];
             /**
              * Custom Rules
              * @description User-written PromQL rules analysed with the catalog (at most 20).
@@ -1481,6 +1611,8 @@ export interface components {
         SentrySource: {
             /** Api Url */
             api_url: string;
+            /** Auth */
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuth"] | components["schemas"]["CredentialAuth"];
             /** Environment */
             environment?: string | null;
             /**
@@ -1499,8 +1631,6 @@ export interface components {
              * @default true
              */
             tls_verify: boolean;
-            /** Token Set */
-            token_set: boolean;
         };
         /**
          * SentrySourceInput
@@ -1514,10 +1644,10 @@ export interface components {
              */
             api_url: string;
             /**
-             * Auth Token
-             * @description Auth token with org:read and project:read. Omit to keep the stored one (update only); not needed for synthetic://.
+             * Auth
+             * @description Auth token with org:read and project:read, inline or as a shared credential; not needed for synthetic://.
              */
-            auth_token?: string | null;
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuthInput"] | components["schemas"]["CredentialRef"];
             /**
              * Environment
              * @description Analyse only this environment; null analyses all of them.
@@ -1661,6 +1791,33 @@ export interface components {
             /** Start */
             start: string;
         };
+        /** TokenAuth */
+        TokenAuth: {
+            /** Token Set */
+            token_set: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "token";
+        };
+        /**
+         * TokenAuthInput
+         * @description The kind's API token: Cloudflare API token, Sentry auth token, Grafana service account
+         *     token.
+         */
+        TokenAuthInput: {
+            /**
+             * Token
+             * @description Omit to keep the stored token (update only).
+             */
+            token?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "token";
+        };
         /**
          * TrendBucketStatus
          * @enum {string}
@@ -1726,6 +1883,8 @@ export interface components {
             agents?: string[];
             /** Api Url */
             api_url: string;
+            /** Auth */
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["BasicAuth"] | components["schemas"]["CredentialAuth"];
             /** Groups */
             groups?: string[];
             /**
@@ -1745,15 +1904,11 @@ export interface components {
              * @default wazuh-monitoring-*
              */
             monitoring_index_pattern: string;
-            /** Password Set */
-            password_set: boolean;
             /**
              * Tls Verify
              * @default true
              */
             tls_verify: boolean;
-            /** Username */
-            username?: string | null;
         };
         /**
          * WazuhSourceInput
@@ -1773,6 +1928,11 @@ export interface components {
              * @description Wazuh indexer URL, e.g. https://wazuh-indexer:9200 (path prefixes are kept); synthetic://<scenario> for demo data.
              */
             api_url: string;
+            /**
+             * Auth
+             * @description Indexer user with read access to the alerts indices (basic), inline or as a shared credential; not needed for synthetic://.
+             */
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["BasicAuthInput"] | components["schemas"]["CredentialRef"];
             /**
              * Groups
              * @description Agent groups; their current members (from the monitoring index) are analysed together with the named agents.
@@ -1802,21 +1962,11 @@ export interface components {
              */
             monitoring_index_pattern: string;
             /**
-             * Password
-             * @description Omit to keep the stored password (update only); not needed for synthetic://.
-             */
-            password?: string | null;
-            /**
              * Tls Verify
              * @description Verify the indexer's TLS certificate; turn off only for a self-signed or internal certificate (the Wazuh default).
              * @default true
              */
             tls_verify: boolean;
-            /**
-             * Username
-             * @description Indexer user with read access to the alerts indices; not needed for synthetic://.
-             */
-            username?: string | null;
         };
         /**
          * Weekday
@@ -2098,6 +2248,216 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuntimeConfig"];
+                };
+            };
+        };
+    };
+    list_credentials_api_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialList"];
+                };
+            };
+        };
+    };
+    create_credential_api_credentials_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredentialInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Credential"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    get_credential_api_credentials__credential_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Credential"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_credential_api_credentials__credential_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredentialInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Credential"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    delete_credential_api_credentials__credential_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

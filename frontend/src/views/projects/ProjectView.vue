@@ -22,9 +22,9 @@ import {
   sourceHost,
   wazuhSource,
 } from "../../lib/projects";
+import { authSummary } from "../../lib/auth";
 
 const HISTORY_PAGE_SIZE = 20;
-const AUTH_LABELS: Record<string, string> = { none: "No authentication", bearer: "Bearer token", basic: "Basic auth" };
 
 const props = defineProps<{ projectId: string }>();
 
@@ -72,7 +72,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
           <dd v-if="prometheus">
             <SourceHealth :project="project.data.value" kind="prometheus" />
             <span class="mono">{{ sourceHost(prometheus.url) }}</span>
-            · {{ AUTH_LABELS[prometheus.auth.type] }}<template v-if="!prometheus.tls_verify"> · TLS not verified</template>
+            · {{ authSummary("prometheus", prometheus.auth) }}<template v-if="!prometheus.tls_verify"> · TLS not verified</template>
             <MatcherChips class="chips" :matchers="project.data.value.matchers" />
             <ul v-if="prometheus.custom_rules?.length" class="custom-rules" aria-label="Custom rules">
               <li v-for="r in prometheus.custom_rules" :key="r.slug">
@@ -87,6 +87,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
             zone <span class="mono">{{ cloudflare.zone_id }}</span>
             <template v-if="cloudflare.api_url.startsWith('synthetic:')"> · <span class="mono">{{ sourceHost(cloudflare.api_url) }}</span></template>
             <template v-if="!cloudflare.hostnames.length"> · all hostnames</template>
+            <template v-if="cloudflare.auth.type === 'credential'"> · {{ authSummary("cloudflare", cloudflare.auth) }}</template>
             <MatcherChips v-else class="chips" label="Cloudflare hostname filter" :matchers="cloudflareFilters(cloudflare)" />
           </dd>
           <dd v-else class="muted">Not configured</dd>
@@ -97,6 +98,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
             · org <span class="mono">{{ sentry.organization }}</span>
             <template v-if="!sentry.environment"> · all environments</template>
             <template v-if="sentry.tls_verify === false"> · TLS not verified</template>
+            <template v-if="sentry.auth.type === 'credential'"> · {{ authSummary("sentry", sentry.auth) }}</template>
             <MatcherChips class="chips" label="Sentry filters" :matchers="sentryFilters(sentry)" />
           </dd>
           <dd v-else class="muted">Not configured</dd>
@@ -107,6 +109,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
             · {{ [...(wazuh.agents ?? []), ...(wazuh.groups ?? []).map((g) => `group ${g}`)].join(", ") || "agents by label" }}
             <template v-if="wazuh.index_pattern !== WAZUH_INDEX_PATTERN"> · <span class="mono">{{ wazuh.index_pattern }}</span></template>
             <template v-if="wazuh.tls_verify === false"> · TLS not verified</template>
+            <template v-if="wazuh.auth.type === 'credential'"> · {{ authSummary("wazuh", wazuh.auth) }}</template>
             <MatcherChips
               v-if="wazuh.labels?.length"
               class="chips"
@@ -122,6 +125,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
             · {{ grafanaRules }}
             <template v-if="(grafana.org_id ?? 1) !== 1"> · org {{ grafana.org_id }}</template>
             <template v-if="grafana.tls_verify === false"> · TLS not verified</template>
+            <template v-if="grafana.auth.type === 'credential'"> · {{ authSummary("grafana", grafana.auth) }}</template>
             <MatcherChips v-if="grafana.rule_labels?.length" class="chips" label="Grafana rule labels" :matchers="grafana.rule_labels" />
             <MatcherChips
               v-if="grafana.instance_labels?.length"

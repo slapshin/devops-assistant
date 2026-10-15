@@ -30,6 +30,9 @@ export type ErrorKindActivity = Schemas["ErrorKindActivity"];
 export type CustomRule = Schemas["CustomRule"];
 export type CustomRulePreview = Schemas["CustomRulePreview"];
 export type CustomRulePreviewRequest = Schemas["CustomRulePreviewRequest"];
+export type Credential = Schemas["Credential"];
+export type CredentialList = Schemas["CredentialList"];
+export type CredentialInput = Schemas["CredentialInput"];
 
 /** Error carrying an RFC 9457 problem body, or a synthetic one for network failures. */
 export class ApiError extends Error {

@@ -1,13 +1,12 @@
 """Projects: user-managed analysis scopes and the sources they are analysed from (T011, T014).
 
 A project holds at most one data source per kind; its equality label matchers select the
-series of its Prometheus source. Secrets are write-only: input models accept them, read models
-only say whether one is stored. New source kinds are added as new members
-of ``SourceKind`` and of the source unions without changing storage.
+series of its Prometheus source. Each source authenticates with one of its kind's mechanisms
+(``app.domain.auth``), inline or through a shared credential. New source kinds are added as new
+members of ``SourceKind`` and of the source unions without changing storage.
 """
 
 import re
-from enum import StrEnum
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
@@ -22,6 +21,19 @@ from pydantic import (
     model_validator,
 )
 
+from app.domain.auth import (
+    CloudflareAuth,
+    CloudflareAuthInput,
+    GrafanaAuth,
+    GrafanaAuthInput,
+    NoAuth,
+    PrometheusAuth,
+    PrometheusAuthInput,
+    SentryAuth,
+    SentryAuthInput,
+    WazuhAuth,
+    WazuhAuthInput,
+)
 from app.domain.common import (
     Contract,
     LabelMatcher,
@@ -62,6 +74,8 @@ _GRAFANA_UID = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 MAX_GRAFANA_FOLDERS = 20
 MAX_GRAFANA_RULES = 100
 MAX_GRAFANA_FOLDER_CHARS = 255
+SECRET_REQUIRED_KINDS = frozenset({SourceKind.CLOUDFLARE, SourceKind.SENTRY, SourceKind.GRAFANA})
+"""Kinds whose API always needs a secret (except synthetic://)."""
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
 )
@@ -89,42 +103,14 @@ def validate_source_url(value: str) -> str:
     return value.rstrip("/")
 
 
-class AuthType(StrEnum):
-    NONE = "none"
-    BEARER = "bearer"
-    BASIC = "basic"
-
-
-class NoAuth(Contract):
-    type: Literal[AuthType.NONE] = AuthType.NONE
-
-
 # --- write models -----------------------------------------------------------------------------
-
-
-class BearerAuthInput(Contract):
-    type: Literal[AuthType.BEARER] = AuthType.BEARER
-    token: SecretStr | None = Field(
-        default=None, description="Omit to keep the stored token (update only)."
-    )
-
-
-class BasicAuthInput(Contract):
-    type: Literal[AuthType.BASIC] = AuthType.BASIC
-    username: str = Field(min_length=1, max_length=256)
-    password: SecretStr | None = Field(
-        default=None, description="Omit to keep the stored password (update only)."
-    )
-
-
-AuthInput = Annotated[NoAuth | BearerAuthInput | BasicAuthInput, Field(discriminator="type")]
 
 
 class PrometheusSourceInput(Contract):
     kind: Literal[SourceKind.PROMETHEUS] = SourceKind.PROMETHEUS
     url: str = Field(max_length=2048)
     tls_verify: bool = True
-    auth: AuthInput = Field(default_factory=NoAuth)
+    auth: PrometheusAuthInput = Field(default_factory=NoAuth)
     custom_rules: CustomRules = Field(
         default_factory=list,
         description=f"User-written PromQL rules analysed with the catalog (at most "
@@ -147,16 +133,15 @@ class CloudflareSourceInput(Contract):
         max_length=MAX_HOSTNAMES,
         description="Analyse only these hostnames; empty analyses the whole zone.",
     )
-    api_token: SecretStr | None = Field(
-        default=None,
-        description="API token with Analytics:Read on the zone (and optionally Zone:Read, to "
-        "show its domain). Omit to keep the stored one (update only); not needed for "
-        "synthetic://.",
-    )
     api_url: str = Field(
         default=CLOUDFLARE_GRAPHQL_URL,
         max_length=2048,
         description="GraphQL endpoint; synthetic://<scenario> for demo data.",
+    )
+    auth: CloudflareAuthInput = Field(
+        default_factory=NoAuth,
+        description="API token with Analytics:Read on the zone (and optionally Zone:Read, to "
+        "show its domain), inline or as a shared credential; not needed for synthetic://.",
     )
 
     @field_validator("zone_id")
@@ -246,11 +231,6 @@ class SentrySourceInput(Contract):
         default_factory=list,
         description="Tag filters applied to every project, all of which must match.",
     )
-    auth_token: SecretStr | None = Field(
-        default=None,
-        description="Auth token with org:read and project:read. Omit to keep the stored one "
-        "(update only); not needed for synthetic://.",
-    )
     api_url: str = Field(
         default=SENTRY_URL,
         max_length=2048,
@@ -262,6 +242,11 @@ class SentrySourceInput(Contract):
         default=True,
         description="Verify the server's TLS certificate; turn off only for a self-hosted "
         "Sentry with a self-signed or internal certificate.",
+    )
+    auth: SentryAuthInput = Field(
+        default_factory=NoAuth,
+        description="Auth token with org:read and project:read, inline or as a shared "
+        "credential; not needed for synthetic://.",
     )
 
     @field_validator("organization")
@@ -391,20 +376,15 @@ class WazuhSourceInput(Contract):
         description="Index of the agent snapshots the Wazuh dashboard writes; used to resolve "
         "groups.",
     )
-    username: str | None = Field(
-        default=None,
-        max_length=256,
-        description="Indexer user with read access to the alerts indices; not needed for "
-        "synthetic://.",
-    )
-    password: SecretStr | None = Field(
-        default=None,
-        description="Omit to keep the stored password (update only); not needed for synthetic://.",
-    )
     tls_verify: bool = Field(
         default=True,
         description="Verify the indexer's TLS certificate; turn off only for a self-signed or "
         "internal certificate (the Wazuh default).",
+    )
+    auth: WazuhAuthInput = Field(
+        default_factory=NoAuth,
+        description="Indexer user with read access to the alerts indices (basic), inline or "
+        "as a shared credential; not needed for synthetic://.",
     )
 
     @field_validator("api_url")
@@ -416,11 +396,6 @@ class WazuhSourceInput(Contract):
     @classmethod
     def _valid_index_pattern(cls, value: str) -> str:
         return validate_index_pattern(value)
-
-    @field_validator("username")
-    @classmethod
-    def _strip_username(cls, value: str | None) -> str | None:
-        return (value or "").strip() or None
 
     @model_validator(mode="after")
     def _selects_agents(self) -> WazuhSourceInput:
@@ -483,15 +458,15 @@ class GrafanaSourceInput(Contract):
         description="Alert instance label matchers (e.g. project=shop), all of which must "
         "match; instances without them are not counted.",
     )
-    token: SecretStr | None = Field(
-        default=None,
-        description="Service account token (Viewer role). Omit to keep the stored one (update "
-        "only); not needed for synthetic://.",
-    )
     tls_verify: bool = Field(
         default=True,
         description="Verify Grafana's TLS certificate; turn off only for a self-signed or "
         "internal certificate.",
+    )
+    auth: GrafanaAuthInput = Field(
+        default_factory=NoAuth,
+        description="Service account token (Viewer role), inline or as a shared credential; "
+        "not needed for synthetic://.",
     )
 
     @field_validator("api_url")
@@ -593,25 +568,11 @@ def require_matchers(matchers: list[LabelMatcher], kinds: list[SourceKind]) -> l
 # --- read models ------------------------------------------------------------------------------
 
 
-class BearerAuth(Contract):
-    type: Literal[AuthType.BEARER] = AuthType.BEARER
-    token_set: bool
-
-
-class BasicAuth(Contract):
-    type: Literal[AuthType.BASIC] = AuthType.BASIC
-    username: str
-    password_set: bool
-
-
-Auth = Annotated[NoAuth | BearerAuth | BasicAuth, Field(discriminator="type")]
-
-
 class PrometheusSource(Contract):
     kind: Literal[SourceKind.PROMETHEUS] = SourceKind.PROMETHEUS
     url: str
     tls_verify: bool
-    auth: Auth
+    auth: PrometheusAuth
     custom_rules: list[CustomRule] = Field(default_factory=list)
 
 
@@ -620,7 +581,7 @@ class CloudflareSource(Contract):
     zone_id: str
     hostnames: list[str]
     api_url: str
-    token_set: bool
+    auth: CloudflareAuth
 
 
 class SentrySource(Contract):
@@ -631,7 +592,7 @@ class SentrySource(Contract):
     tags: list[SentryTag] = Field(default_factory=list)
     api_url: str
     tls_verify: bool = True
-    token_set: bool
+    auth: SentryAuth
 
 
 class WazuhSource(Contract):
@@ -642,9 +603,8 @@ class WazuhSource(Contract):
     groups: list[str] = Field(default_factory=list)
     labels: list[WazuhLabel] = Field(default_factory=list)
     monitoring_index_pattern: str = WAZUH_MONITORING_INDEX_PATTERN
-    username: str | None = None
     tls_verify: bool = True
-    password_set: bool
+    auth: WazuhAuth
 
 
 class GrafanaSource(Contract):
@@ -656,7 +616,7 @@ class GrafanaSource(Contract):
     rule_labels: list[LabelMatcher] = Field(default_factory=list)
     instance_labels: list[LabelMatcher] = Field(default_factory=list)
     tls_verify: bool = True
-    token_set: bool
+    auth: GrafanaAuth
 
 
 AnySource = PrometheusSource | CloudflareSource | SentrySource | WazuhSource | GrafanaSource

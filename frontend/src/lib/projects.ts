@@ -1,4 +1,5 @@
 import type { AnalysisReport, ConnectionTest, LabelMatcher, Problem, ProjectInput, ProjectSummary, ReportSchedule, SourceInfo, SourceKind, Weekday } from "../api/client";
+import { type AuthDraft, authDraftFrom, authInput, emptyAuth, validateAuth } from "./auth";
 import { type CustomRuleDraft, ruleDraftFrom, ruleInput, validateCustomRules } from "./customRules";
 
 /** Mirrors backend/app/domain/common.py and projects.py so most mistakes never reach the server. */
@@ -36,8 +37,6 @@ const GRAFANA_UID = /^[A-Za-z0-9_-]{1,40}$/;
 export const MAX_GRAFANA_FOLDERS = 20;
 export const MAX_GRAFANA_RULES = 100;
 const MAX_GRAFANA_FOLDER_CHARS = 255;
-
-export type AuthType = "none" | "bearer" | "basic";
 
 /** Mirrors backend/app/domain/schedule.py. */
 const LOCAL_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -105,17 +104,14 @@ export interface ProjectDraft {
   /** Prometheus source; an empty URL means none. */
   url: string;
   tlsVerify: boolean;
-  authType: AuthType;
-  token: string;
-  username: string;
-  password: string;
+  /** Authentication of each source kind (kept while a source is switched off). */
+  auth: Record<SourceKind, AuthDraft>;
   /** Custom rules of the Prometheus source, in collection order. */
   customRules: CustomRuleDraft[];
   cloudflare: boolean;
   zoneId: string;
   /** Comma- or space-separated; empty analyses the whole zone. */
   hostnames: string;
-  cfToken: string;
   cfApiUrl: string;
   sentry: boolean;
   sentryOrg: string;
@@ -125,7 +121,6 @@ export interface ProjectDraft {
   sentryTags: TagDraft[];
   /** Empty analyses every environment. */
   sentryEnvironment: string;
-  sentryToken: string;
   sentryApiUrl: string;
   sentryTlsVerify: boolean;
   wazuh: boolean;
@@ -138,8 +133,6 @@ export interface ProjectDraft {
   /** Agent label filters; rows left completely empty are ignored. */
   wazuhLabels: TagDraft[];
   wazuhIndex: string;
-  wazuhUsername: string;
-  wazuhPassword: string;
   wazuhTlsVerify: boolean;
   grafana: boolean;
   grafanaUrl: string;
@@ -152,7 +145,6 @@ export interface ProjectDraft {
   grafanaRuleLabels: MatcherDraft[];
   /** Alert instance label matchers; rows left completely empty are ignored. */
   grafanaInstanceLabels: MatcherDraft[];
-  grafanaToken: string;
   grafanaTlsVerify: boolean;
   scheduled: boolean;
   scheduleTime: string;
@@ -162,13 +154,8 @@ export interface ProjectDraft {
   keepReports: number;
 }
 
-/** Which secret is already stored server-side, so an empty secret input keeps it. */
-export interface StoredAuth {
-  type: AuthType;
-  secretSet: boolean;
-}
-
-export type FieldErrors = Record<string, string>;
+export type { FieldErrors } from "./auth";
+import type { FieldErrors } from "./auth";
 
 export function emptyDraft(): ProjectDraft {
   return {
@@ -180,22 +167,23 @@ export function emptyDraft(): ProjectDraft {
     ],
     url: "",
     tlsVerify: true,
-    authType: "none",
-    token: "",
-    username: "",
-    password: "",
+    auth: {
+      prometheus: emptyAuth("prometheus"),
+      cloudflare: emptyAuth("cloudflare"),
+      sentry: emptyAuth("sentry"),
+      wazuh: emptyAuth("wazuh"),
+      grafana: emptyAuth("grafana"),
+    },
     customRules: [],
     cloudflare: false,
     zoneId: "",
     hostnames: "",
-    cfToken: "",
     cfApiUrl: CLOUDFLARE_GRAPHQL_URL,
     sentry: false,
     sentryOrg: "",
     sentryProjects: "",
     sentryTags: [],
     sentryEnvironment: "",
-    sentryToken: "",
     sentryApiUrl: SENTRY_URL,
     sentryTlsVerify: true,
     wazuh: false,
@@ -205,8 +193,6 @@ export function emptyDraft(): ProjectDraft {
     wazuhMonitoringIndex: WAZUH_MONITORING_INDEX_PATTERN,
     wazuhLabels: [],
     wazuhIndex: WAZUH_INDEX_PATTERN,
-    wazuhUsername: "",
-    wazuhPassword: "",
     wazuhTlsVerify: true,
     grafana: false,
     grafanaUrl: "",
@@ -215,7 +201,6 @@ export function emptyDraft(): ProjectDraft {
     grafanaRuleUids: "",
     grafanaRuleLabels: [],
     grafanaInstanceLabels: [],
-    grafanaToken: "",
     grafanaTlsVerify: true,
     scheduled: false,
     scheduleTime: DEFAULT_SCHEDULE_TIME,
@@ -269,29 +254,29 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
   const sentry = sentrySource(project);
   const wazuh = wazuhSource(project);
   const grafana = grafanaSource(project);
-  const auth = source?.auth;
   return {
     name: project.name,
     description: project.description ?? "",
     matchers: project.matchers.map((m) => ({ ...m })),
     url: source?.url ?? "",
     tlsVerify: source?.tls_verify ?? true,
-    authType: auth?.type ?? "none",
-    token: "",
-    username: auth?.type === "basic" ? auth.username : "",
-    password: "",
+    auth: {
+      prometheus: authDraftFrom("prometheus", source?.auth),
+      cloudflare: authDraftFrom("cloudflare", cloudflare?.auth),
+      sentry: authDraftFrom("sentry", sentry?.auth),
+      wazuh: authDraftFrom("wazuh", wazuh?.auth),
+      grafana: authDraftFrom("grafana", grafana?.auth),
+    },
     customRules: (source?.custom_rules ?? []).map(ruleDraftFrom),
     cloudflare: !!cloudflare,
     zoneId: cloudflare?.zone_id ?? "",
     hostnames: cloudflare?.hostnames.join(", ") ?? "",
-    cfToken: "",
     cfApiUrl: cloudflare?.api_url ?? CLOUDFLARE_GRAPHQL_URL,
     sentry: !!sentry,
     sentryOrg: sentry?.organization ?? "",
     sentryProjects: sentry?.projects.join(", ") ?? "",
     sentryTags: sentry?.tags?.map((t) => ({ ...t })) ?? [],
     sentryEnvironment: sentry?.environment ?? "",
-    sentryToken: "",
     sentryApiUrl: sentry?.api_url ?? SENTRY_URL,
     sentryTlsVerify: sentry?.tls_verify ?? true,
     wazuh: !!wazuh,
@@ -301,8 +286,6 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     wazuhMonitoringIndex: wazuh?.monitoring_index_pattern ?? WAZUH_MONITORING_INDEX_PATTERN,
     wazuhLabels: wazuh?.labels?.map((l) => ({ ...l })) ?? [],
     wazuhIndex: wazuh?.index_pattern ?? WAZUH_INDEX_PATTERN,
-    wazuhUsername: wazuh?.username ?? "",
-    wazuhPassword: "",
     wazuhTlsVerify: wazuh?.tls_verify ?? true,
     grafana: !!grafana,
     grafanaUrl: grafana?.api_url ?? "",
@@ -311,7 +294,6 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     grafanaRuleUids: grafana?.rule_uids?.join(", ") ?? "",
     grafanaRuleLabels: grafana?.rule_labels?.map((m) => ({ ...m })) ?? [],
     grafanaInstanceLabels: grafana?.instance_labels?.map((m) => ({ ...m })) ?? [],
-    grafanaToken: "",
     grafanaTlsVerify: grafana?.tls_verify ?? true,
     scheduled: !!project.schedule,
     scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
@@ -326,30 +308,6 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
 export function cloneDraft(project: ProjectSummary): ProjectDraft {
   return { ...draftFrom(project), name: `${project.name} (copy)`.slice(0, MAX_NAME_CHARS) };
 }
-
-export function storedAuth(project: ProjectSummary | null | undefined): StoredAuth | null {
-  const auth = prometheusSource(project)?.auth;
-  if (!auth) return null;
-  if (auth.type === "bearer") return { type: "bearer", secretSet: auth.token_set };
-  if (auth.type === "basic") return { type: "basic", secretSet: auth.password_set };
-  return { type: "none", secretSet: false };
-}
-
-/** True when the project stores a Cloudflare API token an empty token input keeps. */
-export const storedCloudflareToken = (project: ProjectSummary | null | undefined) => !!cloudflareSource(project)?.token_set;
-
-/** True when the project stores a Sentry auth token an empty token input keeps. */
-export const storedSentryToken = (project: ProjectSummary | null | undefined) => !!sentrySource(project)?.token_set;
-
-/** True when the project stores a Wazuh indexer password an empty password input keeps. */
-export const storedWazuhPassword = (project: ProjectSummary | null | undefined) => !!wazuhSource(project)?.password_set;
-
-/** True when the project stores a Grafana service account token an empty token input keeps. */
-export const storedGrafanaToken = (project: ProjectSummary | null | undefined) => !!grafanaSource(project)?.token_set;
-
-/** True when the empty secret input for the chosen auth type keeps a stored secret. */
-export const keepsStoredSecret = (draft: ProjectDraft, stored: StoredAuth | null) =>
-  !!stored && stored.type === draft.authType && stored.secretSet;
 
 /** Lower-cased, unique, sorted items of a comma- or space-separated list. */
 export function parseList(raw: string): string[] {
@@ -412,7 +370,7 @@ export function validateMatchers(matchers: MatcherDraft[], required = true): Fie
   return errors;
 }
 
-export function validateSource(draft: ProjectDraft, stored: StoredAuth | null, required = false): FieldErrors {
+export function validateSource(draft: ProjectDraft, required = false): FieldErrors {
   const errors: FieldErrors = {};
   const url = draft.url.trim();
   if (!url) {
@@ -422,16 +380,10 @@ export function validateSource(draft: ProjectDraft, stored: StoredAuth | null, r
 
   const bad = urlError(url);
   if (bad) errors["prometheus.url"] = bad;
-  const keeps = keepsStoredSecret(draft, stored);
-  if (draft.authType === "bearer" && !draft.token && !keeps) errors["prometheus.auth.token"] = "Required";
-  if (draft.authType === "basic") {
-    if (!draft.username.trim()) errors["prometheus.auth.username"] = "Required";
-    if (!draft.password && !keeps) errors["prometheus.auth.password"] = "Required";
-  }
-  return errors;
+  return { ...errors, ...validateAuth("prometheus", draft.auth.prometheus) };
 }
 
-export function validateCloudflare(draft: ProjectDraft, tokenStored: boolean): FieldErrors {
+export function validateCloudflare(draft: ProjectDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!draft.cloudflare) return errors;
   if (!ZONE_ID.test(draft.zoneId.trim().toLowerCase())) errors["cloudflare.zone_id"] = "Expected a zone ID of 32 hex characters";
@@ -443,11 +395,10 @@ export function validateCloudflare(draft: ProjectDraft, tokenStored: boolean): F
   const badUrl = apiUrl ? urlError(apiUrl) : "Required";
   if (badUrl) errors["cloudflare.api_url"] = badUrl;
   const synthetic = apiUrl.startsWith("synthetic:");
-  if (!draft.cfToken && !tokenStored && !synthetic) errors["cloudflare.api_token"] = "Required";
-  return errors;
+  return { ...errors, ...validateAuth("cloudflare", draft.auth.cloudflare, synthetic) };
 }
 
-export function validateSentry(draft: ProjectDraft, tokenStored: boolean): FieldErrors {
+export function validateSentry(draft: ProjectDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!draft.sentry) return errors;
   const slugError = "Lower-case letters, digits, - and _";
@@ -464,8 +415,7 @@ export function validateSentry(draft: ProjectDraft, tokenStored: boolean): Field
   const badUrl = apiUrl ? urlError(apiUrl) : "Required";
   if (badUrl) errors["sentry.api_url"] = badUrl;
   const synthetic = apiUrl.startsWith("synthetic:");
-  if (!draft.sentryToken && !tokenStored && !synthetic) errors["sentry.auth_token"] = "Required";
-  return errors;
+  return { ...errors, ...validateAuth("sentry", draft.auth.sentry, synthetic) };
 }
 
 export function validateSentryTags(tags: TagDraft[]): FieldErrors {
@@ -487,7 +437,7 @@ export function validateSentryTags(tags: TagDraft[]): FieldErrors {
 
 const usedTags = (tags: TagDraft[]) => tags.filter((t) => t.key.trim() || t.value);
 
-export function validateWazuh(draft: ProjectDraft, passwordStored: boolean): FieldErrors {
+export function validateWazuh(draft: ProjectDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!draft.wazuh) return errors;
   const apiUrl = draft.wazuhUrl.trim();
@@ -518,8 +468,7 @@ export function validateWazuh(draft: ProjectDraft, passwordStored: boolean): Fie
   if (!agents.length && !groups.length && !labels.length) errors["wazuh.agents"] ??= "Select agents by name, group or label";
   if (!WAZUH_INDEX.test(draft.wazuhIndex.trim())) errors["wazuh.index_pattern"] = "One lower-case index pattern, e.g. wazuh-alerts-4.x-*";
   const synthetic = apiUrl.startsWith("synthetic:");
-  if (draft.wazuhUsername.trim() && !draft.wazuhPassword && !passwordStored && !synthetic) errors["wazuh.password"] = "Required";
-  return errors;
+  return { ...errors, ...validateAuth("wazuh", draft.auth.wazuh, synthetic) };
 }
 
 const usedMatchers = (rows: MatcherDraft[]) => rows.filter((m) => m.name.trim() || m.value);
@@ -542,7 +491,7 @@ function validateMatcherRows(rows: MatcherDraft[], field: string): FieldErrors {
   return errors;
 }
 
-export function validateGrafana(draft: ProjectDraft, tokenStored: boolean): FieldErrors {
+export function validateGrafana(draft: ProjectDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!draft.grafana) return errors;
   const apiUrl = draft.grafanaUrl.trim();
@@ -562,8 +511,7 @@ export function validateGrafana(draft: ProjectDraft, tokenStored: boolean): Fiel
     errors["grafana.folders"] ??= "Select alert rules by folder, UID or rule label";
   }
   const synthetic = apiUrl.startsWith("synthetic:");
-  if (!draft.grafanaToken && !tokenStored && !synthetic) errors["grafana.token"] = "Required";
-  return errors;
+  return { ...errors, ...validateAuth("grafana", draft.auth.grafana, synthetic) };
 }
 
 export function validateSchedule(draft: ProjectDraft): FieldErrors {
@@ -582,20 +530,13 @@ export function validateRetention(draft: ProjectDraft): FieldErrors {
   return {};
 }
 
-export function validateDraft(
-  draft: ProjectDraft,
-  stored: StoredAuth | null,
-  cfTokenStored = false,
-  sentryTokenStored = false,
-  wazuhPasswordStored = false,
-  grafanaTokenStored = false,
-): FieldErrors {
+export function validateDraft(draft: ProjectDraft): FieldErrors {
   const errors: FieldErrors = {};
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
   const rules = draft.url.trim() ? validateCustomRules(draft.customRules) : {};
-  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft, stored), ...rules, ...validateCloudflare(draft, cfTokenStored), ...validateSentry(draft, sentryTokenStored), ...validateWazuh(draft, wazuhPasswordStored), ...validateGrafana(draft, grafanaTokenStored), ...validateSchedule(draft), ...validateRetention(draft) };
+  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft), ...rules, ...validateCloudflare(draft), ...validateSentry(draft), ...validateWazuh(draft), ...validateGrafana(draft), ...validateSchedule(draft), ...validateRetention(draft) };
 }
 
 type SourceInput = NonNullable<ProjectInput["sources"]>[number];
@@ -603,17 +544,11 @@ type SourceInput = NonNullable<ProjectInput["sources"]>[number];
 type PrometheusSourceInput = Extract<SourceInput, { kind: "prometheus" }>;
 
 export function prometheusInput(draft: ProjectDraft): PrometheusSourceInput {
-  const auth =
-    draft.authType === "bearer"
-      ? { type: "bearer" as const, ...(draft.token ? { token: draft.token } : {}) }
-      : draft.authType === "basic"
-        ? { type: "basic" as const, username: draft.username.trim(), ...(draft.password ? { password: draft.password } : {}) }
-        : { type: "none" as const };
   return {
     kind: "prometheus",
     url: draft.url.trim(),
     tls_verify: draft.tlsVerify,
-    auth,
+    auth: authInput("prometheus", draft.auth.prometheus) as PrometheusSourceInput["auth"],
     // Omitted is the same as none, so drafts without rules send what they always did.
     ...(draft.customRules.length ? { custom_rules: draft.customRules.map(ruleInput) } : {}),
   };
@@ -625,8 +560,8 @@ export function cloudflareInput(draft: ProjectDraft): SourceInput {
     zone_id: draft.zoneId.trim().toLowerCase(),
     hostnames: parseHostnames(draft.hostnames),
     api_url: draft.cfApiUrl.trim(),
-    ...(draft.cfToken ? { api_token: draft.cfToken } : {}),
-  };
+    auth: authInput("cloudflare", draft.auth.cloudflare),
+  } as SourceInput;
 }
 
 export function sentryInput(draft: ProjectDraft): SourceInput {
@@ -638,8 +573,8 @@ export function sentryInput(draft: ProjectDraft): SourceInput {
     environment: draft.sentryEnvironment.trim() || null,
     api_url: draft.sentryApiUrl.trim(),
     tls_verify: draft.sentryTlsVerify,
-    ...(draft.sentryToken ? { auth_token: draft.sentryToken } : {}),
-  };
+    auth: authInput("sentry", draft.auth.sentry),
+  } as SourceInput;
 }
 
 export function wazuhInput(draft: ProjectDraft): SourceInput {
@@ -651,10 +586,9 @@ export function wazuhInput(draft: ProjectDraft): SourceInput {
     groups: parseNames(draft.wazuhGroups),
     monitoring_index_pattern: draft.wazuhMonitoringIndex.trim() || WAZUH_MONITORING_INDEX_PATTERN,
     labels: usedTags(draft.wazuhLabels).map((l) => ({ key: l.key.trim(), value: l.value })),
-    username: draft.wazuhUsername.trim() || null,
     tls_verify: draft.wazuhTlsVerify,
-    ...(draft.wazuhPassword ? { password: draft.wazuhPassword } : {}),
-  };
+    auth: authInput("wazuh", draft.auth.wazuh),
+  } as SourceInput;
 }
 
 export function grafanaInput(draft: ProjectDraft): SourceInput {
@@ -668,8 +602,8 @@ export function grafanaInput(draft: ProjectDraft): SourceInput {
     rule_labels: matchers(draft.grafanaRuleLabels),
     instance_labels: matchers(draft.grafanaInstanceLabels),
     tls_verify: draft.grafanaTlsVerify,
-    ...(draft.grafanaToken ? { token: draft.grafanaToken } : {}),
-  };
+    auth: authInput("grafana", draft.auth.grafana),
+  } as SourceInput;
 }
 
 /** The input of one configured source kind. */

@@ -12,6 +12,7 @@ import sentryTest from "../../fixtures/api/connection_test_sentry.json";
 import wazuhTest from "../../fixtures/api/connection_test_wazuh.json";
 import grafanaTest from "../../fixtures/api/connection_test_grafana.json";
 import customRulePreview from "../../fixtures/api/custom_rule_preview.json";
+import credentials from "../../fixtures/api/credentials.json";
 import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
@@ -45,6 +46,7 @@ beforeEach(() => {
   routes = {
     "GET /api/config": () => json(config),
     "GET /api/projects": () => json(projects),
+    "GET /api/credentials": () => json({ items: [] }),
   };
 
   localStorage.clear();
@@ -462,7 +464,7 @@ describe("project form", () => {
     expect(result).toHaveTextContent("Reachable · 3,456,789 requests in 24 h · 30 days of history");
     expect(within(result).getByRole("row", { name: /Security \(WAF\).*Supported/ })).toBeInTheDocument();
 
-    const source = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["api.example.com", "shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", api_token: "cf-token" };
+    const source = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["api.example.com", "shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", auth: { type: "token", token: "cf-token" } };
     expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
 
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
@@ -474,7 +476,7 @@ describe("project form", () => {
   });
 
   it("keeps a stored Cloudflare token and maps server errors to the right source", async () => {
-    const cloudflare = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", token_set: true };
+    const cloudflare = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", auth: { type: "token", token_set: true } };
     const both = { ...base, sources: [...base.sources, cloudflare] } as Summary;
     routes[`GET /api/projects/${PID}`] = () => json(both);
     routes[`PUT /api/projects/${PID}`] = () =>
@@ -493,7 +495,7 @@ describe("project form", () => {
 
     const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
     expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "cloudflare"]);
-    expect(put.sources[1]).not.toHaveProperty("api_token");
+    expect(put.sources[1].auth).toEqual({ type: "token" });
   });
 
   it("creates a Sentry project, validates slugs and tests it", async () => {
@@ -545,7 +547,7 @@ describe("project form", () => {
       environment: "production",
       api_url: "https://sentry.io",
       tls_verify: true,
-      auth_token: "sntrys-token",
+      auth: { type: "token", token: "sntrys-token" },
     };
     expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
 
@@ -558,7 +560,7 @@ describe("project form", () => {
 
   it("edits a self-hosted Sentry and keeps its stored token", async () => {
     const url = "https://sentry.internal:9000/sentry";
-    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false, token_set: true };
+    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false, auth: { type: "token", token_set: true } };
 
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, sentry] } as Summary);
     routes[`PUT /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, sentry] });
@@ -582,7 +584,7 @@ describe("project form", () => {
 
     const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
     expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "sentry"]);
-    expect(put.sources[1]).toEqual({ kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false });
+    expect(put.sources[1]).toEqual({ kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false, auth: { type: "token" } });
   });
 
   it("creates a Wazuh source selected by labels and tests it", async () => {
@@ -625,9 +627,8 @@ describe("project form", () => {
       groups: [],
       monitoring_index_pattern: "wazuh-monitoring-*",
       labels: [{ key: "project", value: "shop" }],
-      username: "reader",
       tls_verify: false,
-      password: "s3cret",
+      auth: { type: "basic", username: "reader", password: "s3cret" },
     };
     expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
 
@@ -677,9 +678,8 @@ describe("project form", () => {
       groups: ["ops"],
       monitoring_index_pattern: "wazuh-monitoring-*",
       labels: [],
-      username: "reader",
       tls_verify: true,
-      password_set: true,
+      auth: { type: "basic", username: "reader", password_set: true },
     };
 
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, wazuh] } as Summary);
@@ -699,7 +699,7 @@ describe("project form", () => {
 
     const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
     expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "wazuh"]);
-    expect(put.sources[1]).toEqual({ ...wazuh, password_set: undefined });
+    expect(put.sources[1]).toEqual({ ...wazuh, auth: { type: "basic", username: "reader" } });
     expect(put.sources[1]).not.toHaveProperty("password");
   });
 
@@ -747,7 +747,7 @@ describe("project form", () => {
       rule_labels: [],
       instance_labels: [{ name: "project", op: "=", value: "shop" }],
       tls_verify: true,
-      token: "glsa_token",
+      auth: { type: "token", token: "glsa_token" },
     };
     expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
 
@@ -768,7 +768,7 @@ describe("project form", () => {
       rule_labels: [{ name: "team", op: "=", value: "web" }],
       instance_labels: [{ name: "project", op: "=", value: "shop" }],
       tls_verify: true,
-      token_set: true,
+      auth: { type: "token", token_set: true },
     };
 
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, grafana] } as Summary);
@@ -788,7 +788,7 @@ describe("project form", () => {
 
     const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
     expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "grafana"]);
-    expect(put.sources[1]).toEqual({ ...grafana, token_set: undefined });
+    expect(put.sources[1]).toEqual({ ...grafana, auth: { type: "token" } });
     expect(put.sources[1]).not.toHaveProperty("token");
   });
 
@@ -901,6 +901,109 @@ describe("project form", () => {
   });
 });
 
+describe("shared credentials", () => {
+  const credential = credentials.items[0]!;
+  const grafana = {
+    kind: "grafana",
+    api_url: "https://grafana.example.com",
+    org_id: 1,
+    folders: ["Shop"],
+    rule_uids: [],
+    rule_labels: [],
+    instance_labels: [],
+    tls_verify: true,
+  };
+
+  it("lists credentials with their projects and creates one", async () => {
+    routes["GET /api/credentials"] = () => json(credentials);
+    routes["POST /api/credentials"] = () => json({ ...credential, credential_id: "new-id", name: "Sentry org", kind: "sentry", used_by: [] }, 201);
+    await renderAt("/credentials");
+
+    const row = await screen.findByRole("row", { name: /Grafana production/ });
+    expect(within(row).getByText("Service account token")).toBeInTheDocument();
+    expect(within(row).getByRole("link", { name: base.name })).toHaveAttribute("href", `/projects/${PID}`);
+
+    await fireEvent.click(screen.getByRole("button", { name: "New credential" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create credential" }));
+
+    expect(screen.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Service account token")).toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(screen.getByLabelText("Name"), " Sentry org ");
+    await fireEvent.update(screen.getByLabelText("Source kind"), "sentry");
+    await fireEvent.update(screen.getByLabelText("Auth token"), "sntrys-shared");
+    await fireEvent.click(screen.getByRole("button", { name: "Create credential" }));
+
+    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/credentials")).toBe(true));
+    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/credentials")?.body ?? "{}");
+    expect(sent).toEqual({ name: "Sentry org", description: null, kind: "sentry", auth: { type: "token", token: "sntrys-shared" } });
+  });
+
+  it("keeps a stored secret on edit and explains why a used credential cannot be deleted", async () => {
+    routes["GET /api/credentials"] = () => json(credentials);
+    routes[`PUT /api/credentials/${credential.credential_id}`] = () => json(credential);
+    routes[`DELETE /api/credentials/${credential.credential_id}`] = () =>
+      problem(409, "credential_in_use", "Credential is in use", `Cannot delete it: used by ${base.name}.`);
+    await renderAt("/credentials");
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit Grafana production" }));
+
+    expect(screen.getByLabelText("Service account token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    expect(screen.getByLabelText("Source kind")).toBeDisabled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").auth).toEqual({ type: "token" });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Delete Grafana production" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(`Cannot delete it: used by ${base.name}.`);
+  });
+
+  it("uses a shared credential for a source", async () => {
+    routes["GET /api/credentials"] = () => json(credentials);
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, { ...grafana, auth: { type: "token", token_set: true } }] } as Summary);
+    routes[`PUT /api/projects/${PID}`] = () => json(base);
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    await renderAt(`/projects/${PID}/edit`);
+
+    const group = await screen.findByRole("group", { name: "Grafana alerts" });
+    await fireEvent.update(await within(group).findByLabelText("Authentication"), "credential");
+
+    expect(within(group).queryByLabelText("Service account token")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(within(group).getByLabelText("Shared credential")).toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(within(group).getByLabelText("Shared credential"), credential.credential_id);
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
+    const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
+    expect(put.sources[1]).toEqual({ ...grafana, auth: { type: "credential", credential_id: credential.credential_id } });
+  });
+
+  it("saves an inline token as a shared credential", async () => {
+    routes["POST /api/credentials"] = () => json({ ...credential, credential_id: "made-id", name: "Grafana shared", used_by: [] }, 201);
+    await renderAt("/projects/new");
+
+    await fireEvent.click(await screen.findByLabelText("Analyse Grafana alert rules"));
+    const group = screen.getByRole("group", { name: "Grafana alerts" });
+    await fireEvent.update(within(group).getByLabelText("Service account token"), "glsa_inline");
+    routes["GET /api/credentials"] = () => json({ items: [{ ...credential, credential_id: "made-id", name: "Grafana shared", used_by: [] }] });
+    await fireEvent.click(within(group).getByRole("button", { name: "Save as shared credential…" }));
+    await fireEvent.update(within(group).getByLabelText("Shared credential name"), "Grafana shared");
+    await fireEvent.click(within(group).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(within(group).getByLabelText("Shared credential")).toHaveValue("made-id"));
+    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/credentials")?.body ?? "{}");
+    expect(sent).toEqual({ name: "Grafana shared", kind: "grafana", auth: { type: "token", token: "glsa_inline" } });
+  });
+});
+
 describe("project page", () => {
   it("shows configuration and pages through the analysis history", async () => {
     routes[`GET /api/projects/${PID}`] = () => json(base);
@@ -927,8 +1030,8 @@ describe("project page", () => {
   });
 
   it("shows Cloudflare and Sentry filters as matcher chips", async () => {
-    const cloudflare = { kind: "cloudflare", zone_id: "a".repeat(32), hostnames: ["shop.example.com", "api.example.com"], api_url: "https://api.cloudflare.com/client/v4", token_set: true };
-    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: "production", api_url: "https://sentry.io", tls_verify: true, token_set: true };
+    const cloudflare = { kind: "cloudflare", zone_id: "a".repeat(32), hostnames: ["shop.example.com", "api.example.com"], api_url: "https://api.cloudflare.com/client/v4", auth: { type: "token", token_set: true } };
+    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: "production", api_url: "https://sentry.io", tls_verify: true, auth: { type: "token", token_set: true } };
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, cloudflare, sentry] } as Summary);
     routes[`GET /api/projects/${PID}/health`] = () => json([reachable]);
     routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });

@@ -538,6 +538,7 @@
       },
       "BearerAuthInput": {
         "additionalProperties": false,
+        "description": "``Authorization: Bearer <token>``.",
         "properties": {
           "token": {
             "anyOf": [
@@ -589,6 +590,28 @@
             "title": "Api Url",
             "type": "string"
           },
+          "auth": {
+            "discriminator": {
+              "mapping": {
+                "credential": "#/components/schemas/CredentialAuth",
+                "none": "#/components/schemas/NoAuth",
+                "token": "#/components/schemas/TokenAuth"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/TokenAuth"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialAuth"
+              }
+            ],
+            "title": "Auth"
+          },
           "hostnames": {
             "items": {
               "type": "string"
@@ -602,10 +625,6 @@
             "title": "Kind",
             "type": "string"
           },
-          "token_set": {
-            "title": "Token Set",
-            "type": "boolean"
-          },
           "zone_id": {
             "title": "Zone Id",
             "type": "string"
@@ -615,7 +634,7 @@
           "zone_id",
           "hostnames",
           "api_url",
-          "token_set"
+          "auth"
         ],
         "title": "CloudflareSource",
         "type": "object"
@@ -624,26 +643,35 @@
         "additionalProperties": false,
         "description": "One Cloudflare zone, optionally narrowed to some of its hostnames.",
         "properties": {
-          "api_token": {
-            "anyOf": [
-              {
-                "format": "password",
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain). Omit to keep the stored one (update only); not needed for synthetic://.",
-            "title": "Api Token"
-          },
           "api_url": {
             "default": "https://api.cloudflare.com/client/v4/graphql",
             "description": "GraphQL endpoint; synthetic://<scenario> for demo data.",
             "maxLength": 2048,
             "title": "Api Url",
             "type": "string"
+          },
+          "auth": {
+            "description": "API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain), inline or as a shared credential; not needed for synthetic://.",
+            "discriminator": {
+              "mapping": {
+                "credential": "#/components/schemas/CredentialRef",
+                "none": "#/components/schemas/NoAuth",
+                "token": "#/components/schemas/TokenAuthInput"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/TokenAuthInput"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialRef"
+              }
+            ],
+            "title": "Auth"
           },
           "hostnames": {
             "description": "Analyse only these hostnames; empty analyses the whole zone.",
@@ -809,6 +837,230 @@
           "source"
         ],
         "title": "ConnectionTestRequest",
+        "type": "object"
+      },
+      "Credential": {
+        "additionalProperties": false,
+        "properties": {
+          "auth": {
+            "discriminator": {
+              "mapping": {
+                "basic": "#/components/schemas/BasicAuth",
+                "bearer": "#/components/schemas/BearerAuth",
+                "token": "#/components/schemas/TokenAuth"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BearerAuth"
+              },
+              {
+                "$ref": "#/components/schemas/BasicAuth"
+              },
+              {
+                "$ref": "#/components/schemas/TokenAuth"
+              }
+            ],
+            "title": "Auth"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "credential_id": {
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "readable": {
+            "default": true,
+            "description": "False when the stored secret cannot be decrypted (lost or changed key).",
+            "title": "Readable",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "used_by": {
+            "description": "Projects whose sources use the credential.",
+            "items": {
+              "$ref": "#/components/schemas/CredentialUsage"
+            },
+            "title": "Used By",
+            "type": "array"
+          }
+        },
+        "required": [
+          "credential_id",
+          "name",
+          "kind",
+          "auth",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Credential",
+        "type": "object"
+      },
+      "CredentialAuth": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_id": {
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "name": {
+            "description": "The shared credential's name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "credential",
+            "default": "credential",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "credential_id",
+          "name"
+        ],
+        "title": "CredentialAuth",
+        "type": "object"
+      },
+      "CredentialInput": {
+        "additionalProperties": false,
+        "description": "Body of POST /api/credentials and PUT /api/credentials/{credential_id}.",
+        "properties": {
+          "auth": {
+            "description": "Prometheus: bearer or basic; Wazuh: basic; Cloudflare, Sentry and Grafana: token. Omit the secret on update to keep the stored one.",
+            "discriminator": {
+              "mapping": {
+                "basic": "#/components/schemas/BasicAuthInput",
+                "bearer": "#/components/schemas/BearerAuthInput",
+                "token": "#/components/schemas/TokenAuthInput"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BearerAuthInput"
+              },
+              {
+                "$ref": "#/components/schemas/BasicAuthInput"
+              },
+              {
+                "$ref": "#/components/schemas/TokenAuthInput"
+              }
+            ],
+            "title": "Auth"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind",
+            "description": "Only sources of this kind can use the credential."
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "auth"
+        ],
+        "title": "CredentialInput",
+        "type": "object"
+      },
+      "CredentialList": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Credential"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CredentialList",
+        "type": "object"
+      },
+      "CredentialRef": {
+        "additionalProperties": false,
+        "description": "Use a shared credential of the source's kind; its secret is resolved at each use.",
+        "properties": {
+          "credential_id": {
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "credential",
+            "default": "credential",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "credential_id"
+        ],
+        "title": "CredentialRef",
+        "type": "object"
+      },
+      "CredentialUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "title": "CredentialUsage",
         "type": "object"
       },
       "CustomRule": {
@@ -1351,6 +1603,9 @@
           "project_busy",
           "source_not_configured",
           "credentials_unreadable",
+          "credential_not_found",
+          "credential_name_taken",
+          "credential_in_use",
           "analysis_not_found",
           "report_not_ready",
           "report_unavailable",
@@ -1946,6 +2201,28 @@
             "title": "Api Url",
             "type": "string"
           },
+          "auth": {
+            "discriminator": {
+              "mapping": {
+                "credential": "#/components/schemas/CredentialAuth",
+                "none": "#/components/schemas/NoAuth",
+                "token": "#/components/schemas/TokenAuth"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/TokenAuth"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialAuth"
+              }
+            ],
+            "title": "Auth"
+          },
           "folders": {
             "items": {
               "type": "string"
@@ -1989,15 +2266,11 @@
             "default": true,
             "title": "Tls Verify",
             "type": "boolean"
-          },
-          "token_set": {
-            "title": "Token Set",
-            "type": "boolean"
           }
         },
         "required": [
           "api_url",
-          "token_set"
+          "auth"
         ],
         "title": "GrafanaSource",
         "type": "object"
@@ -2011,6 +2284,29 @@
             "maxLength": 2048,
             "title": "Api Url",
             "type": "string"
+          },
+          "auth": {
+            "description": "Service account token (Viewer role), inline or as a shared credential; not needed for synthetic://.",
+            "discriminator": {
+              "mapping": {
+                "credential": "#/components/schemas/CredentialRef",
+                "none": "#/components/schemas/NoAuth",
+                "token": "#/components/schemas/TokenAuthInput"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/TokenAuthInput"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialRef"
+              }
+            ],
+            "title": "Auth"
           },
           "folders": {
             "description": "Folder UIDs or titles whose alert rules are analysed.",
@@ -2066,20 +2362,6 @@
             "description": "Verify Grafana's TLS certificate; turn off only for a self-signed or internal certificate.",
             "title": "Tls Verify",
             "type": "boolean"
-          },
-          "token": {
-            "anyOf": [
-              {
-                "format": "password",
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Service account token (Viewer role). Omit to keep the stored one (update only); not needed for synthetic://.",
-            "title": "Token"
           }
         },
         "required": [
@@ -2963,6 +3245,7 @@
               "mapping": {
                 "basic": "#/components/schemas/BasicAuth",
                 "bearer": "#/components/schemas/BearerAuth",
+                "credential": "#/components/schemas/CredentialAuth",
                 "none": "#/components/schemas/NoAuth"
               },
               "propertyName": "type"
@@ -2976,6 +3259,9 @@
               },
               {
                 "$ref": "#/components/schemas/BasicAuth"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialAuth"
               }
             ],
             "title": "Auth"
@@ -3018,6 +3304,7 @@
               "mapping": {
                 "basic": "#/components/schemas/BasicAuthInput",
                 "bearer": "#/components/schemas/BearerAuthInput",
+                "credential": "#/components/schemas/CredentialRef",
                 "none": "#/components/schemas/NoAuth"
               },
               "propertyName": "type"
@@ -3031,6 +3318,9 @@
               },
               {
                 "$ref": "#/components/schemas/BasicAuthInput"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialRef"
               }
             ],
             "title": "Auth"
@@ -3250,6 +3540,28 @@
             "title": "Api Url",
             "type": "string"
           },
+          "auth": {
+            "discriminator": {
+              "mapping": {
+                "credential": "#/components/schemas/CredentialAuth",
+                "none": "#/components/schemas/NoAuth",
+                "token": "#/components/schemas/TokenAuth"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/TokenAuth"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialAuth"
+              }
+            ],
+            "title": "Auth"
+          },
           "environment": {
             "anyOf": [
               {
@@ -3289,17 +3601,13 @@
             "default": true,
             "title": "Tls Verify",
             "type": "boolean"
-          },
-          "token_set": {
-            "title": "Token Set",
-            "type": "boolean"
           }
         },
         "required": [
           "organization",
           "projects",
           "api_url",
-          "token_set"
+          "auth"
         ],
         "title": "SentrySource",
         "type": "object"
@@ -3315,19 +3623,28 @@
             "title": "Api Url",
             "type": "string"
           },
-          "auth_token": {
-            "anyOf": [
+          "auth": {
+            "description": "Auth token with org:read and project:read, inline or as a shared credential; not needed for synthetic://.",
+            "discriminator": {
+              "mapping": {
+                "credential": "#/components/schemas/CredentialRef",
+                "none": "#/components/schemas/NoAuth",
+                "token": "#/components/schemas/TokenAuthInput"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
               {
-                "format": "password",
-                "type": "string",
-                "writeOnly": true
+                "$ref": "#/components/schemas/NoAuth"
               },
               {
-                "type": "null"
+                "$ref": "#/components/schemas/TokenAuthInput"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialRef"
               }
             ],
-            "description": "Auth token with org:read and project:read. Omit to keep the stored one (update only); not needed for synthetic://.",
-            "title": "Auth Token"
+            "title": "Auth"
           },
           "environment": {
             "anyOf": [
@@ -3688,6 +4005,54 @@
         "title": "TimeRange",
         "type": "object"
       },
+      "TokenAuth": {
+        "additionalProperties": false,
+        "properties": {
+          "token_set": {
+            "title": "Token Set",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "token",
+            "default": "token",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token_set"
+        ],
+        "title": "TokenAuth",
+        "type": "object"
+      },
+      "TokenAuthInput": {
+        "additionalProperties": false,
+        "description": "The kind's API token: Cloudflare API token, Sentry auth token, Grafana service account\ntoken.",
+        "properties": {
+          "token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to keep the stored token (update only).",
+            "title": "Token"
+          },
+          "type": {
+            "const": "token",
+            "default": "token",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "TokenAuthInput",
+        "type": "object"
+      },
       "TrendBucketStatus": {
         "enum": [
           "ok",
@@ -3861,6 +4226,28 @@
             "title": "Api Url",
             "type": "string"
           },
+          "auth": {
+            "discriminator": {
+              "mapping": {
+                "basic": "#/components/schemas/BasicAuth",
+                "credential": "#/components/schemas/CredentialAuth",
+                "none": "#/components/schemas/NoAuth"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/BasicAuth"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialAuth"
+              }
+            ],
+            "title": "Auth"
+          },
           "groups": {
             "items": {
               "type": "string"
@@ -3891,30 +4278,15 @@
             "title": "Monitoring Index Pattern",
             "type": "string"
           },
-          "password_set": {
-            "title": "Password Set",
-            "type": "boolean"
-          },
           "tls_verify": {
             "default": true,
             "title": "Tls Verify",
             "type": "boolean"
-          },
-          "username": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Username"
           }
         },
         "required": [
           "api_url",
-          "password_set"
+          "auth"
         ],
         "title": "WazuhSource",
         "type": "object"
@@ -3937,6 +4309,29 @@
             "maxLength": 2048,
             "title": "Api Url",
             "type": "string"
+          },
+          "auth": {
+            "description": "Indexer user with read access to the alerts indices (basic), inline or as a shared credential; not needed for synthetic://.",
+            "discriminator": {
+              "mapping": {
+                "basic": "#/components/schemas/BasicAuthInput",
+                "credential": "#/components/schemas/CredentialRef",
+                "none": "#/components/schemas/NoAuth"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoAuth"
+              },
+              {
+                "$ref": "#/components/schemas/BasicAuthInput"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialRef"
+              }
+            ],
+            "title": "Auth"
           },
           "groups": {
             "description": "Agent groups; their current members (from the monitoring index) are analysed together with the named agents.",
@@ -3974,38 +4369,11 @@
             "title": "Monitoring Index Pattern",
             "type": "string"
           },
-          "password": {
-            "anyOf": [
-              {
-                "format": "password",
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Omit to keep the stored password (update only); not needed for synthetic://.",
-            "title": "Password"
-          },
           "tls_verify": {
             "default": true,
             "description": "Verify the indexer's TLS certificate; turn off only for a self-signed or internal certificate (the Wazuh default).",
             "title": "Tls Verify",
             "type": "boolean"
-          },
-          "username": {
-            "anyOf": [
-              {
-                "maxLength": 256,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Indexer user with read access to the alerts indices; not needed for synthetic://.",
-            "title": "Username"
           }
         },
         "required": [
@@ -4376,6 +4744,261 @@
           }
         },
         "summary": "Runtime Config"
+      }
+    },
+    "/api/credentials": {
+      "get": {
+        "operationId": "list_credentials_api_credentials_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Credentials",
+        "tags": [
+          "credentials"
+        ]
+      },
+      "post": {
+        "operationId": "create_credential_api_credentials_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Create Credential",
+        "tags": [
+          "credentials"
+        ]
+      }
+    },
+    "/api/credentials/{credential_id}": {
+      "delete": {
+        "description": "Only an unused credential can be deleted.",
+        "operationId": "delete_credential_api_credentials__credential_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Credential",
+        "tags": [
+          "credentials"
+        ]
+      },
+      "get": {
+        "operationId": "get_credential_api_credentials__credential_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Credential",
+        "tags": [
+          "credentials"
+        ]
+      },
+      "put": {
+        "description": "Rotating the secret applies to every source using the credential at its next use.",
+        "operationId": "update_credential_api_credentials__credential_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Update Credential",
+        "tags": [
+          "credentials"
+        ]
       }
     },
     "/api/health": {

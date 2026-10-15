@@ -1,4 +1,9 @@
-"""SQLite ProjectRepository: projects and per-kind source configs with encrypted secrets."""
+"""SQLite ProjectRepository: projects and per-kind source configs with encrypted secrets.
+
+A source row stores its non-secret config as JSON, including the public part of its auth
+mechanism (``config["auth"]``); the secret is stored encrypted in the row, or comes from the
+shared credential referenced by ``credential_id`` (T021).
+"""
 
 import asyncio
 import builtins
@@ -8,64 +13,78 @@ from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy as sa
-from pydantic import SecretStr
+from pydantic import BaseModel, TypeAdapter
 
+from app.domain.auth import (
+    AuthType,
+    BasicAuthInput,
+    BearerAuthInput,
+    CredentialAuth,
+    CredentialRef,
+    NoAuth,
+)
 from app.domain.common import LabelMatcher, SourceKind, format_utc
-from app.domain.custom_rules import CustomRule
 from app.domain.ids import new_project_id
 from app.domain.projects import (
-    WAZUH_MONITORING_INDEX_PATTERN,
-    AuthType,
-    BasicAuth,
-    BasicAuthInput,
-    BearerAuth,
-    BearerAuthInput,
+    SECRET_REQUIRED_KINDS,
+    AnySource,
     CloudflareConnection,
-    CloudflareSource,
-    CloudflareSourceInput,
     GrafanaConnection,
-    GrafanaSource,
-    GrafanaSourceInput,
-    NoAuth,
     Project,
     ProjectInput,
     PrometheusConnection,
-    PrometheusSource,
     PrometheusSourceInput,
     SentryConnection,
-    SentrySource,
-    SentrySourceInput,
-    SentryTag,
+    Source,
     SourceConnection,
     SourceInput,
     WazuhConnection,
-    WazuhLabel,
-    WazuhSource,
-    WazuhSourceInput,
     synthetic_url,
 )
 from app.domain.schedule import ReportSchedule
-from app.storage.db import app_meta, project_sources, projects
+from app.storage.auth import (
+    CredentialInvalid,
+    SecretRequired,
+    connection_auth,
+    secret_view,
+    split_secret,
+)
+from app.storage.db import app_meta, credentials, project_sources, projects
 from app.storage.secrets import SecretBox, SecretsUnreadable
+
+__all__ = ["CredentialInvalid", "ProjectNameTaken", "SecretRequired", "SqliteProjectRepository"]
 
 LEGACY_IMPORT_KEY = "legacy_source_import"
 """Set to 'pending' by migration 0003 when it created projects from existing reports."""
 LEGACY_IMPORT_PENDING = "pending"
 LEGACY_IMPORT_DONE = "done"
 
+_SOURCE_VIEW: TypeAdapter[AnySource] = TypeAdapter(Source)
+_CONNECTIONS: dict[SourceKind, type[BaseModel]] = {
+    SourceKind.PROMETHEUS: PrometheusConnection,
+    SourceKind.CLOUDFLARE: CloudflareConnection,
+    SourceKind.SENTRY: SentryConnection,
+    SourceKind.WAZUH: WazuhConnection,
+    SourceKind.GRAFANA: GrafanaConnection,
+}
+
+_SOURCES = sa.select(
+    project_sources,
+    credentials.c.name.label("credential_name"),
+    credentials.c.auth.label("credential_auth"),
+    credentials.c.secrets.label("credential_secrets"),
+).select_from(
+    project_sources.outerjoin(
+        credentials, project_sources.c.credential_id == credentials.c.credential_id
+    )
+)
+"""Source rows with the shared credential they reference, if any."""
+
 
 class ProjectNameTaken(Exception):
     def __init__(self, name: str) -> None:
         super().__init__(f"a project named {name!r} already exists")
         self.name = name
-
-
-class SecretRequired(Exception):
-    """A secret was omitted but nothing of that kind is stored to keep."""
-
-    def __init__(self, field: str) -> None:
-        super().__init__(f"{field} is required")
-        self.field = field
 
 
 class SqliteProjectRepository:
@@ -86,7 +105,7 @@ class SqliteProjectRepository:
 
     def _load(self, conn: sa.Connection, project_id: str | None) -> list[Project]:
         stmt = sa.select(projects).order_by(projects.c.name)
-        src_stmt = sa.select(project_sources)
+        src_stmt = _SOURCES
         if project_id is not None:
             stmt = stmt.where(projects.c.project_id == project_id)
             src_stmt = src_stmt.where(project_sources.c.project_id == project_id)
@@ -102,9 +121,10 @@ class SqliteProjectRepository:
     def _project(self, row: Any, source_rows: list[Any], now: datetime) -> Project:
         readable = True
         for src in source_rows:
-            if src.secrets is not None:
+            _, blob = _effective_auth(src)
+            if blob is not None:
                 try:
-                    self.box.decrypt(src.secrets)
+                    self.box.decrypt(blob)
                 except SecretsUnreadable:
                     readable = False
         schedule = _schedule(row.schedule)
@@ -165,14 +185,21 @@ class SqliteProjectRepository:
             .where(project_sources.c.kind == kind.value)
         ).first()
 
+    def _connection(
+        self, kind: SourceKind, config: dict[str, Any], public: dict[str, Any], blob: bytes | None
+    ) -> SourceConnection:
+        """Decrypted connection; raises SecretsUnreadable."""
+        secrets = self.box.decrypt(blob) if blob is not None else {}
+        fields = {k: v for k, v in config.items() if k != "auth"}
+        connection = _CONNECTIONS[kind].model_validate(
+            {**fields, **connection_auth(kind, public, secrets)}
+        )
+        return connection  # type: ignore[return-value]
+
     async def prometheus_connection(self, project_id: str) -> PrometheusConnection | None:
         """Decrypted connection for a stored project; raises SecretsUnreadable."""
-        row = await self._run(lambda c: self._stored(c, project_id, SourceKind.PROMETHEUS))
-        if row is None:
-            return None
-        config = json.loads(row.config)
-        secrets = self.box.decrypt(row.secrets) if row.secrets is not None else {}
-        return _connection(config, secrets)
+        found = await self.connections(project_id)
+        return next((c for c in found if isinstance(c, PrometheusConnection)), None)
 
     async def connections(self, project_id: str) -> builtins.list[SourceConnection]:
         """Decrypted connections of every stored source, by kind; raises SecretsUnreadable."""
@@ -180,152 +207,73 @@ class SqliteProjectRepository:
         def q(conn: sa.Connection) -> builtins.list[Any]:
             return builtins.list(
                 conn.execute(
-                    sa.select(project_sources)
-                    .where(project_sources.c.project_id == project_id)
-                    .order_by(project_sources.c.kind)
+                    _SOURCES.where(project_sources.c.project_id == project_id).order_by(
+                        project_sources.c.kind
+                    )
                 )
             )
 
         found: builtins.list[SourceConnection] = []
         for row in await self._run(q):
-            secrets = self.box.decrypt(row.secrets) if row.secrets is not None else {}
-            found.append(_any_connection(SourceKind(row.kind), json.loads(row.config), secrets))
+            public, blob = _effective_auth(row)
+            found.append(
+                self._connection(SourceKind(row.kind), json.loads(row.config), public, blob)
+            )
         return found
 
     async def resolve_connection(
         self, source: SourceInput, project_id: str | None
     ) -> SourceConnection:
-        """Connection for a draft source, filling omitted secrets from the stored project."""
-        row = None
-        if project_id is not None:
-            row = await self._run(lambda c: self._stored(c, project_id, source.kind))
-        config, secrets = self._split(source, row)
-        return _any_connection(source.kind, config, secrets)
+        """Connection for a draft source, filling omitted secrets from the stored project.
+
+        Raises SecretRequired, CredentialInvalid and SecretsUnreadable.
+        """
+
+        def q(conn: sa.Connection) -> tuple[dict[str, Any], dict[str, Any], bytes | None]:
+            stored = self._stored(conn, project_id, source.kind) if project_id else None
+            config, secrets, credential_id = self._split(conn, source, stored)
+            if credential_id is None:
+                return config, config["auth"], self.box.encrypt(secrets) if secrets else None
+            row = conn.execute(
+                sa.select(credentials.c.auth, credentials.c.secrets).where(
+                    credentials.c.credential_id == credential_id
+                )
+            ).one()
+            return config, json.loads(row.auth), row.secrets
+
+        config, public, blob = await self._run(q)
+        return self._connection(source.kind, config, public, blob)
 
     # --- writes --------------------------------------------------------------------------
 
-    def _split(self, source: SourceInput, stored: Any) -> tuple[dict[str, Any], dict[str, str]]:
-        """Non-secret config and the secrets to store, keeping omitted secrets from ``stored``.
+    def _split(
+        self, conn: sa.Connection, source: SourceInput, stored: Any
+    ) -> tuple[dict[str, Any], dict[str, str], str | None]:
+        """Non-secret config, the secrets to store and the referenced credential.
 
-        Raises SecretRequired with the field path relative to the source.
+        Omitted secrets are kept from ``stored``. Raises SecretRequired and CredentialInvalid
+        with the field path relative to the source.
         """
-        match source:
-            case PrometheusSourceInput():
-                return self._split_prometheus(source, stored)
-            case CloudflareSourceInput():
-                return self._split_cloudflare(source, stored)
-            case SentrySourceInput():
-                return self._split_sentry(source, stored)
-            case WazuhSourceInput():
-                return self._split_wazuh(source, stored)
-            case GrafanaSourceInput():
-                return self._split_grafana(source, stored)
-
-    def _split_prometheus(
-        self, source: PrometheusSourceInput, stored: Any
-    ) -> tuple[dict[str, Any], dict[str, str]]:
-        auth = source.auth
-        config: dict[str, Any] = {
-            "url": source.url,
-            "tls_verify": source.tls_verify,
-            "auth": {"type": auth.type.value},
-        }
-        if source.custom_rules:
-            config["custom_rules"] = [r.model_dump(mode="json") for r in source.custom_rules]
-
-        def kept(field: str) -> dict[str, str]:
-            stored_type = json.loads(stored.config)["auth"]["type"] if stored else None
-            if stored_type != auth.type.value or stored.secrets is None:
-                raise SecretRequired(f"auth.{field}")
-            return self.box.decrypt(stored.secrets)
-
-        match auth:
-            case BearerAuthInput(token=token):
-                secrets = {"token": token.get_secret_value()} if token else kept("token")
-            case BasicAuthInput(username=username, password=password):
-                config["auth"]["username"] = username
-                secrets = (
-                    {"password": password.get_secret_value()} if password else kept("password")
+        config = source.model_dump(mode="json", exclude={"kind", "auth"})
+        secrets: dict[str, str] = {}
+        credential_id: str | None = None
+        match source.auth:
+            case NoAuth():
+                if source.kind in SECRET_REQUIRED_KINDS and not synthetic_url(config["api_url"]):
+                    raise SecretRequired("auth")
+                config["auth"] = {"type": AuthType.NONE.value}
+            case CredentialRef() as ref:
+                _check_credential(conn, ref.credential_id, source.kind)
+                credential_id = ref.credential_id
+                config["auth"] = {"type": AuthType.CREDENTIAL.value}
+            case auth:
+                own = stored if stored is not None and stored.credential_id is None else None
+                stored_auth = json.loads(own.config)["auth"] if own is not None else None
+                blob = own.secrets if own is not None else None
+                config["auth"], secrets = split_secret(
+                    auth, stored_auth, (lambda: self.box.decrypt(blob)) if blob else None
                 )
-            case _:
-                secrets = {}
-        return config, secrets
-
-    def _split_cloudflare(
-        self, source: CloudflareSourceInput, stored: Any
-    ) -> tuple[dict[str, Any], dict[str, str]]:
-        config: dict[str, Any] = {
-            "zone_id": source.zone_id,
-            "hostnames": source.hostnames,
-            "api_url": source.api_url,
-        }
-        if source.api_token is not None:
-            return config, {"api_token": source.api_token.get_secret_value()}
-        if stored is not None and stored.secrets is not None:
-            return config, self.box.decrypt(stored.secrets)
-        if synthetic_url(source.api_url):
-            return config, {}
-        raise SecretRequired("api_token")
-
-    def _split_sentry(
-        self, source: SentrySourceInput, stored: Any
-    ) -> tuple[dict[str, Any], dict[str, str]]:
-        config: dict[str, Any] = {
-            "organization": source.organization,
-            "projects": source.projects,
-            "environment": source.environment,
-            "tags": [t.model_dump() for t in source.tags],
-            "tls_verify": source.tls_verify,
-            "api_url": source.api_url,
-        }
-        if source.auth_token is not None:
-            return config, {"auth_token": source.auth_token.get_secret_value()}
-        if stored is not None and stored.secrets is not None:
-            return config, self.box.decrypt(stored.secrets)
-        if synthetic_url(source.api_url):
-            return config, {}
-        raise SecretRequired("auth_token")
-
-    def _split_wazuh(
-        self, source: WazuhSourceInput, stored: Any
-    ) -> tuple[dict[str, Any], dict[str, str]]:
-        config: dict[str, Any] = {
-            "api_url": source.api_url,
-            "index_pattern": source.index_pattern,
-            "agents": source.agents,
-            "groups": source.groups,
-            "labels": [label.model_dump() for label in source.labels],
-            "monitoring_index_pattern": source.monitoring_index_pattern,
-            "username": source.username,
-            "tls_verify": source.tls_verify,
-        }
-        if source.password is not None:
-            return config, {"password": source.password.get_secret_value()}
-        if stored is not None and stored.secrets is not None:
-            return config, self.box.decrypt(stored.secrets)
-        if synthetic_url(source.api_url) or source.username is None:
-            return config, {}
-        raise SecretRequired("password")
-
-    def _split_grafana(
-        self, source: GrafanaSourceInput, stored: Any
-    ) -> tuple[dict[str, Any], dict[str, str]]:
-        config: dict[str, Any] = {
-            "api_url": source.api_url,
-            "org_id": source.org_id,
-            "folders": source.folders,
-            "rule_uids": source.rule_uids,
-            "rule_labels": [m.model_dump() for m in source.rule_labels],
-            "instance_labels": [m.model_dump() for m in source.instance_labels],
-            "tls_verify": source.tls_verify,
-        }
-        if source.token is not None:
-            return config, {"token": source.token.get_secret_value()}
-        if stored is not None and stored.secrets is not None:
-            return config, self.box.decrypt(stored.secrets)
-        if synthetic_url(source.api_url):
-            return config, {}
-        raise SecretRequired("token")
+        return config, secrets, credential_id
 
     def _write_sources(
         self,
@@ -340,15 +288,18 @@ class SqliteProjectRepository:
         for i, source in enumerate(data.sources):
             stored = self._stored(conn, secrets_from or project_id, source.kind)
             try:
-                config, secrets = self._split(source, stored)
+                config, secrets, credential_id = self._split(conn, source, stored)
             except SecretRequired as exc:
                 raise SecretRequired(f"{i}.{exc.field}") from None
+            except CredentialInvalid as exc:
+                raise CredentialInvalid(f"{i}.{exc.field}", exc.message) from None
             rows.append(
                 {
                     "project_id": project_id,
                     "kind": source.kind.value,
                     "config": json.dumps(config, sort_keys=True),
                     "secrets": self.box.encrypt(secrets) if secrets else None,
+                    "credential_id": credential_id,
                     "updated_at": now,
                 }
             )
@@ -463,7 +414,7 @@ class SqliteProjectRepository:
                         ~sa.exists().where(project_sources.c.project_id == projects.c.project_id)
                     )
                 ).all()
-                config, secrets = self._split(source, None)
+                config, secrets, _ = self._split(c, source, None)
                 for (project_id,) in without:
                     c.execute(
                         project_sources.insert().values(
@@ -502,143 +453,30 @@ def _schedule(raw: str | None) -> ReportSchedule | None:
     return ReportSchedule.model_validate_json(raw) if raw else None
 
 
-def _source_view(
-    row: Any,
-) -> PrometheusSource | CloudflareSource | SentrySource | WazuhSource | GrafanaSource:
+def _effective_auth(row: Any) -> tuple[dict[str, Any], bytes | None]:
+    """Public auth and encrypted secrets of a source row: its own or its credential's."""
+    if row.credential_id is not None:
+        return json.loads(row.credential_auth), row.credential_secrets
+    return json.loads(row.config)["auth"], row.secrets
+
+
+def _source_view(row: Any) -> AnySource:
     config = json.loads(row.config)
-    if SourceKind(row.kind) is SourceKind.GRAFANA:
-        return GrafanaSource(
-            api_url=config["api_url"],
-            org_id=config.get("org_id", 1),
-            folders=config.get("folders", []),
-            rule_uids=config.get("rule_uids", []),
-            rule_labels=_matchers(config.get("rule_labels", [])),
-            instance_labels=_matchers(config.get("instance_labels", [])),
-            tls_verify=config.get("tls_verify", True),
-            token_set=row.secrets is not None,
+    public = config.pop("auth")
+    if row.credential_id is not None:
+        auth: BaseModel = CredentialAuth(credential_id=row.credential_id, name=row.credential_name)
+    else:
+        auth = secret_view(public, row.secrets is not None)
+    return _SOURCE_VIEW.validate_python({**config, "kind": row.kind, "auth": auth.model_dump()})
+
+
+def _check_credential(conn: sa.Connection, credential_id: str, kind: SourceKind) -> None:
+    found = conn.execute(
+        sa.select(credentials.c.kind).where(credentials.c.credential_id == credential_id)
+    ).first()
+    if found is None:
+        raise CredentialInvalid("auth.credential_id", "no such credential")
+    if found.kind != kind.value:
+        raise CredentialInvalid(
+            "auth.credential_id", f"a {found.kind} credential cannot be used by a {kind} source"
         )
-    if SourceKind(row.kind) is SourceKind.WAZUH:
-        return WazuhSource(
-            api_url=config["api_url"],
-            index_pattern=config["index_pattern"],
-            agents=config.get("agents", []),
-            groups=config.get("groups", []),
-            labels=[WazuhLabel(**label) for label in config.get("labels", [])],
-            monitoring_index_pattern=config.get(
-                "monitoring_index_pattern", WAZUH_MONITORING_INDEX_PATTERN
-            ),
-            username=config.get("username"),
-            tls_verify=config.get("tls_verify", True),
-            password_set=row.secrets is not None,
-        )
-    if SourceKind(row.kind) is SourceKind.SENTRY:
-        return SentrySource(
-            organization=config["organization"],
-            projects=_sentry_projects(config),
-            environment=config.get("environment"),
-            tags=[SentryTag(**t) for t in config.get("tags", [])],
-            api_url=config["api_url"],
-            tls_verify=config.get("tls_verify", True),
-            token_set=row.secrets is not None,
-        )
-    if SourceKind(row.kind) is SourceKind.CLOUDFLARE:
-        return CloudflareSource(
-            zone_id=config["zone_id"],
-            hostnames=config["hostnames"],
-            api_url=config["api_url"],
-            token_set=row.secrets is not None,
-        )
-    auth = config["auth"]
-    match AuthType(auth["type"]):
-        case AuthType.BEARER:
-            view: NoAuth | BearerAuth | BasicAuth = BearerAuth(token_set=row.secrets is not None)
-        case AuthType.BASIC:
-            view = BasicAuth(username=auth["username"], password_set=row.secrets is not None)
-        case AuthType.NONE:
-            view = NoAuth()
-    return PrometheusSource(
-        url=config["url"],
-        tls_verify=config["tls_verify"],
-        auth=view,
-        custom_rules=_custom_rules(config),
-    )
-
-
-def _any_connection(
-    kind: SourceKind, config: dict[str, Any], secrets: dict[str, str]
-) -> SourceConnection:
-    match kind:
-        case SourceKind.PROMETHEUS:
-            return _connection(config, secrets)
-        case SourceKind.CLOUDFLARE:
-            token = secrets.get("api_token")
-            return CloudflareConnection(
-                zone_id=config["zone_id"],
-                hostnames=config["hostnames"],
-                api_url=config["api_url"],
-                api_token=SecretStr(token) if token else None,
-            )
-        case SourceKind.SENTRY:
-            auth_token = secrets.get("auth_token")
-            return SentryConnection(
-                organization=config["organization"],
-                projects=_sentry_projects(config),
-                environment=config.get("environment"),
-                tags=[SentryTag(**t) for t in config.get("tags", [])],
-                api_url=config["api_url"],
-                tls_verify=config.get("tls_verify", True),
-                auth_token=SecretStr(auth_token) if auth_token else None,
-            )
-        case SourceKind.WAZUH:
-            password = secrets.get("password")
-            return WazuhConnection(
-                api_url=config["api_url"],
-                index_pattern=config["index_pattern"],
-                agents=config.get("agents", []),
-                groups=config.get("groups", []),
-                labels=[WazuhLabel(**label) for label in config.get("labels", [])],
-                monitoring_index_pattern=config.get(
-                    "monitoring_index_pattern", WAZUH_MONITORING_INDEX_PATTERN
-                ),
-                username=config.get("username"),
-                password=SecretStr(password) if password else None,
-                tls_verify=config.get("tls_verify", True),
-            )
-        case SourceKind.GRAFANA:
-            token = secrets.get("token")
-            return GrafanaConnection(
-                api_url=config["api_url"],
-                org_id=config.get("org_id", 1),
-                folders=config.get("folders", []),
-                rule_uids=config.get("rule_uids", []),
-                rule_labels=_matchers(config.get("rule_labels", [])),
-                instance_labels=_matchers(config.get("instance_labels", [])),
-                token=SecretStr(token) if token else None,
-                tls_verify=config.get("tls_verify", True),
-            )
-
-
-def _matchers(raw: list[dict[str, str]]) -> list[LabelMatcher]:
-    return [LabelMatcher.model_validate(m) for m in raw]
-
-
-def _sentry_projects(config: dict[str, Any]) -> list[str]:
-    """Project slugs; sources saved before multi-project support stored one ``project``."""
-    return list(config.get("projects") or [config["project"]])
-
-
-def _connection(config: dict[str, Any], secrets: dict[str, str]) -> PrometheusConnection:
-    auth = config["auth"]
-    token, password = secrets.get("token"), secrets.get("password")
-    return PrometheusConnection(
-        url=config["url"],
-        tls_verify=config["tls_verify"],
-        bearer_token=SecretStr(token) if token else None,
-        basic_auth_user=auth.get("username"),
-        basic_auth_password=SecretStr(password) if password else None,
-        custom_rules=_custom_rules(config),
-    )
-
-
-def _custom_rules(config: dict[str, Any]) -> list[CustomRule]:
-    return [CustomRule.model_validate(r) for r in config.get("custom_rules", [])]

@@ -2,7 +2,11 @@
 
 import logging
 
-from app.domain.common import LabelMatcher
+from pydantic import SecretStr
+
+from app.domain.auth import CredentialRef, TokenAuthInput
+from app.domain.common import LabelMatcher, SourceKind
+from app.domain.credentials import CredentialInput
 from app.domain.projects import (
     CloudflareSourceInput,
     GrafanaSourceInput,
@@ -15,6 +19,7 @@ from app.settings import Settings
 from app.sources.cloudflare.synthetic import SYNTHETIC_ZONE_ID
 from app.sources.prometheus.synthetic import DEMO_CUSTOM_RULES, SCENARIOS
 from app.sources.sentry.synthetic import SYNTHETIC_ORGANIZATION
+from app.storage.credentials import SqliteCredentialRepository
 from app.storage.projects import SqliteProjectRepository
 
 log = logging.getLogger("app")
@@ -25,7 +30,15 @@ DEMO_MATCHERS = [
 ]
 
 
-def demo_projects() -> list[ProjectInput]:
+DEMO_CREDENTIAL = CredentialInput(
+    name="Demo Grafana token",
+    description="Shared by the demo projects' Grafana sources; synthetic sources ignore it.",
+    kind=SourceKind.GRAFANA,
+    auth=TokenAuthInput(token=SecretStr("glsa_demo")),
+)
+
+
+def demo_projects(grafana_credential_id: str) -> list[ProjectInput]:
     return [
         ProjectInput(
             name=f"Demo: {scenario}",
@@ -52,6 +65,7 @@ def demo_projects() -> list[ProjectInput]:
                     api_url=f"synthetic://{scenario}",
                     folders=["Shop"],
                     instance_labels=[LabelMatcher(name="project", value="shop")],
+                    auth=CredentialRef(credential_id=grafana_credential_id),
                 ),
             ],
         )
@@ -59,7 +73,11 @@ def demo_projects() -> list[ProjectInput]:
     ]
 
 
-async def bootstrap_projects(settings: Settings, projects: SqliteProjectRepository) -> None:
+async def bootstrap_projects(
+    settings: Settings,
+    projects: SqliteProjectRepository,
+    credentials: SqliteCredentialRepository,
+) -> None:
     imported = await projects.import_legacy_source(settings.metrics_connection)
     if imported is not None:
         if settings.metrics_url is None:
@@ -77,6 +95,9 @@ async def bootstrap_projects(settings: Settings, projects: SqliteProjectReposito
         log.info("METRICS_URL is deprecated and ignored; sources are configured per project")
 
     if settings.demo_projects and await projects.count() == 0:
-        for data in demo_projects():
+        credential = next(
+            (c for c in await credentials.list() if c.name == DEMO_CREDENTIAL.name), None
+        ) or await credentials.create(DEMO_CREDENTIAL)
+        for data in demo_projects(credential.credential_id):
             await projects.create(data)
         log.info("seeded %d demo projects", len(SCENARIOS))

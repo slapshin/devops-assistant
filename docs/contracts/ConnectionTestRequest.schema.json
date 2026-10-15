@@ -39,6 +39,7 @@
     },
     "BearerAuthInput": {
       "additionalProperties": false,
+      "description": "``Authorization: Bearer <token>``.",
       "properties": {
         "token": {
           "anyOf": [
@@ -78,27 +79,35 @@
       "additionalProperties": false,
       "description": "One Cloudflare zone, optionally narrowed to some of its hostnames.",
       "properties": {
-        "api_token": {
-          "anyOf": [
-            {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain). Omit to keep the stored one (update only); not needed for synthetic://.",
-          "title": "Api Token"
-        },
         "api_url": {
           "default": "https://api.cloudflare.com/client/v4/graphql",
           "description": "GraphQL endpoint; synthetic://<scenario> for demo data.",
           "maxLength": 2048,
           "title": "Api Url",
           "type": "string"
+        },
+        "auth": {
+          "description": "API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain), inline or as a shared credential; not needed for synthetic://.",
+          "discriminator": {
+            "mapping": {
+              "credential": "#/$defs/CredentialRef",
+              "none": "#/$defs/NoAuth",
+              "token": "#/$defs/TokenAuthInput"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuth"
+            },
+            {
+              "$ref": "#/$defs/TokenAuthInput"
+            },
+            {
+              "$ref": "#/$defs/CredentialRef"
+            }
+          ],
+          "title": "Auth"
         },
         "hostnames": {
           "description": "Analyse only these hostnames; empty analyses the whole zone.",
@@ -125,6 +134,29 @@
         "zone_id"
       ],
       "title": "CloudflareSourceInput",
+      "type": "object"
+    },
+    "CredentialRef": {
+      "additionalProperties": false,
+      "description": "Use a shared credential of the source's kind; its secret is resolved at each use.",
+      "properties": {
+        "credential_id": {
+          "maxLength": 36,
+          "minLength": 1,
+          "title": "Credential Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "credential",
+          "default": "credential",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credential_id"
+      ],
+      "title": "CredentialRef",
       "type": "object"
     },
     "CustomRule": {
@@ -285,6 +317,29 @@
           "title": "Api Url",
           "type": "string"
         },
+        "auth": {
+          "description": "Service account token (Viewer role), inline or as a shared credential; not needed for synthetic://.",
+          "discriminator": {
+            "mapping": {
+              "credential": "#/$defs/CredentialRef",
+              "none": "#/$defs/NoAuth",
+              "token": "#/$defs/TokenAuthInput"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuth"
+            },
+            {
+              "$ref": "#/$defs/TokenAuthInput"
+            },
+            {
+              "$ref": "#/$defs/CredentialRef"
+            }
+          ],
+          "title": "Auth"
+        },
         "folders": {
           "description": "Folder UIDs or titles whose alert rules are analysed.",
           "items": {
@@ -339,21 +394,6 @@
           "description": "Verify Grafana's TLS certificate; turn off only for a self-signed or internal certificate.",
           "title": "Tls Verify",
           "type": "boolean"
-        },
-        "token": {
-          "anyOf": [
-            {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Service account token (Viewer role). Omit to keep the stored one (update only); not needed for synthetic://.",
-          "title": "Token"
         }
       },
       "required": [
@@ -422,6 +462,7 @@
             "mapping": {
               "basic": "#/$defs/BasicAuthInput",
               "bearer": "#/$defs/BearerAuthInput",
+              "credential": "#/$defs/CredentialRef",
               "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
@@ -435,6 +476,9 @@
             },
             {
               "$ref": "#/$defs/BasicAuthInput"
+            },
+            {
+              "$ref": "#/$defs/CredentialRef"
             }
           ],
           "title": "Auth"
@@ -482,20 +526,28 @@
           "title": "Api Url",
           "type": "string"
         },
-        "auth_token": {
-          "anyOf": [
+        "auth": {
+          "description": "Auth token with org:read and project:read, inline or as a shared credential; not needed for synthetic://.",
+          "discriminator": {
+            "mapping": {
+              "credential": "#/$defs/CredentialRef",
+              "none": "#/$defs/NoAuth",
+              "token": "#/$defs/TokenAuthInput"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
             {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
+              "$ref": "#/$defs/NoAuth"
             },
             {
-              "type": "null"
+              "$ref": "#/$defs/TokenAuthInput"
+            },
+            {
+              "$ref": "#/$defs/CredentialRef"
             }
           ],
-          "default": null,
-          "description": "Auth token with org:read and project:read. Omit to keep the stored one (update only); not needed for synthetic://.",
-          "title": "Auth Token"
+          "title": "Auth"
         },
         "environment": {
           "anyOf": [
@@ -595,6 +647,35 @@
       "title": "ThresholdOp",
       "type": "string"
     },
+    "TokenAuthInput": {
+      "additionalProperties": false,
+      "description": "The kind's API token: Cloudflare API token, Sentry auth token, Grafana service account\ntoken.",
+      "properties": {
+        "token": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Omit to keep the stored token (update only).",
+          "title": "Token"
+        },
+        "type": {
+          "const": "token",
+          "default": "token",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "TokenAuthInput",
+      "type": "object"
+    },
     "Unit": {
       "enum": [
         "ratio",
@@ -650,6 +731,29 @@
           "title": "Api Url",
           "type": "string"
         },
+        "auth": {
+          "description": "Indexer user with read access to the alerts indices (basic), inline or as a shared credential; not needed for synthetic://.",
+          "discriminator": {
+            "mapping": {
+              "basic": "#/$defs/BasicAuthInput",
+              "credential": "#/$defs/CredentialRef",
+              "none": "#/$defs/NoAuth"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuth"
+            },
+            {
+              "$ref": "#/$defs/BasicAuthInput"
+            },
+            {
+              "$ref": "#/$defs/CredentialRef"
+            }
+          ],
+          "title": "Auth"
+        },
         "groups": {
           "description": "Agent groups; their current members (from the monitoring index) are analysed together with the named agents.",
           "items": {
@@ -686,40 +790,11 @@
           "title": "Monitoring Index Pattern",
           "type": "string"
         },
-        "password": {
-          "anyOf": [
-            {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Omit to keep the stored password (update only); not needed for synthetic://.",
-          "title": "Password"
-        },
         "tls_verify": {
           "default": true,
           "description": "Verify the indexer's TLS certificate; turn off only for a self-signed or internal certificate (the Wazuh default).",
           "title": "Tls Verify",
           "type": "boolean"
-        },
-        "username": {
-          "anyOf": [
-            {
-              "maxLength": 256,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Indexer user with read access to the alerts indices; not needed for synthetic://.",
-          "title": "Username"
         }
       },
       "required": [

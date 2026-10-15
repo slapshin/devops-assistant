@@ -12,6 +12,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app import __version__
 from app.ai.providers import provider_from_settings
 from app.analysis.engine import RobustDetector
+from app.api.credentials import router as credentials_router
 from app.api.problems import install_problem_handlers
 from app.api.projects import router as projects_router
 from app.api.routes import router
@@ -25,6 +26,7 @@ from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
 from app.sources.factory import ProjectSources
 from app.static import mount_ui
+from app.storage.credentials import SqliteCredentialRepository
 from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository
 from app.storage.secrets import load_secret_box
@@ -71,12 +73,14 @@ def build_services(
         provider, unavailable, reason = provider_from_settings(settings)
 
     repo = SqliteReportRepository(settings.database_path)
-    projects = SqliteProjectRepository(repo.engine, load_secret_box(settings))
+    box = load_secret_box(settings)
+    projects = SqliteProjectRepository(repo.engine, box)
+    credentials = SqliteCredentialRepository(repo.engine, box)
     sources = ProjectSources(projects, override=source)
     pipeline = AnalysisPipeline(sources, RobustDetector(), config, provider, unavailable, reason)
     runner = JobRunner(repo, pipeline, config, settings.explanation_status, limits)
     scheduler = ReportScheduler(projects, runner)
-    return Services(settings, config, sources, repo, runner, projects, scheduler)
+    return Services(settings, config, sources, repo, runner, projects, scheduler, credentials)
 
 
 def create_app(
@@ -101,7 +105,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
-        await bootstrap_projects(settings, services.projects)
+        await bootstrap_projects(settings, services.projects, services.credentials)
         recovered = await services.runner.start()
         services.scheduler.start()
         log.info(
@@ -137,6 +141,7 @@ def create_app(
     install_problem_handlers(app)
     app.include_router(router)
     app.include_router(projects_router)
+    app.include_router(credentials_router)
     if settings.ui_dir is not None:
         mount_ui(app, settings.ui_dir)
     return app
