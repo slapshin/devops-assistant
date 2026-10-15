@@ -64,7 +64,7 @@ project_sources = sa.Table(
         sa.String(36),
         sa.ForeignKey("credentials.credential_id", ondelete="RESTRICT"),
         nullable=True,
-        comment="Shared credential used instead of inline secrets",
+        comment="Credential holding the source's secret",
     ),
 )
 

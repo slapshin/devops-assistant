@@ -1,4 +1,4 @@
-"""Shared credentials: one secret used by the sources of many projects (T021).
+"""Credentials: the secrets sources authenticate with, usable by many projects (T021).
 
 A credential belongs to one source kind and holds one of that kind's secret mechanisms; sources
 of that kind reference it with ``auth: {type: credential, credential_id}``. Rotating it updates

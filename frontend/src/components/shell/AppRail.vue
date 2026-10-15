@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** Left icon rail: home, projects and shared credentials, plus the report views while a report is open. */
+/** Left icon rail: home, projects and credentials, plus the report views while a report is open. */
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 
@@ -21,7 +21,7 @@ const onCredentials = computed(() => route.path.startsWith("/credentials"));
     <RouterLink to="/" :class="{ on: onProjects }" aria-label="Projects" title="Projects">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 4.5h12M3 9h12M3 13.5h12" /></svg>
     </RouterLink>
-    <RouterLink to="/credentials" :class="{ on: onCredentials }" aria-label="Shared credentials" title="Shared credentials">
+    <RouterLink to="/credentials" :class="{ on: onCredentials }" aria-label="Credentials" title="Credentials">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="11.5" r="3.5" /><path d="M8.5 9l6-6M12.5 5l2 2M10.5 7l1.5 1.5" /></svg>
     </RouterLink>
     <template v-if="reportId">

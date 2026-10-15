@@ -1,4 +1,4 @@
-"""Shared credential routes (T021): CRUD; secrets are write-only."""
+"""Credential routes (T021): CRUD; secrets are write-only."""
 
 from fastapi import APIRouter, Response
 

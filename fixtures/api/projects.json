@@ -22,8 +22,9 @@
           "url": "http://victoriametrics.example:8428",
           "tls_verify": true,
           "auth": {
-            "type": "bearer",
-            "token_set": true
+            "type": "credential",
+            "credential_id": "01999a3c-0000-7000-8000-0000000000c2",
+            "name": "VictoriaMetrics reader"
           },
           "custom_rules": []
         }

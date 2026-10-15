@@ -141,51 +141,6 @@
       "title": "AnalysisJob",
       "type": "object"
     },
-    "BasicAuth": {
-      "additionalProperties": false,
-      "properties": {
-        "password_set": {
-          "title": "Password Set",
-          "type": "boolean"
-        },
-        "type": {
-          "const": "basic",
-          "default": "basic",
-          "title": "Type",
-          "type": "string"
-        },
-        "username": {
-          "title": "Username",
-          "type": "string"
-        }
-      },
-      "required": [
-        "username",
-        "password_set"
-      ],
-      "title": "BasicAuth",
-      "type": "object"
-    },
-    "BearerAuth": {
-      "additionalProperties": false,
-      "properties": {
-        "token_set": {
-          "title": "Token Set",
-          "type": "boolean"
-        },
-        "type": {
-          "const": "bearer",
-          "default": "bearer",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "token_set"
-      ],
-      "title": "BearerAuth",
-      "type": "object"
-    },
     "ChangeDirection": {
       "enum": [
         "up",
@@ -206,17 +161,13 @@
           "discriminator": {
             "mapping": {
               "credential": "#/$defs/CredentialAuth",
-              "none": "#/$defs/NoAuth",
-              "token": "#/$defs/TokenAuth"
+              "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
           },
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/TokenAuth"
             },
             {
               "$ref": "#/$defs/CredentialAuth"
@@ -259,7 +210,7 @@
           "type": "string"
         },
         "name": {
-          "description": "The shared credential's name.",
+          "description": "The credential's name.",
           "title": "Name",
           "type": "string"
         },
@@ -475,17 +426,13 @@
           "discriminator": {
             "mapping": {
               "credential": "#/$defs/CredentialAuth",
-              "none": "#/$defs/NoAuth",
-              "token": "#/$defs/TokenAuth"
+              "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
           },
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/TokenAuth"
             },
             {
               "$ref": "#/$defs/CredentialAuth"
@@ -799,8 +746,6 @@
         "auth": {
           "discriminator": {
             "mapping": {
-              "basic": "#/$defs/BasicAuth",
-              "bearer": "#/$defs/BearerAuth",
               "credential": "#/$defs/CredentialAuth",
               "none": "#/$defs/NoAuth"
             },
@@ -809,12 +754,6 @@
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/BearerAuth"
-            },
-            {
-              "$ref": "#/$defs/BasicAuth"
             },
             {
               "$ref": "#/$defs/CredentialAuth"
@@ -929,17 +868,13 @@
           "discriminator": {
             "mapping": {
               "credential": "#/$defs/CredentialAuth",
-              "none": "#/$defs/NoAuth",
-              "token": "#/$defs/TokenAuth"
+              "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
           },
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/TokenAuth"
             },
             {
               "$ref": "#/$defs/CredentialAuth"
@@ -1141,26 +1076,6 @@
       "title": "ThresholdOp",
       "type": "string"
     },
-    "TokenAuth": {
-      "additionalProperties": false,
-      "properties": {
-        "token_set": {
-          "title": "Token Set",
-          "type": "boolean"
-        },
-        "type": {
-          "const": "token",
-          "default": "token",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "token_set"
-      ],
-      "title": "TokenAuth",
-      "type": "object"
-    },
     "Unit": {
       "enum": [
         "ratio",
@@ -1214,7 +1129,6 @@
         "auth": {
           "discriminator": {
             "mapping": {
-              "basic": "#/$defs/BasicAuth",
               "credential": "#/$defs/CredentialAuth",
               "none": "#/$defs/NoAuth"
             },
@@ -1223,9 +1137,6 @@
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/BasicAuth"
             },
             {
               "$ref": "#/$defs/CredentialAuth"

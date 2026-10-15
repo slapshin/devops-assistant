@@ -248,7 +248,7 @@ async def test_draft_connection_resolves_credential(client: TestClient) -> None:
     assert tested.status_code == 200 and tested.json()["reachable"]
 
     conn = await services(client).projects.resolve_connection(
-        WazuhSourceInput.model_validate(draft["source"]), None
+        WazuhSourceInput.model_validate(draft["source"])
     )
     assert isinstance(conn, WazuhConnection)
     assert conn.username == "reader" and conn.password is not None
@@ -274,102 +274,130 @@ def test_demo_projects_share_a_grafana_credential(tmp_path: Path) -> None:
     assert len(credential["used_by"]) == len(projects) > 1
 
 
-# --- sharing existing secrets (migration 0007 + startup import) ------------------------------
+# --- moving existing inline secrets (migrations 0007/0008 + startup import) -------------------
+
+NOW = "2026-10-01T00:00:00Z"
 
 
-def grafana_inline(
-    name: str, token: str, url: str = "https://grafana.example.com"
-) -> dict[str, Any]:
-    return {
-        "name": name,
-        "sources": [
-            {
-                "kind": "grafana",
-                "api_url": url,
-                "folders": ["Shop"],
-                "auth": {"type": "token", "token": token},
-            }
-        ],
-    }
+def seed_inline(
+    tmp_path: Path,
+    key: bytes,
+    sources: list[tuple[str, str, dict[str, Any], dict[str, str] | None]],
+) -> None:
+    """Projects with sources that store their own secret, as saved before credentials-only.
 
-
-def wazuh_inline(name: str, username: str) -> dict[str, Any]:
-    return {
-        "name": name,
-        "sources": [
-            {
-                "kind": "wazuh",
-                "api_url": "https://indexer:9200",
-                "agents": ["web-1"],
-                "auth": {"type": "basic", "username": username, "password": "pw"},
-            }
-        ],
-    }
-
-
-def mark_import_pending(tmp_path: Path) -> None:
+    Each entry is (project name, kind, config with ``auth``, secrets or None).
+    """
+    with make_client(tmp_path, secret_key=key.decode()):
+        pass  # migrate an empty database to head
+    box = SecretBox(key)
     with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
+        for i, (name, kind, config, secrets) in enumerate(sources):
+            pid = f"p{i}"
+            db.execute(
+                "INSERT INTO projects (project_id, name, matchers, created_at, updated_at)"
+                " VALUES (?, ?, '[]', ?, ?)",
+                (pid, name, NOW, NOW),
+            )
+            db.execute(
+                "INSERT INTO project_sources (project_id, kind, config, secrets, updated_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (pid, kind, json.dumps(config), box.encrypt(secrets) if secrets else None, NOW),
+            )
         db.execute(
-            "INSERT INTO app_meta (key, value) VALUES ('shared_credentials_import', 'pending')"
+            "INSERT OR REPLACE INTO app_meta (key, value)"
+            " VALUES ('shared_credentials_import', 'pending')"
         )
 
 
-async def test_startup_shares_identical_existing_secrets(tmp_path: Path) -> None:
-    key = Fernet.generate_key().decode()
-    with make_client(tmp_path, secret_key=key) as c:
-        for body in (
-            grafana_inline("Shop", TOKEN),
-            grafana_inline("Blog", TOKEN),
-            grafana_inline("Other", ROTATED),
-            wazuh_inline("Hosts A", "reader"),
-            wazuh_inline("Hosts B", "reader"),
-            wazuh_inline("Hosts C", "admin"),
-        ):
-            assert c.post("/api/projects", json=body).status_code == 201
-    mark_import_pending(tmp_path)
+def grafana_config(url: str = "https://grafana.example.com") -> dict[str, Any]:
+    return {"api_url": url, "folders": ["Shop"], "auth": {"type": "token"}}
 
-    with make_client(tmp_path, secret_key=key) as c:
-        shared = {cr["name"]: cr for cr in c.get("/api/credentials").json()["items"]}
+
+def wazuh_config(username: str) -> dict[str, Any]:
+    return {
+        "api_url": "https://indexer:9200",
+        "agents": ["web-1"],
+        "auth": {"type": "basic", "username": username},
+    }
+
+
+async def test_startup_moves_inline_secrets_into_credentials(tmp_path: Path) -> None:
+    key = Fernet.generate_key()
+    seed_inline(
+        tmp_path,
+        key,
+        [
+            ("Shop", "grafana", grafana_config(), {"token": TOKEN}),
+            ("Blog", "grafana", grafana_config(), {"token": TOKEN}),
+            ("Other", "grafana", grafana_config(), {"token": ROTATED}),
+            (
+                "Edge",
+                "cloudflare",
+                {
+                    "zone_id": ZONE,
+                    "hostnames": [],
+                    "api_url": "https://cf",
+                    "auth": {"type": "token"},
+                },
+                {"api_token": "cf"},
+            ),
+            ("Hosts A", "wazuh", wazuh_config("reader"), {"password": "pw"}),
+            ("Hosts B", "wazuh", wazuh_config("reader"), {"password": "pw"}),
+            ("Open", "wazuh", {**wazuh_config("x"), "auth": {"type": "none"}}, None),
+        ],
+    )
+
+    with make_client(tmp_path, secret_key=key.decode()) as c:
+        moved = {cr["name"]: cr for cr in c.get("/api/credentials").json()["items"]}
         projects = {p["name"]: p for p in c.get("/api/projects").json()["items"]}
-        shop = await services(c).projects.connections(projects["Shop"]["project_id"])
+        shop = await services(c).projects.connections("p0")
+        edge = await services(c).projects.connections("p3")
 
-    assert sorted(shared) == ["Grafana token (grafana.example.com)", "Wazuh reader@indexer"]
-    grafana = shared["Grafana token (grafana.example.com)"]
-    assert [u["name"] for u in grafana["used_by"]] == ["Blog", "Shop"]
-    assert grafana["auth"] == {"type": "token", "token_set": True}
-    assert shared["Wazuh reader@indexer"]["auth"]["username"] == "reader"
-    assert projects["Shop"]["sources"][0]["auth"]["credential_id"] == grafana["credential_id"]
-    assert projects["Other"]["sources"][0]["auth"] == {"type": "token", "token_set": True}
-    assert projects["Hosts C"]["sources"][0]["auth"]["type"] == "basic"
+    assert sorted(moved) == [
+        "Cloudflare token",
+        "Grafana token (grafana.example.com)",
+        "Grafana token (grafana.example.com) 2",
+        "Wazuh reader@indexer",
+    ]
+    shared = next(
+        cr for cr in moved.values() if len(cr["used_by"]) == 2 and cr["kind"] == "grafana"
+    )
+    assert [u["name"] for u in shared["used_by"]] == ["Blog", "Shop"]
+    assert shared["description"] == "Moved on upgrade from Blog, Shop."
+    assert projects["Shop"]["sources"][0]["auth"]["credential_id"] == shared["credential_id"]
+    assert projects["Other"]["sources"][0]["auth"]["type"] == "credential"
+    assert projects["Open"]["sources"][0]["auth"] == {"type": "none"}
     assert isinstance(shop[0], GrafanaConnection) and shop[0].token is not None
     assert shop[0].token.get_secret_value() == TOKEN
-
+    assert isinstance(edge[0], CloudflareConnection) and edge[0].api_token is not None
+    assert edge[0].api_token.get_secret_value() == "cf"
     with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
-        linked = db.execute(
-            "SELECT COUNT(*) FROM project_sources WHERE credential_id IS NOT NULL"
-            " AND secrets IS NULL"
-        ).fetchone()[0]
+        inline = db.execute("SELECT COUNT(*) FROM project_sources WHERE secrets IS NOT NULL")
+        assert inline.fetchone()[0] == 0
 
-    assert linked == 4
-
-    # The import runs once: duplicates made afterwards stay inline.
-    with make_client(tmp_path, secret_key=key) as c:
-        c.post("/api/projects", json=grafana_inline("Later 1", "glsa_new"))
-        c.post("/api/projects", json=grafana_inline("Later 2", "glsa_new"))
-
-    with make_client(tmp_path, secret_key=key) as c:
-        assert len(c.get("/api/credentials").json()["items"]) == 2
+    # The import runs once.
+    with make_client(tmp_path, secret_key=key.decode()) as c:
+        assert len(c.get("/api/credentials").json()["items"]) == 4
 
 
-async def test_shared_import_skips_unreadable_secrets(tmp_path: Path) -> None:
-    with make_client(tmp_path, secret_key=Fernet.generate_key().decode()) as c:
-        c.post("/api/projects", json=grafana_inline("Shop", TOKEN))
-        c.post("/api/projects", json=grafana_inline("Blog", TOKEN))
-    mark_import_pending(tmp_path)
+def test_unreadable_inline_secrets_move_as_they_are(tmp_path: Path) -> None:
+    seed_inline(
+        tmp_path,
+        Fernet.generate_key(),
+        [
+            ("Shop", "grafana", grafana_config(), {"token": TOKEN}),
+            ("Blog", "grafana", grafana_config(), {"token": TOKEN}),
+        ],
+    )
 
     with make_client(tmp_path, secret_key=Fernet.generate_key().decode()) as c:
-        assert c.get("/api/credentials").json()["items"] == []
-        assert c.get("/api/projects").json()["items"][0]["credentials_readable"] is False
+        moved = c.get("/api/credentials").json()["items"]
+        projects = c.get("/api/projects").json()["items"]
+
+    assert len(moved) == 2  # undecryptable secrets cannot be compared, so each gets its own
+    assert [cr["readable"] for cr in moved] == [False, False]
+    assert [p["credentials_readable"] for p in projects] == [False, False]
 
 
 def test_migration_marks_import_pending_only_with_inline_secrets(tmp_path: Path) -> None:
@@ -387,7 +415,7 @@ def test_migration_marks_import_pending_only_with_inline_secrets(tmp_path: Path)
 # --- migration 0006 ---------------------------------------------------------------------------
 
 
-async def test_migration_moves_secrets_into_auth(tmp_path: Path) -> None:
+async def test_migrations_move_secrets_into_credentials(tmp_path: Path) -> None:
     key = Fernet.generate_key()
     box = SecretBox(key)
     engine = make_engine(tmp_path / "assistant.sqlite3")
@@ -427,12 +455,14 @@ async def test_migration_moves_secrets_into_auth(tmp_path: Path) -> None:
 
     with make_client(tmp_path, secret_key=key.decode()) as c:
         sources = {s["kind"]: s for s in c.get("/api/projects/p1").json()["sources"]}
+        moved = {cr["kind"]: cr for cr in c.get("/api/credentials").json()["items"]}
         connections = await services(c).projects.connections("p1")
 
-    assert sources["cloudflare"]["auth"] == {"type": "token", "token_set": True}
+    assert sources["cloudflare"]["auth"]["credential_id"] == moved["cloudflare"]["credential_id"]
+    assert moved["cloudflare"]["auth"] == {"type": "token", "token_set": True}
     assert sources["sentry"]["auth"] == {"type": "none"}
     assert sources["sentry"]["projects"] == ["web"]
-    assert sources["wazuh"]["auth"] == {
+    assert moved["wazuh"]["auth"] == {
         "type": "basic",
         "username": "reader",
         "password_set": True,

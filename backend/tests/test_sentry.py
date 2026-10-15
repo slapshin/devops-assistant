@@ -1,6 +1,5 @@
 """Sentry source (T017): REST client, collection, detection, and project API."""
 
-import sqlite3
 import time
 from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, datetime, timedelta
@@ -32,7 +31,13 @@ from app.sources.sentry.client import SentryClient
 from app.sources.sentry.connect import connect_sentry, probe_sentry
 from app.sources.sentry.source import SentryMetricsSource
 from app.sources.sentry.synthetic import SyntheticSentryApi
-from tests.helpers import StaticSources, make_scope
+from tests.helpers import (
+    StaticSources,
+    create_credential,
+    credential_ref,
+    credential_view,
+    make_scope,
+)
 
 ORG = "acme"
 PROJECT = "shop-web"
@@ -377,10 +382,9 @@ def test_tls_verification_is_stored_and_defaults_on(api: TestClient) -> None:
 
     assert on["sources"][0]["tls_verify"] is True
 
+    credential = create_credential(api, "sentry", {"type": "token", "token": TOKEN})
     body = sentry_body(
-        api_url="https://sentry.internal/sentry",
-        tls_verify=False,
-        auth={"type": "token", "token": TOKEN},
+        api_url="https://sentry.internal/sentry", tls_verify=False, auth=credential_ref(credential)
     )
     off = api.post("/api/projects", json={**body, "name": "internal"}).json()
 
@@ -827,17 +831,18 @@ def sentry_body(**source: Any) -> dict[str, Any]:
     }
 
 
-def test_sentry_project_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
+def test_sentry_project_uses_a_credential(api: TestClient, tmp_path: Path) -> None:
     missing = api.post("/api/projects", json=sentry_body())
 
     assert missing.status_code == 422
-    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth"]
+    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth.credential_id"]
 
+    credential = create_credential(api, "sentry", {"type": "token", "token": TOKEN})
     tags = [{"key": "team", "value": "shop"}]
     res = api.post(
         "/api/projects",
         json=sentry_body(
-            auth={"type": "token", "token": TOKEN},
+            auth=credential_ref(credential),
             environment="production",
             projects=["web", "api"],
             tags=tags,
@@ -845,8 +850,7 @@ def test_sentry_project_token_is_write_only(api: TestClient, tmp_path: Path) -> 
     )
 
     assert res.status_code == 201, res.text
-    project = res.json()
-    assert project["sources"] == [
+    assert res.json()["sources"] == [
         {
             "kind": "sentry",
             "organization": ORG,
@@ -855,21 +859,9 @@ def test_sentry_project_token_is_write_only(api: TestClient, tmp_path: Path) -> 
             "tags": tags,
             "api_url": "https://sentry.io",
             "tls_verify": True,
-            "auth": {"type": "token", "token_set": True},
+            "auth": credential_view(credential),
         }
     ]
-
-    with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
-        raw = db.execute("SELECT config, secrets FROM project_sources").fetchone()
-
-    assert TOKEN not in raw[0] and TOKEN.encode() not in raw[1]
-
-    pid = project["project_id"]
-    body = sentry_body(environment="staging", auth={"type": "token"})
-
-    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["auth"]["token_set"]
-    clone = api.post(f"/api/projects?clone_of={pid}", json={**body, "name": "copy"})
-    assert clone.status_code == 201 and clone.json()["sources"][0]["auth"]["token_set"]
     assert TOKEN not in api.get("/api/projects").text
 
 

@@ -1,4 +1,4 @@
-"""SQLite CredentialRepository: shared source credentials with encrypted secrets (T021)."""
+"""SQLite CredentialRepository: source credentials with encrypted secrets (T021)."""
 
 import asyncio
 import json
@@ -17,12 +17,10 @@ from app.storage.auth import secret_value, secret_view, split_secret
 from app.storage.db import app_meta, credentials, project_sources, projects
 from app.storage.secrets import SecretBox, SecretsUnreadable
 
-SHARED_IMPORT_KEY = "shared_credentials_import"
-"""Set to 'pending' by migration 0007 when sources with inline secrets existed."""
-SHARED_IMPORT_PENDING = "pending"
-SHARED_IMPORT_DONE = "done"
-MIN_SHARED_SOURCES = 2
-"""An inline secret becomes a shared credential when at least this many sources use it."""
+INLINE_IMPORT_KEY = "shared_credentials_import"
+"""Set to 'pending' by migrations 0007/0008 when sources still stored their own secrets."""
+INLINE_IMPORT_PENDING = "pending"
+INLINE_IMPORT_DONE = "done"
 
 _KIND_LABELS = {
     SourceKind.PROMETHEUS: "Prometheus",
@@ -200,87 +198,130 @@ class SqliteCredentialRepository:
 
         return await self._run(q)
 
-    async def share_duplicate_secrets(self) -> int | None:
-        """Once after migration 0007: identical inline secrets of one kind and mechanism used by
-        several sources become one shared credential that those sources reference.
+    async def move_inline_secrets(self) -> int | None:
+        """Once after migrations 0007/0008: every secret still stored in a source becomes a
+        credential that the source references; identical secrets (same kind, mechanism and
+        value) share one. A secret that cannot be decrypted is moved as is, into a credential of
+        its own that reports ``readable: false``.
 
-        Secrets that cannot be decrypted are left inline. Returns the number of credentials
-        created, or None when no import was pending.
+        Returns the number of credentials created, or None when no import was pending.
         """
         now = format_utc(datetime.now(UTC))
 
         def q(conn: sa.Connection) -> int | None:
             pending = conn.execute(
-                sa.select(app_meta.c.value).where(app_meta.c.key == SHARED_IMPORT_KEY)
+                sa.select(app_meta.c.value).where(app_meta.c.key == INLINE_IMPORT_KEY)
             ).first()
-            if pending is None or pending[0] != SHARED_IMPORT_PENDING:
+            if pending is None or pending[0] != INLINE_IMPORT_PENDING:
                 return None
 
             groups: dict[tuple[str, str, str], list[tuple[Any, dict[str, Any]]]] = {}
+            blobs: dict[tuple[str, str, str], bytes] = {}
             rows = conn.execute(
                 sa.select(project_sources)
-                .where(project_sources.c.secrets.is_not(None))
                 .where(project_sources.c.credential_id.is_(None))
                 .order_by(project_sources.c.kind, project_sources.c.project_id)
             )
             for row in rows:
                 config = json.loads(row.config)
                 public = config["auth"]
+                if row.secrets is None or public["type"] in INLINE_FREE_TYPES:
+                    _relink(conn, row, config, None, now)
+                    continue
+                field = _secret_field(public)
                 try:
-                    value = secret_value(self.box.decrypt(row.secrets), _secret_field(public))
+                    value = secret_value(self.box.decrypt(row.secrets), field)
                 except SecretsUnreadable:
-                    continue
-                if value is not None:
+                    value = None
+                if value is None:  # unreadable: keep the ciphertext, one credential per source
+                    key = (row.kind, json.dumps(public, sort_keys=True), f"#{row.project_id}")
+                    blobs[key] = row.secrets
+                else:
                     key = (row.kind, json.dumps(public, sort_keys=True), value)
-                    groups.setdefault(key, []).append((row, config))
+                    blobs.setdefault(key, self.box.encrypt({field: value}))
+                groups.setdefault(key, []).append((row, config))
 
-            taken = {name.lower() for (name,) in conn.execute(sa.select(credentials.c.name))}
-            created = 0
-            for (kind, public_json, value), members in groups.items():
-                if len(members) < MIN_SHARED_SOURCES:
-                    continue
-                public = json.loads(public_json)
-                credential_id = new_credential_id()
-                conn.execute(
-                    credentials.insert().values(
-                        credential_id=credential_id,
-                        name=_unique_name(_import_name(SourceKind(kind), public, members), taken),
-                        description=f"Created on upgrade from the identical secret of "
-                        f"{len(members)} sources.",
-                        kind=kind,
-                        auth=public_json,
-                        secrets=self.box.encrypt({_secret_field(public): value}),
-                        created_at=now,
-                        updated_at=now,
-                    )
+            for key, members in groups.items():
+                kind, public_json, _ = key
+                credential_id = insert_credential(
+                    conn,
+                    kind=SourceKind(kind),
+                    public=json.loads(public_json),
+                    blob=blobs[key],
+                    name=_import_name(SourceKind(kind), json.loads(public_json), members),
+                    description=f"Moved on upgrade from {_projects_text(conn, members)}.",
+                    now=now,
                 )
                 for row, config in members:
-                    config["auth"] = {"type": AuthType.CREDENTIAL.value}
-                    conn.execute(
-                        project_sources.update()
-                        .where(project_sources.c.project_id == row.project_id)
-                        .where(project_sources.c.kind == kind)
-                        .values(
-                            config=json.dumps(config, sort_keys=True),
-                            secrets=None,
-                            credential_id=credential_id,
-                            updated_at=now,
-                        )
-                    )
-                    conn.execute(
-                        projects.update()
-                        .where(projects.c.project_id == row.project_id)
-                        .values(updated_at=now)
-                    )
-                created += 1
+                    _relink(conn, row, config, credential_id, now)
             conn.execute(
                 app_meta.update()
-                .where(app_meta.c.key == SHARED_IMPORT_KEY)
-                .values(value=SHARED_IMPORT_DONE)
+                .where(app_meta.c.key == INLINE_IMPORT_KEY)
+                .values(value=INLINE_IMPORT_DONE)
             )
-            return created
+            return len(groups)
 
         return await self._run(q)
+
+
+INLINE_FREE_TYPES = (AuthType.NONE.value, AuthType.CREDENTIAL.value)
+
+
+def insert_credential(
+    conn: sa.Connection,
+    *,
+    kind: SourceKind,
+    public: dict[str, Any],
+    blob: bytes,
+    name: str,
+    description: str | None,
+    now: str,
+) -> str:
+    """Insert a credential holding the encrypted ``blob``, under a unique variant of ``name``."""
+    taken = {n.lower() for (n,) in conn.execute(sa.select(credentials.c.name))}
+    credential_id = new_credential_id()
+    conn.execute(
+        credentials.insert().values(
+            credential_id=credential_id,
+            name=_unique_name(name, taken),
+            description=description,
+            kind=kind.value,
+            auth=json.dumps(public, sort_keys=True),
+            secrets=blob,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    return credential_id
+
+
+def _relink(
+    conn: sa.Connection, row: Any, config: dict[str, Any], credential_id: str | None, now: str
+) -> None:
+    """Point a source at ``credential_id`` (none without one) and drop its own secret."""
+    config["auth"] = {"type": AuthType.CREDENTIAL.value if credential_id else AuthType.NONE.value}
+    conn.execute(
+        project_sources.update()
+        .where(project_sources.c.project_id == row.project_id)
+        .where(project_sources.c.kind == row.kind)
+        .values(
+            config=json.dumps(config, sort_keys=True),
+            secrets=None,
+            credential_id=credential_id,
+            updated_at=now,
+        )
+    )
+    conn.execute(
+        projects.update().where(projects.c.project_id == row.project_id).values(updated_at=now)
+    )
+
+
+def _projects_text(conn: sa.Connection, members: list[tuple[Any, dict[str, Any]]]) -> str:
+    ids = [row.project_id for row, _ in members]
+    rows = conn.execute(
+        sa.select(projects.c.name).where(projects.c.project_id.in_(ids)).order_by(projects.c.name)
+    )
+    return ", ".join(str(name) for (name,) in rows)
 
 
 def _secret_field(public: dict[str, Any]) -> str:
@@ -298,7 +339,8 @@ def _import_name(
     label = _KIND_LABELS[kind]
     if public["type"] == AuthType.BASIC.value:
         return f"{label} {public['username']}@{host}" if host else f"{label} {public['username']}"
-    return f"{label} {public['type']} ({host})" if host else f"{label} {public['type']}"
+    mechanism = "token" if public["type"] == AuthType.TOKEN.value else public["type"]
+    return f"{label} {mechanism} ({host})" if host else f"{label} {mechanism}"
 
 
 def _unique_name(base: str, taken: set[str]) -> str:

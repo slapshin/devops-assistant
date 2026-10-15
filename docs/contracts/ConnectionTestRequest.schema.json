@@ -1,71 +1,5 @@
 {
   "$defs": {
-    "BasicAuthInput": {
-      "additionalProperties": false,
-      "properties": {
-        "password": {
-          "anyOf": [
-            {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Omit to keep the stored password (update only).",
-          "title": "Password"
-        },
-        "type": {
-          "const": "basic",
-          "default": "basic",
-          "title": "Type",
-          "type": "string"
-        },
-        "username": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Username",
-          "type": "string"
-        }
-      },
-      "required": [
-        "username"
-      ],
-      "title": "BasicAuthInput",
-      "type": "object"
-    },
-    "BearerAuthInput": {
-      "additionalProperties": false,
-      "description": "``Authorization: Bearer <token>``.",
-      "properties": {
-        "token": {
-          "anyOf": [
-            {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Omit to keep the stored token (update only).",
-          "title": "Token"
-        },
-        "type": {
-          "const": "bearer",
-          "default": "bearer",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "title": "BearerAuthInput",
-      "type": "object"
-    },
     "ChangeDirection": {
       "enum": [
         "up",
@@ -87,21 +21,17 @@
           "type": "string"
         },
         "auth": {
-          "description": "API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain), inline or as a shared credential; not needed for synthetic://.",
+          "description": "A Cloudflare credential: an API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain); not needed for synthetic://.",
           "discriminator": {
             "mapping": {
               "credential": "#/$defs/CredentialRef",
-              "none": "#/$defs/NoAuth",
-              "token": "#/$defs/TokenAuthInput"
+              "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
           },
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/TokenAuthInput"
             },
             {
               "$ref": "#/$defs/CredentialRef"
@@ -138,7 +68,7 @@
     },
     "CredentialRef": {
       "additionalProperties": false,
-      "description": "Use a shared credential of the source's kind; its secret is resolved at each use.",
+      "description": "Use a credential of the source's kind; its secret is resolved at each use.",
       "properties": {
         "credential_id": {
           "maxLength": 36,
@@ -318,21 +248,17 @@
           "type": "string"
         },
         "auth": {
-          "description": "Service account token (Viewer role), inline or as a shared credential; not needed for synthetic://.",
+          "description": "A Grafana credential: a service account token (Viewer role); not needed for synthetic://.",
           "discriminator": {
             "mapping": {
               "credential": "#/$defs/CredentialRef",
-              "none": "#/$defs/NoAuth",
-              "token": "#/$defs/TokenAuthInput"
+              "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
           },
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/TokenAuthInput"
             },
             {
               "$ref": "#/$defs/CredentialRef"
@@ -458,10 +384,9 @@
       "additionalProperties": false,
       "properties": {
         "auth": {
+          "description": "A Prometheus credential (bearer or basic), or none.",
           "discriminator": {
             "mapping": {
-              "basic": "#/$defs/BasicAuthInput",
-              "bearer": "#/$defs/BearerAuthInput",
               "credential": "#/$defs/CredentialRef",
               "none": "#/$defs/NoAuth"
             },
@@ -470,12 +395,6 @@
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/BearerAuthInput"
-            },
-            {
-              "$ref": "#/$defs/BasicAuthInput"
             },
             {
               "$ref": "#/$defs/CredentialRef"
@@ -527,21 +446,17 @@
           "type": "string"
         },
         "auth": {
-          "description": "Auth token with org:read and project:read, inline or as a shared credential; not needed for synthetic://.",
+          "description": "A Sentry credential: an auth token with org:read and project:read; not needed for synthetic://.",
           "discriminator": {
             "mapping": {
               "credential": "#/$defs/CredentialRef",
-              "none": "#/$defs/NoAuth",
-              "token": "#/$defs/TokenAuthInput"
+              "none": "#/$defs/NoAuth"
             },
             "propertyName": "type"
           },
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/TokenAuthInput"
             },
             {
               "$ref": "#/$defs/CredentialRef"
@@ -647,35 +562,6 @@
       "title": "ThresholdOp",
       "type": "string"
     },
-    "TokenAuthInput": {
-      "additionalProperties": false,
-      "description": "The kind's API token: Cloudflare API token, Sentry auth token, Grafana service account\ntoken.",
-      "properties": {
-        "token": {
-          "anyOf": [
-            {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Omit to keep the stored token (update only).",
-          "title": "Token"
-        },
-        "type": {
-          "const": "token",
-          "default": "token",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "title": "TokenAuthInput",
-      "type": "object"
-    },
     "Unit": {
       "enum": [
         "ratio",
@@ -732,10 +618,9 @@
           "type": "string"
         },
         "auth": {
-          "description": "Indexer user with read access to the alerts indices (basic), inline or as a shared credential; not needed for synthetic://.",
+          "description": "A Wazuh credential: an indexer user with read access to the alerts indices; none when the indexer needs no authentication.",
           "discriminator": {
             "mapping": {
-              "basic": "#/$defs/BasicAuthInput",
               "credential": "#/$defs/CredentialRef",
               "none": "#/$defs/NoAuth"
             },
@@ -744,9 +629,6 @@
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/BasicAuthInput"
             },
             {
               "$ref": "#/$defs/CredentialRef"
@@ -805,7 +687,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets.",
+  "description": "Body of POST /api/projects/test-connection: a draft source.",
   "properties": {
     "matchers": {
       "description": "Required with a Prometheus source.",
@@ -815,19 +697,6 @@
       "maxItems": 10,
       "title": "Matchers",
       "type": "array"
-    },
-    "project_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Reuse this project's stored secrets for omitted ones.",
-      "title": "Project Id"
     },
     "source": {
       "oneOf": [

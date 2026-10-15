@@ -1,7 +1,6 @@
 """Wazuh source (T018): indexer client, collection, detection, and project API."""
 
 import json
-import sqlite3
 import time
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
@@ -34,7 +33,13 @@ from app.sources.wazuh.client import WazuhClient
 from app.sources.wazuh.connect import connect_wazuh, probe_wazuh
 from app.sources.wazuh.source import WazuhMetricsSource
 from app.sources.wazuh.synthetic import SyntheticWazuhApi
-from tests.helpers import StaticSources, make_scope
+from tests.helpers import (
+    StaticSources,
+    create_credential,
+    credential_ref,
+    credential_view,
+    make_scope,
+)
 
 INDEX = "wazuh-alerts-4.x-*"
 PASSWORD = "wazuh-s3cr3t-password"
@@ -642,26 +647,23 @@ def wazuh_body(**source: Any) -> dict[str, Any]:
     }
 
 
-def test_wazuh_password_is_write_only(api: TestClient, tmp_path: Path) -> None:
-    missing = api.post("/api/projects", json=wazuh_body(auth={"type": "basic", "username": "r"}))
+def test_wazuh_source_uses_a_credential(api: TestClient, tmp_path: Path) -> None:
+    unauthenticated = api.post("/api/projects", json={**wazuh_body(), "name": "open"})
 
-    assert missing.status_code == 422
-    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth.password"]
+    assert unauthenticated.status_code == 201
+    assert unauthenticated.json()["sources"][0]["auth"] == {"type": "none"}
 
+    credential = create_credential(
+        api, "wazuh", {"type": "basic", "username": "reader", "password": PASSWORD}
+    )
     labels = [{"key": "project", "value": "shop"}]
-
     res = api.post(
         "/api/projects",
-        json=wazuh_body(
-            auth={"type": "basic", "username": "reader", "password": PASSWORD},
-            labels=labels,
-            tls_verify=False,
-        ),
+        json=wazuh_body(auth=credential_ref(credential), labels=labels, tls_verify=False),
     )
 
     assert res.status_code == 201, res.text
-    project = res.json()
-    assert project["sources"] == [
+    assert res.json()["sources"] == [
         {
             "kind": "wazuh",
             "api_url": "https://indexer:9200",
@@ -671,31 +673,13 @@ def test_wazuh_password_is_write_only(api: TestClient, tmp_path: Path) -> None:
             "labels": labels,
             "monitoring_index_pattern": "wazuh-monitoring-*",
             "tls_verify": False,
-            "auth": {"type": "basic", "username": "reader", "password_set": True},
+            "auth": credential_view(credential),
         }
     ]
-
-    with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
-        raw = db.execute("SELECT config, secrets FROM project_sources").fetchone()
-    assert PASSWORD not in raw[0] and PASSWORD.encode() not in raw[1]
-
-    pid = project["project_id"]
-    body = wazuh_body(auth={"type": "basic", "username": "reader"}, agents=["web-1", "web-2"])
-
-    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["auth"]["password_set"]
-
-    clone = api.post(f"/api/projects?clone_of={pid}", json={**body, "name": "copy"})
-    assert clone.status_code == 201 and clone.json()["sources"][0]["auth"]["password_set"]
     assert PASSWORD not in api.get("/api/projects").text
 
     selectless = api.post("/api/projects", json=wazuh_body(agents=[], name="x"))
     assert selectless.status_code == 422
-
-    grouped = api.post(
-        "/api/projects", json={**wazuh_body(agents=[], groups=["web"]), "name": "by group"}
-    )
-    assert grouped.status_code == 201, grouped.text
-    assert grouped.json()["sources"][0]["groups"] == ["web"]
 
 
 def test_synthetic_wazuh_project_end_to_end(api: TestClient) -> None:

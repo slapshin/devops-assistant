@@ -2,9 +2,8 @@
 
 import time
 from datetime import UTC, datetime
-from typing import Annotated
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Response
 
 from app.api.problems import ProblemError, problem_responses, validation_problem
 from app.api.routes import ServicesDep
@@ -45,7 +44,7 @@ from app.sources.sentry.connect import connect_sentry, probe_sentry
 from app.sources.sentry.synthetic import SCENARIOS as SENTRY_SCENARIOS
 from app.sources.wazuh.connect import connect_wazuh, probe_wazuh
 from app.sources.wazuh.synthetic import SCENARIOS as WAZUH_SCENARIOS
-from app.storage.projects import CredentialInvalid, ProjectNameTaken, SecretRequired
+from app.storage.projects import CredentialInvalid, ProjectNameTaken
 from app.storage.secrets import SecretsUnreadable
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -110,8 +109,6 @@ def _write_error(exc: Exception, field_prefix: str) -> ProblemError:
                 "Project name taken",
                 f"A project named {name!r} already exists.",
             )
-        case SecretRequired(field=field):
-            return _invalid(f"{field_prefix}.{field}", "required when no secret is stored")
         case CredentialInvalid(field=field, message=message):
             return _invalid(f"{field_prefix}.{field}", message)
         case SecretsUnreadable():
@@ -140,20 +137,12 @@ async def list_projects(services: ServicesDep) -> ProjectList:
 @router.post(
     "", status_code=201, response_model=Project, responses=problem_responses(404, 409, 422)
 )
-async def create_project(
-    data: ProjectInput,
-    services: ServicesDep,
-    clone_of: Annotated[
-        str | None,
-        Query(description="Clone: reuse this project's stored secrets for omitted ones."),
-    ] = None,
-) -> Project:
+async def create_project(data: ProjectInput, services: ServicesDep) -> Project:
+    """A clone is a create with the original's settings; credentials are referenced, not copied."""
     _validate(data)
-    if clone_of is not None and await services.projects.get(clone_of) is None:
-        raise _not_found(clone_of)
     try:
-        return await services.projects.create(data, secrets_from=clone_of)
-    except (ProjectNameTaken, SecretRequired, CredentialInvalid, SecretsUnreadable) as exc:
+        return await services.projects.create(data)
+    except (ProjectNameTaken, CredentialInvalid) as exc:
         raise _write_error(exc, "body.sources") from None
 
 
@@ -170,7 +159,7 @@ async def update_project(project_id: str, data: ProjectInput, services: Services
     _validate(data)
     try:
         project = await services.projects.update(project_id, data)
-    except (ProjectNameTaken, SecretRequired, CredentialInvalid, SecretsUnreadable) as exc:
+    except (ProjectNameTaken, CredentialInvalid) as exc:
         raise _write_error(exc, "body.sources") from None
     if project is None:
         raise _not_found(project_id)
@@ -228,11 +217,9 @@ def _draft_scope(matchers: list[LabelMatcher]) -> Scope:
 )
 async def test_connection(body: ConnectionTestRequest, services: ServicesDep) -> ConnectionTest:
     _check_scenario(body.source, "body.source")
-    if body.project_id is not None and await services.projects.get(body.project_id) is None:
-        raise _not_found(body.project_id)
     try:
-        conn = await services.projects.resolve_connection(body.source, body.project_id)
-    except (SecretRequired, CredentialInvalid, SecretsUnreadable) as exc:
+        conn = await services.projects.resolve_connection(body.source)
+    except (CredentialInvalid, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.source") from None
     return await _probe(conn, _draft_scope(body.matchers))
 
@@ -247,11 +234,9 @@ async def preview_custom_rule(
 ) -> CustomRulePreview:
     """Run one custom rule's query over the last 24 h; query errors are reported in the body."""
     _check_scenario(body.source, "body.source")
-    if body.project_id is not None and await services.projects.get(body.project_id) is None:
-        raise _not_found(body.project_id)
     try:
-        conn = await services.projects.resolve_connection(body.source, body.project_id)
-    except (SecretRequired, CredentialInvalid, SecretsUnreadable) as exc:
+        conn = await services.projects.resolve_connection(body.source)
+    except (CredentialInvalid, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.source") from None
     if not isinstance(conn, PrometheusConnection):  # pragma: no cover - the body is Prometheus
         raise _invalid("body.source.kind", "custom rules need a Prometheus source")

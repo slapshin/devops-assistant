@@ -1,4 +1,4 @@
-"""Stored auth mechanisms, shared by source configs and credentials (T021).
+"""Stored credential mechanisms (T021).
 
 A mechanism is stored as public JSON (``{"type": ..., "username": ...}``) plus a secrets dict
 that is encrypted separately: ``{"token": ...}`` or ``{"password": ...}``.

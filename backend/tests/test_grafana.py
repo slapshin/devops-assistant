@@ -1,6 +1,5 @@
 """Grafana alerts source (T019): HTTP client, history replay, detection, and project API."""
 
-import sqlite3
 import time
 from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, datetime, timedelta
@@ -41,7 +40,13 @@ from app.sources.grafana.connect import connect_grafana, probe_grafana
 from app.sources.grafana.source import GrafanaMetricsSource
 from app.sources.grafana.synthetic import SyntheticGrafanaApi
 from app.sources.prometheus.synthetic import SyntheticMetricsSource
-from tests.helpers import StaticSources, make_scope
+from tests.helpers import (
+    StaticSources,
+    create_credential,
+    credential_ref,
+    credential_view,
+    make_scope,
+)
 
 TOKEN = "glsa_s3cr3t-grafana-token"
 END = datetime(2026, 10, 6, 10, 0, tzinfo=UTC)
@@ -770,18 +775,18 @@ def grafana_body(**source: Any) -> dict[str, Any]:
     }
 
 
-def test_grafana_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
+def test_grafana_source_uses_a_credential(api: TestClient, tmp_path: Path) -> None:
     missing = api.post("/api/projects", json=grafana_body())
 
     assert missing.status_code == 422
-    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth"]
+    assert [e["field"] for e in missing.json()["errors"]] == ["body.sources.0.auth.credential_id"]
 
+    credential = create_credential(api, "grafana", {"type": "token", "token": TOKEN})
     instance_labels = [{"name": "project", "op": "=", "value": "shop"}]
-
     res = api.post(
         "/api/projects",
         json=grafana_body(
-            auth={"type": "token", "token": TOKEN},
+            auth=credential_ref(credential),
             instance_labels=instance_labels,
             org_id=2,
             tls_verify=False,
@@ -789,8 +794,7 @@ def test_grafana_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
     )
 
     assert res.status_code == 201, res.text
-    project = res.json()
-    assert project["sources"] == [
+    assert res.json()["sources"] == [
         {
             "kind": "grafana",
             "api_url": "https://grafana.example.com",
@@ -800,26 +804,14 @@ def test_grafana_token_is_write_only(api: TestClient, tmp_path: Path) -> None:
             "rule_labels": [],
             "instance_labels": instance_labels,
             "tls_verify": False,
-            "auth": {"type": "token", "token_set": True},
+            "auth": credential_view(credential),
         }
     ]
-
-    with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
-        raw = db.execute("SELECT config, secrets FROM project_sources").fetchone()
-    assert TOKEN not in raw[0] and TOKEN.encode() not in raw[1]
-
-    pid = project["project_id"]
-    body = grafana_body(folders=["Shop", "Infra"], auth={"type": "token"})
-
-    assert api.put(f"/api/projects/{pid}", json=body).json()["sources"][0]["auth"]["token_set"]
-
-    clone = api.post(f"/api/projects?clone_of={pid}", json={**body, "name": "copy"})
-    assert clone.status_code == 201 and clone.json()["sources"][0]["auth"]["token_set"]
     assert TOKEN not in api.get("/api/projects").text
 
     selectless = api.post(
         "/api/projects",
-        json=grafana_body(folders=[], name="x", auth={"type": "token", "token": TOKEN}),
+        json=grafana_body(folders=[], name="x", auth=credential_ref(credential)),
     )
     assert selectless.status_code == 422
 

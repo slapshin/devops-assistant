@@ -1,10 +1,10 @@
-"""Source authentication: the mechanisms each source kind accepts (T021).
+"""Source authentication through credentials (T021).
 
-Every source kind has its own union of mechanisms, so a kind gains a mechanism (a custom
-header, a client certificate, ...) without affecting the others. A source either carries its
-mechanism inline or references a shared credential of the same kind (``type: credential``);
-a credential holds one of its kind's secret mechanisms (``CREDENTIAL_AUTH_TYPES``). Secrets are
-write-only: input models accept them, read models only say whether one is stored.
+Secrets live only in credentials: a credential belongs to one source kind and holds one of
+that kind's secret mechanisms (``CREDENTIAL_AUTH_TYPES``), so a kind gains a mechanism (a
+custom header, a client certificate, ...) without affecting the others. A source either needs
+no authentication (``none``) or references a credential of its kind (``credential``). Secrets
+are write-only: input models accept them, read models only say whether one is stored.
 """
 
 from enum import StrEnum
@@ -30,7 +30,7 @@ CREDENTIAL_AUTH_TYPES: dict[SourceKind, tuple[AuthType, ...]] = {
     SourceKind.WAZUH: (AuthType.BASIC,),
     SourceKind.GRAFANA: (AuthType.TOKEN,),
 }
-"""Secret mechanisms of each kind: what an inline secret or a shared credential can hold."""
+"""Secret mechanisms a credential of each kind can hold."""
 
 
 class NoAuth(Contract):
@@ -68,26 +68,18 @@ class TokenAuthInput(Contract):
 
 
 class CredentialRef(Contract):
-    """Use a shared credential of the source's kind; its secret is resolved at each use."""
+    """Use a credential of the source's kind; its secret is resolved at each use."""
 
     type: Literal[AuthType.CREDENTIAL] = AuthType.CREDENTIAL
     credential_id: str = Field(min_length=1, max_length=36)
 
 
-PrometheusAuthInput = Annotated[
-    NoAuth | BearerAuthInput | BasicAuthInput | CredentialRef, Field(discriminator="type")
-]
-CloudflareAuthInput = Annotated[
-    NoAuth | TokenAuthInput | CredentialRef, Field(discriminator="type")
-]
-SentryAuthInput = Annotated[NoAuth | TokenAuthInput | CredentialRef, Field(discriminator="type")]
-WazuhAuthInput = Annotated[NoAuth | BasicAuthInput | CredentialRef, Field(discriminator="type")]
-GrafanaAuthInput = Annotated[NoAuth | TokenAuthInput | CredentialRef, Field(discriminator="type")]
+SourceAuthInput = Annotated[NoAuth | CredentialRef, Field(discriminator="type")]
+"""A source's authentication: none, or a credential of the source's kind."""
 SecretAuthInput = Annotated[
     BearerAuthInput | BasicAuthInput | TokenAuthInput, Field(discriminator="type")
 ]
-"""A secret mechanism of any kind (a shared credential's auth)."""
-AnyAuthInput = NoAuth | BearerAuthInput | BasicAuthInput | TokenAuthInput | CredentialRef
+"""A secret mechanism of any kind (a credential's auth)."""
 
 
 # --- read models ------------------------------------------------------------------------------
@@ -112,14 +104,8 @@ class TokenAuth(Contract):
 class CredentialAuth(Contract):
     type: Literal[AuthType.CREDENTIAL] = AuthType.CREDENTIAL
     credential_id: str
-    name: str = Field(description="The shared credential's name.")
+    name: str = Field(description="The credential's name.")
 
 
-PrometheusAuth = Annotated[
-    NoAuth | BearerAuth | BasicAuth | CredentialAuth, Field(discriminator="type")
-]
-CloudflareAuth = Annotated[NoAuth | TokenAuth | CredentialAuth, Field(discriminator="type")]
-SentryAuth = Annotated[NoAuth | TokenAuth | CredentialAuth, Field(discriminator="type")]
-WazuhAuth = Annotated[NoAuth | BasicAuth | CredentialAuth, Field(discriminator="type")]
-GrafanaAuth = Annotated[NoAuth | TokenAuth | CredentialAuth, Field(discriminator="type")]
+SourceAuth = Annotated[NoAuth | CredentialAuth, Field(discriminator="type")]
 SecretAuth = Annotated[BearerAuth | BasicAuth | TokenAuth, Field(discriminator="type")]

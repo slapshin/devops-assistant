@@ -221,6 +221,7 @@ def test_upgrade_creates_projects_and_keeps_reports(
 
     with make_client(tmp_path / "data", **legacy_settings) as client:
         [project] = client.get("/api/projects").json()["items"]
+        [credential] = client.get("/api/credentials").json()["items"]
 
         assert project["name"] == "shop / production"
         assert project["matchers"] == MATCHERS
@@ -229,10 +230,15 @@ def test_upgrade_creates_projects_and_keeps_reports(
                 "kind": "prometheus",
                 "url": "https://vm.example/prometheus",
                 "tls_verify": True,
-                "auth": {"type": "bearer", "token_set": True},
+                "auth": {
+                    "type": "credential",
+                    "credential_id": credential["credential_id"],
+                    "name": "Prometheus (METRICS_URL)",
+                },
                 "custom_rules": [],
             }
         ]
+        assert credential["auth"] == {"type": "bearer", "token_set": True}
         assert project["latest_analysis"]["analysis_id"] == analysis_id
         assert "legacy-token" not in client.get("/api/projects").text
 

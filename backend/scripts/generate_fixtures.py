@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from app.ai.providers import FakeExplanationProvider
 from app.analysis.engine import RobustDetector, trend_summary
-from app.domain.auth import BearerAuth, TokenAuth
+from app.domain.auth import BearerAuth, CredentialAuth, TokenAuth
 from app.domain.common import (
     STEP_SECONDS,
     ConfidenceLevel,
@@ -113,6 +113,7 @@ from app.sources.wazuh.synthetic import SyntheticWazuhApi
 
 ROOT = Path(__file__).resolve().parents[2] / "fixtures"
 PROJECT_ID = "01999a3c-0000-7000-8000-000000000001"
+PROMETHEUS_CREDENTIAL_ID = "01999a3c-0000-7000-8000-0000000000c2"
 SCOPE = Scope(
     project_id=PROJECT_ID,
     project_name="shop / production",
@@ -1105,7 +1106,10 @@ def build() -> dict[str, BaseModel]:
                         PrometheusSource(
                             url="http://victoriametrics.example:8428",
                             tls_verify=True,
-                            auth=BearerAuth(token_set=True),
+                            auth=CredentialAuth(
+                                credential_id=PROMETHEUS_CREDENTIAL_ID,
+                                name="VictoriaMetrics reader",
+                            ),
                         )
                     ],
                     schedule=SCHEDULE,
@@ -1122,13 +1126,21 @@ def build() -> dict[str, BaseModel]:
                 Credential(
                     credential_id="01999a3c-0000-7000-8000-0000000000c1",
                     name="Grafana production",
-                    description="Viewer service account shared by the shop projects.",
+                    description="Viewer service account of the production Grafana.",
                     kind=SourceKind.GRAFANA,
                     auth=TokenAuth(token_set=True),
+                    created_at=T,
+                    updated_at=T,
+                ),
+                Credential(
+                    credential_id=PROMETHEUS_CREDENTIAL_ID,
+                    name="VictoriaMetrics reader",
+                    kind=SourceKind.PROMETHEUS,
+                    auth=BearerAuth(token_set=True),
                     used_by=[CredentialUsage(project_id=PROJECT_ID, name=SCOPE.project_name)],
                     created_at=T,
                     updated_at=T,
-                )
+                ),
             ]
         ),
         "api/connection_test.json": ConnectionTest(

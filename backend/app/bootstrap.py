@@ -94,12 +94,9 @@ async def bootstrap_projects(
     elif settings.metrics_url is not None:
         log.info("METRICS_URL is deprecated and ignored; sources are configured per project")
 
-    shared = await credentials.share_duplicate_secrets()
-    if shared:
-        log.warning(
-            "moved identical source secrets into %d shared credential(s); see Shared credentials",
-            shared,
-        )
+    moved = await credentials.move_inline_secrets()
+    if moved:
+        log.warning("moved source secrets into %d credential(s); see Credentials", moved)
 
     if settings.demo_projects and await projects.count() == 0:
         credential = next(

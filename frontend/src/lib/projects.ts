@@ -1,5 +1,5 @@
 import type { AnalysisReport, ConnectionTest, LabelMatcher, Problem, ProjectInput, ProjectSummary, ReportSchedule, SourceInfo, SourceKind, Weekday } from "../api/client";
-import { type AuthDraft, authDraftFrom, authInput, emptyAuth, validateAuth } from "./auth";
+import { credentialIdOf, sourceAuthInput, validateSourceCredential } from "./auth";
 import { type CustomRuleDraft, ruleDraftFrom, ruleInput, validateCustomRules } from "./customRules";
 
 /** Mirrors backend/app/domain/common.py and projects.py so most mistakes never reach the server. */
@@ -104,8 +104,8 @@ export interface ProjectDraft {
   /** Prometheus source; an empty URL means none. */
   url: string;
   tlsVerify: boolean;
-  /** Authentication of each source kind (kept while a source is switched off). */
-  auth: Record<SourceKind, AuthDraft>;
+  /** The credential of each source kind, "" for none (kept while a source is switched off). */
+  auth: Record<SourceKind, string>;
   /** Custom rules of the Prometheus source, in collection order. */
   customRules: CustomRuleDraft[];
   cloudflare: boolean;
@@ -167,13 +167,7 @@ export function emptyDraft(): ProjectDraft {
     ],
     url: "",
     tlsVerify: true,
-    auth: {
-      prometheus: emptyAuth("prometheus"),
-      cloudflare: emptyAuth("cloudflare"),
-      sentry: emptyAuth("sentry"),
-      wazuh: emptyAuth("wazuh"),
-      grafana: emptyAuth("grafana"),
-    },
+    auth: { prometheus: "", cloudflare: "", sentry: "", wazuh: "", grafana: "" },
     customRules: [],
     cloudflare: false,
     zoneId: "",
@@ -261,11 +255,11 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     url: source?.url ?? "",
     tlsVerify: source?.tls_verify ?? true,
     auth: {
-      prometheus: authDraftFrom("prometheus", source?.auth),
-      cloudflare: authDraftFrom("cloudflare", cloudflare?.auth),
-      sentry: authDraftFrom("sentry", sentry?.auth),
-      wazuh: authDraftFrom("wazuh", wazuh?.auth),
-      grafana: authDraftFrom("grafana", grafana?.auth),
+      prometheus: credentialIdOf(source?.auth),
+      cloudflare: credentialIdOf(cloudflare?.auth),
+      sentry: credentialIdOf(sentry?.auth),
+      wazuh: credentialIdOf(wazuh?.auth),
+      grafana: credentialIdOf(grafana?.auth),
     },
     customRules: (source?.custom_rules ?? []).map(ruleDraftFrom),
     cloudflare: !!cloudflare,
@@ -304,7 +298,7 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
   };
 }
 
-/** A new project prefilled from ``project``; stored secrets are reused server-side (clone_of). */
+/** A new project prefilled from ``project``, using the same credentials. */
 export function cloneDraft(project: ProjectSummary): ProjectDraft {
   return { ...draftFrom(project), name: `${project.name} (copy)`.slice(0, MAX_NAME_CHARS) };
 }
@@ -380,7 +374,7 @@ export function validateSource(draft: ProjectDraft, required = false): FieldErro
 
   const bad = urlError(url);
   if (bad) errors["prometheus.url"] = bad;
-  return { ...errors, ...validateAuth("prometheus", draft.auth.prometheus) };
+  return errors;
 }
 
 export function validateCloudflare(draft: ProjectDraft): FieldErrors {
@@ -395,7 +389,7 @@ export function validateCloudflare(draft: ProjectDraft): FieldErrors {
   const badUrl = apiUrl ? urlError(apiUrl) : "Required";
   if (badUrl) errors["cloudflare.api_url"] = badUrl;
   const synthetic = apiUrl.startsWith("synthetic:");
-  return { ...errors, ...validateAuth("cloudflare", draft.auth.cloudflare, synthetic) };
+  return { ...errors, ...validateSourceCredential("cloudflare", draft.auth.cloudflare, synthetic) };
 }
 
 export function validateSentry(draft: ProjectDraft): FieldErrors {
@@ -415,7 +409,7 @@ export function validateSentry(draft: ProjectDraft): FieldErrors {
   const badUrl = apiUrl ? urlError(apiUrl) : "Required";
   if (badUrl) errors["sentry.api_url"] = badUrl;
   const synthetic = apiUrl.startsWith("synthetic:");
-  return { ...errors, ...validateAuth("sentry", draft.auth.sentry, synthetic) };
+  return { ...errors, ...validateSourceCredential("sentry", draft.auth.sentry, synthetic) };
 }
 
 export function validateSentryTags(tags: TagDraft[]): FieldErrors {
@@ -468,7 +462,7 @@ export function validateWazuh(draft: ProjectDraft): FieldErrors {
   if (!agents.length && !groups.length && !labels.length) errors["wazuh.agents"] ??= "Select agents by name, group or label";
   if (!WAZUH_INDEX.test(draft.wazuhIndex.trim())) errors["wazuh.index_pattern"] = "One lower-case index pattern, e.g. wazuh-alerts-4.x-*";
   const synthetic = apiUrl.startsWith("synthetic:");
-  return { ...errors, ...validateAuth("wazuh", draft.auth.wazuh, synthetic) };
+  return { ...errors, ...validateSourceCredential("wazuh", draft.auth.wazuh, synthetic) };
 }
 
 const usedMatchers = (rows: MatcherDraft[]) => rows.filter((m) => m.name.trim() || m.value);
@@ -511,7 +505,7 @@ export function validateGrafana(draft: ProjectDraft): FieldErrors {
     errors["grafana.folders"] ??= "Select alert rules by folder, UID or rule label";
   }
   const synthetic = apiUrl.startsWith("synthetic:");
-  return { ...errors, ...validateAuth("grafana", draft.auth.grafana, synthetic) };
+  return { ...errors, ...validateSourceCredential("grafana", draft.auth.grafana, synthetic) };
 }
 
 export function validateSchedule(draft: ProjectDraft): FieldErrors {
@@ -548,7 +542,7 @@ export function prometheusInput(draft: ProjectDraft): PrometheusSourceInput {
     kind: "prometheus",
     url: draft.url.trim(),
     tls_verify: draft.tlsVerify,
-    auth: authInput("prometheus", draft.auth.prometheus) as PrometheusSourceInput["auth"],
+    auth: sourceAuthInput(draft.auth.prometheus),
     // Omitted is the same as none, so drafts without rules send what they always did.
     ...(draft.customRules.length ? { custom_rules: draft.customRules.map(ruleInput) } : {}),
   };
@@ -560,7 +554,7 @@ export function cloudflareInput(draft: ProjectDraft): SourceInput {
     zone_id: draft.zoneId.trim().toLowerCase(),
     hostnames: parseHostnames(draft.hostnames),
     api_url: draft.cfApiUrl.trim(),
-    auth: authInput("cloudflare", draft.auth.cloudflare),
+    auth: sourceAuthInput(draft.auth.cloudflare),
   } as SourceInput;
 }
 
@@ -573,7 +567,7 @@ export function sentryInput(draft: ProjectDraft): SourceInput {
     environment: draft.sentryEnvironment.trim() || null,
     api_url: draft.sentryApiUrl.trim(),
     tls_verify: draft.sentryTlsVerify,
-    auth: authInput("sentry", draft.auth.sentry),
+    auth: sourceAuthInput(draft.auth.sentry),
   } as SourceInput;
 }
 
@@ -587,7 +581,7 @@ export function wazuhInput(draft: ProjectDraft): SourceInput {
     monitoring_index_pattern: draft.wazuhMonitoringIndex.trim() || WAZUH_MONITORING_INDEX_PATTERN,
     labels: usedTags(draft.wazuhLabels).map((l) => ({ key: l.key.trim(), value: l.value })),
     tls_verify: draft.wazuhTlsVerify,
-    auth: authInput("wazuh", draft.auth.wazuh),
+    auth: sourceAuthInput(draft.auth.wazuh),
   } as SourceInput;
 }
 
@@ -602,7 +596,7 @@ export function grafanaInput(draft: ProjectDraft): SourceInput {
     rule_labels: matchers(draft.grafanaRuleLabels),
     instance_labels: matchers(draft.grafanaInstanceLabels),
     tls_verify: draft.grafanaTlsVerify,
-    auth: authInput("grafana", draft.auth.grafana),
+    auth: sourceAuthInput(draft.auth.grafana),
   } as SourceInput;
 }
 

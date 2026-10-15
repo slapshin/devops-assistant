@@ -1,35 +1,27 @@
 import type { Credential, ProjectSummary, Schemas, SourceKind } from "../api/client";
 
-/** Mirrors backend/app/domain/auth.py: every source kind has its own authentication mechanisms. */
-export type AuthType = "none" | "bearer" | "basic" | "token" | "credential";
+/** Mirrors backend/app/domain/auth.py: sources authenticate only through credentials of their kind, and each kind has its
+ * own secret mechanisms. */
+export type SecretType = "bearer" | "basic" | "token";
 export type FieldErrors = Record<string, string>;
 
-/** What the server stores for a source or credential, so an empty secret input keeps it. */
-export interface StoredAuth {
-  type: AuthType;
-  secretSet: boolean;
-}
-
-export interface AuthDraft {
-  type: AuthType;
+export interface SecretDraft {
+  type: SecretType;
   token: string;
   username: string;
   password: string;
-  credentialId: string;
-  /** The stored mechanism this draft started from; null for a new source. */
-  stored: StoredAuth | null;
+  /** Whether the stored credential this draft edits holds a secret of ``type``; null for a new credential. */
+  stored: { type: SecretType; secretSet: boolean } | null;
 }
 
 interface Mechanism {
-  type: AuthType;
+  type: SecretType;
   label: string;
 }
 
-/** Inline mechanisms offered per kind. Wazuh's basic auth with an empty username means none, and
- * token kinds send none for synthetic:// sources without a token. */
-export const AUTH_MECHANISMS: Record<SourceKind, Mechanism[]> = {
+/** Secret mechanisms of each kind (CREDENTIAL_AUTH_TYPES). */
+export const CREDENTIAL_MECHANISMS: Record<SourceKind, Mechanism[]> = {
   prometheus: [
-    { type: "none", label: "None" },
     { type: "bearer", label: "Bearer token" },
     { type: "basic", label: "Basic auth" },
   ],
@@ -37,12 +29,6 @@ export const AUTH_MECHANISMS: Record<SourceKind, Mechanism[]> = {
   sentry: [{ type: "token", label: "Auth token" }],
   wazuh: [{ type: "basic", label: "Username and password" }],
   grafana: [{ type: "token", label: "Service account token" }],
-};
-
-/** Mechanisms a shared credential of each kind can hold (CREDENTIAL_AUTH_TYPES). */
-export const CREDENTIAL_MECHANISMS: Record<SourceKind, Mechanism[]> = {
-  ...AUTH_MECHANISMS,
-  prometheus: AUTH_MECHANISMS.prometheus.filter((m) => m.type !== "none"),
 };
 
 /** Label of a kind's token input. */
@@ -54,111 +40,68 @@ export const TOKEN_LABELS: Record<SourceKind, string> = {
   grafana: "Service account token",
 };
 
-const DEFAULT_TYPE: Record<SourceKind, AuthType> = {
-  prometheus: "none",
-  cloudflare: "token",
-  sentry: "token",
-  wazuh: "basic",
-  grafana: "token",
-};
+/** Kinds whose API always needs a credential (except synthetic:// sources); mirrors SECRET_REQUIRED_KINDS. */
+export const CREDENTIAL_REQUIRED: readonly SourceKind[] = ["cloudflare", "sentry", "grafana"];
 
-export const emptyAuth = (kind: SourceKind, type: AuthType = DEFAULT_TYPE[kind]): AuthDraft => ({
+export const emptySecret = (kind: SourceKind, type: SecretType = CREDENTIAL_MECHANISMS[kind][0]!.type): SecretDraft => ({
   type,
   token: "",
   username: "",
   password: "",
-  credentialId: "",
   stored: null,
 });
 
-type SourceAuth = ProjectSummary["sources"][number]["auth"];
-type SecretAuth = Credential["auth"];
-
-export function storedAuthOf(auth: SourceAuth | SecretAuth | undefined): StoredAuth | null {
-  if (!auth) return null;
-  if (auth.type === "bearer" || auth.type === "token") return { type: auth.type, secretSet: auth.token_set };
-  if (auth.type === "basic") return { type: "basic", secretSet: auth.password_set };
-  return { type: auth.type, secretSet: false };
-}
-
-/** The editable form of a stored mechanism; secrets start empty and are kept unless replaced. */
-export function authDraftFrom(kind: SourceKind, auth: SourceAuth | SecretAuth | undefined): AuthDraft {
-  if (!auth || auth.type === "none") return emptyAuth(kind);
+/** The editable form of a stored credential's secret; secrets start empty and are kept unless replaced. */
+export function secretDraftFrom(kind: SourceKind, auth: Credential["auth"]): SecretDraft {
   return {
-    ...emptyAuth(kind, auth.type),
+    ...emptySecret(kind, auth.type),
     username: auth.type === "basic" ? auth.username : "",
-    credentialId: auth.type === "credential" ? auth.credential_id : "",
-    stored: storedAuthOf(auth),
+    stored: { type: auth.type, secretSet: auth.type === "basic" ? auth.password_set : auth.token_set },
   };
 }
 
 /** True when an empty secret input keeps the stored secret of the chosen mechanism. */
-export const keepsSecret = (auth: AuthDraft) => !!auth.stored && auth.stored.type === auth.type && auth.stored.secretSet;
+export const keepsSecret = (secret: SecretDraft) => !!secret.stored && secret.stored.type === secret.type && secret.stored.secretSet;
 
-/** Client-side checks of one source's auth; ``synthetic`` sources need no secret. */
-export function validateAuth(kind: SourceKind, auth: AuthDraft, synthetic = false): FieldErrors {
+/** Client-side checks of a credential's secret; errors are keyed ``<prefix>.token`` etc. */
+export function validateSecret(secret: SecretDraft, prefix: string): FieldErrors {
   const errors: FieldErrors = {};
-  const field = `${kind}.auth`;
-  const keeps = keepsSecret(auth);
-  switch (auth.type) {
-    case "credential":
-      if (!auth.credentialId) errors[`${field}.credential_id`] = "Choose a shared credential";
-      break;
-    case "bearer":
-      if (!auth.token && !keeps) errors[`${field}.token`] = "Required";
-      break;
-    case "token":
-      if (!auth.token && !keeps && !synthetic) errors[`${field}.token`] = "Required";
-      break;
-    case "basic":
-      if (kind === "wazuh") {
-        if (auth.username.trim() && !auth.password && !keeps && !synthetic) errors[`${field}.password`] = "Required";
-      } else {
-        if (!auth.username.trim()) errors[`${field}.username`] = "Required";
-        if (!auth.password && !keeps) errors[`${field}.password`] = "Required";
-      }
-      break;
+  const keeps = keepsSecret(secret);
+  if (secret.type === "basic") {
+    if (!secret.username.trim()) errors[`${prefix}.username`] = "Required";
+    if (!secret.password && !keeps) errors[`${prefix}.password`] = "Required";
+  } else if (!secret.token && !keeps) {
+    errors[`${prefix}.token`] = "Required";
   }
   return errors;
 }
 
-export type AuthInput =
-  | Schemas["NoAuth"]
-  | Schemas["BearerAuthInput"]
-  | Schemas["BasicAuthInput"]
-  | Schemas["TokenAuthInput"]
-  | Schemas["CredentialRef"];
-
-/** The request body of a source's auth; omitted secrets keep the stored ones. */
-export function authInput(kind: SourceKind, auth: AuthDraft): AuthInput {
-  const keeps = keepsSecret(auth);
-  switch (auth.type) {
-    case "credential":
-      return { type: "credential", credential_id: auth.credentialId };
-    case "bearer":
-      return { type: "bearer", ...(auth.token ? { token: auth.token } : {}) };
-    case "token":
-      if (!auth.token && !keeps) return { type: "none" };
-      return { type: "token", ...(auth.token ? { token: auth.token } : {}) };
-    case "basic":
-      if (kind === "wazuh" && !auth.username.trim()) return { type: "none" };
-      return { type: "basic", username: auth.username.trim(), ...(auth.password ? { password: auth.password } : {}) };
-    default:
-      return { type: "none" };
-  }
+/** A credential's auth; an omitted secret keeps the stored one. */
+export function secretInput(secret: SecretDraft): Schemas["CredentialInput"]["auth"] {
+  if (secret.type === "basic") return { type: "basic", username: secret.username.trim(), ...(secret.password ? { password: secret.password } : {}) };
+  return { type: secret.type, ...(secret.token ? { token: secret.token } : {}) };
 }
 
-/** A shared credential's auth: always one of its kind's secret mechanisms. */
-export function credentialAuthInput(auth: AuthDraft): Schemas["CredentialInput"]["auth"] {
-  if (auth.type === "basic") return { type: "basic", username: auth.username.trim(), ...(auth.password ? { password: auth.password } : {}) };
-  if (auth.type === "bearer") return { type: "bearer", ...(auth.token ? { token: auth.token } : {}) };
-  return { type: "token", ...(auth.token ? { token: auth.token } : {}) };
+type SourceAuth = ProjectSummary["sources"][number]["auth"];
+
+/** The credential a stored source uses; "" for none. */
+export const credentialIdOf = (auth: SourceAuth | undefined) => (auth?.type === "credential" ? auth.credential_id : "");
+
+/** A source's auth in a request: the chosen credential, or none. */
+export const sourceAuthInput = (credentialId: string): Schemas["NoAuth"] | Schemas["CredentialRef"] =>
+  credentialId ? { type: "credential", credential_id: credentialId } : { type: "none" };
+
+/** Kinds that need a credential get one, except synthetic:// sources. */
+export function validateSourceCredential(kind: SourceKind, credentialId: string, synthetic: boolean): FieldErrors {
+  if (credentialId || synthetic || !CREDENTIAL_REQUIRED.includes(kind)) return {};
+  return { [`${kind}.auth.credential_id`]: "Choose a credential" };
 }
 
-/** Short description of a stored source's auth, e.g. "Shared: Grafana production". */
-export function authSummary(kind: SourceKind, auth: SourceAuth): string {
-  if (auth.type === "credential") return `Shared credential: ${auth.name}`;
-  if (auth.type === "none") return "No authentication";
-  const mechanism = AUTH_MECHANISMS[kind].find((m) => m.type === auth.type);
-  return mechanism?.label ?? auth.type;
+/** Short description of a stored source's auth, e.g. "Credential: Grafana production". */
+export const authSummary = (auth: SourceAuth) => (auth.type === "credential" ? `Credential: ${auth.name}` : "No authentication");
+
+/** The mechanism of a credential, e.g. "Basic auth (reader)". */
+export function mechanismLabel(credential: Credential): string {
+  const label = CREDENTIAL_MECHANISMS[credential.kind].find((m) => m.type === credential.auth.type)?.label ?? credential.auth.type;
+  return credential.auth.type === "basic" ? `${label} (${credential.auth.username})` : label;
 }

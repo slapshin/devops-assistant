@@ -2,6 +2,9 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi.testclient import TestClient
 
 from app.domain.common import LabelMatcher, Scope, SourceKind
 from app.domain.interfaces import MetricsSource, OpenedSource
@@ -28,3 +31,24 @@ class StaticSources:
     @asynccontextmanager
     async def open(self, scope: Scope) -> AsyncGenerator[list[OpenedSource]]:
         yield self.sources
+
+
+def create_credential(
+    client: TestClient, kind: str, auth: dict[str, Any], name: str = ""
+) -> dict[str, Any]:
+    """A credential through the API; the source auth that references it is ``credential_ref``."""
+    res = client.post(
+        "/api/credentials", json={"name": name or f"{kind} credential", "kind": kind, "auth": auth}
+    )
+    assert res.status_code == 201, res.text
+
+    created: dict[str, Any] = res.json()
+    return created
+
+
+def credential_ref(credential: dict[str, Any]) -> dict[str, str]:
+    return {"type": "credential", "credential_id": credential["credential_id"]}
+
+
+def credential_view(credential: dict[str, Any]) -> dict[str, str]:
+    return {**credential_ref(credential), "name": credential["name"]}

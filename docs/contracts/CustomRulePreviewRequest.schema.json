@@ -1,71 +1,5 @@
 {
   "$defs": {
-    "BasicAuthInput": {
-      "additionalProperties": false,
-      "properties": {
-        "password": {
-          "anyOf": [
-            {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Omit to keep the stored password (update only).",
-          "title": "Password"
-        },
-        "type": {
-          "const": "basic",
-          "default": "basic",
-          "title": "Type",
-          "type": "string"
-        },
-        "username": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Username",
-          "type": "string"
-        }
-      },
-      "required": [
-        "username"
-      ],
-      "title": "BasicAuthInput",
-      "type": "object"
-    },
-    "BearerAuthInput": {
-      "additionalProperties": false,
-      "description": "``Authorization: Bearer <token>``.",
-      "properties": {
-        "token": {
-          "anyOf": [
-            {
-              "format": "password",
-              "type": "string",
-              "writeOnly": true
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Omit to keep the stored token (update only).",
-          "title": "Token"
-        },
-        "type": {
-          "const": "bearer",
-          "default": "bearer",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "title": "BearerAuthInput",
-      "type": "object"
-    },
     "ChangeDirection": {
       "enum": [
         "up",
@@ -77,7 +11,7 @@
     },
     "CredentialRef": {
       "additionalProperties": false,
-      "description": "Use a shared credential of the source's kind; its secret is resolved at each use.",
+      "description": "Use a credential of the source's kind; its secret is resolved at each use.",
       "properties": {
         "credential_id": {
           "maxLength": 36,
@@ -302,10 +236,9 @@
       "additionalProperties": false,
       "properties": {
         "auth": {
+          "description": "A Prometheus credential (bearer or basic), or none.",
           "discriminator": {
             "mapping": {
-              "basic": "#/$defs/BasicAuthInput",
-              "bearer": "#/$defs/BearerAuthInput",
               "credential": "#/$defs/CredentialRef",
               "none": "#/$defs/NoAuth"
             },
@@ -314,12 +247,6 @@
           "oneOf": [
             {
               "$ref": "#/$defs/NoAuth"
-            },
-            {
-              "$ref": "#/$defs/BearerAuthInput"
-            },
-            {
-              "$ref": "#/$defs/BasicAuthInput"
             },
             {
               "$ref": "#/$defs/CredentialRef"
@@ -402,19 +329,6 @@
       "maxItems": 10,
       "title": "Matchers",
       "type": "array"
-    },
-    "project_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Reuse this project's stored secrets for omitted ones.",
-      "title": "Project Id"
     },
     "rule": {
       "$ref": "#/$defs/CustomRule"

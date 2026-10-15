@@ -1,11 +1,11 @@
 <script setup lang="ts">
-/** Shared credentials (/credentials): secrets of one source kind that sources of many projects use. */
+/** Credentials (/credentials): the secrets of one source kind that project sources authenticate with. */
 import { computed, ref, watch } from "vue";
 import { ApiError, type Credential, type SourceKind } from "../../api/client";
 import { useCreateCredential, useCredentials, useDeleteCredential, useUpdateCredential } from "../../api/queries";
-import AuthEditor from "../../components/projects/AuthEditor.vue";
+import SecretEditor from "../../components/projects/SecretEditor.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
-import { AUTH_MECHANISMS, type AuthDraft, CREDENTIAL_MECHANISMS, type FieldErrors, authDraftFrom, credentialAuthInput, emptyAuth, validateAuth } from "../../lib/auth";
+import { CREDENTIAL_MECHANISMS, type FieldErrors, type SecretDraft, emptySecret, mechanismLabel, secretDraftFrom, secretInput, validateSecret } from "../../lib/auth";
 import { formatAge, utcTooltip } from "../../lib/format";
 import { SOURCE_KIND_LABELS, serverFieldErrors } from "../../lib/projects";
 
@@ -16,7 +16,7 @@ interface CredentialDraft {
   name: string;
   description: string;
   kind: SourceKind;
-  auth: AuthDraft;
+  auth: SecretDraft;
 }
 
 const credentials = useCredentials();
@@ -39,7 +39,7 @@ const inUse = computed(() => (current.value?.used_by?.length ?? 0) > 0);
 const saving = computed(() => create.isPending.value || update.isPending.value);
 
 function newDraft(kind: SourceKind = "grafana"): CredentialDraft {
-  return { name: "", description: "", kind, auth: emptyAuth(kind, CREDENTIAL_MECHANISMS[kind][0]!.type) };
+  return { name: "", description: "", kind, auth: emptySecret(kind) };
 }
 
 // A kind's mechanisms differ: switching the kind of a draft starts its auth over.
@@ -47,7 +47,7 @@ watch(
   () => draft.value.kind,
   (kind, previous) => {
     if (kind !== previous && !CREDENTIAL_MECHANISMS[kind].some((m) => m.type === draft.value.auth.type)) {
-      draft.value.auth = emptyAuth(kind, CREDENTIAL_MECHANISMS[kind][0]!.type);
+      draft.value.auth = emptySecret(kind);
     }
   },
 );
@@ -59,19 +59,15 @@ const clientErrors = computed<FieldErrors>(() => {
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
   // A credential's secret is always required (synthetic sources need none, so they need no credential).
-  return { ...errors, ...validateAuth(draft.value.kind, draft.value.auth) };
+  return { ...errors, ...validateSecret(draft.value.auth, "auth") };
 });
 const errors = computed<FieldErrors>(() => ({ ...(submitted.value ? clientErrors.value : {}), ...serverErrors.value }));
 const errorId = (field: string) => `err-${field.replaceAll(".", "-")}`;
 const describedBy = (field: string) => (errors.value[field] ? errorId(field) : undefined);
 
-/** Server fields are "body.auth.token"; the editor shows them as "<kind>.auth.token". */
 function applyServerError(error: unknown) {
   if (error instanceof ApiError && error.problem.code === "validation_error") {
-    const fields = serverFieldErrors(error.problem);
-    serverErrors.value = Object.fromEntries(
-      Object.entries(fields).map(([field, message]) => [field.startsWith("auth") ? `${draft.value.kind}.${field}` : field, message]),
-    );
+    serverErrors.value = serverFieldErrors(error.problem);
     formError.value = "Some fields need attention.";
   } else if (error instanceof ApiError && error.problem.code === "credential_name_taken") {
     serverErrors.value = { name: error.problem.detail ?? "Name already in use" };
@@ -93,7 +89,7 @@ function openEdit(credential: Credential) {
     name: credential.name,
     description: credential.description ?? "",
     kind: credential.kind,
-    auth: authDraftFrom(credential.kind, credential.auth),
+    auth: secretDraftFrom(credential.kind, credential.auth),
   };
   submitted.value = false;
   formError.value = null;
@@ -116,7 +112,7 @@ async function save() {
     name: draft.value.name.trim(),
     description: draft.value.description.trim() || null,
     kind: draft.value.kind,
-    auth: credentialAuthInput(draft.value.auth),
+    auth: secretInput(draft.value.auth),
   };
   try {
     if (editing.value === "new") await create.mutateAsync(body);
@@ -139,22 +135,18 @@ async function confirmDelete(credential: Credential) {
   }
 }
 
-const mechanismLabel = (credential: Credential) => {
-  const label = AUTH_MECHANISMS[credential.kind].find((m) => m.type === credential.auth.type)?.label ?? credential.auth.type;
-  return credential.auth.type === "basic" ? `${label} (${credential.auth.username})` : label;
-};
 </script>
 
 <template>
-  <AppTopbar :crumbs="[{ label: 'Shared credentials' }]" />
+  <AppTopbar :crumbs="[{ label: 'Credentials' }]" />
   <main class="page" aria-labelledby="credentials-title">
     <div class="page-head">
-      <h1 id="credentials-title">Shared credentials</h1>
+      <h1 id="credentials-title">Credentials</h1>
       <button v-if="editing !== 'new'" type="button" class="primary" @click="openNew">New credential</button>
     </div>
     <p class="muted">
-      A token or password that sources of many projects use, e.g. one Grafana service account. Rotate it here once and every source using it
-      connects with the new secret. Secrets are stored encrypted and are never shown again.
+      Tokens and passwords that project sources authenticate with, e.g. one Grafana service account for every project. Rotate a credential here
+      once and every source using it connects with the new secret. Secrets are stored encrypted and are never shown again.
     </p>
 
     <form v-if="editing" class="card form stack" novalidate aria-labelledby="credential-form-title" @submit.prevent="save">
@@ -175,7 +167,7 @@ const mechanismLabel = (credential: Credential) => {
         </select>
         <p v-if="inUse" id="credential-kind-hint" class="muted hint">In use, so its kind cannot change.</p>
       </div>
-      <AuthEditor :key="draft.kind" v-model="draft.auth" :kind="draft.kind" id-prefix="credential" :errors="errors" for-credential />
+      <SecretEditor :key="draft.kind" v-model="draft.auth" :kind="draft.kind" id-prefix="credential" field-prefix="auth" :errors="errors" />
       <p v-if="formError" role="alert" class="banner error">{{ formError }}</p>
       <div class="row">
         <button type="submit" class="primary" :disabled="saving">{{ saving ? "Saving…" : editing === "new" ? "Create credential" : "Save changes" }}</button>
@@ -190,7 +182,7 @@ const mechanismLabel = (credential: Credential) => {
       <button type="button" @click="credentials.refetch()">Retry</button>
     </div>
     <div v-else-if="items.length === 0" class="card empty">
-      <p>No shared credentials yet. Create one here, or use “Save as shared credential” next to a token in a project’s source.</p>
+      <p>No credentials yet. Create one here, or with “New credential…” next to a source in a project’s form.</p>
     </div>
     <div v-else class="table-wrap">
       <table class="table">

@@ -24,7 +24,7 @@ import customRulesReport from "../../fixtures/reports/report_custom_rules.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
-import type { AnalysisJob, ProjectSummary } from "./api/client";
+import type { AnalysisJob, Credential, ProjectSummary } from "./api/client";
 import App from "./App.vue";
 import { makeRouter } from "./router";
 
@@ -40,14 +40,33 @@ const problem = (status: number, code: string, title = code, detail?: string, he
 
 let routes: Record<string, Handler>;
 let calls: { method: string; url: string; body?: string }[];
+let credentialItems: Credential[];
+
+const VM = credentials.items.find((c) => c.kind === "prometheus") as Credential;
+const GRAFANA = credentials.items.find((c) => c.kind === "grafana") as Credential;
+
+/** What the server returns for a created credential (POST /api/credentials). */
+function createdCredential(body: { name: string; description?: string | null; kind: Credential["kind"]; auth: { type: string; username?: string } }): Credential {
+  const auth = body.auth.type === "basic" ? { type: "basic" as const, username: body.auth.username ?? "", password_set: true } : { type: body.auth.type as "token", token_set: true };
+  return { ...GRAFANA, credential_id: `cred-${body.kind}`, name: body.name, description: body.description ?? null, kind: body.kind, auth, used_by: [] };
+}
+
+const sourceCredential = (c: Credential) => ({ type: "credential", credential_id: c.credential_id });
+const sourceCredentialView = (c: Credential) => ({ ...sourceCredential(c), name: c.name });
 
 beforeEach(() => {
   calls = [];
   routes = {
     "GET /api/config": () => json(config),
     "GET /api/projects": () => json(projects),
-    "GET /api/credentials": () => json({ items: [] }),
+    "GET /api/credentials": () => json({ items: credentialItems }),
+    "POST /api/credentials": (init) => {
+      const created = createdCredential(JSON.parse(String(init?.body)));
+      credentialItems = [...credentialItems, created];
+      return json(created, 201);
+    },
   };
+  credentialItems = structuredClone(credentials.items) as Credential[];
 
   localStorage.clear();
 
@@ -245,12 +264,8 @@ describe("project form", () => {
     expect(await screen.findByText(/Must not contain credentials/)).toBeInTheDocument();
 
     await fireEvent.update(screen.getByLabelText("URL"), "http://vm:8428/prom");
-    await fireEvent.update(screen.getByLabelText("Authentication"), "bearer");
-    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
-
-    expect(screen.getByLabelText("Token")).toHaveAttribute("aria-invalid", "true");
-
-    await fireEvent.update(screen.getByLabelText("Token"), "tok");
+    await waitFor(() => expect(screen.getByRole("option", { name: VM.name })).toBeInTheDocument());
+    await fireEvent.update(screen.getByLabelText("Credential"), VM.credential_id);
 
     expect(screen.getByText("The Prometheus connection has not been tested.")).toBeInTheDocument();
 
@@ -264,7 +279,7 @@ describe("project form", () => {
         { name: "project", op: "=", value: "shop" },
         { name: "env", op: "=", value: "prod" },
       ],
-      sources: [{ kind: "prometheus", url: "http://vm:8428/prom", tls_verify: true, auth: { type: "bearer", token: "tok" } }],
+      sources: [{ kind: "prometheus", url: "http://vm:8428/prom", tls_verify: true, auth: sourceCredential(VM) }],
       schedule: null,
       keep_reports: null,
     });
@@ -334,7 +349,7 @@ describe("project form", () => {
     expect(JSON.parse(calls.filter((c) => c.method === "PUT")[1]?.body ?? "{}").schedule.timezone).toBe("Europe/Berlin");
   });
 
-  it("keeps a stored secret when the field is left empty and shows server errors", async () => {
+  it("keeps the source's credential and shows server errors", async () => {
     routes[`GET /api/projects/${PID}`] = () => json(base);
     let attempt = 0;
     routes[`PUT /api/projects/${PID}`] = () =>
@@ -345,27 +360,22 @@ describe("project form", () => {
 
     await renderAt(`/projects/${PID}/edit`);
 
-    expect(await screen.findByLabelText("Token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveValue(VM.credential_id));
     expect(screen.getByLabelText("Name")).toHaveValue(base.name);
 
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText("bad label")).toBeInTheDocument();
-    const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
-    expect(put.sources[0].auth).toEqual({ type: "bearer" });
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").sources[0].auth).toEqual(sourceCredential(VM));
 
-    // switching the auth type needs the new secret
-    await fireEvent.update(screen.getByLabelText("Authentication"), "basic");
-
-    expect(screen.getByLabelText("Password")).toHaveAttribute("placeholder", "");
-
+    await fireEvent.update(screen.getByLabelText("Credential"), "");
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(screen.getByLabelText("Password")).toHaveAttribute("aria-invalid", "true");
-    expect(calls.filter((c) => c.method === "PUT")).toHaveLength(1);
+    await waitFor(() => expect(calls.filter((c) => c.method === "PUT")).toHaveLength(2));
+    expect(JSON.parse(calls.filter((c) => c.method === "PUT")[1]?.body ?? "{}").sources[0].auth).toEqual({ type: "none" });
   });
 
-  it("clones a project with all settings and its stored secret", async () => {
+  it("clones a project with all settings and its credential", async () => {
     const original = { ...base, schedule: { time: "07:30", timezone: "Europe/Berlin", weekdays: ["mon"] }, keep_reports: 5 } as Summary;
     routes[`GET /api/projects/${PID}`] = () => json(original);
     routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
@@ -378,23 +388,20 @@ describe("project form", () => {
 
     expect(await screen.findByRole("heading", { name: "Clone project" })).toBeInTheDocument();
     expect(await screen.findByLabelText("Name")).toHaveValue(`${base.name} (copy)`);
-    expect(screen.getByLabelText("Token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveValue(VM.credential_id));
     expect(screen.queryByRole("heading", { name: "Delete project" })).not.toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "Test Prometheus connection" }));
 
     await waitFor(() => expect(calls.some((c) => c.url === "/api/projects/test-connection")).toBe(true));
-    expect(JSON.parse(calls.find((c) => c.url === "/api/projects/test-connection")?.body ?? "{}").project_id).toBe(PID);
+    expect(JSON.parse(calls.find((c) => c.url === "/api/projects/test-connection")?.body ?? "{}").source.auth).toEqual(sourceCredential(VM));
 
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
     await waitFor(() => expect(router.currentRoute.value.path).toBe("/projects/clone-id"));
-    const post = calls.find((c) => c.method === "POST" && c.url.startsWith("/api/projects?"));
-    expect(post?.url).toBe(`/api/projects?clone_of=${PID}`);
-
-    const sent = JSON.parse(post?.body ?? "{}");
+    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/projects")?.body ?? "{}");
     expect(sent.matchers).toEqual(base.matchers);
-    expect(sent.sources[0].auth).toEqual({ type: "bearer" });
+    expect(sent.sources[0].auth).toEqual(sourceCredential(VM));
     expect(sent.schedule).toEqual(original.schedule);
     expect(sent.keep_reports).toBe(5);
   });
@@ -417,7 +424,6 @@ describe("project form", () => {
     expect(result).toHaveTextContent("Reachable · 1832 matching series · 30 days of history");
     expect(within(result).getByRole("row", { name: /Latency.*Unsupported.*histogram/ })).toBeInTheDocument();
     expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({
-      project_id: null,
       matchers: [
         { name: "project", op: "=", value: "shop" },
         { name: "env", op: "=", value: "production" },
@@ -451,21 +457,39 @@ describe("project form", () => {
 
     expect(screen.getByLabelText("Zone ID")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("Invalid hostnames: bad_host")).toBeInTheDocument();
-    expect(screen.getByLabelText("API token")).toHaveAttribute("aria-invalid", "true");
+    const cfGroup = screen.getByRole("group", { name: "Cloudflare" });
+    expect(within(cfGroup).getByLabelText("Credential")).toHaveAttribute("aria-invalid", "true");
+    expect(within(cfGroup).getByText("Choose a credential")).toBeInTheDocument();
     expect(screen.getByLabelText("Label value 1")).not.toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("The Cloudflare connection has not been tested.")).toBeInTheDocument();
 
     await fireEvent.update(screen.getByLabelText("Zone ID"), "0123456789ABCDEF0123456789ABCDEF");
     await fireEvent.update(screen.getByLabelText(/Hostnames/), "Shop.Example.com api.example.com");
-    await fireEvent.update(screen.getByLabelText("API token"), "cf-token");
+    await fireEvent.click(within(cfGroup).getByRole("button", { name: "New credential…" }));
+    await fireEvent.click(within(cfGroup).getByRole("button", { name: "Create credential" }));
+
+    expect(within(cfGroup).getByLabelText("Credential name")).toHaveAttribute("aria-invalid", "true");
+    expect(within(cfGroup).getByLabelText("API token")).toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(within(cfGroup).getByLabelText("Credential name"), "Cloudflare shop");
+    await fireEvent.update(within(cfGroup).getByLabelText("API token"), "cf-token");
+    await fireEvent.click(within(cfGroup).getByRole("button", { name: "Create credential" }));
+
+    await waitFor(() => expect(within(cfGroup).getByLabelText("Credential")).toHaveValue("cred-cloudflare"));
+    expect(JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/credentials")?.body ?? "{}")).toEqual({
+      name: "Cloudflare shop",
+      kind: "cloudflare",
+      auth: { type: "token", token: "cf-token" },
+    });
+
     await fireEvent.click(screen.getByRole("button", { name: "Test Cloudflare connection" }));
 
     const result = await screen.findByRole("region", { name: "Connection test result" });
     expect(result).toHaveTextContent("Reachable · 3,456,789 requests in 24 h · 30 days of history");
     expect(within(result).getByRole("row", { name: /Security \(WAF\).*Supported/ })).toBeInTheDocument();
 
-    const source = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["api.example.com", "shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", auth: { type: "token", token: "cf-token" } };
-    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
+    const source = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["api.example.com", "shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", auth: { type: "credential", credential_id: "cred-cloudflare" } };
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ matchers: [], source });
 
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
@@ -475,8 +499,10 @@ describe("project form", () => {
     expect(sent.sources).toEqual([source]);
   });
 
-  it("keeps a stored Cloudflare token and maps server errors to the right source", async () => {
-    const cloudflare = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", auth: { type: "token", token_set: true } };
+  it("keeps a Cloudflare source's credential and maps server errors to the right source", async () => {
+    const cf = createdCredential({ name: "Cloudflare shop", kind: "cloudflare", auth: { type: "token" } });
+    credentialItems = [...credentialItems, cf];
+    const cloudflare = { kind: "cloudflare", zone_id: "0123456789abcdef0123456789abcdef", hostnames: ["shop.example.com"], api_url: "https://api.cloudflare.com/client/v4/graphql", auth: sourceCredentialView(cf) };
     const both = { ...base, sources: [...base.sources, cloudflare] } as Summary;
     routes[`GET /api/projects/${PID}`] = () => json(both);
     routes[`PUT /api/projects/${PID}`] = () =>
@@ -485,7 +511,8 @@ describe("project form", () => {
 
     await renderAt(`/projects/${PID}/edit`);
 
-    expect(await screen.findByLabelText("API token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    const cfGroup = await screen.findByRole("group", { name: "Cloudflare" });
+    await waitFor(() => expect(within(cfGroup).getByLabelText("Credential")).toHaveValue(cf.credential_id));
     expect(screen.getByLabelText(/Hostnames/)).toHaveValue("shop.example.com");
 
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -495,10 +522,12 @@ describe("project form", () => {
 
     const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
     expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "cloudflare"]);
-    expect(put.sources[1].auth).toEqual({ type: "token" });
+    expect(put.sources[1].auth).toEqual(sourceCredential(cf));
   });
 
   it("creates a Sentry project, validates slugs and tests it", async () => {
+    const sentryCredential = createdCredential({ name: "Sentry acme", kind: "sentry", auth: { type: "token" } });
+    credentialItems = [...credentialItems, sentryCredential];
     routes["POST /api/projects/test-connection"] = () => json(sentryTest);
     routes["POST /api/projects"] = () => json({ ...base, project_id: "sentry-id" }, 201);
     routes["GET /api/projects/sentry-id"] = () => json({ ...base, project_id: "sentry-id" });
@@ -523,7 +552,8 @@ describe("project form", () => {
     expect(screen.getByLabelText("Tag key 1")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText("Tag value 1")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText(/Environment/)).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByLabelText("Auth token")).toHaveAttribute("aria-invalid", "true");
+    const sentryGroup = screen.getByRole("group", { name: "Sentry" });
+    expect(within(sentryGroup).getByLabelText("Credential")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("The Sentry connection has not been tested.")).toBeInTheDocument();
 
     await fireEvent.update(screen.getByLabelText("Organization"), "Acme");
@@ -532,7 +562,7 @@ describe("project form", () => {
     await fireEvent.update(screen.getByLabelText("Tag value 1"), "shop");
     await fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
     await fireEvent.update(screen.getByLabelText(/Environment/), "production");
-    await fireEvent.update(screen.getByLabelText("Auth token"), "sntrys-token");
+    await fireEvent.update(within(sentryGroup).getByLabelText("Credential"), sentryCredential.credential_id);
     await fireEvent.click(screen.getByRole("button", { name: "Test Sentry connection" }));
 
     const result = await screen.findByRole("region", { name: "Connection test result" });
@@ -547,9 +577,9 @@ describe("project form", () => {
       environment: "production",
       api_url: "https://sentry.io",
       tls_verify: true,
-      auth: { type: "token", token: "sntrys-token" },
+      auth: sourceCredential(sentryCredential),
     };
-    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ matchers: [], source });
 
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
@@ -558,9 +588,11 @@ describe("project form", () => {
     expect(sent.sources).toEqual([source]);
   });
 
-  it("edits a self-hosted Sentry and keeps its stored token", async () => {
+  it("edits a self-hosted Sentry and keeps its credential", async () => {
     const url = "https://sentry.internal:9000/sentry";
-    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false, auth: { type: "token", token_set: true } };
+    const sentryCredential = createdCredential({ name: "Sentry internal", kind: "sentry", auth: { type: "token" } });
+    credentialItems = [...credentialItems, sentryCredential];
+    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false, auth: sourceCredentialView(sentryCredential) };
 
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, sentry] } as Summary);
     routes[`PUT /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, sentry] });
@@ -568,13 +600,13 @@ describe("project form", () => {
 
     await renderAt(`/projects/${PID}/edit`);
 
-    expect(await screen.findByLabelText("Auth token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    const sentryGroup = await screen.findByRole("group", { name: "Sentry" });
+    await waitFor(() => expect(within(sentryGroup).getByLabelText("Credential")).toHaveValue(sentryCredential.credential_id));
     expect(screen.getByLabelText("Sentry projects")).toHaveValue("shop-web");
     expect(screen.getByLabelText("Tag value 1")).toHaveValue("shop");
     expect(screen.getByLabelText("Sentry URL")).toBeVisible();
     expect(screen.getByLabelText("Sentry URL")).toHaveValue(url);
 
-    const sentryGroup = screen.getByRole("group", { name: "Sentry" });
     expect(within(sentryGroup).getByLabelText("Verify TLS certificates")).not.toBeChecked();
     expect(within(sentryGroup).getByText(/self-signed or internal certificate/)).toBeInTheDocument();
 
@@ -584,7 +616,7 @@ describe("project form", () => {
 
     const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
     expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "sentry"]);
-    expect(put.sources[1]).toEqual({ kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false, auth: { type: "token" } });
+    expect(put.sources[1]).toEqual({ kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: null, api_url: url, tls_verify: false, auth: sourceCredential(sentryCredential) });
   });
 
   it("creates a Wazuh source selected by labels and tests it", async () => {
@@ -599,19 +631,29 @@ describe("project form", () => {
     const group = screen.getByRole("group", { name: "Wazuh" });
 
     await fireEvent.update(within(group).getByLabelText(/^Agents/), "web 1!");
-    await fireEvent.update(within(group).getByLabelText("Username"), "reader");
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
     expect(within(group).getByLabelText("Indexer URL")).toHaveAttribute("aria-invalid", "true");
     expect(within(group).getByText("Invalid agent names: 1!")).toBeInTheDocument();
+    expect(within(group).getByLabelText("Credential")).toHaveValue("");
+
+    await fireEvent.click(within(group).getByRole("button", { name: "New credential…" }));
+    await fireEvent.update(within(group).getByLabelText("Credential name"), "Wazuh reader");
+    await fireEvent.update(within(group).getByLabelText("Username"), "reader");
+    await fireEvent.click(within(group).getByRole("button", { name: "Create credential" }));
+
     expect(within(group).getByLabelText("Password")).toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(within(group).getByLabelText("Password"), "s3cret");
+    await fireEvent.click(within(group).getByRole("button", { name: "Create credential" }));
+
+    await waitFor(() => expect(within(group).getByLabelText("Credential")).toHaveValue("cred-wazuh"));
 
     await fireEvent.update(within(group).getByLabelText(/^Agents/), "");
     await fireEvent.update(within(group).getByLabelText("Indexer URL"), "https://wazuh-indexer:9200/");
     await fireEvent.click(within(group).getByRole("button", { name: "Add label" }));
     await fireEvent.update(within(group).getByLabelText("Label key 1"), "project");
     await fireEvent.update(within(group).getByLabelText("Label value 1"), "shop");
-    await fireEvent.update(within(group).getByLabelText("Password"), "s3cret");
     await fireEvent.click(within(group).getByLabelText("Verify TLS certificates"));
     await fireEvent.click(screen.getByRole("button", { name: "Test Wazuh connection" }));
 
@@ -628,9 +670,9 @@ describe("project form", () => {
       monitoring_index_pattern: "wazuh-monitoring-*",
       labels: [{ key: "project", value: "shop" }],
       tls_verify: false,
-      auth: { type: "basic", username: "reader", password: "s3cret" },
+      auth: { type: "credential", credential_id: "cred-wazuh" },
     };
-    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ matchers: [], source });
 
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
@@ -669,7 +711,9 @@ describe("project form", () => {
     expect(sent.sources[0]).toMatchObject({ kind: "wazuh", agents: [], groups: ["shop-db", "shop-web"], labels: [] });
   });
 
-  it("edits a Wazuh source and keeps its stored password", async () => {
+  it("edits a Wazuh source and keeps its credential", async () => {
+    const reader = createdCredential({ name: "Wazuh reader", kind: "wazuh", auth: { type: "basic", username: "reader" } });
+    credentialItems = [...credentialItems, reader];
     const wazuh = {
       kind: "wazuh",
       api_url: "https://wazuh-indexer:9200",
@@ -679,7 +723,7 @@ describe("project form", () => {
       monitoring_index_pattern: "wazuh-monitoring-*",
       labels: [],
       tls_verify: true,
-      auth: { type: "basic", username: "reader", password_set: true },
+      auth: sourceCredentialView(reader),
     };
 
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, wazuh] } as Summary);
@@ -689,7 +733,7 @@ describe("project form", () => {
     await renderAt(`/projects/${PID}/edit`);
 
     const group = await screen.findByRole("group", { name: "Wazuh" });
-    expect(within(group).getByLabelText("Password")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    await waitFor(() => expect(within(group).getByLabelText("Credential")).toHaveValue(reader.credential_id));
     expect(within(group).getByLabelText(/^Agents/)).toHaveValue("shop-db-1, shop-web-1");
     expect(within(group).getByLabelText(/^Agent groups/)).toHaveValue("ops");
 
@@ -699,8 +743,7 @@ describe("project form", () => {
 
     const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
     expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "wazuh"]);
-    expect(put.sources[1]).toEqual({ ...wazuh, auth: { type: "basic", username: "reader" } });
-    expect(put.sources[1]).not.toHaveProperty("password");
+    expect(put.sources[1]).toEqual({ ...wazuh, auth: sourceCredential(reader) });
   });
 
   it("creates a Grafana alerts source and tests it", async () => {
@@ -719,7 +762,7 @@ describe("project form", () => {
 
     expect(within(group).getByLabelText("Grafana URL")).toHaveAttribute("aria-invalid", "true");
     expect(within(group).getByText("Invalid rule UIDs: bad/uid")).toBeInTheDocument();
-    expect(within(group).getByLabelText("Service account token")).toHaveAttribute("aria-invalid", "true");
+    expect(within(group).getByLabelText("Credential")).toHaveAttribute("aria-invalid", "true");
 
     await fireEvent.update(within(group).getByLabelText(/^Rule UIDs/), "");
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
@@ -731,7 +774,7 @@ describe("project form", () => {
     await fireEvent.click(within(group).getByRole("button", { name: "Add instance label" }));
     await fireEvent.update(within(group).getByLabelText("Instance labels name 1"), "project");
     await fireEvent.update(within(group).getByLabelText("Instance labels value 1"), "shop");
-    await fireEvent.update(within(group).getByLabelText("Service account token"), "glsa_token");
+    await fireEvent.update(within(group).getByLabelText("Credential"), GRAFANA.credential_id);
     await fireEvent.click(screen.getByRole("button", { name: "Test Grafana connection" }));
 
     const result = await screen.findByRole("region", { name: "Connection test result" });
@@ -747,9 +790,9 @@ describe("project form", () => {
       rule_labels: [],
       instance_labels: [{ name: "project", op: "=", value: "shop" }],
       tls_verify: true,
-      auth: { type: "token", token: "glsa_token" },
+      auth: sourceCredential(GRAFANA),
     };
-    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ project_id: null, matchers: [], source });
+    expect(JSON.parse(calls.find((c) => c.url.includes("test-connection"))?.body ?? "{}")).toEqual({ matchers: [], source });
 
     await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
@@ -758,7 +801,7 @@ describe("project form", () => {
     expect(sent.sources).toEqual([source]);
   });
 
-  it("edits a Grafana source and keeps its stored token", async () => {
+  it("edits a Grafana source and keeps its credential", async () => {
     const grafana = {
       kind: "grafana",
       api_url: "https://grafana.example.com",
@@ -768,7 +811,7 @@ describe("project form", () => {
       rule_labels: [{ name: "team", op: "=", value: "web" }],
       instance_labels: [{ name: "project", op: "=", value: "shop" }],
       tls_verify: true,
-      auth: { type: "token", token_set: true },
+      auth: sourceCredentialView(GRAFANA),
     };
 
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, grafana] } as Summary);
@@ -778,7 +821,7 @@ describe("project form", () => {
     await renderAt(`/projects/${PID}/edit`);
 
     const group = await screen.findByRole("group", { name: "Grafana alerts" });
-    expect(within(group).getByLabelText("Service account token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    await waitFor(() => expect(within(group).getByLabelText("Credential")).toHaveValue(GRAFANA.credential_id));
     expect(within(group).getByLabelText(/^Folders/)).toHaveValue("Infrastructure");
     expect(within(group).getByLabelText("Rule labels value 1")).toHaveValue("web");
 
@@ -788,8 +831,7 @@ describe("project form", () => {
 
     const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
     expect(put.sources.map((x: { kind: string }) => x.kind)).toEqual(["prometheus", "grafana"]);
-    expect(put.sources[1]).toEqual({ ...grafana, auth: { type: "token" } });
-    expect(put.sources[1]).not.toHaveProperty("token");
+    expect(put.sources[1]).toEqual({ ...grafana, auth: sourceCredential(GRAFANA) });
   });
 
   it("adds a custom rule, previews it and sends it with the Prometheus source", async () => {
@@ -901,27 +943,15 @@ describe("project form", () => {
   });
 });
 
-describe("shared credentials", () => {
-  const credential = credentials.items[0]!;
-  const grafana = {
-    kind: "grafana",
-    api_url: "https://grafana.example.com",
-    org_id: 1,
-    folders: ["Shop"],
-    rule_uids: [],
-    rule_labels: [],
-    instance_labels: [],
-    tls_verify: true,
-  };
-
+describe("credentials", () => {
   it("lists credentials with their projects and creates one", async () => {
-    routes["GET /api/credentials"] = () => json(credentials);
-    routes["POST /api/credentials"] = () => json({ ...credential, credential_id: "new-id", name: "Sentry org", kind: "sentry", used_by: [] }, 201);
     await renderAt("/credentials");
 
-    const row = await screen.findByRole("row", { name: /Grafana production/ });
-    expect(within(row).getByText("Service account token")).toBeInTheDocument();
+    const row = await screen.findByRole("row", { name: new RegExp(VM.name) });
+    expect(within(row).getByText("Bearer token")).toBeInTheDocument();
     expect(within(row).getByRole("link", { name: base.name })).toHaveAttribute("href", `/projects/${PID}`);
+    expect(within(screen.getByRole("row", { name: new RegExp(GRAFANA.name) })).getByText("Not used")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Credentials" })).toHaveAttribute("href", "/credentials");
 
     await fireEvent.click(screen.getByRole("button", { name: "New credential" }));
     await fireEvent.click(screen.getByRole("button", { name: "Create credential" }));
@@ -934,73 +964,38 @@ describe("shared credentials", () => {
     await fireEvent.update(screen.getByLabelText("Auth token"), "sntrys-shared");
     await fireEvent.click(screen.getByRole("button", { name: "Create credential" }));
 
-    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/credentials")).toBe(true));
+    expect(await screen.findByRole("row", { name: /Sentry org/ })).toBeInTheDocument();
     const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/credentials")?.body ?? "{}");
     expect(sent).toEqual({ name: "Sentry org", description: null, kind: "sentry", auth: { type: "token", token: "sntrys-shared" } });
   });
 
   it("keeps a stored secret on edit and explains why a used credential cannot be deleted", async () => {
-    routes["GET /api/credentials"] = () => json(credentials);
-    routes[`PUT /api/credentials/${credential.credential_id}`] = () => json(credential);
-    routes[`DELETE /api/credentials/${credential.credential_id}`] = () =>
+    routes[`PUT /api/credentials/${VM.credential_id}`] = () => json(VM);
+    routes[`DELETE /api/credentials/${VM.credential_id}`] = () =>
       problem(409, "credential_in_use", "Credential is in use", `Cannot delete it: used by ${base.name}.`);
     await renderAt("/credentials");
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Edit Grafana production" }));
+    await fireEvent.click(await screen.findByRole("button", { name: `Edit ${VM.name}` }));
 
-    expect(screen.getByLabelText("Service account token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+    expect(screen.getByLabelText("Token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
     expect(screen.getByLabelText("Source kind")).toBeDisabled();
 
+    await fireEvent.update(screen.getByLabelText("Authentication"), "basic");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.getByLabelText("Password")).toHaveAttribute("aria-invalid", "true");
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+
+    await fireEvent.update(screen.getByLabelText("Authentication"), "bearer");
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
-    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").auth).toEqual({ type: "token" });
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").auth).toEqual({ type: "bearer" });
 
-    await fireEvent.click(screen.getByRole("button", { name: "Delete Grafana production" }));
+    await fireEvent.click(screen.getByRole("button", { name: `Delete ${VM.name}` }));
     await fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(`Cannot delete it: used by ${base.name}.`);
-  });
-
-  it("uses a shared credential for a source", async () => {
-    routes["GET /api/credentials"] = () => json(credentials);
-    routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, { ...grafana, auth: { type: "token", token_set: true } }] } as Summary);
-    routes[`PUT /api/projects/${PID}`] = () => json(base);
-    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
-    await renderAt(`/projects/${PID}/edit`);
-
-    const group = await screen.findByRole("group", { name: "Grafana alerts" });
-    await fireEvent.update(await within(group).findByLabelText("Authentication"), "credential");
-
-    expect(within(group).queryByLabelText("Service account token")).not.toBeInTheDocument();
-
-    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-
-    expect(within(group).getByLabelText("Shared credential")).toHaveAttribute("aria-invalid", "true");
-
-    await fireEvent.update(within(group).getByLabelText("Shared credential"), credential.credential_id);
-    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-
-    await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
-    const put = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}");
-    expect(put.sources[1]).toEqual({ ...grafana, auth: { type: "credential", credential_id: credential.credential_id } });
-  });
-
-  it("saves an inline token as a shared credential", async () => {
-    routes["POST /api/credentials"] = () => json({ ...credential, credential_id: "made-id", name: "Grafana shared", used_by: [] }, 201);
-    await renderAt("/projects/new");
-
-    await fireEvent.click(await screen.findByLabelText("Analyse Grafana alert rules"));
-    const group = screen.getByRole("group", { name: "Grafana alerts" });
-    await fireEvent.update(within(group).getByLabelText("Service account token"), "glsa_inline");
-    routes["GET /api/credentials"] = () => json({ items: [{ ...credential, credential_id: "made-id", name: "Grafana shared", used_by: [] }] });
-    await fireEvent.click(within(group).getByRole("button", { name: "Save as shared credential…" }));
-    await fireEvent.update(within(group).getByLabelText("Shared credential name"), "Grafana shared");
-    await fireEvent.click(within(group).getByRole("button", { name: "Save" }));
-
-    await waitFor(() => expect(within(group).getByLabelText("Shared credential")).toHaveValue("made-id"));
-    const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/credentials")?.body ?? "{}");
-    expect(sent).toEqual({ name: "Grafana shared", kind: "grafana", auth: { type: "token", token: "glsa_inline" } });
   });
 });
 
@@ -1018,7 +1013,7 @@ describe("project page", () => {
 
     expect(await screen.findByRole("heading", { name: base.name })).toBeInTheDocument();
     expect(screen.getByText("victoriametrics.example:8428")).toBeInTheDocument();
-    expect(screen.getByText(/Bearer token/)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`Credential: ${VM.name}`))).toBeInTheDocument();
     expect(screen.getByText(/Mon, Wed, Fri at 08:00 \(Europe\/Berlin\)/)).toBeInTheDocument();
     expect(await screen.findAllByRole("row")).toHaveLength(2);
 
@@ -1030,8 +1025,8 @@ describe("project page", () => {
   });
 
   it("shows Cloudflare and Sentry filters as matcher chips", async () => {
-    const cloudflare = { kind: "cloudflare", zone_id: "a".repeat(32), hostnames: ["shop.example.com", "api.example.com"], api_url: "https://api.cloudflare.com/client/v4", auth: { type: "token", token_set: true } };
-    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: "production", api_url: "https://sentry.io", tls_verify: true, auth: { type: "token", token_set: true } };
+    const cloudflare = { kind: "cloudflare", zone_id: "a".repeat(32), hostnames: ["shop.example.com", "api.example.com"], api_url: "https://api.cloudflare.com/client/v4", auth: { type: "none" } };
+    const sentry = { kind: "sentry", organization: "acme", projects: ["shop-web"], tags: [{ key: "team", value: "shop" }], environment: "production", api_url: "https://sentry.io", tls_verify: true, auth: { type: "none" } };
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, sources: [...base.sources, cloudflare, sentry] } as Summary);
     routes[`GET /api/projects/${PID}/health`] = () => json([reachable]);
     routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });

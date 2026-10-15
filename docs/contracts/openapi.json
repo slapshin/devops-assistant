@@ -594,17 +594,13 @@
             "discriminator": {
               "mapping": {
                 "credential": "#/components/schemas/CredentialAuth",
-                "none": "#/components/schemas/NoAuth",
-                "token": "#/components/schemas/TokenAuth"
+                "none": "#/components/schemas/NoAuth"
               },
               "propertyName": "type"
             },
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/TokenAuth"
               },
               {
                 "$ref": "#/components/schemas/CredentialAuth"
@@ -651,21 +647,17 @@
             "type": "string"
           },
           "auth": {
-            "description": "API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain), inline or as a shared credential; not needed for synthetic://.",
+            "description": "A Cloudflare credential: an API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain); not needed for synthetic://.",
             "discriminator": {
               "mapping": {
                 "credential": "#/components/schemas/CredentialRef",
-                "none": "#/components/schemas/NoAuth",
-                "token": "#/components/schemas/TokenAuthInput"
+                "none": "#/components/schemas/NoAuth"
               },
               "propertyName": "type"
             },
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/TokenAuthInput"
               },
               {
                 "$ref": "#/components/schemas/CredentialRef"
@@ -789,7 +781,7 @@
       },
       "ConnectionTestRequest": {
         "additionalProperties": false,
-        "description": "Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets.",
+        "description": "Body of POST /api/projects/test-connection: a draft source.",
         "properties": {
           "matchers": {
             "description": "Required with a Prometheus source.",
@@ -799,18 +791,6 @@
             "maxItems": 10,
             "title": "Matchers",
             "type": "array"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Reuse this project's stored secrets for omitted ones.",
-            "title": "Project Id"
           },
           "source": {
             "oneOf": [
@@ -928,7 +908,7 @@
             "type": "string"
           },
           "name": {
-            "description": "The shared credential's name.",
+            "description": "The credential's name.",
             "title": "Name",
             "type": "string"
           },
@@ -1023,7 +1003,7 @@
       },
       "CredentialRef": {
         "additionalProperties": false,
-        "description": "Use a shared credential of the source's kind; its secret is resolved at each use.",
+        "description": "Use a credential of the source's kind; its secret is resolved at each use.",
         "properties": {
           "credential_id": {
             "maxLength": 36,
@@ -1285,18 +1265,6 @@
             "maxItems": 10,
             "title": "Matchers",
             "type": "array"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Reuse this project's stored secrets for omitted ones.",
-            "title": "Project Id"
           },
           "rule": {
             "$ref": "#/components/schemas/CustomRule"
@@ -2205,17 +2173,13 @@
             "discriminator": {
               "mapping": {
                 "credential": "#/components/schemas/CredentialAuth",
-                "none": "#/components/schemas/NoAuth",
-                "token": "#/components/schemas/TokenAuth"
+                "none": "#/components/schemas/NoAuth"
               },
               "propertyName": "type"
             },
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/TokenAuth"
               },
               {
                 "$ref": "#/components/schemas/CredentialAuth"
@@ -2286,21 +2250,17 @@
             "type": "string"
           },
           "auth": {
-            "description": "Service account token (Viewer role), inline or as a shared credential; not needed for synthetic://.",
+            "description": "A Grafana credential: a service account token (Viewer role); not needed for synthetic://.",
             "discriminator": {
               "mapping": {
                 "credential": "#/components/schemas/CredentialRef",
-                "none": "#/components/schemas/NoAuth",
-                "token": "#/components/schemas/TokenAuthInput"
+                "none": "#/components/schemas/NoAuth"
               },
               "propertyName": "type"
             },
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/TokenAuthInput"
               },
               {
                 "$ref": "#/components/schemas/CredentialRef"
@@ -3243,8 +3203,6 @@
           "auth": {
             "discriminator": {
               "mapping": {
-                "basic": "#/components/schemas/BasicAuth",
-                "bearer": "#/components/schemas/BearerAuth",
                 "credential": "#/components/schemas/CredentialAuth",
                 "none": "#/components/schemas/NoAuth"
               },
@@ -3253,12 +3211,6 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/BearerAuth"
-              },
-              {
-                "$ref": "#/components/schemas/BasicAuth"
               },
               {
                 "$ref": "#/components/schemas/CredentialAuth"
@@ -3300,10 +3252,9 @@
         "additionalProperties": false,
         "properties": {
           "auth": {
+            "description": "A Prometheus credential (bearer or basic), or none.",
             "discriminator": {
               "mapping": {
-                "basic": "#/components/schemas/BasicAuthInput",
-                "bearer": "#/components/schemas/BearerAuthInput",
                 "credential": "#/components/schemas/CredentialRef",
                 "none": "#/components/schemas/NoAuth"
               },
@@ -3312,12 +3263,6 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/BearerAuthInput"
-              },
-              {
-                "$ref": "#/components/schemas/BasicAuthInput"
               },
               {
                 "$ref": "#/components/schemas/CredentialRef"
@@ -3544,17 +3489,13 @@
             "discriminator": {
               "mapping": {
                 "credential": "#/components/schemas/CredentialAuth",
-                "none": "#/components/schemas/NoAuth",
-                "token": "#/components/schemas/TokenAuth"
+                "none": "#/components/schemas/NoAuth"
               },
               "propertyName": "type"
             },
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/TokenAuth"
               },
               {
                 "$ref": "#/components/schemas/CredentialAuth"
@@ -3624,21 +3565,17 @@
             "type": "string"
           },
           "auth": {
-            "description": "Auth token with org:read and project:read, inline or as a shared credential; not needed for synthetic://.",
+            "description": "A Sentry credential: an auth token with org:read and project:read; not needed for synthetic://.",
             "discriminator": {
               "mapping": {
                 "credential": "#/components/schemas/CredentialRef",
-                "none": "#/components/schemas/NoAuth",
-                "token": "#/components/schemas/TokenAuthInput"
+                "none": "#/components/schemas/NoAuth"
               },
               "propertyName": "type"
             },
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/TokenAuthInput"
               },
               {
                 "$ref": "#/components/schemas/CredentialRef"
@@ -4229,7 +4166,6 @@
           "auth": {
             "discriminator": {
               "mapping": {
-                "basic": "#/components/schemas/BasicAuth",
                 "credential": "#/components/schemas/CredentialAuth",
                 "none": "#/components/schemas/NoAuth"
               },
@@ -4238,9 +4174,6 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/BasicAuth"
               },
               {
                 "$ref": "#/components/schemas/CredentialAuth"
@@ -4311,10 +4244,9 @@
             "type": "string"
           },
           "auth": {
-            "description": "Indexer user with read access to the alerts indices (basic), inline or as a shared credential; not needed for synthetic://.",
+            "description": "A Wazuh credential: an indexer user with read access to the alerts indices; none when the indexer needs no authentication.",
             "discriminator": {
               "mapping": {
-                "basic": "#/components/schemas/BasicAuthInput",
                 "credential": "#/components/schemas/CredentialRef",
                 "none": "#/components/schemas/NoAuth"
               },
@@ -4323,9 +4255,6 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoAuth"
-              },
-              {
-                "$ref": "#/components/schemas/BasicAuthInput"
               },
               {
                 "$ref": "#/components/schemas/CredentialRef"
@@ -5040,27 +4969,8 @@
         ]
       },
       "post": {
+        "description": "A clone is a create with the original's settings; credentials are referenced, not copied.",
         "operationId": "create_project_api_projects_post",
-        "parameters": [
-          {
-            "description": "Clone: reuse this project's stored secrets for omitted ones.",
-            "in": "query",
-            "name": "clone_of",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Clone: reuse this project's stored secrets for omitted ones.",
-              "title": "Clone Of"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {

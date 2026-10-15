@@ -1,8 +1,8 @@
 """SQLite ProjectRepository: projects and per-kind source configs with encrypted secrets.
 
-A source row stores its non-secret config as JSON, including the public part of its auth
-mechanism (``config["auth"]``); the secret is stored encrypted in the row, or comes from the
-shared credential referenced by ``credential_id`` (T021).
+A source row stores its config as JSON (``config["auth"]`` is ``none`` or ``credential``) and
+references the credential holding its secret with ``credential_id`` (T021). Rows saved before
+then kept an encrypted secret in ``secrets``; the startup import moves those into credentials.
 """
 
 import asyncio
@@ -17,8 +17,6 @@ from pydantic import BaseModel, TypeAdapter
 
 from app.domain.auth import (
     AuthType,
-    BasicAuthInput,
-    BearerAuthInput,
     CredentialAuth,
     CredentialRef,
     NoAuth,
@@ -42,17 +40,12 @@ from app.domain.projects import (
     synthetic_url,
 )
 from app.domain.schedule import ReportSchedule
-from app.storage.auth import (
-    CredentialInvalid,
-    SecretRequired,
-    connection_auth,
-    secret_view,
-    split_secret,
-)
+from app.storage.auth import CredentialInvalid, connection_auth
+from app.storage.credentials import insert_credential
 from app.storage.db import app_meta, credentials, project_sources, projects
 from app.storage.secrets import SecretBox, SecretsUnreadable
 
-__all__ = ["CredentialInvalid", "ProjectNameTaken", "SecretRequired", "SqliteProjectRepository"]
+__all__ = ["CredentialInvalid", "ProjectNameTaken", "SqliteProjectRepository"]
 
 LEGACY_IMPORT_KEY = "legacy_source_import"
 """Set to 'pending' by migration 0003 when it created projects from existing reports."""
@@ -78,7 +71,7 @@ _SOURCES = sa.select(
         credentials, project_sources.c.credential_id == credentials.c.credential_id
     )
 )
-"""Source rows with the shared credential they reference, if any."""
+"""Source rows with the credential they reference, if any."""
 
 
 class ProjectNameTaken(Exception):
@@ -221,19 +214,13 @@ class SqliteProjectRepository:
             )
         return found
 
-    async def resolve_connection(
-        self, source: SourceInput, project_id: str | None
-    ) -> SourceConnection:
-        """Connection for a draft source, filling omitted secrets from the stored project.
-
-        Raises SecretRequired, CredentialInvalid and SecretsUnreadable.
-        """
+    async def resolve_connection(self, source: SourceInput) -> SourceConnection:
+        """Connection for a draft source. Raises CredentialInvalid and SecretsUnreadable."""
 
         def q(conn: sa.Connection) -> tuple[dict[str, Any], dict[str, Any], bytes | None]:
-            stored = self._stored(conn, project_id, source.kind) if project_id else None
-            config, secrets, credential_id = self._split(conn, source, stored)
+            config, credential_id = self._split(conn, source)
             if credential_id is None:
-                return config, config["auth"], self.box.encrypt(secrets) if secrets else None
+                return config, config["auth"], None
             row = conn.execute(
                 sa.select(credentials.c.auth, credentials.c.secrets).where(
                     credentials.c.credential_id == credential_id
@@ -246,51 +233,32 @@ class SqliteProjectRepository:
 
     # --- writes --------------------------------------------------------------------------
 
-    def _split(
-        self, conn: sa.Connection, source: SourceInput, stored: Any
-    ) -> tuple[dict[str, Any], dict[str, str], str | None]:
-        """Non-secret config, the secrets to store and the referenced credential.
+    @staticmethod
+    def _split(conn: sa.Connection, source: SourceInput) -> tuple[dict[str, Any], str | None]:
+        """Stored config and referenced credential of a source.
 
-        Omitted secrets are kept from ``stored``. Raises SecretRequired and CredentialInvalid
-        with the field path relative to the source.
+        Raises CredentialInvalid with the field path relative to the source.
         """
         config = source.model_dump(mode="json", exclude={"kind", "auth"})
-        secrets: dict[str, str] = {}
-        credential_id: str | None = None
         match source.auth:
+            case CredentialRef(credential_id=credential_id):
+                _check_credential(conn, credential_id, source.kind)
+                config["auth"] = {"type": AuthType.CREDENTIAL.value}
+                return config, credential_id
             case NoAuth():
                 if source.kind in SECRET_REQUIRED_KINDS and not synthetic_url(config["api_url"]):
-                    raise SecretRequired("auth")
+                    raise CredentialInvalid("auth.credential_id", "choose a credential")
                 config["auth"] = {"type": AuthType.NONE.value}
-            case CredentialRef() as ref:
-                _check_credential(conn, ref.credential_id, source.kind)
-                credential_id = ref.credential_id
-                config["auth"] = {"type": AuthType.CREDENTIAL.value}
-            case auth:
-                own = stored if stored is not None and stored.credential_id is None else None
-                stored_auth = json.loads(own.config)["auth"] if own is not None else None
-                blob = own.secrets if own is not None else None
-                config["auth"], secrets = split_secret(
-                    auth, stored_auth, (lambda: self.box.decrypt(blob)) if blob else None
-                )
-        return config, secrets, credential_id
+                return config, None
 
     def _write_sources(
-        self,
-        conn: sa.Connection,
-        project_id: str,
-        data: ProjectInput,
-        now: str,
-        secrets_from: str | None = None,
+        self, conn: sa.Connection, project_id: str, data: ProjectInput, now: str
     ) -> None:
-        """Replace the project's sources; omitted secrets come from ``secrets_from`` or itself."""
+        """Replace the project's sources."""
         rows = []
         for i, source in enumerate(data.sources):
-            stored = self._stored(conn, secrets_from or project_id, source.kind)
             try:
-                config, secrets, credential_id = self._split(conn, source, stored)
-            except SecretRequired as exc:
-                raise SecretRequired(f"{i}.{exc.field}") from None
+                config, credential_id = self._split(conn, source)
             except CredentialInvalid as exc:
                 raise CredentialInvalid(f"{i}.{exc.field}", exc.message) from None
             rows.append(
@@ -298,7 +266,6 @@ class SqliteProjectRepository:
                     "project_id": project_id,
                     "kind": source.kind.value,
                     "config": json.dumps(config, sort_keys=True),
-                    "secrets": self.box.encrypt(secrets) if secrets else None,
                     "credential_id": credential_id,
                     "updated_at": now,
                 }
@@ -324,8 +291,7 @@ class SqliteProjectRepository:
             stmt = stmt.where(projects.c.project_id != project_id)
         return conn.execute(stmt).first() is not None
 
-    async def create(self, data: ProjectInput, secrets_from: str | None = None) -> Project:
-        """Create a project; omitted secrets are copied from project ``secrets_from`` (clone)."""
+    async def create(self, data: ProjectInput) -> Project:
         project_id = new_project_id()
         now = format_utc(datetime.now(UTC))
 
@@ -341,7 +307,7 @@ class SqliteProjectRepository:
                     **self._values(data),
                 )
             )
-            self._write_sources(conn, project_id, data, now, secrets_from)
+            self._write_sources(conn, project_id, data, now)
             return self._load(conn, project_id)[0]
 
         return await self._run(q)
@@ -389,15 +355,9 @@ class SqliteProjectRepository:
     async def import_legacy_source(self, conn: PrometheusConnection | None) -> int | None:
         """Once after migration 0003: give migrated projects the deprecated METRICS_* source.
 
-        Returns the number of projects updated, or None when no import was pending.
+        Its credentials, if any, become the credential "Prometheus (METRICS_URL)". Returns the
+        number of projects updated, or None when no import was pending.
         """
-        source = None
-        if conn is not None:
-            source = PrometheusSourceInput(
-                url=conn.url,
-                tls_verify=conn.tls_verify,
-                auth=_auth_input(conn),
-            )
         now = format_utc(datetime.now(UTC))
 
         def q(c: sa.Connection) -> int | None:
@@ -408,20 +368,37 @@ class SqliteProjectRepository:
                 return None
 
             updated = 0
-            if source is not None:
+            if conn is not None:
                 without = c.execute(
                     sa.select(projects.c.project_id).where(
                         ~sa.exists().where(project_sources.c.project_id == projects.c.project_id)
                     )
                 ).all()
-                config, secrets, _ = self._split(c, source, None)
+                public, secrets = _legacy_auth(conn)
+                credential_id = None
+                if public is not None and without:
+                    credential_id = insert_credential(
+                        c,
+                        kind=SourceKind.PROMETHEUS,
+                        public=public,
+                        blob=self.box.encrypt(secrets),
+                        name="Prometheus (METRICS_URL)",
+                        description="Imported from the deprecated METRICS_* settings.",
+                        now=now,
+                    )
+                source = PrometheusSourceInput(
+                    url=conn.url,
+                    tls_verify=conn.tls_verify,
+                    auth=CredentialRef(credential_id=credential_id) if credential_id else NoAuth(),
+                )
                 for (project_id,) in without:
+                    config, _ = self._split(c, source)
                     c.execute(
                         project_sources.insert().values(
                             project_id=project_id,
                             kind=SourceKind.PROMETHEUS.value,
                             config=json.dumps(config, sort_keys=True),
-                            secrets=self.box.encrypt(secrets) if secrets else None,
+                            credential_id=credential_id,
                             updated_at=now,
                         )
                     )
@@ -441,12 +418,16 @@ class SqliteProjectRepository:
         return await self._run(q)
 
 
-def _auth_input(conn: PrometheusConnection) -> NoAuth | BearerAuthInput | BasicAuthInput:
+def _legacy_auth(conn: PrometheusConnection) -> tuple[dict[str, Any] | None, dict[str, str]]:
+    """Public auth and secrets of the METRICS_* settings; (None, {}) without authentication."""
     if conn.bearer_token is not None:
-        return BearerAuthInput(token=conn.bearer_token)
+        return {"type": AuthType.BEARER.value}, {"token": conn.bearer_token.get_secret_value()}
     if conn.basic_auth_user and conn.basic_auth_password is not None:
-        return BasicAuthInput(username=conn.basic_auth_user, password=conn.basic_auth_password)
-    return NoAuth()
+        return (
+            {"type": AuthType.BASIC.value, "username": conn.basic_auth_user},
+            {"password": conn.basic_auth_password.get_secret_value()},
+        )
+    return None, {}
 
 
 def _schedule(raw: str | None) -> ReportSchedule | None:
@@ -454,19 +435,20 @@ def _schedule(raw: str | None) -> ReportSchedule | None:
 
 
 def _effective_auth(row: Any) -> tuple[dict[str, Any], bytes | None]:
-    """Public auth and encrypted secrets of a source row: its own or its credential's."""
+    """Public auth and encrypted secrets of a source row: its credential's, or none."""
     if row.credential_id is not None:
         return json.loads(row.credential_auth), row.credential_secrets
-    return json.loads(row.config)["auth"], row.secrets
+    return {"type": AuthType.NONE.value}, None
 
 
 def _source_view(row: Any) -> AnySource:
     config = json.loads(row.config)
-    public = config.pop("auth")
-    if row.credential_id is not None:
-        auth: BaseModel = CredentialAuth(credential_id=row.credential_id, name=row.credential_name)
-    else:
-        auth = secret_view(public, row.secrets is not None)
+    config.pop("auth")  # none or credential; the reference is the column
+    auth: BaseModel = (
+        CredentialAuth(credential_id=row.credential_id, name=row.credential_name)
+        if row.credential_id is not None
+        else NoAuth()
+    )
     return _SOURCE_VIEW.validate_python({**config, "kind": row.kind, "auth": auth.model_dump()})
 
 

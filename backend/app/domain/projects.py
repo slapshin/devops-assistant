@@ -2,7 +2,7 @@
 
 A project holds at most one data source per kind; its equality label matchers select the
 series of its Prometheus source. Each source authenticates with one of its kind's mechanisms
-(``app.domain.auth``), inline or through a shared credential. New source kinds are added as new
+(``app.domain.auth``) through a credential of its kind. New source kinds are added as new
 members of ``SourceKind`` and of the source unions without changing storage.
 """
 
@@ -21,19 +21,7 @@ from pydantic import (
     model_validator,
 )
 
-from app.domain.auth import (
-    CloudflareAuth,
-    CloudflareAuthInput,
-    GrafanaAuth,
-    GrafanaAuthInput,
-    NoAuth,
-    PrometheusAuth,
-    PrometheusAuthInput,
-    SentryAuth,
-    SentryAuthInput,
-    WazuhAuth,
-    WazuhAuthInput,
-)
+from app.domain.auth import NoAuth, SourceAuth, SourceAuthInput
 from app.domain.common import (
     Contract,
     LabelMatcher,
@@ -110,7 +98,9 @@ class PrometheusSourceInput(Contract):
     kind: Literal[SourceKind.PROMETHEUS] = SourceKind.PROMETHEUS
     url: str = Field(max_length=2048)
     tls_verify: bool = True
-    auth: PrometheusAuthInput = Field(default_factory=NoAuth)
+    auth: SourceAuthInput = Field(
+        default_factory=NoAuth, description="A Prometheus credential (bearer or basic), or none."
+    )
     custom_rules: CustomRules = Field(
         default_factory=list,
         description=f"User-written PromQL rules analysed with the catalog (at most "
@@ -138,10 +128,10 @@ class CloudflareSourceInput(Contract):
         max_length=2048,
         description="GraphQL endpoint; synthetic://<scenario> for demo data.",
     )
-    auth: CloudflareAuthInput = Field(
+    auth: SourceAuthInput = Field(
         default_factory=NoAuth,
-        description="API token with Analytics:Read on the zone (and optionally Zone:Read, to "
-        "show its domain), inline or as a shared credential; not needed for synthetic://.",
+        description="A Cloudflare credential: an API token with Analytics:Read on the zone (and "
+        "optionally Zone:Read, to show its domain); not needed for synthetic://.",
     )
 
     @field_validator("zone_id")
@@ -243,10 +233,10 @@ class SentrySourceInput(Contract):
         description="Verify the server's TLS certificate; turn off only for a self-hosted "
         "Sentry with a self-signed or internal certificate.",
     )
-    auth: SentryAuthInput = Field(
+    auth: SourceAuthInput = Field(
         default_factory=NoAuth,
-        description="Auth token with org:read and project:read, inline or as a shared "
-        "credential; not needed for synthetic://.",
+        description="A Sentry credential: an auth token with org:read and project:read; not "
+        "needed for synthetic://.",
     )
 
     @field_validator("organization")
@@ -381,10 +371,10 @@ class WazuhSourceInput(Contract):
         description="Verify the indexer's TLS certificate; turn off only for a self-signed or "
         "internal certificate (the Wazuh default).",
     )
-    auth: WazuhAuthInput = Field(
+    auth: SourceAuthInput = Field(
         default_factory=NoAuth,
-        description="Indexer user with read access to the alerts indices (basic), inline or "
-        "as a shared credential; not needed for synthetic://.",
+        description="A Wazuh credential: an indexer user with read access to the alerts indices; "
+        "none when the indexer needs no authentication.",
     )
 
     @field_validator("api_url")
@@ -463,10 +453,10 @@ class GrafanaSourceInput(Contract):
         description="Verify Grafana's TLS certificate; turn off only for a self-signed or "
         "internal certificate.",
     )
-    auth: GrafanaAuthInput = Field(
+    auth: SourceAuthInput = Field(
         default_factory=NoAuth,
-        description="Service account token (Viewer role), inline or as a shared credential; "
-        "not needed for synthetic://.",
+        description="A Grafana credential: a service account token (Viewer role); not needed "
+        "for synthetic://.",
     )
 
     @field_validator("api_url")
@@ -572,7 +562,7 @@ class PrometheusSource(Contract):
     kind: Literal[SourceKind.PROMETHEUS] = SourceKind.PROMETHEUS
     url: str
     tls_verify: bool
-    auth: PrometheusAuth
+    auth: SourceAuth
     custom_rules: list[CustomRule] = Field(default_factory=list)
 
 
@@ -581,7 +571,7 @@ class CloudflareSource(Contract):
     zone_id: str
     hostnames: list[str]
     api_url: str
-    auth: CloudflareAuth
+    auth: SourceAuth
 
 
 class SentrySource(Contract):
@@ -592,7 +582,7 @@ class SentrySource(Contract):
     tags: list[SentryTag] = Field(default_factory=list)
     api_url: str
     tls_verify: bool = True
-    auth: SentryAuth
+    auth: SourceAuth
 
 
 class WazuhSource(Contract):
@@ -604,7 +594,7 @@ class WazuhSource(Contract):
     labels: list[WazuhLabel] = Field(default_factory=list)
     monitoring_index_pattern: str = WAZUH_MONITORING_INDEX_PATTERN
     tls_verify: bool = True
-    auth: WazuhAuth
+    auth: SourceAuth
 
 
 class GrafanaSource(Contract):
@@ -616,7 +606,7 @@ class GrafanaSource(Contract):
     rule_labels: list[LabelMatcher] = Field(default_factory=list)
     instance_labels: list[LabelMatcher] = Field(default_factory=list)
     tls_verify: bool = True
-    auth: GrafanaAuth
+    auth: SourceAuth
 
 
 AnySource = PrometheusSource | CloudflareSource | SentrySource | WazuhSource | GrafanaSource
@@ -663,11 +653,8 @@ class ProjectList(Contract):
 
 
 class ConnectionTestRequest(Contract):
-    """Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets."""
+    """Body of POST /api/projects/test-connection: a draft source."""
 
-    project_id: str | None = Field(
-        default=None, description="Reuse this project's stored secrets for omitted ones."
-    )
     source: SourceInput
     matchers: OptionalMatchers = Field(
         default_factory=list,
@@ -687,9 +674,6 @@ class ConnectionTestRequest(Contract):
 class CustomRulePreviewRequest(Contract):
     """Body of POST /api/projects/custom-rules/preview: one rule against a draft source."""
 
-    project_id: str | None = Field(
-        default=None, description="Reuse this project's stored secrets for omitted ones."
-    )
     source: PrometheusSourceInput
     matchers: OptionalMatchers = Field(
         default_factory=list, validate_default=True, description="The project's label matchers."

@@ -4,8 +4,8 @@ import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ApiError, type ConnectionTest, type SourceKind } from "../../api/client";
 import { useCreateProject, useDeleteProject, useProject, useTestConnection, useUpdateProject } from "../../api/queries";
-import AuthEditor from "../../components/projects/AuthEditor.vue";
 import ConnectionTestResult from "../../components/projects/ConnectionTestResult.vue";
+import CredentialPicker from "../../components/projects/CredentialPicker.vue";
 import CustomRulesEditor from "../../components/projects/CustomRulesEditor.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import type { Crumb } from "../../components/shell/crumbs";
@@ -148,7 +148,7 @@ const saveWarning = computed(() => {
 const previewBase = computed(() => {
   const usable = !Object.keys({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, true) }).length;
   if (!usable) return null;
-  return { project_id: sourceId.value, matchers: matchersInput(draft.value), source: prometheusConnection() };
+  return { matchers: matchersInput(draft.value), source: prometheusConnection() };
 });
 
 const saving = computed(() => create.isPending.value || update.isPending.value);
@@ -201,7 +201,6 @@ async function runTest(kind: SourceKind) {
   testing.value = kind;
   try {
     const result = await tester.mutateAsync({
-      project_id: sourceId.value,
       matchers: kind === "prometheus" ? matchersInput(draft.value) : [],
       source: sourceInput(draft.value, kind),
     });
@@ -225,7 +224,7 @@ async function save() {
     const body = toInput(draft.value);
     const saved = props.projectId
       ? await update.mutateAsync({ id: props.projectId, body })
-      : await create.mutateAsync({ body, cloneOf: props.cloneOf });
+      : await create.mutateAsync(body);
     await router.push(`/projects/${saved.project_id}`);
   } catch (error) {
     applyServerError(error);
@@ -253,7 +252,7 @@ async function confirmDelete() {
 
     <form v-else class="form stack" novalidate @submit.prevent="save">
       <p v-if="cloning && existing.data.value" class="banner">
-        Copied from <RouterLink :to="`/projects/${cloneOf}`">{{ existing.data.value.name }}</RouterLink>, including its stored
+        Copied from <RouterLink :to="`/projects/${cloneOf}`">{{ existing.data.value.name }}</RouterLink>, using the same
         credentials. Reports are not copied.
       </p>
       <div class="field">
@@ -338,7 +337,9 @@ async function confirmDelete() {
           <p v-if="errors['prometheus.url']" :id="errorId('prometheus.url')" class="field-error">{{ errors["prometheus.url"] }}</p>
         </div>
         <label class="check"><input v-model="draft.tlsVerify" type="checkbox"> Verify TLS certificates</label>
-        <AuthEditor v-model="draft.auth.prometheus" kind="prometheus" id-prefix="source" :errors="errors" />
+        <CredentialPicker v-model="draft.auth.prometheus" kind="prometheus" id-prefix="source" :errors="errors" optional>
+          <template #hint>Bearer token or basic auth; None when the server needs no authentication.</template>
+        </CredentialPicker>
         <div class="row">
           <button type="button" :disabled="tester.isPending.value" @click="runTest('prometheus')">
             {{ testing === "prometheus" ? "Testing…" : "Test Prometheus connection" }}
@@ -392,11 +393,11 @@ async function confirmDelete() {
             <p id="cf-hostnames-hint" class="muted hint">Separate with commas or spaces. Empty analyses the whole zone.</p>
             <p v-if="errors['cloudflare.hostnames']" :id="errorId('cloudflare.hostnames')" class="field-error">{{ errors["cloudflare.hostnames"] }}</p>
           </div>
-          <AuthEditor v-model="draft.auth.cloudflare" kind="cloudflare" id-prefix="cf" :errors="errors">
+          <CredentialPicker v-model="draft.auth.cloudflare" kind="cloudflare" id-prefix="cf" :errors="errors" :optional="draft.cfApiUrl.trim().startsWith('synthetic:')">
             <template #hint>
               A custom token with the permission <strong>Zone → Analytics → Read</strong> for this zone. Add <strong>Zone → Zone → Read</strong> to show the zone’s domain in findings.
             </template>
-          </AuthEditor>
+          </CredentialPicker>
           <details :open="!!errors['cloudflare.api_url']">
             <summary>Advanced</summary>
             <div class="field">
@@ -537,12 +538,12 @@ async function confirmDelete() {
               <button type="button" :disabled="draft.sentryTags.length >= MAX_SENTRY_TAGS" @click="draft.sentryTags.push({ key: '', value: '' })">Add tag</button>
             </div>
           </div>
-          <AuthEditor v-model="draft.auth.sentry" kind="sentry" id-prefix="sentry" :errors="errors">
+          <CredentialPicker v-model="draft.auth.sentry" kind="sentry" id-prefix="sentry" :errors="errors" :optional="draft.sentryApiUrl.trim().startsWith('synthetic:')">
             <template #hint>
               A personal token or internal integration with the scopes <strong>org:read</strong> and <strong>project:read</strong>.
               Organization tokens (for CI) cannot read events.
             </template>
-          </AuthEditor>
+          </CredentialPicker>
           <div class="row">
             <button type="button" :disabled="tester.isPending.value" @click="runTest('sentry')">
               {{ testing === "sentry" ? "Testing…" : "Test Sentry connection" }}
@@ -678,12 +679,12 @@ async function confirmDelete() {
               {{ errors["wazuh.monitoring_index_pattern"] }}
             </p>
           </div>
-          <AuthEditor v-model="draft.auth.wazuh" kind="wazuh" id-prefix="wazuh" :errors="errors">
+          <CredentialPicker v-model="draft.auth.wazuh" kind="wazuh" id-prefix="wazuh" :errors="errors" optional>
             <template #hint>
-              An indexer user that may only read <code>wazuh-alerts-*</code> (and <code>wazuh-monitoring-*</code> with groups); leave empty
+              An indexer user that may only read <code>wazuh-alerts-*</code> (and <code>wazuh-monitoring-*</code> with groups); None
               when the indexer needs no authentication.
             </template>
-          </AuthEditor>
+          </CredentialPicker>
           <div class="row">
             <button type="button" :disabled="tester.isPending.value" @click="runTest('wazuh')">
               {{ testing === "wazuh" ? "Testing…" : "Test Wazuh connection" }}
@@ -817,12 +818,12 @@ async function confirmDelete() {
               </button>
             </div>
           </div>
-          <AuthEditor v-model="draft.auth.grafana" kind="grafana" id-prefix="grafana" :errors="errors">
+          <CredentialPicker v-model="draft.auth.grafana" kind="grafana" id-prefix="grafana" :errors="errors" :optional="draft.grafanaUrl.trim().startsWith('synthetic:')">
             <template #hint>
               A service account with the <strong>Viewer</strong> role (Administration → Users and access → Service accounts); it
               reads alert rules and their state history only.
             </template>
-          </AuthEditor>
+          </CredentialPicker>
           <div class="row">
             <button type="button" :disabled="tester.isPending.value" @click="runTest('grafana')">
               {{ testing === "grafana" ? "Testing…" : "Test Grafana connection" }}
@@ -917,7 +918,7 @@ async function confirmDelete() {
     <section v-if="editing && existing.data.value" class="card danger-zone" aria-labelledby="delete-title">
       <h2 id="delete-title">Delete project</h2>
       <p>
-        Deleting removes the project, its stored credentials and
+        Deleting removes the project and
         <strong>{{ existing.data.value.report_count }} saved {{ existing.data.value.report_count === 1 ? "report" : "reports" }}</strong>.
         This cannot be undone.
       </p>

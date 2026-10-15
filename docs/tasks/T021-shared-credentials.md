@@ -1,4 +1,4 @@
-# T021 — Shared credentials and per-kind source authentication
+# T021 — Credentials and per-kind source authentication
 
 Dependencies: T020. Status: see [task index](README.md).
 
@@ -32,7 +32,7 @@ Many projects often use the same secret, for example one Grafana service account
   - Creates the table and the column.
   - Rewrites the Cloudflare, Sentry, Grafana and Wazuh configs into the `auth` shape, and the pre-multi-project Sentry `project` key into `projects`.
   - Secrets are not re-encrypted, because migrations have no key. The repository still reads the old `api_token` / `auth_token` secret keys (`LEGACY_TOKEN_KEYS`) and re-keys them on the next save.
-- **Existing values are shared on upgrade** (migration 0007 + `SqliteCredentialRepository.share_duplicate_secrets`).
+- **Existing values are shared on upgrade** (migration 0007 + the startup import, now `SqliteCredentialRepository.move_inline_secrets`).
   - Migrations cannot decrypt, so 0007 only marks `app_meta.shared_credentials_import` as `pending` when inline secrets exist.
   - Once at the next startup, inline secrets that are identical are grouped. Identical means the same kind, the same mechanism (type and username) and the same decrypted secret.
   - Every group used by two or more sources becomes one credential, named after the kind and host, e.g. "Grafana token (grafana.example.com)" or "Wazuh reader@indexer".
@@ -69,10 +69,25 @@ Many projects often use the same secret, for example one Grafana service account
   - the project page names the shared credential.
 - [x] `make contracts`, `make fixtures` and `make check` pass.
 
+## Follow-up (2026-10-15): credentials only
+
+- **Sources hold no secrets.** A source's `auth` is `none` or `{type: credential, credential_id}`; the bearer, basic and token mechanisms exist only in credentials.
+  - Cloudflare, Sentry and Grafana sources with a real URL need a credential: `422` on `sources.N.auth.credential_id`.
+  - `clone_of` (create) and `project_id` (test-connection, custom-rules preview) are removed, because nothing is left to copy or fill in. A clone is a plain create that references the same credentials.
+- **Migration 0008 + startup import.** 0008 marks the import pending again when any source still stores a secret. `move_inline_secrets` then moves every such secret into a credential once:
+  - identical readable secrets share one credential, as in 0007;
+  - an undecryptable secret is copied as it is into its own credential, which shows `readable: false`;
+  - the `METRICS_*` legacy import creates the credential "Prometheus (METRICS_URL)".
+  - The `project_sources.secrets` column is no longer written; dropping it is left for a later migration.
+- **UI.**
+  - "Shared credentials" is now "Credentials" (rail, page, texts).
+  - Each source has a *Credential* select. *None* is offered where the kind allows it.
+  - *New credential…* creates a credential inline in the project form and selects it. This replaces the per-source secret inputs and *Save as shared credential…*.
+
 ## Remaining limitations / follow-ups
 
 - No new mechanisms yet (Prometheus custom header or mTLS, Cloudflare global key); the unions are ready for them.
-- Identical inline secrets are merged only once, on upgrade. Duplicates created later are converted one source at a time with the UI shortcut.
+- `project_sources.secrets` is kept (always empty after the startup import) until a later migration drops it.
 - There is no access control, as for the rest of the app: anyone who can open the UI can point a source at any URL and use any credential of its kind. A credential is not bound to a URL.
 
 ## Completion record

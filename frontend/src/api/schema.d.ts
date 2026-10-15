@@ -144,7 +144,10 @@ export interface paths {
         /** List Projects */
         get: operations["list_projects_api_projects_get"];
         put?: never;
-        /** Create Project */
+        /**
+         * Create Project
+         * @description A clone is a create with the original's settings; credentials are referenced, not copied.
+         */
         post: operations["create_project_api_projects_post"];
         delete?: never;
         options?: never;
@@ -466,7 +469,7 @@ export interface components {
             /** Api Url */
             api_url: string;
             /** Auth */
-            auth: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuth"] | components["schemas"]["CredentialAuth"];
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["CredentialAuth"];
             /** Hostnames */
             hostnames: string[];
             /**
@@ -490,9 +493,9 @@ export interface components {
             api_url: string;
             /**
              * Auth
-             * @description API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain), inline or as a shared credential; not needed for synthetic://.
+             * @description A Cloudflare credential: an API token with Analytics:Read on the zone (and optionally Zone:Read, to show its domain); not needed for synthetic://.
              */
-            auth?: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuthInput"] | components["schemas"]["CredentialRef"];
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["CredentialRef"];
             /**
              * Hostnames
              * @description Analyse only these hostnames; empty analyses the whole zone.
@@ -545,7 +548,7 @@ export interface components {
         };
         /**
          * ConnectionTestRequest
-         * @description Body of POST /api/projects/test-connection: a draft, possibly reusing stored secrets.
+         * @description Body of POST /api/projects/test-connection: a draft source.
          */
         ConnectionTestRequest: {
             /**
@@ -553,11 +556,6 @@ export interface components {
              * @description Required with a Prometheus source.
              */
             matchers?: components["schemas"]["LabelMatcher"][];
-            /**
-             * Project Id
-             * @description Reuse this project's stored secrets for omitted ones.
-             */
-            project_id?: string | null;
             /** Source */
             source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"] | components["schemas"]["GrafanaSourceInput"];
         };
@@ -594,7 +592,7 @@ export interface components {
             credential_id: string;
             /**
              * Name
-             * @description The shared credential's name.
+             * @description The credential's name.
              */
             name: string;
             /**
@@ -627,7 +625,7 @@ export interface components {
         };
         /**
          * CredentialRef
-         * @description Use a shared credential of the source's kind; its secret is resolved at each use.
+         * @description Use a credential of the source's kind; its secret is resolved at each use.
          */
         CredentialRef: {
             /** Credential Id */
@@ -763,11 +761,6 @@ export interface components {
              * @description The project's label matchers.
              */
             matchers?: components["schemas"]["LabelMatcher"][];
-            /**
-             * Project Id
-             * @description Reuse this project's stored secrets for omitted ones.
-             */
-            project_id?: string | null;
             rule: components["schemas"]["CustomRule"];
             source: components["schemas"]["PrometheusSourceInput"];
         };
@@ -1083,7 +1076,7 @@ export interface components {
             /** Api Url */
             api_url: string;
             /** Auth */
-            auth: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuth"] | components["schemas"]["CredentialAuth"];
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["CredentialAuth"];
             /** Folders */
             folders?: string[];
             /** Instance Labels */
@@ -1124,9 +1117,9 @@ export interface components {
             api_url: string;
             /**
              * Auth
-             * @description Service account token (Viewer role), inline or as a shared credential; not needed for synthetic://.
+             * @description A Grafana credential: a service account token (Viewer role); not needed for synthetic://.
              */
-            auth?: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuthInput"] | components["schemas"]["CredentialRef"];
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["CredentialRef"];
             /**
              * Folders
              * @description Folder UIDs or titles whose alert rules are analysed.
@@ -1488,7 +1481,7 @@ export interface components {
         /** PrometheusSource */
         PrometheusSource: {
             /** Auth */
-            auth: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuth"] | components["schemas"]["BasicAuth"] | components["schemas"]["CredentialAuth"];
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["CredentialAuth"];
             /** Custom Rules */
             custom_rules?: components["schemas"]["CustomRule"][];
             /**
@@ -1503,8 +1496,11 @@ export interface components {
         };
         /** PrometheusSourceInput */
         PrometheusSourceInput: {
-            /** Auth */
-            auth?: components["schemas"]["NoAuth"] | components["schemas"]["BearerAuthInput"] | components["schemas"]["BasicAuthInput"] | components["schemas"]["CredentialRef"];
+            /**
+             * Auth
+             * @description A Prometheus credential (bearer or basic), or none.
+             */
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["CredentialRef"];
             /**
              * Custom Rules
              * @description User-written PromQL rules analysed with the catalog (at most 20).
@@ -1612,7 +1608,7 @@ export interface components {
             /** Api Url */
             api_url: string;
             /** Auth */
-            auth: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuth"] | components["schemas"]["CredentialAuth"];
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["CredentialAuth"];
             /** Environment */
             environment?: string | null;
             /**
@@ -1645,9 +1641,9 @@ export interface components {
             api_url: string;
             /**
              * Auth
-             * @description Auth token with org:read and project:read, inline or as a shared credential; not needed for synthetic://.
+             * @description A Sentry credential: an auth token with org:read and project:read; not needed for synthetic://.
              */
-            auth?: components["schemas"]["NoAuth"] | components["schemas"]["TokenAuthInput"] | components["schemas"]["CredentialRef"];
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["CredentialRef"];
             /**
              * Environment
              * @description Analyse only this environment; null analyses all of them.
@@ -1884,7 +1880,7 @@ export interface components {
             /** Api Url */
             api_url: string;
             /** Auth */
-            auth: components["schemas"]["NoAuth"] | components["schemas"]["BasicAuth"] | components["schemas"]["CredentialAuth"];
+            auth: components["schemas"]["NoAuth"] | components["schemas"]["CredentialAuth"];
             /** Groups */
             groups?: string[];
             /**
@@ -1930,9 +1926,9 @@ export interface components {
             api_url: string;
             /**
              * Auth
-             * @description Indexer user with read access to the alerts indices (basic), inline or as a shared credential; not needed for synthetic://.
+             * @description A Wazuh credential: an indexer user with read access to the alerts indices; none when the indexer needs no authentication.
              */
-            auth?: components["schemas"]["NoAuth"] | components["schemas"]["BasicAuthInput"] | components["schemas"]["CredentialRef"];
+            auth?: components["schemas"]["NoAuth"] | components["schemas"]["CredentialRef"];
             /**
              * Groups
              * @description Agent groups; their current members (from the monitoring index) are analysed together with the named agents.
@@ -2504,10 +2500,7 @@ export interface operations {
     };
     create_project_api_projects_post: {
         parameters: {
-            query?: {
-                /** @description Clone: reuse this project's stored secrets for omitted ones. */
-                clone_of?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;

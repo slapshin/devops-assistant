@@ -88,9 +88,7 @@ function useProjectMutation<A, T>(fn: (args: A) => Promise<T>, removes?: (args: 
 }
 
 export const useCreateProject = () =>
-  useProjectMutation(({ body, cloneOf }: { body: ProjectInput; cloneOf?: string }) =>
-    apiPost<ProjectSummary>(cloneOf ? `/api/projects?clone_of=${encodeURIComponent(cloneOf)}` : "/api/projects", body),
-  );
+  useProjectMutation((body: ProjectInput) => apiPost<ProjectSummary>("/api/projects", body));
 
 export const useUpdateProject = () =>
   useProjectMutation(({ id, body }: { id: string; body: ProjectInput }) => apiPut<ProjectSummary>(projectPath(id), body));
