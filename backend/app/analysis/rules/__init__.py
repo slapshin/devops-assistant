@@ -15,6 +15,7 @@ from app.analysis.rules.host import HOST_RULES
 from app.analysis.rules.host_security import HOST_SECURITY_RULES
 from app.analysis.rules.proxy import PROXY_RULES
 from app.analysis.rules.requests import REQUEST_RULES
+from app.analysis.rules.runtime import RUNTIME_RULES
 from app.analysis.rules.security import SECURITY_RULES
 
 __all__ = ["RULES", "SEVERITY_ORDER", "Dir", "Rule", "RuleKind", "format_value"]
@@ -36,6 +37,7 @@ RULES = _index(
         *REQUEST_RULES,
         *PROXY_RULES,
         *DATABASE_RULES,
+        *RUNTIME_RULES,
         *EDGE_RULES,
         *SECURITY_RULES,
         *APPLICATION_RULES,

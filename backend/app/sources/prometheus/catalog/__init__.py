@@ -17,6 +17,7 @@ from app.sources.prometheus.catalog.base import Direction, Gate, Role, SignalDef
 from app.sources.prometheus.catalog.container import CONTAINER_CATALOG
 from app.sources.prometheus.catalog.host import HOST_CATALOG
 from app.sources.prometheus.catalog.mysql import MYSQL_CATALOG
+from app.sources.prometheus.catalog.nodejs import NODEJS_CATALOG
 from app.sources.prometheus.catalog.postgres import POSTGRES_CATALOG
 from app.sources.prometheus.catalog.proxy import PROXY_CATALOG
 from app.sources.prometheus.catalog.redis import REDIS_CATALOG
@@ -34,7 +35,7 @@ __all__ = [
     "SignalDef",
 ]
 
-CATALOG_VERSION = "catalog-2026.10.6"
+CATALOG_VERSION = "catalog-2026.10.15"
 
 CATALOG: tuple[SignalDef, ...] = (
     *HOST_CATALOG,
@@ -44,6 +45,7 @@ CATALOG: tuple[SignalDef, ...] = (
     *POSTGRES_CATALOG,
     *MYSQL_CATALOG,
     *REDIS_CATALOG,
+    *NODEJS_CATALOG,
 )
 TRAFFIC_SIGNALS = frozenset(d.traffic for d in CATALOG if d.traffic is not None)
 

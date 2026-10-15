@@ -19,8 +19,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.14",
-  "config_hash": "c08803ea6db8",
+  "detector_version": "detectors-2026.10.15",
+  "config_hash": "80b08da204c6",
   "sources": [
     {
       "kind": "sentry",
@@ -172,13 +172,13 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_1b634013a7e24cf8",
-      "detector": "level:app_transaction_failure_ratio",
-      "detector_version": "detectors-2026.10.14",
+      "finding_id": "fnd_0dd367b5a8c91af7",
+      "detector": "level:app_error_rate",
+      "detector_version": "detectors-2026.10.15",
       "method": "relative",
-      "family": "app_performance",
-      "signal": "app_transaction_failure_ratio",
-      "title": "Failed transaction share increase",
+      "family": "app_errors",
+      "signal": "app_error_rate",
+      "title": "Error spike",
       "entity": {
         "kind": "application",
         "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
@@ -192,47 +192,155 @@
       },
       "start": "2026-09-30T04:35:00Z",
       "end": "2026-09-30T06:05:00Z",
-      "peak_at": "2026-09-30T06:00:00Z",
+      "peak_at": "2026-09-30T05:30:00Z",
       "duration_seconds": 5400,
       "severity": "high",
       "severity_points": 4,
       "confidence": "high",
       "confidence_reasons": [],
       "observed": {
-        "value": 0.09012539184952978,
-        "unit": "ratio"
+        "value": 1.086667,
+        "unit": "per_second"
       },
       "expected": {
-        "median": 0.003930240152512594,
-        "lower": 0.0,
-        "upper": 0.015930240152512595,
-        "unit": "ratio"
+        "median": 0.055,
+        "lower": 0.025348000000000016,
+        "upper": 0.08465199999999998,
+        "unit": "per_second"
       },
-      "peak_score": 28.73,
+      "peak_score": 139.17,
       "threshold": null,
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_e5836fa7ebb41c1e",
-        "evd_1d13defe682ae3bb"
+        "evd_7b0d94f98ae64d6d"
       ],
       "related_finding_ids": [
-        "fnd_8e59376f3b13de49",
-        "fnd_9a11771f060bf6ca",
-        "fnd_dda882bd2a4fe807",
-        "fnd_f054a8edb91a9e9d"
+        "fnd_189d6132e8bacc89",
+        "fnd_8a7426da39c39983",
+        "fnd_953dc4738b329881",
+        "fnd_e66a065f1d9e7a75"
       ],
       "attributes": {},
       "alert_instances": [],
-      "error_kinds": [],
+      "error_kinds": [
+        {
+          "issue": "SHOP-API-4",
+          "title": "TypeError: 'NoneType' object is not subscriptable",
+          "events": 4967
+        },
+        {
+          "issue": "SHOP-API-1",
+          "title": "TimeoutError: upstream request timed out after 30s",
+          "events": 133
+        },
+        {
+          "issue": "SHOP-API-2",
+          "title": "KeyError: 'currency'",
+          "events": 72
+        },
+        {
+          "issue": "SHOP-API-3",
+          "title": "ValidationError: invalid email address",
+          "events": 44
+        },
+        {
+          "issue": "(other errors)",
+          "title": null,
+          "events": 44
+        }
+      ],
       "state": "resolved",
       "recurrence": "new",
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_56fb414d16de2cac",
+      "finding_id": "fnd_189d6132e8bacc89",
+      "detector": "level:app_unhandled_error_rate",
+      "detector_version": "detectors-2026.10.15",
+      "method": "relative",
+      "family": "app_errors",
+      "signal": "app_unhandled_error_rate",
+      "title": "Unhandled errors (crashes) increase",
+      "entity": {
+        "kind": "application",
+        "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
+        "display_name": "shop-api (production)",
+        "labels": {
+          "organization": "acme",
+          "project": "shop-api",
+          "environment": "production",
+          "tags": "team=shop"
+        }
+      },
+      "start": "2026-09-30T04:35:00Z",
+      "end": "2026-09-30T06:05:00Z",
+      "peak_at": "2026-09-30T04:35:00Z",
+      "duration_seconds": 5400,
+      "severity": "high",
+      "severity_points": 4,
+      "confidence": "high",
+      "confidence_reasons": [],
+      "observed": {
+        "value": 0.25,
+        "unit": "per_second"
+      },
+      "expected": {
+        "median": 0.003333,
+        "lower": 0.0,
+        "upper": 0.011333,
+        "unit": "per_second"
+      },
+      "peak_score": 123.33,
+      "threshold": null,
+      "baseline_days": 14,
+      "baseline_mode": "time_of_day",
+      "evidence_ids": [
+        "evd_eb06dd2892bd9751"
+      ],
+      "related_finding_ids": [
+        "fnd_0dd367b5a8c91af7",
+        "fnd_8a7426da39c39983",
+        "fnd_953dc4738b329881",
+        "fnd_e66a065f1d9e7a75"
+      ],
+      "attributes": {},
+      "alert_instances": [],
+      "error_kinds": [
+        {
+          "issue": "SHOP-API-4",
+          "title": "TypeError: 'NoneType' object is not subscriptable",
+          "events": 4967
+        },
+        {
+          "issue": "SHOP-API-1",
+          "title": "TimeoutError: upstream request timed out after 30s",
+          "events": 133
+        },
+        {
+          "issue": "SHOP-API-2",
+          "title": "KeyError: 'currency'",
+          "events": 72
+        },
+        {
+          "issue": "SHOP-API-3",
+          "title": "ValidationError: invalid email address",
+          "events": 44
+        },
+        {
+          "issue": "(other errors)",
+          "title": null,
+          "events": 44
+        }
+      ],
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
+    },
+    {
+      "finding_id": "fnd_593a788b66a3de95",
       "detector": "level:app_error_rate",
-      "detector_version": "detectors-2026.10.14",
+      "detector_version": "detectors-2026.10.15",
       "method": "relative",
       "family": "app_errors",
       "signal": "app_error_rate",
@@ -272,7 +380,7 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_00444e395b3aba62"
+        "evd_99fa88be2d060cc5"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -285,9 +393,67 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_8e59376f3b13de49",
+      "finding_id": "fnd_8a7426da39c39983",
+      "detector": "level:app_transaction_failure_ratio",
+      "detector_version": "detectors-2026.10.15",
+      "method": "relative",
+      "family": "app_performance",
+      "signal": "app_transaction_failure_ratio",
+      "title": "Failed transaction share increase",
+      "entity": {
+        "kind": "application",
+        "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
+        "display_name": "shop-api (production)",
+        "labels": {
+          "organization": "acme",
+          "project": "shop-api",
+          "environment": "production",
+          "tags": "team=shop"
+        }
+      },
+      "start": "2026-09-30T04:35:00Z",
+      "end": "2026-09-30T06:05:00Z",
+      "peak_at": "2026-09-30T06:00:00Z",
+      "duration_seconds": 5400,
+      "severity": "high",
+      "severity_points": 4,
+      "confidence": "high",
+      "confidence_reasons": [],
+      "observed": {
+        "value": 0.09012539184952978,
+        "unit": "ratio"
+      },
+      "expected": {
+        "median": 0.003930240152512594,
+        "lower": 0.0,
+        "upper": 0.015930240152512595,
+        "unit": "ratio"
+      },
+      "peak_score": 28.73,
+      "threshold": null,
+      "baseline_days": 14,
+      "baseline_mode": "time_of_day",
+      "evidence_ids": [
+        "evd_6f9d3c96e761041a",
+        "evd_86b20e1d2377431e"
+      ],
+      "related_finding_ids": [
+        "fnd_0dd367b5a8c91af7",
+        "fnd_189d6132e8bacc89",
+        "fnd_953dc4738b329881",
+        "fnd_e66a065f1d9e7a75"
+      ],
+      "attributes": {},
+      "alert_instances": [],
+      "error_kinds": [],
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
+    },
+    {
+      "finding_id": "fnd_953dc4738b329881",
       "detector": "level:app_duration_p95",
-      "detector_version": "detectors-2026.10.14",
+      "detector_version": "detectors-2026.10.15",
       "method": "relative",
       "family": "app_performance",
       "signal": "app_duration_p95",
@@ -326,15 +492,15 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_550f9c4c3696480e",
-        "evd_f1b153f8fda428a2",
-        "evd_fbe818c9667fbf8e"
+        "evd_a96faf6defd86be2",
+        "evd_a749b066a9c53f7f",
+        "evd_2e10653ab978914f"
       ],
       "related_finding_ids": [
-        "fnd_1b634013a7e24cf8",
-        "fnd_9a11771f060bf6ca",
-        "fnd_dda882bd2a4fe807",
-        "fnd_f054a8edb91a9e9d"
+        "fnd_0dd367b5a8c91af7",
+        "fnd_189d6132e8bacc89",
+        "fnd_8a7426da39c39983",
+        "fnd_e66a065f1d9e7a75"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -344,92 +510,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_9a11771f060bf6ca",
-      "detector": "level:app_unhandled_error_rate",
-      "detector_version": "detectors-2026.10.14",
-      "method": "relative",
-      "family": "app_errors",
-      "signal": "app_unhandled_error_rate",
-      "title": "Unhandled errors (crashes) increase",
-      "entity": {
-        "kind": "application",
-        "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
-        "display_name": "shop-api (production)",
-        "labels": {
-          "organization": "acme",
-          "project": "shop-api",
-          "environment": "production",
-          "tags": "team=shop"
-        }
-      },
-      "start": "2026-09-30T04:35:00Z",
-      "end": "2026-09-30T06:05:00Z",
-      "peak_at": "2026-09-30T04:35:00Z",
-      "duration_seconds": 5400,
-      "severity": "high",
-      "severity_points": 4,
-      "confidence": "high",
-      "confidence_reasons": [],
-      "observed": {
-        "value": 0.25,
-        "unit": "per_second"
-      },
-      "expected": {
-        "median": 0.003333,
-        "lower": 0.0,
-        "upper": 0.011333,
-        "unit": "per_second"
-      },
-      "peak_score": 123.33,
-      "threshold": null,
-      "baseline_days": 14,
-      "baseline_mode": "time_of_day",
-      "evidence_ids": [
-        "evd_e9b2b51c38c36f88"
-      ],
-      "related_finding_ids": [
-        "fnd_1b634013a7e24cf8",
-        "fnd_8e59376f3b13de49",
-        "fnd_dda882bd2a4fe807",
-        "fnd_f054a8edb91a9e9d"
-      ],
-      "attributes": {},
-      "alert_instances": [],
-      "error_kinds": [
-        {
-          "issue": "SHOP-API-4",
-          "title": "TypeError: 'NoneType' object is not subscriptable",
-          "events": 4967
-        },
-        {
-          "issue": "SHOP-API-1",
-          "title": "TimeoutError: upstream request timed out after 30s",
-          "events": 133
-        },
-        {
-          "issue": "SHOP-API-2",
-          "title": "KeyError: 'currency'",
-          "events": 72
-        },
-        {
-          "issue": "SHOP-API-3",
-          "title": "ValidationError: invalid email address",
-          "events": 44
-        },
-        {
-          "issue": "(other errors)",
-          "title": null,
-          "events": 44
-        }
-      ],
-      "state": "resolved",
-      "recurrence": "new",
-      "prior_episode_days": 0
-    },
-    {
-      "finding_id": "fnd_dda882bd2a4fe807",
+      "finding_id": "fnd_e66a065f1d9e7a75",
       "detector": "level:app_error_users",
-      "detector_version": "detectors-2026.10.14",
+      "detector_version": "detectors-2026.10.15",
       "method": "relative",
       "family": "app_errors",
       "signal": "app_error_users",
@@ -468,96 +551,13 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_d22e343488e74a01"
+        "evd_e51d816064d09fe5"
       ],
       "related_finding_ids": [
-        "fnd_1b634013a7e24cf8",
-        "fnd_8e59376f3b13de49",
-        "fnd_9a11771f060bf6ca",
-        "fnd_f054a8edb91a9e9d"
-      ],
-      "attributes": {},
-      "alert_instances": [],
-      "error_kinds": [
-        {
-          "issue": "SHOP-API-4",
-          "title": "TypeError: 'NoneType' object is not subscriptable",
-          "events": 4967
-        },
-        {
-          "issue": "SHOP-API-1",
-          "title": "TimeoutError: upstream request timed out after 30s",
-          "events": 133
-        },
-        {
-          "issue": "SHOP-API-2",
-          "title": "KeyError: 'currency'",
-          "events": 72
-        },
-        {
-          "issue": "SHOP-API-3",
-          "title": "ValidationError: invalid email address",
-          "events": 44
-        },
-        {
-          "issue": "(other errors)",
-          "title": null,
-          "events": 44
-        }
-      ],
-      "state": "resolved",
-      "recurrence": "new",
-      "prior_episode_days": 0
-    },
-    {
-      "finding_id": "fnd_f054a8edb91a9e9d",
-      "detector": "level:app_error_rate",
-      "detector_version": "detectors-2026.10.14",
-      "method": "relative",
-      "family": "app_errors",
-      "signal": "app_error_rate",
-      "title": "Error spike",
-      "entity": {
-        "kind": "application",
-        "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
-        "display_name": "shop-api (production)",
-        "labels": {
-          "organization": "acme",
-          "project": "shop-api",
-          "environment": "production",
-          "tags": "team=shop"
-        }
-      },
-      "start": "2026-09-30T04:35:00Z",
-      "end": "2026-09-30T06:05:00Z",
-      "peak_at": "2026-09-30T05:30:00Z",
-      "duration_seconds": 5400,
-      "severity": "high",
-      "severity_points": 4,
-      "confidence": "high",
-      "confidence_reasons": [],
-      "observed": {
-        "value": 1.086667,
-        "unit": "per_second"
-      },
-      "expected": {
-        "median": 0.055,
-        "lower": 0.025348000000000016,
-        "upper": 0.08465199999999998,
-        "unit": "per_second"
-      },
-      "peak_score": 139.17,
-      "threshold": null,
-      "baseline_days": 14,
-      "baseline_mode": "time_of_day",
-      "evidence_ids": [
-        "evd_4e4994c5d9c4ec8a"
-      ],
-      "related_finding_ids": [
-        "fnd_1b634013a7e24cf8",
-        "fnd_8e59376f3b13de49",
-        "fnd_9a11771f060bf6ca",
-        "fnd_dda882bd2a4fe807"
+        "fnd_0dd367b5a8c91af7",
+        "fnd_189d6132e8bacc89",
+        "fnd_8a7426da39c39983",
+        "fnd_953dc4738b329881"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -614,8 +614,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_1b634013a7e24cf8",
-          "finding_id": "fnd_1b634013a7e24cf8",
+          "episode_id": "eps_0dd367b5a8c91af7",
+          "finding_id": "fnd_0dd367b5a8c91af7",
           "entity": {
             "kind": "application",
             "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
@@ -627,18 +627,41 @@
               "tags": "team=shop"
             }
           },
-          "family": "app_performance",
-          "signal": "app_transaction_failure_ratio",
+          "family": "app_errors",
+          "signal": "app_error_rate",
           "start": "2026-09-30T04:35:00Z",
           "end": "2026-09-30T06:05:00Z",
           "severity": "high",
-          "peak_observed": 0.09012539184952978,
-          "expected_median": 0.003930240152512594,
-          "unit": "ratio"
+          "peak_observed": 1.176667,
+          "expected_median": 0.055,
+          "unit": "per_second"
         },
         {
-          "episode_id": "eps_56fb414d16de2cac",
-          "finding_id": "fnd_56fb414d16de2cac",
+          "episode_id": "eps_189d6132e8bacc89",
+          "finding_id": "fnd_189d6132e8bacc89",
+          "entity": {
+            "kind": "application",
+            "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
+            "display_name": "shop-api (production)",
+            "labels": {
+              "organization": "acme",
+              "project": "shop-api",
+              "environment": "production",
+              "tags": "team=shop"
+            }
+          },
+          "family": "app_errors",
+          "signal": "app_unhandled_error_rate",
+          "start": "2026-09-30T04:35:00Z",
+          "end": "2026-09-30T06:05:00Z",
+          "severity": "high",
+          "peak_observed": 0.25,
+          "expected_median": 0.003333,
+          "unit": "per_second"
+        },
+        {
+          "episode_id": "eps_593a788b66a3de95",
+          "finding_id": "fnd_593a788b66a3de95",
           "entity": {
             "kind": "application",
             "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop|issue=SHOP-API-4",
@@ -661,8 +684,31 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_8e59376f3b13de49",
-          "finding_id": "fnd_8e59376f3b13de49",
+          "episode_id": "eps_8a7426da39c39983",
+          "finding_id": "fnd_8a7426da39c39983",
+          "entity": {
+            "kind": "application",
+            "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
+            "display_name": "shop-api (production)",
+            "labels": {
+              "organization": "acme",
+              "project": "shop-api",
+              "environment": "production",
+              "tags": "team=shop"
+            }
+          },
+          "family": "app_performance",
+          "signal": "app_transaction_failure_ratio",
+          "start": "2026-09-30T04:35:00Z",
+          "end": "2026-09-30T06:05:00Z",
+          "severity": "high",
+          "peak_observed": 0.09012539184952978,
+          "expected_median": 0.003930240152512594,
+          "unit": "ratio"
+        },
+        {
+          "episode_id": "eps_953dc4738b329881",
+          "finding_id": "fnd_953dc4738b329881",
           "entity": {
             "kind": "application",
             "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
@@ -684,31 +730,8 @@
           "unit": "seconds"
         },
         {
-          "episode_id": "eps_9a11771f060bf6ca",
-          "finding_id": "fnd_9a11771f060bf6ca",
-          "entity": {
-            "kind": "application",
-            "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
-            "display_name": "shop-api (production)",
-            "labels": {
-              "organization": "acme",
-              "project": "shop-api",
-              "environment": "production",
-              "tags": "team=shop"
-            }
-          },
-          "family": "app_errors",
-          "signal": "app_unhandled_error_rate",
-          "start": "2026-09-30T04:35:00Z",
-          "end": "2026-09-30T06:05:00Z",
-          "severity": "high",
-          "peak_observed": 0.25,
-          "expected_median": 0.003333,
-          "unit": "per_second"
-        },
-        {
-          "episode_id": "eps_dda882bd2a4fe807",
-          "finding_id": "fnd_dda882bd2a4fe807",
+          "episode_id": "eps_e66a065f1d9e7a75",
+          "finding_id": "fnd_e66a065f1d9e7a75",
           "entity": {
             "kind": "application",
             "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
@@ -728,29 +751,6 @@
           "peak_observed": 52.0,
           "expected_median": 5.0,
           "unit": "count"
-        },
-        {
-          "episode_id": "eps_f054a8edb91a9e9d",
-          "finding_id": "fnd_f054a8edb91a9e9d",
-          "entity": {
-            "kind": "application",
-            "key": "application|organization=acme|project=shop-api|environment=production|tags=team=shop",
-            "display_name": "shop-api (production)",
-            "labels": {
-              "organization": "acme",
-              "project": "shop-api",
-              "environment": "production",
-              "tags": "team=shop"
-            }
-          },
-          "family": "app_errors",
-          "signal": "app_error_rate",
-          "start": "2026-09-30T04:35:00Z",
-          "end": "2026-09-30T06:05:00Z",
-          "severity": "high",
-          "peak_observed": 1.176667,
-          "expected_median": 0.055,
-          "unit": "per_second"
         }
       ]
     },
@@ -987,8 +987,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_d22e343488e74a01",
-      "finding_id": "fnd_dda882bd2a4fe807",
+      "evidence_id": "evd_e51d816064d09fe5",
+      "finding_id": "fnd_e66a065f1d9e7a75",
       "series": {
         "series_id": "ser_38f36965966cf93f",
         "family": "app_errors",
@@ -1582,8 +1582,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_4e4994c5d9c4ec8a",
-      "finding_id": "fnd_f054a8edb91a9e9d",
+      "evidence_id": "evd_7b0d94f98ae64d6d",
+      "finding_id": "fnd_0dd367b5a8c91af7",
       "series": {
         "series_id": "ser_2d348569f2718983",
         "family": "app_errors",
@@ -2177,8 +2177,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_00444e395b3aba62",
-      "finding_id": "fnd_56fb414d16de2cac",
+      "evidence_id": "evd_99fa88be2d060cc5",
+      "finding_id": "fnd_593a788b66a3de95",
       "series": {
         "series_id": "ser_0257f3e6d7e27aaa",
         "family": "app_errors",
@@ -2775,8 +2775,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_e9b2b51c38c36f88",
-      "finding_id": "fnd_9a11771f060bf6ca",
+      "evidence_id": "evd_eb06dd2892bd9751",
+      "finding_id": "fnd_189d6132e8bacc89",
       "series": {
         "series_id": "ser_c88690f9ec287cd2",
         "family": "app_errors",
@@ -3370,8 +3370,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_e5836fa7ebb41c1e",
-      "finding_id": "fnd_1b634013a7e24cf8",
+      "evidence_id": "evd_6f9d3c96e761041a",
+      "finding_id": "fnd_8a7426da39c39983",
       "series": {
         "series_id": "ser_1da973b06a710a1c",
         "family": "app_performance",
@@ -3965,8 +3965,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_1d13defe682ae3bb",
-      "finding_id": "fnd_1b634013a7e24cf8",
+      "evidence_id": "evd_86b20e1d2377431e",
+      "finding_id": "fnd_8a7426da39c39983",
       "series": {
         "series_id": "ser_899b18386d713937",
         "family": "app_performance",
@@ -4143,8 +4143,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_550f9c4c3696480e",
-      "finding_id": "fnd_8e59376f3b13de49",
+      "evidence_id": "evd_a96faf6defd86be2",
+      "finding_id": "fnd_953dc4738b329881",
       "series": {
         "series_id": "ser_faf03a97d3d7eb16",
         "family": "app_performance",
@@ -4738,8 +4738,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_f1b153f8fda428a2",
-      "finding_id": "fnd_8e59376f3b13de49",
+      "evidence_id": "evd_a749b066a9c53f7f",
+      "finding_id": "fnd_953dc4738b329881",
       "series": {
         "series_id": "ser_cafb20962cf94fb8",
         "family": "app_performance",
@@ -4916,8 +4916,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_fbe818c9667fbf8e",
-      "finding_id": "fnd_8e59376f3b13de49",
+      "evidence_id": "evd_2e10653ab978914f",
+      "finding_id": "fnd_953dc4738b329881",
       "series": {
         "series_id": "ser_899b18386d713937",
         "family": "app_performance",
@@ -5098,47 +5098,47 @@
   "explanation": {
     "status": "succeeded",
     "explanation": {
-      "summary": "6 finding(s) in the latest day; most severe: Failed transaction share increase on shop-api (production).",
+      "summary": "6 finding(s) in the latest day; most severe: Error spike on shop-api (production).",
       "hypotheses": [
         {
-          "text": "Failed transaction share increase on shop-api (production) may reflect a workload or configuration change around its start time.",
+          "text": "Error spike on shop-api (production) may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_1b634013a7e24cf8"
+            "fnd_0dd367b5a8c91af7"
+          ],
+          "likelihood": "possible"
+        },
+        {
+          "text": "Unhandled errors (crashes) increase on shop-api (production) may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_189d6132e8bacc89"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Error spike on shop-api (production) · TypeError: 'NoneType' object is not subscriptable (SHOP-API-4) may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_56fb414d16de2cac"
-          ],
-          "likelihood": "possible"
-        },
-        {
-          "text": "Transaction duration (p95) above expected range on shop-api (production) may reflect a workload or configuration change around its start time.",
-          "finding_ids": [
-            "fnd_8e59376f3b13de49"
+            "fnd_593a788b66a3de95"
           ],
           "likelihood": "possible"
         }
       ],
       "investigation_steps": [
         {
-          "text": "Open the evidence chart for Failed transaction share increase and compare with deploy and log history.",
+          "text": "Open the evidence chart for Error spike and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_1b634013a7e24cf8"
+            "fnd_0dd367b5a8c91af7"
+          ]
+        },
+        {
+          "text": "Open the evidence chart for Unhandled errors (crashes) increase and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_189d6132e8bacc89"
           ]
         },
         {
           "text": "Open the evidence chart for Error spike and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_56fb414d16de2cac"
-          ]
-        },
-        {
-          "text": "Open the evidence chart for Transaction duration (p95) above expected range and compare with deploy and log history.",
-          "finding_ids": [
-            "fnd_8e59376f3b13de49"
+            "fnd_593a788b66a3de95"
           ]
         }
       ],

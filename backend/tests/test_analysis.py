@@ -545,6 +545,43 @@ async def test_redis_replica_link_down_is_a_shortfall() -> None:
     assert finding.title == "Replica disconnected from its master"
 
 
+async def test_nodejs_event_loop_block_findings_relate_within_the_process() -> None:
+    result = await detect(Scenario(nodejs_event_loop_block=True))
+    node = {f.signal: f for f in result.findings if f.entity.labels.get("job") == "storefront"}
+
+    assert set(node) == {
+        "runtime_eventloop_lag",
+        "runtime_heap_used",
+        "runtime_gc_time_ratio",
+        "runtime_cpu",
+    }
+    assert {f.family for f in node.values()} == {SignalFamily.RUNTIME}
+    assert {f.entity.display_name for f in node.values()} == {"storefront · storefront:9464"}
+
+    lag = node["runtime_eventloop_lag"]
+    assert lag.entity.kind is EntityKind.PROCESS
+    assert lag.title == "Event loop lag (p99) at or above 500 ms (heuristic)"
+    assert {f.finding_id for s, f in node.items() if s != lag.signal} <= set(
+        lag.related_finding_ids
+    )
+    assert node["runtime_heap_used"].severity in (Severity.LOW, Severity.MEDIUM)
+
+
+async def test_nodejs_findings_relate_to_routes_of_the_same_job() -> None:
+    caps, col = await collect(Scenario(server_error_burst=True))
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    lag = np.full(N, 0.01)
+    lag[N - 30 : N - 18] = 1.0
+    builder.add("nodejs_eventloop_lag", {"job": "checkout-api", "instance": "api:9464"}, lag)
+    col = col.model_copy(update={"series": [*col.series, *builder.series]})
+
+    result = RobustDetector().detect(REQUEST, WINDOWS, caps, col, CONFIG)
+    (process,) = by_signal(result, "runtime_eventloop_lag")
+    (err,) = by_signal(result, "server_error_ratio")
+
+    assert err.finding_id in process.related_finding_ids
+
+
 def test_every_catalog_signal_is_consumed_by_derivation() -> None:
     consumed: set[str | None] = {*DIRECT, SWARM_FAILED_TASKS}
     for spec in _TRAFFIC_SPECS:

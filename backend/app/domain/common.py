@@ -189,6 +189,9 @@ class SignalFamily(StrEnum):
     DATABASE = "database"
     """Database server health and workload (PostgreSQL via postgres_exporter, MySQL via
     mysqld_exporter, Redis via redis_exporter)."""
+    RUNTIME = "runtime"
+    """Application runtime health (Node.js via prom-client default metrics): event loop lag,
+    heap, garbage collection, handles, CPU, file descriptors."""
     EDGE = "edge"
     """CDN edge HTTP traffic: requests, 5xx/4xx, origin errors, cache hits, TTFB (Cloudflare)."""
     SECURITY = "security"
@@ -270,6 +273,8 @@ class EntityKind(StrEnum):
     """A backend server behind a reverse proxy."""
     DATABASE = "database"
     """A database server (exporter target) or one database on it (PostgreSQL only)."""
+    PROCESS = "process"
+    """An instrumented application process (``job``, ``instance``), e.g. a Node.js service."""
     ZONE = "zone"
     """A Cloudflare zone, optionally narrowed to some of its hostnames."""
     APPLICATION = "application"

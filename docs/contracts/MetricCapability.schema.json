@@ -24,6 +24,7 @@
         "latency",
         "proxy",
         "database",
+        "runtime",
         "edge",
         "security",
         "app_errors",

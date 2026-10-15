@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.6` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
+The catalog is `catalog-2026.10.15` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
 
 ## Scope enforcement
 
@@ -148,6 +148,26 @@ Notes and limitations:
 - Command latency is server-side execution time only (no network, no time blocked in `BLPOP` and friends), averaged over all commands; a burst of slow commands (`KEYS`, large `SMEMBERS`) moves it. `CONFIG RESETSTAT` resets the counters, which `rate` handles.
 - The RDB/AOF status stays `err` until the next successful save or write, so a failing disk is reported for as long as it fails. With the default `stop-writes-on-bgsave-error yes`, the master also rejects writes meanwhile.
 - Not covered: replication offset lag (redis_exporter exports per-replica offsets on the master, not a lag in seconds), blocked clients (normal for queue consumers), Cluster and Sentinel state, slowlog, and per-command latency.
+
+### Node.js
+
+Source: the default metrics of [prom-client](https://github.com/siimon/prom-client) (`collectDefaultMetrics()`, no `prefix`). All series are kind `process` (family `runtime`) with identity `job, instance`; `instance` is one scraped process, or a cluster master whose `AggregatorRegistry` sums its workers.
+
+| Signal | Source metric(s) |
+| --- | --- |
+| `nodejs_eventloop_lag` | `max_over_time(nodejs_eventloop_lag_p99_seconds)`: the worst per-scrape p99 in the step |
+| `nodejs_heap_used` | `avg_over_time(nodejs_heap_size_used_bytes)` |
+| `nodejs_gc_time_ratio` | `rate(nodejs_gc_duration_seconds_sum)` over every GC `kind` |
+| `nodejs_active_handles` | `max_over_time(nodejs_active_handles_total)` (a gauge despite the suffix) |
+| `nodejs_cpu` | `rate(process_cpu_seconds_total)`, only on targets exporting `nodejs_version_info` |
+| `nodejs_fds_used_ratio` | `process_open_fds / process_max_fds`, only on targets exporting `nodejs_version_info` |
+
+Notes and limitations:
+
+- `process_*` metrics come from every official client library (Go, Python, JVM), so the CPU and descriptor signals are joined `on (job, instance)` with `nodejs_version_info`; other runtimes stay out of the Node.js rules.
+- prom-client resets its event loop histogram on every scrape, so each `nodejs_eventloop_lag_p99_seconds` sample covers one scrape interval; while the loop is blocked, scrapes time out and that time is a gap, never a healthy value.
+- V8 does not export its heap limit, so the heap is analysed against its own baseline only. File descriptor metrics exist on Linux only.
+- Not covered: metrics registered with a `prefix`, restarts (`process_start_time_seconds`: deploys restart processes routinely; container restarts and Swarm task failures cover crashes), per-space heap and per-kind GC detail.
 
 ### Cloudflare (T015)
 

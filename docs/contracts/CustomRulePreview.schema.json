@@ -89,6 +89,7 @@
         "proxy",
         "upstream",
         "database",
+        "process",
         "zone",
         "application",
         "agent",

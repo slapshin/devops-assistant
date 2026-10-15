@@ -246,6 +246,7 @@ def test_series_outside_a_regex_scope_are_dropped() -> None:
 
 
 COUNTER = re.compile(r"\b([a-z_:]+_(?:total|count|sum|bucket))\{")
+GAUGES_NAMED_LIKE_COUNTERS = {"docker_swarm_task_info", "nodejs_active_handles_total"}
 
 
 @pytest.mark.parametrize("defn", CATALOG, ids=lambda d: d.signal)
@@ -253,7 +254,7 @@ def test_counters_are_rated_before_aggregation(defn: Any) -> None:
     query = defn.query.render(SCOPE)
 
     for m in COUNTER.finditer(query):
-        if m.group(1) == "docker_swarm_task_info":
+        if m.group(1) in GAUGES_NAMED_LIKE_COUNTERS:
             continue
         head = query[: m.start()].rstrip()
         assert head.endswith(("rate(", "increase(")), f"{m.group(1)} not rated first: {query}"
@@ -352,6 +353,23 @@ def test_redis_entity_names() -> None:
 
     assert server.display_name == "redis · redis://cache1:6379"
     assert server.kind is EntityKind.DATABASE
+
+
+def test_nodejs_process_metrics_need_a_nodejs_target() -> None:
+    for signal in ("nodejs_cpu", "nodejs_fds_used_ratio"):
+        query = BY_SIGNAL[signal].query.render(SCOPE)
+
+        assert "and on (job, instance) count by (job, instance) (nodejs_version_info{" in query
+        assert "nodejs_version_info" in BY_SIGNAL[signal].required_metrics
+
+
+def test_nodejs_entity_names() -> None:
+    process = entity_for(
+        BY_SIGNAL["nodejs_eventloop_lag"], {"job": "storefront", "instance": "10.0.1.4:9464"}
+    )
+
+    assert process.display_name == "storefront · 10.0.1.4:9464"
+    assert process.kind is EntityKind.PROCESS
 
 
 def test_proxy_entity_names() -> None:

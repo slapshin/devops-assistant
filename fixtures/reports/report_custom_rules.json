@@ -25,8 +25,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.14",
-  "config_hash": "c08803ea6db8",
+  "detector_version": "detectors-2026.10.15",
+  "config_hash": "80b08da204c6",
   "sources": [
     {
       "kind": "prometheus",
@@ -1763,6 +1763,132 @@
     },
     {
       "source": "prometheus",
+      "family": "runtime",
+      "signal": "nodejs_eventloop_lag",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "nodejs_eventloop_lag_p99_seconds"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "nodejs_eventloop_lag_p99_seconds"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "nodejs_heap_used",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "nodejs_heap_size_used_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "nodejs_heap_size_used_bytes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "nodejs_gc_time_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "nodejs_gc_duration_seconds_sum"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "nodejs_gc_duration_seconds_sum"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "nodejs_active_handles",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "nodejs_active_handles_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "nodejs_active_handles_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "nodejs_cpu",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "process_cpu_seconds_total",
+        "nodejs_version_info"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "process_cpu_seconds_total",
+        "nodejs_version_info"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "nodejs_fds_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "process_open_fds",
+        "process_max_fds",
+        "nodejs_version_info"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "process_open_fds",
+        "process_max_fds",
+        "nodejs_version_info"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
       "family": "custom",
       "signal": "custom_checkout_failures",
       "status": "supported",
@@ -2080,6 +2206,15 @@
       ]
     },
     {
+      "family": "runtime",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 6,
+      "total_series": 6,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
       "family": "custom",
       "status": "anomalous",
       "capability": "supported",
@@ -2091,9 +2226,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_f43c93bc1b235b5e",
+      "finding_id": "fnd_2771c5e61419b7ce",
       "detector": "level:custom_email_queue",
-      "detector_version": "detectors-2026.10.14",
+      "detector_version": "detectors-2026.10.15",
       "method": "absolute",
       "family": "custom",
       "signal": "custom_email_queue",
@@ -2129,10 +2264,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_a760fbcd380c29e2"
+        "evd_48469bca968baa2c"
       ],
       "related_finding_ids": [
-        "fnd_f5226c9499daf431"
+        "fnd_2a30597044420549"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -2142,9 +2277,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_f5226c9499daf431",
+      "finding_id": "fnd_2a30597044420549",
       "detector": "level:custom_checkout_failures",
-      "detector_version": "detectors-2026.10.14",
+      "detector_version": "detectors-2026.10.15",
       "method": "relative",
       "family": "custom",
       "signal": "custom_checkout_failures",
@@ -2180,10 +2315,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_9d2201a53901a8f5"
+        "evd_e2182a003e4720ec"
       ],
       "related_finding_ids": [
-        "fnd_f43c93bc1b235b5e"
+        "fnd_2771c5e61419b7ce"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -2207,14 +2342,14 @@
       "affected_entities": [
         "custom|job=checkout-api"
       ],
-      "observed_entity_minutes": 25920,
-      "anomalous_share": 0.002315,
+      "observed_entity_minutes": 27360,
+      "anomalous_share": 0.002193,
       "baseline_days_used": 14,
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_f43c93bc1b235b5e",
-          "finding_id": "fnd_f43c93bc1b235b5e",
+          "episode_id": "eps_2771c5e61419b7ce",
+          "finding_id": "fnd_2771c5e61419b7ce",
           "entity": {
             "kind": "custom",
             "key": "custom|job=checkout-api",
@@ -2233,8 +2368,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_f5226c9499daf431",
-          "finding_id": "fnd_f5226c9499daf431",
+          "episode_id": "eps_2a30597044420549",
+          "finding_id": "fnd_2a30597044420549",
           "entity": {
             "kind": "custom",
             "key": "custom|job=checkout-api",
@@ -2265,7 +2400,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2282,7 +2417,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2299,7 +2434,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2316,7 +2451,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2333,7 +2468,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2350,7 +2485,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2367,7 +2502,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2384,7 +2519,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2401,7 +2536,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2418,7 +2553,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2435,7 +2570,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2452,7 +2587,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2469,7 +2604,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 25920,
+      "observed_entity_minutes": 27360,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2479,7 +2614,7 @@
   "trend_summary": {
     "direction": "stable",
     "confidence": "high",
-    "recent_share": 0.000331,
+    "recent_share": 0.000313,
     "previous_share": 0.0,
     "recent_episodes": 2,
     "previous_episodes": 0,
@@ -2487,8 +2622,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_9d2201a53901a8f5",
-      "finding_id": "fnd_f5226c9499daf431",
+      "evidence_id": "evd_e2182a003e4720ec",
+      "finding_id": "fnd_2a30597044420549",
       "series": {
         "series_id": "ser_f310787fa4200236",
         "family": "custom",
@@ -3005,8 +3140,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_a760fbcd380c29e2",
-      "finding_id": "fnd_f43c93bc1b235b5e",
+      "evidence_id": "evd_48469bca968baa2c",
+      "finding_id": "fnd_2771c5e61419b7ce",
       "series": {
         "series_id": "ser_f5978005d3905001",
         "family": "custom",
@@ -3532,14 +3667,14 @@
         {
           "text": "E-mail queue depth at or above 2000 (threshold) on checkout-api may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_f43c93bc1b235b5e"
+            "fnd_2771c5e61419b7ce"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Checkout failures above expected range on checkout-api may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_f5226c9499daf431"
+            "fnd_2a30597044420549"
           ],
           "likelihood": "possible"
         }
@@ -3548,13 +3683,13 @@
         {
           "text": "Open the evidence chart for E-mail queue depth at or above 2000 (threshold) and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_f43c93bc1b235b5e"
+            "fnd_2771c5e61419b7ce"
           ]
         },
         {
           "text": "Open the evidence chart for Checkout failures above expected range and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_f5226c9499daf431"
+            "fnd_2a30597044420549"
           ]
         }
       ],

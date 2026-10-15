@@ -63,6 +63,7 @@ MYSQL_PRIMARY = {"job": "mysql", "instance": "mysql-primary:9104"}
 MYSQL_REPLICA = {"job": "mysql", "instance": "mysql-replica:9104"}
 REDIS_MASTER = {"job": "redis", "instance": "redis://redis-master:6379"}
 REDIS_REPLICA = {"job": "redis", "instance": "redis://redis-replica:6379"}
+NODEJS_APP = {"job": "storefront", "instance": "storefront:9464"}
 QUIET_ROUTE = {
     "job": SERVICE_JOB,
     "http_route": "/internal/order-sla",
@@ -110,6 +111,11 @@ class Scenario:
     redis_eviction_storm: bool = False
     """The Redis master fills maxmemory for 1 h, ending 7 h before T: keys are evicted, the
     keyspace miss share climbs and commands slow down."""
+    nodejs: bool = True
+    """A Node.js storefront process (prom-client default metrics)."""
+    nodejs_event_loop_block: bool = False
+    """The storefront blocks its event loop for 1 h, ending 9 h before T: event loop lag, CPU
+    and GC time climb while the heap grows."""
     recurring_404_days: tuple[int, ...] = ()
     """Trend buckets (1..13) with an extra 404 burst, for recurrence."""
     custom_incident: bool = False
@@ -129,6 +135,7 @@ SCENARIOS: dict[str, Scenario] = {
         database_pileup=True,
         mysql_contention=True,
         redis_eviction_storm=True,
+        nodejs_event_loop_block=True,
         custom_incident=True,
     ),
     "short-history": Scenario(history_days=5, cpu_load=True, histogram=False),
@@ -229,6 +236,8 @@ def build_series(
         _add_mysql_series(builder, gen)
     if scenario.redis:
         _add_redis_series(builder, gen)
+    if scenario.nodejs:
+        _add_nodejs_series(builder, gen)
     for rule in custom_rules:
         _add_custom_series(builder, scenario, rule)
 
@@ -419,6 +428,28 @@ def _add_redis_series(builder: _SeriesBuilder, gen: _Gen) -> None:
     builder.add("redis_replica_link_down", REDIS_REPLICA, gen.available(np.zeros(N)))
 
 
+def _add_nodejs_series(builder: _SeriesBuilder, gen: _Gen) -> None:
+    block = slice(N - 120, N - 108)
+    lag = np.clip(gen.base(0.012, 0.003, 0.001), 0.005, None)
+    heap = np.clip(gen.base(180 * 2**20, 20 * 2**20, 4 * 2**20), 0, None)
+    gc = np.clip(gen.base(0.01, 0.003, 0.001), 0, None)
+    handles = np.round(np.clip(gen.base(60.0, 10.0, 2.0), 0, None))
+    cpu = np.clip(gen.base(0.25, 0.08, 0.02), 0, None)
+    fds = np.clip(gen.base(0.004, 0.001, 0.0002), 0, 1)
+    if gen.scenario.nodejs_event_loop_block:
+        steps = block.stop - block.start
+        lag[block] = 1.2
+        heap[block] = np.linspace(400, 900, steps) * 2**20
+        gc[block] = 0.35
+        cpu[block] = 1.0
+    builder.add("nodejs_eventloop_lag", NODEJS_APP, gen.available(lag))
+    builder.add("nodejs_heap_used", NODEJS_APP, gen.available(heap))
+    builder.add("nodejs_gc_time_ratio", NODEJS_APP, gen.available(gc))
+    builder.add("nodejs_active_handles", NODEJS_APP, gen.available(handles))
+    builder.add("nodejs_cpu", NODEJS_APP, gen.available(cpu))
+    builder.add("nodejs_fds_used_ratio", NODEJS_APP, gen.available(fds))
+
+
 DEMO_CUSTOM_RULES = [
     CustomRule(
         slug="checkout_failures",
@@ -564,6 +595,11 @@ class SyntheticMetricsSource:
             *(
                 (d.signal for d in CATALOG if d.signal.startswith("redis_"))
                 if scenario.redis
+                else ()
+            ),
+            *(
+                (d.signal for d in CATALOG if d.signal.startswith("nodejs_"))
+                if scenario.nodejs
                 else ()
             ),
         }

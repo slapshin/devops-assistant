@@ -120,6 +120,7 @@ export const FAMILY_LABELS: Record<string, string> = {
   latency: "Latency",
   proxy: "Reverse proxies",
   database: "Databases",
+  runtime: "Runtimes (Node.js)",
   edge: "CDN edge (Cloudflare)",
   security: "Security (WAF)",
   app_errors: "Application errors (Sentry)",

@@ -97,6 +97,8 @@ RECURRING_MIN_PRIOR_DAYS = 3
 LATENCY_HISTOGRAM_TOP_SECONDS = 10.0
 """Top finite histogram bucket: p95 at or above it is only a lower bound."""
 _PROXY_KINDS = {EntityKind.PROXY, EntityKind.UPSTREAM}
+_SERVICE_KINDS = {EntityKind.ROUTE, EntityKind.PROCESS}
+"""A service's routes and its runtime processes share the service's ``job``."""
 """A proxy's zones, services and upstreams share its scrape job; overlaps there are related."""
 INSTANCE_LABEL = "instance"
 
@@ -674,7 +676,8 @@ def _finding_state(ep: Episode, config: DetectorConfig) -> FindingState:
 def _related_finding_ids(
     findings: list[Finding], hosts: dict[str, set[str]], config: DetectorConfig
 ) -> dict[str, set[str]]:
-    """Overlapping findings on the same entity, service or database server, or a shared host."""
+    """Overlapping findings on the same entity, service (routes and runtime processes of a job)
+    or database server, or a shared host."""
     slack = timedelta(minutes=config.relation_slack_minutes)
     related: dict[str, set[str]] = defaultdict(set)
     for i, a in enumerate(findings):
@@ -685,7 +688,7 @@ def _related_finding_ids(
 
             same_entity = a.entity.key == b.entity.key
             same_service = (
-                a.entity.kind is b.entity.kind is EntityKind.ROUTE
+                {a.entity.kind, b.entity.kind} <= _SERVICE_KINDS
                 or {a.entity.kind, b.entity.kind} <= _PROXY_KINDS
             ) and a.entity.labels.get(JOB_LABEL) == b.entity.labels.get(JOB_LABEL)
             same_database_server = a.entity.kind is b.entity.kind is EntityKind.DATABASE and all(

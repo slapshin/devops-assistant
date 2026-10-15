@@ -844,7 +844,7 @@ export interface components {
          * EntityKind
          * @enum {string}
          */
-        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "zone" | "application" | "agent" | "alert_rule" | "custom";
+        EntityKind: "node" | "filesystem" | "disk" | "network_interface" | "container" | "service" | "route" | "proxy" | "upstream" | "database" | "process" | "zone" | "application" | "agent" | "alert_rule" | "custom";
         /** EpisodeSummary */
         EpisodeSummary: {
             /** End */
@@ -1716,7 +1716,7 @@ export interface components {
          * SignalFamily
          * @enum {string}
          */
-        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity" | "alerting" | "custom";
+        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "runtime" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity" | "alerting" | "custom";
         /**
          * SignalStatus
          * @enum {string}

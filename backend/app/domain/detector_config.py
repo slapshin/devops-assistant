@@ -10,7 +10,7 @@ from pydantic import Field
 
 from app.domain.common import STEP_SECONDS, Contract
 
-DETECTOR_VERSION = "detectors-2026.10.14"
+DETECTOR_VERSION = "detectors-2026.10.15"
 CONFIG_HASH_HEX_CHARS = 12
 
 
@@ -89,6 +89,20 @@ _DEFAULT_SIGNALS: dict[str, SignalThresholds] = {
     "database_evictions": _T(min_rel_factor=2.0, min_abs_effect=1.0, abs_floor=0.1),
     "database_command_latency": _T(min_rel_factor=2.0, min_abs_effect=0.0005, abs_floor=0.00001),
     "database_cache_miss_ratio": _T(min_rel_factor=1.5, min_abs_effect=0.10, abs_floor=0.01),
+    "runtime_eventloop_lag": _T(
+        min_rel_factor=2.0, min_abs_effect=0.05, abs_floor=0.005, absolute_high=0.5
+    ),
+    "runtime_heap_used": _T(min_rel_factor=1.25, min_abs_effect=50 * _MIB, abs_floor=_MIB),
+    "runtime_gc_time_ratio": _T(min_abs_effect=0.05, abs_floor=0.005, absolute_high=0.25),
+    "runtime_active_handles": _T(min_rel_factor=2.0, min_abs_effect=50.0, abs_floor=1.0),
+    "runtime_cpu": _T(min_rel_factor=1.25, min_abs_effect=0.1, abs_floor=0.01),
+    "runtime_fds_ratio": _T(
+        min_abs_effect=0.10,
+        abs_floor=0.01,
+        absolute_high=0.80,
+        absolute_critical=0.95,
+        absolute_min_minutes=5,
+    ),
     "edge_origin_error_ratio": _T(
         min_abs_effect=0.01, abs_floor=0.001, absolute_high=0.02, absolute_min_minutes=5
     ),
