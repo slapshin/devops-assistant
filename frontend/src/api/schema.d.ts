@@ -350,10 +350,10 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 2.5
+             * @default 2.6
              * @enum {string}
              */
-            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5";
+            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "2.6";
             scope: components["schemas"]["Scope"];
             /** @description Deprecated: the first source; use sources. */
             source?: components["schemas"]["SourceInfo"] | null;
@@ -363,6 +363,11 @@ export interface components {
              */
             sources?: components["schemas"]["SourceInfo"][];
             state: components["schemas"]["ReportState"];
+            /**
+             * Totals
+             * @description Daily event totals of the Sentry, Wazuh and Grafana sources (2.6).
+             */
+            totals?: components["schemas"]["EventTotal"][];
             trend_summary?: components["schemas"]["TrendSummary"] | null;
             /** Trends */
             trends: components["schemas"]["DailyTrend"][];
@@ -779,6 +784,24 @@ export interface components {
             values: (number | null)[];
         };
         /**
+         * DailyCount
+         * @description Events of one 24-hour bucket; bucket_index 0 is the latest day [T-24h, T).
+         */
+        DailyCount: {
+            /** Bucket Index */
+            bucket_index: number;
+            /**
+             * Count
+             * @description Null when nothing in the day is known.
+             */
+            count: number | null;
+            /**
+             * Coverage
+             * @description Share of the day's entity buckets with data; below 1 the count is a lower bound.
+             */
+            coverage: number;
+        };
+        /**
          * DailyTrend
          * @description One 24-hour bucket; bucket_index 0 is the latest day [T-24h, T).
          */
@@ -894,6 +917,31 @@ export interface components {
              * @description The issue's title; null for '(other errors)'.
              */
             title: string | null;
+        };
+        /**
+         * EventTotal
+         * @description Daily events of one source, summed over every analysed entity (2.6): Sentry error
+         *     events, Wazuh alerts, Grafana alert firings.
+         */
+        EventTotal: {
+            /** Days */
+            days: components["schemas"]["DailyCount"][];
+            /**
+             * Entities
+             * @description Entities summed (projects, agents, alert rules).
+             */
+            entities: number;
+            /**
+             * Signal
+             * @description The signal whose events are counted.
+             */
+            signal: string;
+            source: components["schemas"]["SourceKind"];
+            /**
+             * Title
+             * @description What is counted, e.g. 'Sentry error events'.
+             */
+            title: string;
         };
         /**
          * Evidence

@@ -429,6 +429,25 @@ async def test_history_starts_at_the_first_alert() -> None:
     assert 0.17 < series.coverage < 0.19  # 5 of 28 days
 
 
+async def test_alerts_are_totalled_per_day_over_agents() -> None:
+    api = RecordingApi("short-history", INDEX, ["web-1", "db-1"])
+
+    result, _ = await collect(WazuhMetricsSource(api, INDEX, ["web-1", "db-1"]))
+
+    [total] = result.totals
+    assert (total.source, total.signal, total.title) == (
+        SourceKind.WAZUH,
+        "wazuh_alerts",
+        "Wazuh alerts",
+    )
+    assert total.entities == 2
+    alerts = [s for s in result.series if s.signal == "wazuh_alerts"]
+    latest = sum(v or 0.0 for s in alerts for v in s.values[-288:]) * 300
+    assert total.days[0].count == round(latest) > 0
+    assert total.days[0].coverage == 1.0
+    assert total.days[13].count is None, "before the first alert: unknown, not quiet"
+
+
 async def test_failed_chunks_are_unknown_and_disclosed() -> None:
     api = RecordingApi("healthy", INDEX, ["web-1"], fail=True)
 

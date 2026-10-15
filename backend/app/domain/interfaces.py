@@ -22,6 +22,7 @@ from app.domain.report import (
     AnalysisReport,
     AnalysisRequest,
     AnalysisWindows,
+    EventTotal,
     Exclusion,
     SourceInfo,
 )
@@ -102,6 +103,9 @@ class CollectionResult(Contract):
     custom_rules: list[CustomRule] = Field(
         default_factory=list,
         description="Custom rules the source collected; their series carry the rules' signals.",
+    )
+    totals: list[EventTotal] = Field(
+        default_factory=list, description="Daily event totals the source counted."
     )
 
 

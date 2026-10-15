@@ -510,6 +510,42 @@ async def test_firing_is_counted_per_instance_and_bucket() -> None:
     assert result.exclusions == []
 
 
+async def test_firings_are_totalled_per_day_over_rules() -> None:
+    web = {"alertname": "Rule r1", "instance": "web-1", "project": "shop"}
+    db = {"alertname": "Rule r2", "instance": "db-1", "project": "shop"}
+    midnight = END - timedelta(days=1)
+    histories = {
+        "r1": History(
+            [
+                change(1, END - timedelta(hours=3), "Normal", "Alerting", web),
+                change(2, END - timedelta(hours=2), "Alerting", "Normal", web),
+                change(3, END - timedelta(hours=1), "Normal", "Alerting", web),
+            ]
+        ),
+        "r2": History(
+            [
+                change(4, midnight - timedelta(hours=1), "Normal", "Alerting", db),
+                change(5, midnight + timedelta(hours=1), "Alerting", "Normal", db),
+            ]
+        ),
+    }
+    api = FakeApi([rule("r1"), rule("r2", labels={"severity": "critical"})], histories)
+
+    result, _ = await collect(GrafanaMetricsSource(api, ["Shop"]))
+
+    [total] = result.totals
+    assert (total.source, total.signal, total.title) == (
+        SourceKind.GRAFANA,
+        "grafana_alert_firing",
+        "Grafana alert firings",
+    )
+    assert total.entities == 2, "every rule's firing series, whatever its severity"
+    assert [d.count for d in total.days[:3]] == [3, 1, 0], (
+        "two firings of web-1 and one of db-1 across midnight, counted on both days"
+    )
+    assert total.days[0].coverage == 1.0
+
+
 async def test_instances_list_merged_intervals_annotations_and_open_ends() -> None:
     web = {"alertname": "Rule r1", "instance": "web-1", "project": "shop"}
     db = {"alertname": "Rule r1", "instance": "db-1", "project": "shop"}

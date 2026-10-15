@@ -10,6 +10,7 @@ from app.domain.common import (
     REPORT_SCHEMA_VERSION,
     STEP_SECONDS,
     Contract,
+    Ratio,
     Reason,
     Scope,
     SignalFamily,
@@ -80,8 +81,36 @@ class Exclusion(Reason):
     finding_id: str | None = None
 
 
+class DailyCount(Contract):
+    """Events of one 24-hour bucket; bucket_index 0 is the latest day [T-24h, T)."""
+
+    bucket_index: int = Field(ge=0, le=TREND_DAYS - 1)
+    count: int | None = Field(ge=0, description="Null when nothing in the day is known.")
+    coverage: Ratio = Field(
+        description="Share of the day's entity buckets with data; below 1 the count is a lower "
+        "bound."
+    )
+
+
+class EventTotal(Contract):
+    """Daily events of one source, summed over every analysed entity (2.6): Sentry error
+    events, Wazuh alerts, Grafana alert firings."""
+
+    source: SourceKind
+    signal: str = Field(min_length=1, description="The signal whose events are counted.")
+    title: str = Field(min_length=1, description="What is counted, e.g. 'Sentry error events'.")
+    entities: int = Field(ge=0, description="Entities summed (projects, agents, alert rules).")
+    days: list[DailyCount] = Field(min_length=TREND_DAYS, max_length=TREND_DAYS)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if [d.bucket_index for d in self.days] != list(range(TREND_DAYS)):
+            raise ValueError(f"{self.signal}: days must be ordered by bucket_index")
+        return self
+
+
 class AnalysisReport(Contract):
-    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4", "2.5"] = REPORT_SCHEMA_VERSION
+    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6"] = REPORT_SCHEMA_VERSION
     analysis_id: str
     scope: Scope
     windows: AnalysisWindows
@@ -106,6 +135,10 @@ class AnalysisReport(Contract):
     custom_rules: list[CustomRule] = Field(
         default_factory=list,
         description="The project's custom rules as they were when analysed (2.5).",
+    )
+    totals: list[EventTotal] = Field(
+        default_factory=list,
+        description="Daily event totals of the Sentry, Wazuh and Grafana sources (2.6).",
     )
 
     @property

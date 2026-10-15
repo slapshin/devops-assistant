@@ -27,6 +27,7 @@ export type Hypothesis = Schemas["Hypothesis"];
 export type MetricSeries = Schemas["MetricSeries"];
 export type AlertInstanceActivity = Schemas["AlertInstanceActivity"];
 export type ErrorKindActivity = Schemas["ErrorKindActivity"];
+export type EventTotal = Schemas["EventTotal"];
 export type CustomRule = Schemas["CustomRule"];
 export type CustomRulePreview = Schemas["CustomRulePreview"];
 export type CustomRulePreviewRequest = Schemas["CustomRulePreviewRequest"];

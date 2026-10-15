@@ -29,6 +29,7 @@ from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.projects import WazuhLabel
 from app.domain.report import AnalysisWindows, Exclusion, SourceInfo
 from app.sources.base import HISTORY_DAYS
+from app.sources.totals import event_total
 from app.sources.wazuh.api import (
     SECONDS_PER_DAY,
     AgentInfo,
@@ -38,6 +39,7 @@ from app.sources.wazuh.api import (
     WazuhApi,
 )
 from app.sources.wazuh.catalog import (
+    ALERTS_SIGNAL,
     BY_SIGNAL,
     CATALOG_VERSION,
     MAX_AGENTS,
@@ -231,7 +233,11 @@ class WazuhMetricsSource:
             len(exclusions),
             total,
         )
-        return CollectionResult(series=series, exclusions=exclusions)
+        alerts = [s for s in series if s.signal == ALERTS_SIGNAL]
+        alerts_total = event_total(SourceKind.WAZUH, ALERTS_SIGNAL, "Wazuh alerts", alerts, end)
+        return CollectionResult(
+            series=series, exclusions=exclusions, totals=[alerts_total] if alerts_total else []
+        )
 
     def _series(
         self,

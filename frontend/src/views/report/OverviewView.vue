@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import type { Finding } from "../../api/client";
 import CoverageGrid from "../../components/CoverageGrid.vue";
 import CoverageTable from "../../components/CoverageTable.vue";
+import EventTotalPanel from "../../components/EventTotalPanel.vue";
 import ExplanationPanel from "../../components/ExplanationPanel.vue";
 import FindingCard from "../../components/FindingCard.vue";
 import IncidentTimeline from "../../components/IncidentTimeline.vue";
@@ -36,6 +37,8 @@ const severityStats = computed(() =>
 const newCount = computed(() => report.value.findings.filter((f) => f.recurrence === "new").length);
 const baselineDays = computed(() => longestBaselineDays(report.value.coverage));
 const evaluatedCount = computed(() => report.value.coverage.filter((c) => c.status === "anomalous" || c.status === "no_anomaly").length);
+/** One row of event totals: three share it, fewer widen to fill it. */
+const totalSpan = computed(() => `s${24 / Math.min(3, Math.max(1, report.value.totals?.length ?? 1))}`);
 const topFindings = computed(() => report.value.findings.slice(0, TOP_FINDINGS_COUNT));
 const worst = computed(() => report.value.findings[0] ?? null);
 const lede = computed(() => {
@@ -116,6 +119,7 @@ function listSeparator(index: number, length: number): string {
         <div class="d">{{ blindSpots.length ? blindSpots.map((b) => b.family).join(" · ") : "every family evaluated" }}</div>
       </div>
     </section>
+    <EventTotalPanel v-for="t in report.totals ?? []" :key="t.source" :class="totalSpan" :total="t" :end="report.windows.end_time" />
 
     <section class="panel s24" aria-labelledby="summary-title">
       <div class="ph"><h2 id="summary-title">Summary</h2><span class="sub">· latest 24 h</span></div>

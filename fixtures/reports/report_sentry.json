@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.5",
+  "schema_version": "2.6",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e5",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -5150,5 +5150,85 @@
     "reason": null,
     "validation_notes": []
   },
-  "custom_rules": []
+  "custom_rules": [],
+  "totals": [
+    {
+      "source": "sentry",
+      "signal": "sentry_errors",
+      "title": "Sentry error events",
+      "entities": 2,
+      "days": [
+        {
+          "bucket_index": 0,
+          "count": 13557,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 1,
+          "count": 8631,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 2,
+          "count": 8618,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 3,
+          "count": 8597,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 4,
+          "count": 8606,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 5,
+          "count": 8614,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 6,
+          "count": 8677,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 7,
+          "count": 8698,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 8,
+          "count": 8608,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 9,
+          "count": 8665,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 10,
+          "count": 8567,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 11,
+          "count": 8632,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 12,
+          "count": 8551,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 13,
+          "count": 8626,
+          "coverage": 1.0
+        }
+      ]
+    }
+  ]
 }

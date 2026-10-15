@@ -637,6 +637,29 @@ async def test_failed_error_kind_chunks_are_unknown_and_disclosed() -> None:
     assert all(None not in s.values[-288:] for s in errors)
 
 
+async def test_error_events_are_totalled_per_day_from_project_totals_not_kinds() -> None:
+    issues = [IssueInfo("SHOP-WEB-1", "KeyError", 40.0)]
+    fail_at = int((END - timedelta(days=14)).timestamp())  # covers trend days 7..13
+
+    _, result = await collect(FakeApi(issues=issues, fail_at=fail_at))
+
+    [total] = result.totals
+    assert (total.source, total.signal, total.title) == (
+        SourceKind.SENTRY,
+        "sentry_errors",
+        "Sentry error events",
+    )
+    assert total.entities == 1, "the project's total, never its error kinds as well"
+    projects = [
+        s for s in result.series if s.signal == "sentry_errors" and "issue" not in s.entity.labels
+    ]
+    latest = sum(v or 0.0 for s in projects for v in s.values[-288:]) * 300
+    assert total.days[0].count == round(latest)
+    assert total.days[0].coverage == 1.0
+    assert total.days[7].count is None, "a failed day is unknown, never zero"
+    assert total.days[7].coverage == 0.0
+
+
 @pytest.mark.parametrize("rank", ["refused", "ungrouped"])
 async def test_only_the_total_is_analysed_when_sentry_cannot_split_errors(rank: str) -> None:
     issues = [IssueInfo("SHOP-WEB-1", "KeyError", 40.0)]

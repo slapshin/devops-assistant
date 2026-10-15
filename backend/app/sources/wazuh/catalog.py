@@ -56,9 +56,10 @@ class WazuhSignal:
     unit: Unit = Unit.PER_SECOND
 
 
+ALERTS_SIGNAL = "wazuh_alerts"
 _HOST, _FIM = SignalFamily.HOST_SECURITY, SignalFamily.FILE_INTEGRITY
 SIGNALS = (
-    WazuhSignal("wazuh_alerts", _HOST, "All alerts", None),
+    WazuhSignal(ALERTS_SIGNAL, _HOST, "All alerts", None),
     WazuhSignal(
         "wazuh_high_alerts",
         _HOST,

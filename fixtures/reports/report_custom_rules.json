@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.5",
+  "schema_version": "2.6",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e8",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -3862,5 +3862,6 @@
       "max_severity": null,
       "identity_labels": []
     }
-  ]
+  ],
+  "totals": []
 }

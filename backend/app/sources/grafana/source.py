@@ -41,6 +41,7 @@ from app.domain.report import AnalysisWindows, Exclusion, SourceInfo
 from app.sources.base import HISTORY_DAYS
 from app.sources.grafana.api import SECONDS_PER_DAY, AlertRule, GrafanaApi, History, Transition
 from app.sources.grafana.catalog import (
+    BY_SIGNAL,
     CATALOG_VERSION,
     FOLDER_ATTRIBUTE,
     GROUP_ATTRIBUTE,
@@ -60,6 +61,7 @@ from app.sources.grafana.catalog import (
     shown_annotations,
     signals_of,
 )
+from app.sources.totals import event_total
 
 log = logging.getLogger("app.sources.grafana")
 UNLABELLED = "{}"
@@ -67,6 +69,7 @@ UNLABELLED = "{}"
 
 Mask = NDArray[np.bool_]
 Segment = tuple[int, int, "State | None"]
+Span = tuple[int, int]
 
 
 def rule_entity(rule: AlertRule) -> Entity:
@@ -109,6 +112,8 @@ class _RuleSeries:
     firing_instances: list[AlertInstanceActivity]
     """Instances firing in the latest 24 h, oldest first, at most ``MAX_ALERT_INSTANCES``."""
     nodata_instances: list[AlertInstanceActivity]
+    firings: list[Span] = field(default_factory=list)
+    """Firing intervals of every instance in the window, for the daily totals."""
     unlabelled: int = 0
     instances_truncated: bool = False
 
@@ -251,6 +256,8 @@ class GrafanaMetricsSource:
         )
 
         series: list[MetricSeries] = []
+        firings: dict[str, list[Span]] = {}
+        """Series ID of a rule's firing series -> the rule's firing intervals."""
         failures: list[tuple[AlertRule, SourceError]] = []
         truncated: list[AlertRule] = []
         crowded: list[AlertRule] = []
@@ -269,7 +276,13 @@ class GrafanaMetricsSource:
             unlabelled += built.unlabelled
             if built.instances_truncated:
                 crowded.append(rule)
-            series += self._metric_series(rule, built, grid_start, step, supported)
+            built_series = self._metric_series(rule, built, grid_start, step, supported)
+            series += built_series
+            firings |= {
+                s.series_id: built.firings
+                for s in built_series
+                if BY_SIGNAL[s.signal].state is State.FIRING
+            }
 
         exclusions = _failure_exclusions(failures, len(rules))
         exclusions += self._selection_exclusions(
@@ -283,7 +296,17 @@ class GrafanaMetricsSource:
             len(series),
             len(exclusions),
         )
-        return CollectionResult(series=series, exclusions=exclusions)
+        firings_total = event_total(
+            SourceKind.GRAFANA,
+            SIGNALS[0].signal,
+            "Grafana alert firings",
+            [s for s in series if s.series_id in firings],
+            end,
+            lambda s, lo, hi: sum(start < hi and stop > lo for start, stop in firings[s.series_id]),
+        )
+        return CollectionResult(
+            series=series, exclusions=exclusions, totals=[firings_total] if firings_total else []
+        )
 
     def _instances(self, rule: AlertRule, history: History) -> tuple[dict[str, _Instance], int]:
         """Matching instances by label text, and the count of unattributable changes."""
@@ -322,12 +345,14 @@ class GrafanaMetricsSource:
         day_start = end - SECONDS_PER_DAY
         rule_annotations = shown_annotations(rule.annotations, templates=False)
         active: dict[State, list[AlertInstanceActivity]] = {State.FIRING: [], State.NODATA: []}
+        firings: list[Span] = []
         for instance in instances.values():
             segments = _segments(instance, rule, history, grid_start, end)
             fire, missing, seen = _replay(segments, grid_start, step, size)
             firing += fire
             nodata += missing
             known |= seen
+            firings += _spans(segments, State.FIRING, grid_start, end)
             annotations = shown_annotations(instance.annotations) or rule_annotations
             for state, found in active.items():
                 if intervals := _active(segments, state, day_start, end):
@@ -349,6 +374,7 @@ class GrafanaMetricsSource:
             values(nodata),
             listed(active[State.FIRING]),
             listed(active[State.NODATA]),
+            firings,
             unlabelled,
             any(len(found) > MAX_ALERT_INSTANCES for found in active.values()),
         )
@@ -493,13 +519,8 @@ def _segments(
     return out
 
 
-def _active(
-    segments: Sequence[Segment], state: State, since: int, end: int
-) -> list[ActiveInterval]:
-    """Merged intervals in ``state`` within [since, end), the newest ``MAX_ACTIVE_INTERVALS``.
-
-    An interval reaching ``end`` is still active (open end).
-    """
+def _spans(segments: Sequence[Segment], state: State, since: int, end: int) -> list[Span]:
+    """Merged intervals in ``state`` within [since, end), oldest first."""
     spans: list[list[int]] = []
     for lo_t, hi_t, found in segments:
         lo, hi = max(lo_t, since), min(hi_t, end)
@@ -509,12 +530,22 @@ def _active(
             spans[-1][1] = max(spans[-1][1], hi)
         else:
             spans.append([lo, hi])
+    return [(lo, hi) for lo, hi in spans]
+
+
+def _active(
+    segments: Sequence[Segment], state: State, since: int, end: int
+) -> list[ActiveInterval]:
+    """Merged intervals in ``state`` within [since, end), the newest ``MAX_ACTIVE_INTERVALS``.
+
+    An interval reaching ``end`` is still active (open end).
+    """
     return [
         ActiveInterval(
             start=datetime.fromtimestamp(lo, UTC),
             end=None if hi >= end else datetime.fromtimestamp(hi, UTC),
         )
-        for lo, hi in spans[-MAX_ACTIVE_INTERVALS:]
+        for lo, hi in _spans(segments, state, since, end)[-MAX_ACTIVE_INTERVALS:]
     ]
 
 

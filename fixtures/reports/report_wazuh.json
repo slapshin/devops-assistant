@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.5",
+  "schema_version": "2.6",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e6",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -3810,5 +3810,85 @@
     "reason": null,
     "validation_notes": []
   },
-  "custom_rules": []
+  "custom_rules": [],
+  "totals": [
+    {
+      "source": "wazuh",
+      "signal": "wazuh_alerts",
+      "title": "Wazuh alerts",
+      "entities": 3,
+      "days": [
+        {
+          "bucket_index": 0,
+          "count": 7943,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 1,
+          "count": 5040,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 2,
+          "count": 5107,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 3,
+          "count": 5087,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 4,
+          "count": 5040,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 5,
+          "count": 5113,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 6,
+          "count": 5149,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 7,
+          "count": 5142,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 8,
+          "count": 5118,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 9,
+          "count": 5004,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 10,
+          "count": 5084,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 11,
+          "count": 5181,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 12,
+          "count": 5091,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 13,
+          "count": 5050,
+          "coverage": 1.0
+        }
+      ]
+    }
+  ]
 }

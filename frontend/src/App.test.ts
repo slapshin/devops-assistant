@@ -1327,6 +1327,34 @@ describe("report", () => {
     expect(within(timeline).getAllByRole("link")).toHaveLength(anomalies.findings.length);
   });
 
+  it("overview totals the latest day's Sentry errors against the days before", async () => {
+    await renderAt(report(sentryReport));
+
+    const errors = await screen.findByRole("region", { name: "Sentry error events" });
+    expect(errors).toHaveTextContent("13,557");
+    expect(errors).toHaveTextContent("+57 % vs. median 8,618/day over 13 days before");
+    expect(within(errors).getByRole("img")).toHaveAccessibleName("Sentry error events per day, last 14 days");
+  });
+
+  it("overview totals Wazuh alerts", async () => {
+    await renderAt(report(wazuhReport));
+
+    expect(await screen.findByRole("region", { name: "Wazuh alerts" })).toHaveTextContent("7,943");
+  });
+
+  it("overview totals Grafana alert firings over the selected rules", async () => {
+    await renderAt(report(grafanaReport));
+
+    expect(await screen.findByRole("region", { name: "Grafana alert firings" })).toHaveTextContent("4 alert rules");
+  });
+
+  it("overview has no event totals without such sources", async () => {
+    await renderAt(report(anomalies));
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("region", { name: /Sentry error events|Wazuh alerts|Grafana alert firings/ })).not.toBeInTheDocument();
+  });
+
   it("timeline tab shows every finding with its source", async () => {
     await renderAt(`${report(anomalies)}/timeline`);
 

@@ -55,6 +55,7 @@ from app.sources.sentry.catalog import (
     issue_spec,
     query_spec,
 )
+from app.sources.totals import event_total
 
 log = logging.getLogger("app.sources.sentry")
 
@@ -396,6 +397,7 @@ class SentryMetricsSource:
         ]
         tags = [(t.key, t.value) for t in self.tags]
         grid = _Grid(grid_start, size, step)
+        project_errors: list[MetricSeries] = []
         for query in queries:
             signals = [s for s in SIGNALS if s.query is query and s.signal in supported]
             spec = query_spec(query, self.api.transactions_dataset)
@@ -409,9 +411,11 @@ class SentryMetricsSource:
                     spec, self.organization, info.id, self.environment, tags, _span(got, step)
                 )
                 entity = self.entity(info.slug)
-                series += [
+                built = [
                     _series(d, entity, grid.values(d, got.chunks), grid, text) for d in signals
                 ]
+                series += built
+                project_errors += [s for s in built if s.signal == ERRORS_SIGNAL]
                 if info.id in fetched_kinds and query is Query.ERRORS:
                     got_kinds = fetched_kinds[info.id]
                     exclusions += _exclusions(
@@ -432,7 +436,12 @@ class SentryMetricsSource:
             len(exclusions),
             total,
         )
-        return CollectionResult(series=series, exclusions=exclusions)
+        total_errors = event_total(
+            SourceKind.SENTRY, ERRORS_SIGNAL, "Sentry error events", project_errors, end
+        )
+        return CollectionResult(
+            series=series, exclusions=exclusions, totals=[total_errors] if total_errors else []
+        )
 
     @staticmethod
     def _earliest(info: ProjectInfo, grid_start: int) -> int:
