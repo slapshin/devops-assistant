@@ -150,6 +150,7 @@ docker compose -f tools/compose/compose.yml cp assistant:/data/backup.sqlite3 ./
 | Project shows *Unreachable* (Test connection: `reachable: false`) | Nothing listens at the project's URL. Natively, check the tunnel (`curl http://localhost:8428/api/v1/status/buildinfo`). In Docker, use `host.docker.internal` rather than `localhost`, and make sure the tunnel runs on the host. |
 | Project shows *Auth failed* | The source rejected the stored token or password; edit the project and re-enter it. |
 | Project shows *No matching series* | The source is reachable but no series carry all of the project's labels right now. Check the matcher names and values. |
+| After upgrading, new *Shared credentials* appear | Once after the upgrade to shared credentials, identical secrets that several sources used (often copied by *Clone*) were moved into one credential each, e.g. "Grafana token (grafana.example.com)". The startup log says how many. Rename them freely; secrets used once stay with their source. |
 | A token was rotated for many projects | Store it once as a shared credential (*Shared credentials* in the rail, or *Save as shared credential…* next to a source's token) and point the sources at it; rotating the credential then updates them all. A credential in use cannot be deleted. |
 | Project shows *Credentials unreadable* | `DATA_DIR/secret.key` (or `SECRET_KEY`) changed or was lost. Restore it, or re-enter the credentials. |
 | Job `failed` / `metrics_source_unavailable` | The source went away during the run. Retry; saved reports are unaffected. |

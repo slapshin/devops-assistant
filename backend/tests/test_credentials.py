@@ -274,6 +274,116 @@ def test_demo_projects_share_a_grafana_credential(tmp_path: Path) -> None:
     assert len(credential["used_by"]) == len(projects) > 1
 
 
+# --- sharing existing secrets (migration 0007 + startup import) ------------------------------
+
+
+def grafana_inline(
+    name: str, token: str, url: str = "https://grafana.example.com"
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "sources": [
+            {
+                "kind": "grafana",
+                "api_url": url,
+                "folders": ["Shop"],
+                "auth": {"type": "token", "token": token},
+            }
+        ],
+    }
+
+
+def wazuh_inline(name: str, username: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "sources": [
+            {
+                "kind": "wazuh",
+                "api_url": "https://indexer:9200",
+                "agents": ["web-1"],
+                "auth": {"type": "basic", "username": username, "password": "pw"},
+            }
+        ],
+    }
+
+
+def mark_import_pending(tmp_path: Path) -> None:
+    with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
+        db.execute(
+            "INSERT INTO app_meta (key, value) VALUES ('shared_credentials_import', 'pending')"
+        )
+
+
+async def test_startup_shares_identical_existing_secrets(tmp_path: Path) -> None:
+    key = Fernet.generate_key().decode()
+    with make_client(tmp_path, secret_key=key) as c:
+        for body in (
+            grafana_inline("Shop", TOKEN),
+            grafana_inline("Blog", TOKEN),
+            grafana_inline("Other", ROTATED),
+            wazuh_inline("Hosts A", "reader"),
+            wazuh_inline("Hosts B", "reader"),
+            wazuh_inline("Hosts C", "admin"),
+        ):
+            assert c.post("/api/projects", json=body).status_code == 201
+    mark_import_pending(tmp_path)
+
+    with make_client(tmp_path, secret_key=key) as c:
+        shared = {cr["name"]: cr for cr in c.get("/api/credentials").json()["items"]}
+        projects = {p["name"]: p for p in c.get("/api/projects").json()["items"]}
+        shop = await services(c).projects.connections(projects["Shop"]["project_id"])
+
+    assert sorted(shared) == ["Grafana token (grafana.example.com)", "Wazuh reader@indexer"]
+    grafana = shared["Grafana token (grafana.example.com)"]
+    assert [u["name"] for u in grafana["used_by"]] == ["Blog", "Shop"]
+    assert grafana["auth"] == {"type": "token", "token_set": True}
+    assert shared["Wazuh reader@indexer"]["auth"]["username"] == "reader"
+    assert projects["Shop"]["sources"][0]["auth"]["credential_id"] == grafana["credential_id"]
+    assert projects["Other"]["sources"][0]["auth"] == {"type": "token", "token_set": True}
+    assert projects["Hosts C"]["sources"][0]["auth"]["type"] == "basic"
+    assert isinstance(shop[0], GrafanaConnection) and shop[0].token is not None
+    assert shop[0].token.get_secret_value() == TOKEN
+
+    with sqlite3.connect(tmp_path / "assistant.sqlite3") as db:
+        linked = db.execute(
+            "SELECT COUNT(*) FROM project_sources WHERE credential_id IS NOT NULL"
+            " AND secrets IS NULL"
+        ).fetchone()[0]
+
+    assert linked == 4
+
+    # The import runs once: duplicates made afterwards stay inline.
+    with make_client(tmp_path, secret_key=key) as c:
+        c.post("/api/projects", json=grafana_inline("Later 1", "glsa_new"))
+        c.post("/api/projects", json=grafana_inline("Later 2", "glsa_new"))
+
+    with make_client(tmp_path, secret_key=key) as c:
+        assert len(c.get("/api/credentials").json()["items"]) == 2
+
+
+async def test_shared_import_skips_unreadable_secrets(tmp_path: Path) -> None:
+    with make_client(tmp_path, secret_key=Fernet.generate_key().decode()) as c:
+        c.post("/api/projects", json=grafana_inline("Shop", TOKEN))
+        c.post("/api/projects", json=grafana_inline("Blog", TOKEN))
+    mark_import_pending(tmp_path)
+
+    with make_client(tmp_path, secret_key=Fernet.generate_key().decode()) as c:
+        assert c.get("/api/credentials").json()["items"] == []
+        assert c.get("/api/projects").json()["items"][0]["credentials_readable"] is False
+
+
+def test_migration_marks_import_pending_only_with_inline_secrets(tmp_path: Path) -> None:
+    engine = make_engine(tmp_path / "fresh.sqlite3")
+    migrate(engine)
+
+    with engine.connect() as conn:
+        flag = conn.exec_driver_sql(
+            "SELECT value FROM app_meta WHERE key = 'shared_credentials_import'"
+        ).first()
+
+    assert flag is None
+
+
 # --- migration 0006 ---------------------------------------------------------------------------
 
 

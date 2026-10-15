@@ -32,6 +32,13 @@ Many projects often use the same secret, for example one Grafana service account
   - Creates the table and the column.
   - Rewrites the Cloudflare, Sentry, Grafana and Wazuh configs into the `auth` shape, and the pre-multi-project Sentry `project` key into `projects`.
   - Secrets are not re-encrypted, because migrations have no key. The repository still reads the old `api_token` / `auth_token` secret keys (`LEGACY_TOKEN_KEYS`) and re-keys them on the next save.
+- **Existing values are shared on upgrade** (migration 0007 + `SqliteCredentialRepository.share_duplicate_secrets`).
+  - Migrations cannot decrypt, so 0007 only marks `app_meta.shared_credentials_import` as `pending` when inline secrets exist.
+  - Once at the next startup, inline secrets that are identical are grouped. Identical means the same kind, the same mechanism (type and username) and the same decrypted secret.
+  - Every group used by two or more sources becomes one credential, named after the kind and host, e.g. "Grafana token (grafana.example.com)" or "Wazuh reader@indexer".
+  - Those sources then reference the credential instead of their own copy.
+  - Secrets used once, and secrets that cannot be decrypted, stay inline. The log reports how many credentials were created.
+  - The import never runs again, so duplicates made later on purpose stay inline.
 - **"Auth required" is checked when a source is saved, not in the model.** Cloudflare, Sentry and Grafana sources with a real URL and `none` get `422` on `sources.N.auth`, as `api_token` did before. This keeps the input models constructible without secrets.
 - **Clones copy the reference, not the secret.** A source that uses a credential keeps using it in the clone.
 - **Health cache.** Updating a credential drops the cached health of every project that uses it.
@@ -51,6 +58,10 @@ Many projects often use the same secret, for example one Grafana service account
   - Clones keep the reference, and test-connection resolves credentials in drafts.
   - `credentials_readable` covers referenced credentials.
 - [x] Migration 0006 converts existing source configs, and existing secrets (including old secret keys) stay usable.
+- [x] On upgrade, identical existing secrets used by two or more sources become shared credentials, and those sources are linked to them.
+  - Single-use, differing (other username or token) and unreadable secrets stay inline.
+  - The import runs once.
+  - A fresh database never schedules it.
 - [x] UI:
   - every source's authentication uses one `AuthEditor`, which lists the kind's mechanisms plus *Shared credential* once one of that kind exists;
   - *Save as shared credential…* turns a typed secret into a credential and links it;
@@ -61,7 +72,7 @@ Many projects often use the same secret, for example one Grafana service account
 ## Remaining limitations / follow-ups
 
 - No new mechanisms yet (Prometheus custom header or mTLS, Cloudflare global key); the unions are ready for them.
-- No automatic deduplication of identical inline secrets into a credential. The UI shortcut converts one source at a time.
+- Identical inline secrets are merged only once, on upgrade. Duplicates created later are converted one source at a time with the UI shortcut.
 - There is no access control, as for the rest of the app: anyone who can open the UI can point a source at any URL and use any credential of its kind. A credential is not bound to a URL.
 
 ## Completion record
@@ -74,7 +85,7 @@ Many projects often use the same secret, for example one Grafana service account
     - `backend/app/storage/auth.py`
     - `backend/app/storage/credentials.py`
     - `backend/app/api/credentials.py`
-    - `backend/migrations/versions/0006_credentials.py`
+    - `backend/migrations/versions/0006_credentials.py`, `0007_share_existing_secrets.py`
     - `backend/tests/test_credentials.py`
   - Changed backend files:
     - `app/domain/projects.py`
