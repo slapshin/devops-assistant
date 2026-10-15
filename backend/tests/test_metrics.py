@@ -372,6 +372,23 @@ def test_nodejs_entity_names() -> None:
     assert process.kind is EntityKind.PROCESS
 
 
+def test_go_process_metrics_need_a_go_target() -> None:
+    for signal in ("go_cpu", "go_fds_used_ratio"):
+        query = BY_SIGNAL[signal].query.render(SCOPE)
+
+        assert "and on (job, instance) count by (job, instance) (go_info{" in query
+        assert "go_info" in BY_SIGNAL[signal].required_metrics
+
+
+def test_go_entity_names() -> None:
+    process = entity_for(
+        BY_SIGNAL["go_goroutines"], {"job": "inventory", "instance": "10.0.1.7:2112"}
+    )
+
+    assert process.display_name == "inventory · 10.0.1.7:2112"
+    assert process.kind is EntityKind.PROCESS
+
+
 def test_proxy_entity_names() -> None:
     peer = entity_for(
         BY_SIGNAL["angie_peer_unavailable"],

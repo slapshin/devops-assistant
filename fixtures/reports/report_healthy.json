@@ -30,8 +30,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.15",
-  "config_hash": "80b08da204c6",
+  "detector_version": "detectors-2026.10.16",
+  "config_hash": "2f85e2776272",
   "sources": [],
   "source": {
     "kind": "prometheus",

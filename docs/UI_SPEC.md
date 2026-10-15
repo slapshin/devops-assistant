@@ -129,7 +129,7 @@ Severity chips: Critical / High / Medium / Low, each with a text label (solid fi
 
 ## 7. Evidence detail
 
-Opening a finding expands it in place, accordion-style: a detail row directly below the finding's row holds three panels, and clicking the row (or its title) again collapses it. Only one finding is open at a time. The panels are the evidence chart (16 of 24 columns, with a close button), *Finding details* (8 columns) and a full-width *Query inspector*. Below 1100 px they stack. Contents:
+Opening a finding expands it in place, accordion-style: a detail row directly below the finding's row holds three panels, and clicking the row (or its title) again collapses it. Only one finding is open at a time. The panels are the evidence chart (16 of 24 columns), *Finding details* (8 columns) and a full-width *Query inspector*. Below 1100 px they stack. Contents:
 
 1. Title, severity, recurrence, confidence with its **reasons** (e.g. "4 baseline days (< 7)", "coverage 82 %"), state, peak / usual / duration stats, window, detector version and baseline.
 2. **Chart** (ECharts, SVG renderer):

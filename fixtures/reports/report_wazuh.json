@@ -19,8 +19,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.15",
-  "config_hash": "80b08da204c6",
+  "detector_version": "detectors-2026.10.16",
+  "config_hash": "2f85e2776272",
   "sources": [
     {
       "kind": "wazuh",
@@ -124,9 +124,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_43e26ea4bb788f58",
+      "finding_id": "fnd_9d2d0f2020efd41b",
       "detector": "level:hids_alert_rate",
-      "detector_version": "detectors-2026.10.15",
+      "detector_version": "detectors-2026.10.16",
       "method": "relative",
       "family": "host_security",
       "signal": "hids_alert_rate",
@@ -162,10 +162,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_abb451462120992f"
+        "evd_1b10e0a572ddb903"
       ],
       "related_finding_ids": [
-        "fnd_ab1e56712bfef760"
+        "fnd_ea966dc42e6c7f68"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -175,9 +175,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_5a3a133892fec5ae",
+      "finding_id": "fnd_0bf6d88da35638fc",
       "detector": "level:hids_high_alert_rate",
-      "detector_version": "detectors-2026.10.15",
+      "detector_version": "detectors-2026.10.16",
       "method": "relative",
       "family": "host_security",
       "signal": "hids_high_alert_rate",
@@ -213,11 +213,11 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_29b0ab5c3e213f77"
+        "evd_72e23e9a4ae46070"
       ],
       "related_finding_ids": [
-        "fnd_5a555403e28bb922",
-        "fnd_84c4a087f8cdee1f"
+        "fnd_6b7c60a3972cd909",
+        "fnd_d77dc0a3e2d12ba4"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -227,9 +227,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_5a555403e28bb922",
+      "finding_id": "fnd_6b7c60a3972cd909",
       "detector": "level:hids_alert_rate",
-      "detector_version": "detectors-2026.10.15",
+      "detector_version": "detectors-2026.10.16",
       "method": "relative",
       "family": "host_security",
       "signal": "hids_alert_rate",
@@ -265,11 +265,11 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_2f573e23e16bb641"
+        "evd_16f15a1e38499794"
       ],
       "related_finding_ids": [
-        "fnd_5a3a133892fec5ae",
-        "fnd_84c4a087f8cdee1f"
+        "fnd_0bf6d88da35638fc",
+        "fnd_d77dc0a3e2d12ba4"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -279,9 +279,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_84c4a087f8cdee1f",
+      "finding_id": "fnd_d77dc0a3e2d12ba4",
       "detector": "level:hids_auth_failure_rate",
-      "detector_version": "detectors-2026.10.15",
+      "detector_version": "detectors-2026.10.16",
       "method": "relative",
       "family": "host_security",
       "signal": "hids_auth_failure_rate",
@@ -317,11 +317,11 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_5a79b34959acfdf8"
+        "evd_ab474f9729b010bb"
       ],
       "related_finding_ids": [
-        "fnd_5a3a133892fec5ae",
-        "fnd_5a555403e28bb922"
+        "fnd_0bf6d88da35638fc",
+        "fnd_6b7c60a3972cd909"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -331,9 +331,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_ab1e56712bfef760",
+      "finding_id": "fnd_ea966dc42e6c7f68",
       "detector": "level:fim_change_rate",
-      "detector_version": "detectors-2026.10.15",
+      "detector_version": "detectors-2026.10.16",
       "method": "relative",
       "family": "file_integrity",
       "signal": "fim_change_rate",
@@ -369,10 +369,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_e696e1b6dbc1d5cc"
+        "evd_abe41596c2782e80"
       ],
       "related_finding_ids": [
-        "fnd_43e26ea4bb788f58"
+        "fnd_9d2d0f2020efd41b"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -403,8 +403,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_43e26ea4bb788f58",
-          "finding_id": "fnd_43e26ea4bb788f58",
+          "episode_id": "eps_9d2d0f2020efd41b",
+          "finding_id": "fnd_9d2d0f2020efd41b",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-web-2",
@@ -423,8 +423,8 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_5a3a133892fec5ae",
-          "finding_id": "fnd_5a3a133892fec5ae",
+          "episode_id": "eps_0bf6d88da35638fc",
+          "finding_id": "fnd_0bf6d88da35638fc",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-db-1",
@@ -443,8 +443,8 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_5a555403e28bb922",
-          "finding_id": "fnd_5a555403e28bb922",
+          "episode_id": "eps_6b7c60a3972cd909",
+          "finding_id": "fnd_6b7c60a3972cd909",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-db-1",
@@ -463,8 +463,8 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_84c4a087f8cdee1f",
-          "finding_id": "fnd_84c4a087f8cdee1f",
+          "episode_id": "eps_d77dc0a3e2d12ba4",
+          "finding_id": "fnd_d77dc0a3e2d12ba4",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-db-1",
@@ -483,8 +483,8 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_ab1e56712bfef760",
-          "finding_id": "fnd_ab1e56712bfef760",
+          "episode_id": "eps_ea966dc42e6c7f68",
+          "finding_id": "fnd_ea966dc42e6c7f68",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-web-2",
@@ -737,8 +737,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_2f573e23e16bb641",
-      "finding_id": "fnd_5a555403e28bb922",
+      "evidence_id": "evd_16f15a1e38499794",
+      "finding_id": "fnd_6b7c60a3972cd909",
       "series": {
         "series_id": "ser_af5f614188a61413",
         "family": "host_security",
@@ -1302,8 +1302,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_abb451462120992f",
-      "finding_id": "fnd_43e26ea4bb788f58",
+      "evidence_id": "evd_1b10e0a572ddb903",
+      "finding_id": "fnd_9d2d0f2020efd41b",
       "series": {
         "series_id": "ser_555430e8194e290e",
         "family": "host_security",
@@ -1963,8 +1963,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_5a79b34959acfdf8",
-      "finding_id": "fnd_84c4a087f8cdee1f",
+      "evidence_id": "evd_ab474f9729b010bb",
+      "finding_id": "fnd_d77dc0a3e2d12ba4",
       "series": {
         "series_id": "ser_60a0bc566a5641f8",
         "family": "host_security",
@@ -2528,8 +2528,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_e696e1b6dbc1d5cc",
-      "finding_id": "fnd_ab1e56712bfef760",
+      "evidence_id": "evd_abe41596c2782e80",
+      "finding_id": "fnd_ea966dc42e6c7f68",
       "series": {
         "series_id": "ser_993d310e9dbf19e0",
         "family": "file_integrity",
@@ -3189,8 +3189,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_29b0ab5c3e213f77",
-      "finding_id": "fnd_5a3a133892fec5ae",
+      "evidence_id": "evd_72e23e9a4ae46070",
+      "finding_id": "fnd_0bf6d88da35638fc",
       "series": {
         "series_id": "ser_a5a7c51e7d0c38aa",
         "family": "host_security",
@@ -3763,21 +3763,21 @@
         {
           "text": "Surge of security alerts on shop-web-2 may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_43e26ea4bb788f58"
+            "fnd_9d2d0f2020efd41b"
           ],
           "likelihood": "possible"
         },
         {
           "text": "More high-level security alerts (rule level 12+) on shop-db-1 may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_5a3a133892fec5ae"
+            "fnd_0bf6d88da35638fc"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Surge of security alerts on shop-db-1 may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_5a555403e28bb922"
+            "fnd_6b7c60a3972cd909"
           ],
           "likelihood": "possible"
         }
@@ -3786,19 +3786,19 @@
         {
           "text": "Open the evidence chart for Surge of security alerts and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_43e26ea4bb788f58"
+            "fnd_9d2d0f2020efd41b"
           ]
         },
         {
           "text": "Open the evidence chart for More high-level security alerts (rule level 12+) and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_5a3a133892fec5ae"
+            "fnd_0bf6d88da35638fc"
           ]
         },
         {
           "text": "Open the evidence chart for Surge of security alerts and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_5a555403e28bb922"
+            "fnd_6b7c60a3972cd909"
           ]
         }
       ],

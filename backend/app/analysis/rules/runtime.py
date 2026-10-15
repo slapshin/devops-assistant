@@ -1,4 +1,5 @@
-"""Runtime rules (Node.js via prom-client): event loop, heap, GC, handles, CPU, descriptors."""
+"""Runtime rules (Node.js via prom-client, Go via client_golang): event loop, goroutines,
+threads, heap, GC, handles, CPU, descriptors."""
 
 from app.analysis.rules.base import Rule
 from app.domain.common import Severity, SignalFamily
@@ -33,6 +34,27 @@ RUNTIME_RULES = (
         thresholds="runtime_active_handles",
         severity_cap=Severity.MEDIUM,
         title_up="Active handles above expected range (possible handle leak)",
+    ),
+    Rule(
+        "runtime_goroutines",
+        F.RUNTIME,
+        "Goroutines",
+        thresholds="runtime_goroutines",
+        severity_cap=Severity.MEDIUM,
+        title_up="Goroutines above expected range (possible goroutine leak)",
+    ),
+    Rule(
+        "runtime_threads",
+        F.RUNTIME,
+        "OS threads",
+        thresholds="runtime_threads",
+        severity_cap=Severity.MEDIUM,
+    ),
+    Rule(
+        "runtime_gc_pause_ratio",
+        F.RUNTIME,
+        "Time in GC pauses",
+        thresholds="runtime_gc_pause_ratio",
     ),
     Rule("runtime_cpu", F.RUNTIME, "Process CPU", thresholds="runtime_cpu"),
     Rule(

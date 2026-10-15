@@ -30,8 +30,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.15",
-  "config_hash": "80b08da204c6",
+  "detector_version": "detectors-2026.10.16",
+  "config_hash": "2f85e2776272",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -451,9 +451,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_11fbb4393e6f2306",
+      "finding_id": "fnd_ccdda5062286a2ed",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.15",
+      "detector_version": "detectors-2026.10.16",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -495,7 +495,7 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_c003a0ff42da1c00"
+        "evd_bd8fc26ba4a5fb23"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -526,8 +526,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_11fbb4393e6f2306",
-          "finding_id": "fnd_11fbb4393e6f2306",
+          "episode_id": "eps_ccdda5062286a2ed",
+          "finding_id": "fnd_ccdda5062286a2ed",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=shop-production",
@@ -781,8 +781,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_c003a0ff42da1c00",
-      "finding_id": "fnd_11fbb4393e6f2306",
+      "evidence_id": "evd_bd8fc26ba4a5fb23",
+      "finding_id": "fnd_ccdda5062286a2ed",
       "series": {
         "series_id": "ser_6d64ca1e1032319f",
         "family": "cpu",

@@ -15,6 +15,7 @@ Conventions:
 
 from app.sources.prometheus.catalog.base import Direction, Gate, Role, SignalDef
 from app.sources.prometheus.catalog.container import CONTAINER_CATALOG
+from app.sources.prometheus.catalog.golang import GO_CATALOG
 from app.sources.prometheus.catalog.host import HOST_CATALOG
 from app.sources.prometheus.catalog.mysql import MYSQL_CATALOG
 from app.sources.prometheus.catalog.nodejs import NODEJS_CATALOG
@@ -35,7 +36,7 @@ __all__ = [
     "SignalDef",
 ]
 
-CATALOG_VERSION = "catalog-2026.10.15"
+CATALOG_VERSION = "catalog-2026.10.16"
 
 CATALOG: tuple[SignalDef, ...] = (
     *HOST_CATALOG,
@@ -46,6 +47,7 @@ CATALOG: tuple[SignalDef, ...] = (
     *MYSQL_CATALOG,
     *REDIS_CATALOG,
     *NODEJS_CATALOG,
+    *GO_CATALOG,
 )
 TRAFFIC_SIGNALS = frozenset(d.traffic for d in CATALOG if d.traffic is not None)
 

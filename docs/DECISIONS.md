@@ -130,7 +130,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 
 **Report schema version:** `schema_version: "1.0"`. Minor bumps add optional fields; major bumps require a reader migration. Readers must open every saved major version they claim to support, or return `report_unavailable` with `code=schema_unsupported` — never a crash.
 
-## 5. Numerical policy (detector config `detectors-2026.10.15`)
+## 5. Numerical policy (detector config `detectors-2026.10.16`)
 
 All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
@@ -199,6 +199,12 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | Node.js process | active handles (severity ≤ medium) | up | ×2 and ≥ +50 | — |
 | Node.js process | CPU cores (`process_cpu_seconds_total`) | up | ×1.25 and ≥ +0.1 core | — |
 | Node.js process | open file descriptors vs `process_max_fds` | up | +10 pp | ≥ 80 % high, ≥ 95 % critical, for ≥ 5 min |
+| Go process | goroutines (step maximum; severity ≤ medium) | up | ×2 and ≥ +100 | — |
+| Go process | OS threads (step maximum; severity ≤ medium) | up | ×2 and ≥ +20 | — |
+| Go process | heap in use (`go_memstats_heap_alloc_bytes`, step average; severity ≤ medium) | up | ×1.25 and ≥ +50 MiB | — |
+| Go process | time in GC stop-the-world pauses (`rate(go_gc_duration_seconds_sum)`) | up | ×2 and ≥ +0.5 pp | ≥ 5 % for ≥ 15 min |
+| Go process | CPU cores (`process_cpu_seconds_total`) | up | ×1.25 and ≥ +0.1 core | — |
+| Go process | open file descriptors vs `process_max_fds` | up | +10 pp | ≥ 80 % high, ≥ 95 % critical, for ≥ 5 min |
 | Cloudflare edge (zone) | request rate | both | ×2 or ÷2 and ≥ 0.2 req/s change | — |
 | Cloudflare edge (zone) | 5xx share (edge status 500–599, volume-guarded at ≥ 30 requests per step) | up | +2 pp | ≥ 5 % for ≥ 5 min |
 | Cloudflare edge (zone) | origin error share (520–530: origin down, timed out, TLS failure; volume-guarded) | up | +1 pp | ≥ 2 % for ≥ 5 min |

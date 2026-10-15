@@ -219,7 +219,7 @@ watch(
               <tr v-if="selected && f.finding_id === selected.finding_id" class="detail">
                 <td colspan="10">
                   <div class="detail-body">
-                    <EvidencePanel :key="selected.finding_id" :finding="selected" :close-to="listLink" />
+                    <EvidencePanel :key="selected.finding_id" :finding="selected" />
                   </div>
                 </td>
               </tr>

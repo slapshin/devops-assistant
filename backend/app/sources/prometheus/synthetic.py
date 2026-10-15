@@ -64,6 +64,7 @@ MYSQL_REPLICA = {"job": "mysql", "instance": "mysql-replica:9104"}
 REDIS_MASTER = {"job": "redis", "instance": "redis://redis-master:6379"}
 REDIS_REPLICA = {"job": "redis", "instance": "redis://redis-replica:6379"}
 NODEJS_APP = {"job": "storefront", "instance": "storefront:9464"}
+GO_APP = {"job": "inventory", "instance": "inventory:2112"}
 QUIET_ROUTE = {
     "job": SERVICE_JOB,
     "http_route": "/internal/order-sla",
@@ -116,6 +117,11 @@ class Scenario:
     nodejs_event_loop_block: bool = False
     """The storefront blocks its event loop for 1 h, ending 9 h before T: event loop lag, CPU
     and GC time climb while the heap grows."""
+    go: bool = True
+    """A Go inventory service (client_golang default metrics)."""
+    go_goroutine_leak: bool = False
+    """The inventory service leaks goroutines for 8 h until a restart 3 h before T: goroutines,
+    heap and GC pauses climb steadily, then drop back."""
     recurring_404_days: tuple[int, ...] = ()
     """Trend buckets (1..13) with an extra 404 burst, for recurrence."""
     custom_incident: bool = False
@@ -136,6 +142,7 @@ SCENARIOS: dict[str, Scenario] = {
         mysql_contention=True,
         redis_eviction_storm=True,
         nodejs_event_loop_block=True,
+        go_goroutine_leak=True,
         custom_incident=True,
     ),
     "short-history": Scenario(history_days=5, cpu_load=True, histogram=False),
@@ -238,6 +245,8 @@ def build_series(
         _add_redis_series(builder, gen)
     if scenario.nodejs:
         _add_nodejs_series(builder, gen)
+    if scenario.go:
+        _add_go_series(builder, gen)
     for rule in custom_rules:
         _add_custom_series(builder, scenario, rule)
 
@@ -450,6 +459,28 @@ def _add_nodejs_series(builder: _SeriesBuilder, gen: _Gen) -> None:
     builder.add("nodejs_fds_used_ratio", NODEJS_APP, gen.available(fds))
 
 
+def _add_go_series(builder: _SeriesBuilder, gen: _Gen) -> None:
+    leak = slice(N - 132, N - 36)
+    goroutines = np.round(np.clip(gen.base(220.0, 40.0, 8.0), 0, None))
+    threads = np.round(np.clip(gen.base(14.0, 1.0, 0.5), 1, None))
+    heap = np.clip(gen.base(60 * 2**20, 8 * 2**20, 2 * 2**20), 0, None)
+    gc = np.clip(gen.base(0.0004, 0.0001, 0.00003), 0, None)
+    cpu = np.clip(gen.base(0.15, 0.05, 0.01), 0, None)
+    fds = np.clip(gen.base(0.002, 0.0005, 0.0001), 0, 1)
+    if gen.scenario.go_goroutine_leak:
+        ramp = np.linspace(0.0, 1.0, leak.stop - leak.start)
+        goroutines[leak] += np.round(ramp * 6000)
+        heap[leak] += ramp * 500 * 2**20
+        gc[leak] += ramp * 0.02
+        fds[leak] += ramp * 0.3
+    builder.add("go_goroutines", GO_APP, gen.available(goroutines))
+    builder.add("go_threads", GO_APP, gen.available(threads))
+    builder.add("go_heap_used", GO_APP, gen.available(heap))
+    builder.add("go_gc_pause_ratio", GO_APP, gen.available(gc))
+    builder.add("go_cpu", GO_APP, gen.available(cpu))
+    builder.add("go_fds_used_ratio", GO_APP, gen.available(fds))
+
+
 DEMO_CUSTOM_RULES = [
     CustomRule(
         slug="checkout_failures",
@@ -602,6 +633,7 @@ class SyntheticMetricsSource:
                 if scenario.nodejs
                 else ()
             ),
+            *((d.signal for d in CATALOG if d.signal.startswith("go_")) if scenario.go else ()),
         }
         caps = []
         for defn in CATALOG:

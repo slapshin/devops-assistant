@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import type { RouteLocationRaw } from "vue-router";
 import type { Finding } from "../../api/client";
 import ChartBox from "../../components/ChartBox.vue";
 import DataTable from "../../components/DataTable.vue";
@@ -20,7 +19,7 @@ import { useReportContext } from "./context";
 const EVIDENCE_COLUMNS = ["Time", "Observed", "Expected", "Lower", "Upper", "Gap"];
 const SECONDS_PER_MINUTE = 60;
 
-const props = defineProps<{ finding: Finding; closeTo: RouteLocationRaw }>();
+const props = defineProps<{ finding: Finding }>();
 
 const { report, evidenceById } = useReportContext();
 const heading = ref<HTMLElement | null>(null);
@@ -78,9 +77,6 @@ onMounted(async () => {
         <span class="sub mono">· {{ f.entity.display_name }}</span>
         <span v-if="f.alert_instances?.length" class="sub mono">· {{ instancesText(f) }}</span>
         <span v-if="f.error_kinds?.length" class="sub mono">· {{ errorKindsText(f) }}</span>
-        <RouterLink :to="closeTo" class="close" aria-label="Close evidence" title="Close (Esc)">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
-        </RouterLink>
       </div>
       <div class="pb">
         <template v-if="primaryEvidence">
@@ -212,8 +208,6 @@ onMounted(async () => {
 <style scoped>
 h2:focus { outline: none; }
 h2:focus-visible { outline: 2px solid var(--primary); }
-.close { margin-left: auto; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); color: var(--muted); }
-.close:hover { background: var(--hover); color: var(--strong); }
 .caption { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
 .details { gap: 14px; }
 .headline { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; }

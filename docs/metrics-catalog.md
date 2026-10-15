@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.15` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
+The catalog is `catalog-2026.10.16` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
 
 ## Scope enforcement
 
@@ -168,6 +168,26 @@ Notes and limitations:
 - prom-client resets its event loop histogram on every scrape, so each `nodejs_eventloop_lag_p99_seconds` sample covers one scrape interval; while the loop is blocked, scrapes time out and that time is a gap, never a healthy value.
 - V8 does not export its heap limit, so the heap is analysed against its own baseline only. File descriptor metrics exist on Linux only.
 - Not covered: metrics registered with a `prefix`, restarts (`process_start_time_seconds`: deploys restart processes routinely; container restarts and Swarm task failures cover crashes), per-space heap and per-kind GC detail.
+
+### Go
+
+Source: the default registry of [client_golang](https://github.com/prometheus/client_golang) (`GoCollector` and `ProcessCollector`, registered by `promhttp.Handler()`). All series are kind `process` (family `runtime`) with identity `job, instance`; `instance` is one scraped process.
+
+| Signal | Source metric(s) |
+| --- | --- |
+| `go_goroutines` | `max_over_time(go_goroutines)` |
+| `go_threads` | `max_over_time(go_threads)` |
+| `go_heap_used` | `avg_over_time(go_memstats_heap_alloc_bytes)` |
+| `go_gc_pause_ratio` | `rate(go_gc_duration_seconds_sum)`: stop-the-world pause time per second |
+| `go_cpu` | `rate(process_cpu_seconds_total)`, only on targets exporting `go_info` |
+| `go_fds_used_ratio` | `process_open_fds / process_max_fds`, only on targets exporting `go_info` |
+
+Notes and limitations:
+
+- Every Go program instrumented with client_golang exports these metrics, including the Go-written exporters (node_exporter, cAdvisor, postgres_exporter, mysqld_exporter, redis_exporter) and Traefik. Those in the project's scope are analysed as processes too; narrow the label matchers if that is not wanted.
+- `go_gc_duration_seconds` covers stop-the-world pauses only, not the concurrent mark phase, so it understates GC CPU cost; a rising pause share still flags allocation pressure.
+- File descriptor metrics exist on Linux only.
+- Not covered: `GOMEMLIMIT` (`go_gc_gomemlimit_bytes` is `math.MaxInt64` when unset, so the heap is analysed against its own baseline only), the opt-in `runtime/metrics` collectors (scheduler latency, per-class allocations), restarts (`process_start_time_seconds`, as for Node.js) and metrics registered under a custom namespace.
 
 ### Cloudflare (T015)
 

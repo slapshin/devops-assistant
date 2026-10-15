@@ -582,6 +582,28 @@ async def test_nodejs_findings_relate_to_routes_of_the_same_job() -> None:
     assert err.finding_id in process.related_finding_ids
 
 
+async def test_go_goroutine_leak_findings_relate_within_the_process() -> None:
+    result = await detect(Scenario(go_goroutine_leak=True))
+    go = {f.signal: f for f in result.findings if f.entity.labels.get("job") == "inventory"}
+
+    assert set(go) == {
+        "runtime_goroutines",
+        "runtime_heap_used",
+        "runtime_gc_pause_ratio",
+        "runtime_fds_ratio",
+    }
+    assert {f.family for f in go.values()} == {SignalFamily.RUNTIME}
+    assert {f.entity.display_name for f in go.values()} == {"inventory · inventory:2112"}
+
+    leak = go["runtime_goroutines"]
+    assert leak.entity.kind is EntityKind.PROCESS
+    assert leak.title == "Goroutines above expected range (possible goroutine leak)"
+    assert leak.severity in (Severity.LOW, Severity.MEDIUM)
+    assert {f.finding_id for s, f in go.items() if s != leak.signal} <= set(
+        leak.related_finding_ids
+    )
+
+
 def test_every_catalog_signal_is_consumed_by_derivation() -> None:
     consumed: set[str | None] = {*DIRECT, SWARM_FAILED_TASKS}
     for spec in _TRAFFIC_SPECS:

@@ -25,8 +25,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.15",
-  "config_hash": "80b08da204c6",
+  "detector_version": "detectors-2026.10.16",
+  "config_hash": "2f85e2776272",
   "sources": [
     {
       "kind": "prometheus",
@@ -1889,6 +1889,132 @@
     },
     {
       "source": "prometheus",
+      "family": "runtime",
+      "signal": "go_goroutines",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "go_goroutines"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "go_goroutines"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "go_threads",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "go_threads"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "go_threads"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "go_heap_used",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "go_memstats_heap_alloc_bytes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "go_memstats_heap_alloc_bytes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "go_gc_pause_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "go_gc_duration_seconds_sum"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "go_gc_duration_seconds_sum"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "go_cpu",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "process_cpu_seconds_total",
+        "go_info"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "process_cpu_seconds_total",
+        "go_info"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "runtime",
+      "signal": "go_fds_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "process_open_fds",
+        "process_max_fds",
+        "go_info"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "process_open_fds",
+        "process_max_fds",
+        "go_info"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
       "family": "custom",
       "signal": "custom_checkout_failures",
       "status": "supported",
@@ -2209,8 +2335,8 @@
       "family": "runtime",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 6,
-      "total_series": 6,
+      "evaluated_series": 12,
+      "total_series": 12,
       "baseline_days": 14,
       "reasons": []
     },
@@ -2226,9 +2352,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_2771c5e61419b7ce",
+      "finding_id": "fnd_204a08862a199957",
       "detector": "level:custom_email_queue",
-      "detector_version": "detectors-2026.10.15",
+      "detector_version": "detectors-2026.10.16",
       "method": "absolute",
       "family": "custom",
       "signal": "custom_email_queue",
@@ -2264,10 +2390,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_48469bca968baa2c"
+        "evd_372e657c03263a30"
       ],
       "related_finding_ids": [
-        "fnd_2a30597044420549"
+        "fnd_edece74244a6dbf7"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -2277,9 +2403,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_2a30597044420549",
+      "finding_id": "fnd_edece74244a6dbf7",
       "detector": "level:custom_checkout_failures",
-      "detector_version": "detectors-2026.10.15",
+      "detector_version": "detectors-2026.10.16",
       "method": "relative",
       "family": "custom",
       "signal": "custom_checkout_failures",
@@ -2315,10 +2441,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_e2182a003e4720ec"
+        "evd_5d3f252da9f3fbc7"
       ],
       "related_finding_ids": [
-        "fnd_2771c5e61419b7ce"
+        "fnd_204a08862a199957"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -2342,14 +2468,14 @@
       "affected_entities": [
         "custom|job=checkout-api"
       ],
-      "observed_entity_minutes": 27360,
-      "anomalous_share": 0.002193,
+      "observed_entity_minutes": 28800,
+      "anomalous_share": 0.002083,
       "baseline_days_used": 14,
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_2771c5e61419b7ce",
-          "finding_id": "fnd_2771c5e61419b7ce",
+          "episode_id": "eps_204a08862a199957",
+          "finding_id": "fnd_204a08862a199957",
           "entity": {
             "kind": "custom",
             "key": "custom|job=checkout-api",
@@ -2368,8 +2494,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_2a30597044420549",
-          "finding_id": "fnd_2a30597044420549",
+          "episode_id": "eps_edece74244a6dbf7",
+          "finding_id": "fnd_edece74244a6dbf7",
           "entity": {
             "kind": "custom",
             "key": "custom|job=checkout-api",
@@ -2400,7 +2526,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2417,7 +2543,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2434,7 +2560,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2451,7 +2577,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2468,7 +2594,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2485,7 +2611,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2502,7 +2628,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2519,7 +2645,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2536,7 +2662,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2553,7 +2679,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2570,7 +2696,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2587,7 +2713,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2604,7 +2730,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 27360,
+      "observed_entity_minutes": 28800,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2614,7 +2740,7 @@
   "trend_summary": {
     "direction": "stable",
     "confidence": "high",
-    "recent_share": 0.000313,
+    "recent_share": 0.000298,
     "previous_share": 0.0,
     "recent_episodes": 2,
     "previous_episodes": 0,
@@ -2622,8 +2748,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_e2182a003e4720ec",
-      "finding_id": "fnd_2a30597044420549",
+      "evidence_id": "evd_5d3f252da9f3fbc7",
+      "finding_id": "fnd_edece74244a6dbf7",
       "series": {
         "series_id": "ser_f310787fa4200236",
         "family": "custom",
@@ -3140,8 +3266,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_48469bca968baa2c",
-      "finding_id": "fnd_2771c5e61419b7ce",
+      "evidence_id": "evd_372e657c03263a30",
+      "finding_id": "fnd_204a08862a199957",
       "series": {
         "series_id": "ser_f5978005d3905001",
         "family": "custom",
@@ -3667,14 +3793,14 @@
         {
           "text": "E-mail queue depth at or above 2000 (threshold) on checkout-api may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_2771c5e61419b7ce"
+            "fnd_204a08862a199957"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Checkout failures above expected range on checkout-api may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_2a30597044420549"
+            "fnd_edece74244a6dbf7"
           ],
           "likelihood": "possible"
         }
@@ -3683,13 +3809,13 @@
         {
           "text": "Open the evidence chart for E-mail queue depth at or above 2000 (threshold) and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_2771c5e61419b7ce"
+            "fnd_204a08862a199957"
           ]
         },
         {
           "text": "Open the evidence chart for Checkout failures above expected range and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_2a30597044420549"
+            "fnd_edece74244a6dbf7"
           ]
         }
       ],
