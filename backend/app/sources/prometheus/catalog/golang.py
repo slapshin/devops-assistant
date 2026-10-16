@@ -32,7 +32,7 @@ def _go_only(expr: str) -> str:
 GO_CATALOG: tuple[SignalDef, ...] = (
     SignalDef(
         "go_goroutines",
-        SignalFamily.RUNTIME,
+        SignalFamily.GOLANG,
         Unit.COUNT,
         EntityKind.PROCESS,
         GO,
@@ -41,7 +41,7 @@ GO_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "go_threads",
-        SignalFamily.RUNTIME,
+        SignalFamily.GOLANG,
         Unit.COUNT,
         EntityKind.PROCESS,
         GO,
@@ -51,7 +51,7 @@ GO_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "go_heap_used",
-        SignalFamily.RUNTIME,
+        SignalFamily.GOLANG,
         Unit.BYTES,
         EntityKind.PROCESS,
         GO,
@@ -61,7 +61,7 @@ GO_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "go_gc_pause_ratio",
-        SignalFamily.RUNTIME,
+        SignalFamily.GOLANG,
         Unit.RATIO,
         EntityKind.PROCESS,
         GO,
@@ -71,7 +71,7 @@ GO_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "go_cpu",
-        SignalFamily.RUNTIME,
+        SignalFamily.GOLANG,
         Unit.PER_SECOND,
         EntityKind.PROCESS,
         GO,
@@ -80,7 +80,7 @@ GO_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "go_fds_used_ratio",
-        SignalFamily.RUNTIME,
+        SignalFamily.GOLANG,
         Unit.RATIO,
         EntityKind.PROCESS,
         GO,

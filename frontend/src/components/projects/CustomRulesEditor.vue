@@ -97,7 +97,7 @@ const isStale = (i: number) => {
 
 <template>
   <div class="rules stack">
-    <p v-if="!rules.length" class="muted hint">No custom rules. The catalog's host, container, request, proxy, database and runtime signals are analysed either way.</p>
+    <p v-if="!rules.length" class="muted hint">No custom rules. The catalog's host, container, request, proxy, database, Node.js and Go signals are analysed either way.</p>
     <article v-for="(r, i) in rules" :key="i" class="rule" :class="{ invalid: ruleHasErrors(errors, i) }">
       <header class="rule-head">
         <div class="rule-name">

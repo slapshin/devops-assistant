@@ -11,11 +11,12 @@ from app.analysis.rules.base import SEVERITY_ORDER, Dir, Rule, RuleKind, format_
 from app.analysis.rules.container import CONTAINER_RULES
 from app.analysis.rules.database import DATABASE_RULES
 from app.analysis.rules.edge import EDGE_RULES
+from app.analysis.rules.golang import GO_RULES
 from app.analysis.rules.host import HOST_RULES
 from app.analysis.rules.host_security import HOST_SECURITY_RULES
+from app.analysis.rules.nodejs import NODEJS_RULES
 from app.analysis.rules.proxy import PROXY_RULES
 from app.analysis.rules.requests import REQUEST_RULES
-from app.analysis.rules.runtime import RUNTIME_RULES
 from app.analysis.rules.security import SECURITY_RULES
 
 __all__ = ["RULES", "SEVERITY_ORDER", "Dir", "Rule", "RuleKind", "format_value"]
@@ -37,7 +38,8 @@ RULES = _index(
         *REQUEST_RULES,
         *PROXY_RULES,
         *DATABASE_RULES,
-        *RUNTIME_RULES,
+        *NODEJS_RULES,
+        *GO_RULES,
         *EDGE_RULES,
         *SECURITY_RULES,
         *APPLICATION_RULES,

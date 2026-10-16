@@ -151,7 +151,7 @@ Notes and limitations:
 
 ### Node.js
 
-Source: the default metrics of [prom-client](https://github.com/siimon/prom-client) (`collectDefaultMetrics()`, no `prefix`). All series are kind `process` (family `runtime`) with identity `job, instance`; `instance` is one scraped process, or a cluster master whose `AggregatorRegistry` sums its workers.
+Source: the default metrics of [prom-client](https://github.com/siimon/prom-client) (`collectDefaultMetrics()`, no `prefix`). All series are kind `process` (family `nodejs`) with identity `job, instance`; `instance` is one scraped process, or a cluster master whose `AggregatorRegistry` sums its workers.
 
 | Signal | Source metric(s) |
 | --- | --- |
@@ -171,7 +171,7 @@ Notes and limitations:
 
 ### Go
 
-Source: the default registry of [client_golang](https://github.com/prometheus/client_golang) (`GoCollector` and `ProcessCollector`, registered by `promhttp.Handler()`). All series are kind `process` (family `runtime`) with identity `job, instance`; `instance` is one scraped process.
+Source: the default registry of [client_golang](https://github.com/prometheus/client_golang) (`GoCollector` and `ProcessCollector`, registered by `promhttp.Handler()`). All series are kind `process` (family `golang`) with identity `job, instance`; `instance` is one scraped process.
 
 | Signal | Source metric(s) |
 | --- | --- |

@@ -30,8 +30,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.16",
-  "config_hash": "2f85e2776272",
+  "detector_version": "detectors-2026.10.17",
+  "config_hash": "7bb67484c60b",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -368,7 +368,16 @@
       "reasons": []
     },
     {
-      "family": "runtime",
+      "family": "nodejs",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 4,
+      "reasons": []
+    },
+    {
+      "family": "golang",
       "status": "no_anomaly",
       "capability": "unverified",
       "evaluated_series": 2,
@@ -451,9 +460,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_ccdda5062286a2ed",
+      "finding_id": "fnd_926b16abf3dbbe4f",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.16",
+      "detector_version": "detectors-2026.10.17",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -495,7 +504,7 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_bd8fc26ba4a5fb23"
+        "evd_37be77eb209e46cd"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -526,8 +535,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_ccdda5062286a2ed",
-          "finding_id": "fnd_ccdda5062286a2ed",
+          "episode_id": "eps_926b16abf3dbbe4f",
+          "finding_id": "fnd_926b16abf3dbbe4f",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=shop-production",
@@ -781,8 +790,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_bd8fc26ba4a5fb23",
-      "finding_id": "fnd_ccdda5062286a2ed",
+      "evidence_id": "evd_37be77eb209e46cd",
+      "finding_id": "fnd_926b16abf3dbbe4f",
       "series": {
         "series_id": "ser_6d64ca1e1032319f",
         "family": "cpu",

@@ -30,8 +30,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.16",
-  "config_hash": "2f85e2776272",
+  "detector_version": "detectors-2026.10.17",
+  "config_hash": "7bb67484c60b",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -368,7 +368,16 @@
       "reasons": []
     },
     {
-      "family": "runtime",
+      "family": "nodejs",
+      "status": "no_anomaly",
+      "capability": "unverified",
+      "evaluated_series": 2,
+      "total_series": 2,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
+      "family": "golang",
       "status": "no_anomaly",
       "capability": "unverified",
       "evaluated_series": 2,

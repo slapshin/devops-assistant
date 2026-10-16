@@ -34,7 +34,7 @@ def _nodejs_only(expr: str) -> str:
 NODEJS_CATALOG: tuple[SignalDef, ...] = (
     SignalDef(
         "nodejs_eventloop_lag",
-        SignalFamily.RUNTIME,
+        SignalFamily.NODEJS,
         Unit.SECONDS,
         EntityKind.PROCESS,
         NODEJS,
@@ -44,7 +44,7 @@ NODEJS_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "nodejs_heap_used",
-        SignalFamily.RUNTIME,
+        SignalFamily.NODEJS,
         Unit.BYTES,
         EntityKind.PROCESS,
         NODEJS,
@@ -53,7 +53,7 @@ NODEJS_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "nodejs_gc_time_ratio",
-        SignalFamily.RUNTIME,
+        SignalFamily.NODEJS,
         Unit.RATIO,
         EntityKind.PROCESS,
         NODEJS,
@@ -62,7 +62,7 @@ NODEJS_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "nodejs_active_handles",
-        SignalFamily.RUNTIME,
+        SignalFamily.NODEJS,
         Unit.COUNT,
         EntityKind.PROCESS,
         NODEJS,
@@ -71,7 +71,7 @@ NODEJS_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "nodejs_cpu",
-        SignalFamily.RUNTIME,
+        SignalFamily.NODEJS,
         Unit.PER_SECOND,
         EntityKind.PROCESS,
         NODEJS,
@@ -80,7 +80,7 @@ NODEJS_CATALOG: tuple[SignalDef, ...] = (
     ),
     SignalDef(
         "nodejs_fds_used_ratio",
-        SignalFamily.RUNTIME,
+        SignalFamily.NODEJS,
         Unit.RATIO,
         EntityKind.PROCESS,
         NODEJS,

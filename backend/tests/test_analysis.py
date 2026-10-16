@@ -550,21 +550,21 @@ async def test_nodejs_event_loop_block_findings_relate_within_the_process() -> N
     node = {f.signal: f for f in result.findings if f.entity.labels.get("job") == "storefront"}
 
     assert set(node) == {
-        "runtime_eventloop_lag",
-        "runtime_heap_used",
-        "runtime_gc_time_ratio",
-        "runtime_cpu",
+        "nodejs_eventloop_lag",
+        "nodejs_heap_used",
+        "nodejs_gc_time_ratio",
+        "nodejs_cpu",
     }
-    assert {f.family for f in node.values()} == {SignalFamily.RUNTIME}
+    assert {f.family for f in node.values()} == {SignalFamily.NODEJS}
     assert {f.entity.display_name for f in node.values()} == {"storefront · storefront:9464"}
 
-    lag = node["runtime_eventloop_lag"]
+    lag = node["nodejs_eventloop_lag"]
     assert lag.entity.kind is EntityKind.PROCESS
     assert lag.title == "Event loop lag (p99) at or above 500 ms (heuristic)"
     assert {f.finding_id for s, f in node.items() if s != lag.signal} <= set(
         lag.related_finding_ids
     )
-    assert node["runtime_heap_used"].severity in (Severity.LOW, Severity.MEDIUM)
+    assert node["nodejs_heap_used"].severity in (Severity.LOW, Severity.MEDIUM)
 
 
 async def test_nodejs_findings_relate_to_routes_of_the_same_job() -> None:
@@ -576,7 +576,7 @@ async def test_nodejs_findings_relate_to_routes_of_the_same_job() -> None:
     col = col.model_copy(update={"series": [*col.series, *builder.series]})
 
     result = RobustDetector().detect(REQUEST, WINDOWS, caps, col, CONFIG)
-    (process,) = by_signal(result, "runtime_eventloop_lag")
+    (process,) = by_signal(result, "nodejs_eventloop_lag")
     (err,) = by_signal(result, "server_error_ratio")
 
     assert err.finding_id in process.related_finding_ids
@@ -587,15 +587,15 @@ async def test_go_goroutine_leak_findings_relate_within_the_process() -> None:
     go = {f.signal: f for f in result.findings if f.entity.labels.get("job") == "inventory"}
 
     assert set(go) == {
-        "runtime_goroutines",
-        "runtime_heap_used",
-        "runtime_gc_pause_ratio",
-        "runtime_fds_ratio",
+        "go_goroutines",
+        "go_heap_used",
+        "go_gc_pause_ratio",
+        "go_fds_ratio",
     }
-    assert {f.family for f in go.values()} == {SignalFamily.RUNTIME}
+    assert {f.family for f in go.values()} == {SignalFamily.GOLANG}
     assert {f.entity.display_name for f in go.values()} == {"inventory · inventory:2112"}
 
-    leak = go["runtime_goroutines"]
+    leak = go["go_goroutines"]
     assert leak.entity.kind is EntityKind.PROCESS
     assert leak.title == "Goroutines above expected range (possible goroutine leak)"
     assert leak.severity in (Severity.LOW, Severity.MEDIUM)
