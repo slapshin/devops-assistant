@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.6",
+  "schema_version": "2.7",
   "analysis_id": "01999a2b-0000-7000-8000-000000000004",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -467,6 +467,8 @@
       "family": "cpu",
       "signal": "cpu_utilization",
       "title": "CPU utilisation above expected range",
+      "summary": "The host's CPUs were busier than usual; sustained saturation slows every process on it.",
+      "help": "Find the processes using the CPU (top, pidstat) and check for a deploy, cron job or traffic increase that started with the episode.",
       "entity": {
         "kind": "node",
         "key": "node|job=node|instance=shop-production",

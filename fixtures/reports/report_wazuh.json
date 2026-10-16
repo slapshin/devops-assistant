@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.6",
+  "schema_version": "2.7",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e6",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -131,6 +131,8 @@
       "family": "host_security",
       "signal": "hids_alert_rate",
       "title": "Surge of security alerts",
+      "summary": "The agent raised more Wazuh alerts than usual.",
+      "help": "Open the agent's alerts in the Wazuh dashboard and group by rule to see what changed; check for scans, updates or misconfigurations.",
       "entity": {
         "kind": "agent",
         "key": "agent|name=shop-web-2",
@@ -182,6 +184,8 @@
       "family": "host_security",
       "signal": "hids_high_alert_rate",
       "title": "More high-level security alerts (rule level 12+)",
+      "summary": "More high-level alerts (rule level 12+), which Wazuh treats as significant.",
+      "help": "Review these alerts in the Wazuh dashboard first, and confirm or rule out a compromise of the agent.",
       "entity": {
         "kind": "agent",
         "key": "agent|name=shop-db-1",
@@ -234,6 +238,8 @@
       "family": "host_security",
       "signal": "hids_auth_failure_rate",
       "title": "Surge of authentication failures (possible brute force)",
+      "summary": "More authentication failures on the agent, which may be a brute-force attempt.",
+      "help": "Check the source IPs and accounts in the alerts, block abusive sources, and prefer key-based SSH logins.",
       "entity": {
         "kind": "agent",
         "key": "agent|name=shop-db-1",
@@ -286,6 +292,8 @@
       "family": "host_security",
       "signal": "hids_alert_rate",
       "title": "Surge of security alerts",
+      "summary": "The agent raised more Wazuh alerts than usual.",
+      "help": "Open the agent's alerts in the Wazuh dashboard and group by rule to see what changed; check for scans, updates or misconfigurations.",
       "entity": {
         "kind": "agent",
         "key": "agent|name=shop-db-1",
@@ -338,6 +346,8 @@
       "family": "file_integrity",
       "signal": "fim_change_rate",
       "title": "Burst of file changes (FIM)",
+      "summary": "More monitored files changed on the agent.",
+      "help": "Check whether a deploy or package update explains the changes; unexpected changes to binaries or configuration need investigation.",
       "entity": {
         "kind": "agent",
         "key": "agent|name=shop-web-2",

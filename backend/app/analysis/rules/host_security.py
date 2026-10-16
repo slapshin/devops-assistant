@@ -17,6 +17,11 @@ HOST_SECURITY_RULES = (
         thresholds="hids_alert_rate",
         severity_cap=Severity.HIGH,
         title_up="Surge of security alerts",
+        summary="The agent raised more Wazuh alerts than usual.",
+        help=(
+            "Open the agent's alerts in the Wazuh dashboard and group by rule to see what "
+            "changed; check for scans, updates or misconfigurations."
+        ),
     ),
     Rule(
         "hids_high_alert_rate",
@@ -25,6 +30,11 @@ HOST_SECURITY_RULES = (
         thresholds="hids_high_alert_rate",
         severity_cap=Severity.HIGH,
         title_up="More high-level security alerts (rule level 12+)",
+        summary="More high-level alerts (rule level 12+), which Wazuh treats as significant.",
+        help=(
+            "Review these alerts in the Wazuh dashboard first, and confirm or rule out a "
+            "compromise of the agent."
+        ),
     ),
     Rule(
         "hids_auth_failure_rate",
@@ -33,6 +43,11 @@ HOST_SECURITY_RULES = (
         thresholds="hids_auth_failure_rate",
         severity_cap=Severity.HIGH,
         title_up="Surge of authentication failures (possible brute force)",
+        summary="More authentication failures on the agent, which may be a brute-force attempt.",
+        help=(
+            "Check the source IPs and accounts in the alerts, block abusive sources, and "
+            "prefer key-based SSH logins."
+        ),
     ),
     Rule(
         "fim_change_rate",
@@ -41,5 +56,10 @@ HOST_SECURITY_RULES = (
         thresholds="fim_change_rate",
         severity_cap=Severity.MEDIUM,
         title_up="Burst of file changes (FIM)",
+        summary="More monitored files changed on the agent.",
+        help=(
+            "Check whether a deploy or package update explains the changes; unexpected "
+            "changes to binaries or configuration need investigation."
+        ),
     ),
 )

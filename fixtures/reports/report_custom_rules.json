@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.6",
+  "schema_version": "2.7",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e8",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -2368,6 +2368,8 @@
       "family": "custom",
       "signal": "custom_email_queue",
       "title": "E-mail queue depth at or above 2000 (threshold)",
+      "summary": null,
+      "help": null,
       "entity": {
         "kind": "custom",
         "key": "custom|job=checkout-api",
@@ -2419,6 +2421,8 @@
       "family": "custom",
       "signal": "custom_checkout_failures",
       "title": "Checkout failures above expected range",
+      "summary": null,
+      "help": null,
       "entity": {
         "kind": "custom",
         "key": "custom|job=checkout-api",

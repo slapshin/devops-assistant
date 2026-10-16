@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.6",
+  "schema_version": "2.7",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000cf",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000c1",
@@ -257,6 +257,8 @@
       "family": "security",
       "signal": "security_blocked_rate",
       "title": "Surge of blocked requests (WAF/firewall)",
+      "summary": "The WAF or firewall blocked more requests than usual; this may be an attack.",
+      "help": "Review the zone's security events for the source IPs, countries and rules that matched, and check that legitimate users are not blocked.",
       "entity": {
         "kind": "zone",
         "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -309,6 +311,8 @@
       "family": "security",
       "signal": "security_challenge_rate",
       "title": "Surge of challenged requests",
+      "summary": "More requests were challenged (CAPTCHA, JS challenge), often bots or an attack.",
+      "help": "Review the security events for the rules that matched, and check that real users or API clients are not being challenged.",
       "entity": {
         "kind": "zone",
         "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -361,6 +365,8 @@
       "family": "edge",
       "signal": "edge_ttfb_p95",
       "title": "Edge time to first byte (p95) above expected range",
+      "summary": "The edge took longer to send the first byte to the slowest 5 % of visitors.",
+      "help": "Compare with the origin response time: if both rose, the origin is slow; otherwise look at cache hit share and edge routing.",
       "entity": {
         "kind": "zone",
         "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -417,6 +423,8 @@
       "family": "edge",
       "signal": "edge_server_error_ratio",
       "title": "Edge server error rate (5xx) at or above 5.0 % (heuristic)",
+      "summary": "A larger share of edge responses were 5xx errors.",
+      "help": "Check whether they come from the origin (520-530 errors, origin logs) or from Cloudflare itself (status page).",
       "entity": {
         "kind": "zone",
         "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -472,6 +480,8 @@
       "family": "edge",
       "signal": "edge_origin_error_ratio",
       "title": "Origin error rate (520-530) at or above 2.0 % (heuristic)",
+      "summary": "Cloudflare could not reach the origin or got invalid responses (520-530).",
+      "help": "Check that the origin is up, its firewall allows Cloudflare's IP ranges, TLS certificates are valid and responses are not timing out.",
       "entity": {
         "kind": "zone",
         "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -527,6 +537,8 @@
       "family": "edge",
       "signal": "edge_origin_time_p95",
       "title": "Origin response time (p95) above expected range",
+      "summary": "The origin took longer to respond to Cloudflare for the slowest 5 % of requests.",
+      "help": "Check the origin's application latency, dependencies and resource saturation.",
       "entity": {
         "kind": "zone",
         "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",

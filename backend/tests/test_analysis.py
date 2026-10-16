@@ -721,3 +721,22 @@ def _dummy_source() -> MetricSeries:
 def test_every_rule_has_thresholds_or_is_event(name: str) -> None:
     rule = RULES[name]
     assert rule.kind.value != "level" or rule.thresholds in CONFIG.signals
+
+
+@pytest.mark.parametrize("name", sorted(RULES))
+def test_every_rule_explains_its_findings(name: str) -> None:
+    rule = RULES[name]
+
+    assert rule.summary.endswith(".")
+    assert rule.help.endswith(".")
+
+
+async def test_findings_carry_their_rules_summary_and_help() -> None:
+    caps, col = await collect("incident")
+
+    result = RobustDetector().detect(REQUEST, WINDOWS, caps, col, CONFIG)
+
+    assert result.findings
+    for f in result.findings:
+        assert f.summary == RULES[f.signal].summary
+        assert f.help == RULES[f.signal].help

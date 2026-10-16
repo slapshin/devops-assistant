@@ -45,6 +45,11 @@ class Rule:
     """The absolute thresholds are breached at or below the value (custom rules)."""
     custom: bool = False
     """A user-defined rule: its thresholds are the user's, not diagnostic heuristics."""
+    summary: str = ""
+    """One sentence on what a finding of this rule means; empty for custom rules, whose
+    description says it."""
+    help: str = ""
+    """What to check first when a finding of this rule appears."""
 
     def title(self, *, up: bool, threshold: float | None, unit: Unit) -> str:
         if threshold is not None and self.kind is RuleKind.LEVEL:

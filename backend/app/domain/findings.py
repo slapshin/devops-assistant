@@ -82,6 +82,12 @@ class Finding(Contract):
     family: SignalFamily
     signal: str
     title: str
+    summary: str | None = Field(
+        default=None, description="What the finding means (2.7); null for custom rules."
+    )
+    help: str | None = Field(
+        default=None, description="What to check first (2.7); null for custom rules."
+    )
     entity: Entity
     start: UtcDatetime
     end: UtcDatetime

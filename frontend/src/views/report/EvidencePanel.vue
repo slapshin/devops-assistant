@@ -102,6 +102,7 @@ onMounted(async () => {
           <span class="tag">{{ f.state === "ongoing" ? "Ongoing" : "Resolved" }}</span>
         </div>
         <h3 class="headline">{{ headline(f) }}</h3>
+        <p v-if="f.summary" class="summary">{{ f.summary }}</p>
         <dl class="stats">
           <div><dt class="lbl">Peak</dt><dd :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</dd></div>
           <div v-if="f.expected">
@@ -114,6 +115,10 @@ onMounted(async () => {
           </div>
           <div><dt class="lbl">Duration</dt><dd>{{ formatDuration(f.duration_seconds) }}</dd></div>
         </dl>
+        <section v-if="f.help" class="help" aria-labelledby="help-title">
+          <h4 id="help-title" class="lbl">What to check</h4>
+          <p>{{ f.help }}</p>
+        </section>
         <p v-if="rule?.description" class="rule-description">{{ rule.description }}</p>
         <dl class="kv">
           <template v-if="rule">
@@ -226,4 +231,8 @@ details > * + * { margin-top: 8px; }
 .query { display: flex; flex-direction: column; gap: 6px; }
 .labels { margin-top: 8px; }
 .rule-description { margin: 0; white-space: pre-line; }
+.summary { margin: 0; }
+.help { background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; }
+.help h4 { margin: 0 0 4px; font-weight: 500; }
+.help p { margin: 0; }
 </style>

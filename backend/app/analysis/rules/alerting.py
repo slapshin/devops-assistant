@@ -19,6 +19,11 @@ ALERTING_RULES = (
         kind=RuleKind.EVENT,
         event_points=2,
         title_up="Grafana alert firing",
+        summary="A Grafana alert rule fired.",
+        help=(
+            "Open the rule in Grafana, read its summary and runbook, and check the "
+            "instances and labels that fired."
+        ),
     ),
     Rule(
         "alert_firing_critical",
@@ -27,6 +32,11 @@ ALERTING_RULES = (
         kind=RuleKind.EVENT,
         event_points=3,
         title_up="Critical Grafana alert firing",
+        summary="A Grafana alert rule with severity critical fired.",
+        help=(
+            "Treat it as urgent: open the rule in Grafana, follow its runbook and check the "
+            "instances that fired."
+        ),
     ),
     Rule(
         "alert_firing_info",
@@ -35,6 +45,8 @@ ALERTING_RULES = (
         kind=RuleKind.EVENT,
         event_points=1,
         title_up="Informational Grafana alert firing",
+        summary="A Grafana alert rule with severity info fired.",
+        help=("Usually informational; check whether it recurs or coincides with other findings."),
     ),
     Rule(
         "alert_nodata",
@@ -44,5 +56,10 @@ ALERTING_RULES = (
         event_points=1,
         severity_cap=Severity.LOW,
         title_up="Grafana alert rule has no data or errors",
+        summary="A Grafana alert rule had no data or failed to evaluate, so it cannot alert.",
+        help=(
+            "Check the rule's query and data source in Grafana; a missing metric or data "
+            "source error means the condition is not being watched."
+        ),
     ),
 )

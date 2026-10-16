@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.6",
+  "schema_version": "2.7",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e7",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -122,6 +122,8 @@
       "family": "alerting",
       "signal": "alert_firing_critical",
       "title": "Critical Grafana alert firing",
+      "summary": "A Grafana alert rule with severity critical fired.",
+      "help": "Treat it as urgent: open the rule in Grafana, follow its runbook and check the instances that fired.",
       "entity": {
         "kind": "alert_rule",
         "key": "alert_rule|uid=shop-5xx",
@@ -206,6 +208,8 @@
       "family": "alerting",
       "signal": "alert_firing_critical",
       "title": "Critical Grafana alert firing",
+      "summary": "A Grafana alert rule with severity critical fired.",
+      "help": "Treat it as urgent: open the rule in Grafana, follow its runbook and check the instances that fired.",
       "entity": {
         "kind": "alert_rule",
         "key": "alert_rule|uid=shop-5xx",
@@ -272,6 +276,8 @@
       "family": "alerting",
       "signal": "alert_firing",
       "title": "Grafana alert firing",
+      "summary": "A Grafana alert rule fired.",
+      "help": "Open the rule in Grafana, read its summary and runbook, and check the instances and labels that fired.",
       "entity": {
         "kind": "alert_rule",
         "key": "alert_rule|uid=shop-disk",
@@ -339,6 +345,8 @@
       "family": "alerting",
       "signal": "alert_firing_info",
       "title": "Informational Grafana alert firing",
+      "summary": "A Grafana alert rule with severity info fired.",
+      "help": "Usually informational; check whether it recurs or coincides with other findings.",
       "entity": {
         "kind": "alert_rule",
         "key": "alert_rule|uid=shop-worker",
@@ -403,6 +411,8 @@
       "family": "alerting",
       "signal": "alert_nodata",
       "title": "Grafana alert rule has no data or errors",
+      "summary": "A Grafana alert rule had no data or failed to evaluate, so it cannot alert.",
+      "help": "Check the rule's query and data source in Grafana; a missing metric or data source error means the condition is not being watched.",
       "entity": {
         "kind": "alert_rule",
         "key": "alert_rule|uid=shop-queue",

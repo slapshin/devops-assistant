@@ -328,6 +328,7 @@ async def test_incident_breaches_every_custom_rule_mode() -> None:
     anomaly = found["custom_checkout_failures"]
     assert anomaly.method is DetectionMethod.RELATIVE
     assert anomaly.title == "Checkout failures above expected range"
+    assert (anomaly.summary, anomaly.help) == (None, None)
     threshold = found["custom_queue_depth"]
     assert threshold.method is DetectionMethod.ABSOLUTE
     assert threshold.threshold == 900

@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from app.ai.providers import FakeExplanationProvider
 from app.analysis.engine import RobustDetector, trend_summary
+from app.analysis.rules import RULES
 from app.domain.auth import BearerAuth, CredentialAuth, TokenAuth
 from app.domain.common import (
     STEP_SECONDS,
@@ -560,6 +561,8 @@ def cpu_finding(
         family=SignalFamily.CPU,
         signal="cpu_utilization",
         title="CPU utilisation above expected range",
+        summary=RULES["cpu_utilization"].summary,
+        help=RULES["cpu_utilization"].help,
         entity=NODE,
         start=start,
         end=end,
@@ -624,6 +627,8 @@ def not_found_finding(aid: str) -> tuple[Finding, Evidence]:
         family=SignalFamily.CLIENT_ERRORS,
         signal="client_error_rate",
         title="404 increase",
+        summary=RULES["client_error_rate"].summary,
+        help=RULES["client_error_rate"].help,
         entity=ROUTE,
         start=start,
         end=end,

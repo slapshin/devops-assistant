@@ -1040,6 +1040,19 @@
           "title": "Finding Id",
           "type": "string"
         },
+        "help": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What to check first (2.7); null for custom rules.",
+          "title": "Help"
+        },
         "method": {
           "$ref": "#/$defs/DetectionMethod"
         },
@@ -1101,6 +1114,19 @@
         "state": {
           "$ref": "#/$defs/FindingState",
           "default": "resolved"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What the finding means (2.7); null for custom rules.",
+          "title": "Summary"
         },
         "threshold": {
           "anyOf": [
@@ -1878,7 +1904,7 @@
       "type": "string"
     },
     "schema_version": {
-      "default": "2.6",
+      "default": "2.7",
       "enum": [
         "2.0",
         "2.1",
@@ -1886,7 +1912,8 @@
         "2.3",
         "2.4",
         "2.5",
-        "2.6"
+        "2.6",
+        "2.7"
       ],
       "title": "Schema Version",
       "type": "string"

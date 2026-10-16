@@ -25,6 +25,7 @@ const threshold = computed(() => props.evidence?.threshold ?? f.value.threshold)
         <strong :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</strong>
         <span class="lbl">peak · {{ usualText(f) || "no usual range" }}</span>
       </div>
+      <p v-if="f.summary" class="summary">{{ f.summary }}</p>
       <span v-if="isLatencyMean(f.signal)" class="lbl">Mean latency (no histogram)</span>
       <EvidenceSparkline v-if="evidence" :evidence="evidence" :finding="f" />
       <div class="legend">
@@ -51,6 +52,7 @@ const threshold = computed(() => props.evidence?.threshold ?? f.value.threshold)
 .finding .pb { gap: 6px; }
 .value { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .value strong { font-size: 26px; font-weight: 600; line-height: 1.15; }
+.summary { margin: 0; font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .band { background: var(--info); opacity: 0.35; }
 .current { background: currentColor; }
 </style>

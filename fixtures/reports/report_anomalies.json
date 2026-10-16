@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.6",
+  "schema_version": "2.7",
   "analysis_id": "01999a2b-0000-7000-8000-000000000002",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -462,6 +462,8 @@
       "family": "cpu",
       "signal": "cpu_utilization",
       "title": "CPU utilisation above expected range",
+      "summary": "The host's CPUs were busier than usual; sustained saturation slows every process on it.",
+      "help": "Find the processes using the CPU (top, pidstat) and check for a deploy, cron job or traffic increase that started with the episode.",
       "entity": {
         "kind": "node",
         "key": "node|job=node|instance=shop-production",
@@ -512,6 +514,8 @@
       "family": "client_errors",
       "signal": "client_error_rate",
       "title": "404 increase",
+      "summary": "More requests were rejected with 4xx client errors (other than 404).",
+      "help": "Group by status: 401/403 point to auth or token problems, 400/422 to client or contract changes, 429 to rate limiting.",
       "entity": {
         "kind": "route",
         "key": "route|job=checkout-api|http_route=/api/v1/orders/:order|http_request_method=GET",

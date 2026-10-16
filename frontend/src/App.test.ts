@@ -1274,6 +1274,16 @@ describe("report", () => {
     expect(within(labels).getByText("env=production")).not.toHaveClass("key");
   });
 
+  it("a finding explains the problem and what to check", async () => {
+    const clientErrors = anomalies.findings.find((f) => f.signal === "client_error_rate");
+    await renderAt(`${report(anomalies)}/findings/${clientErrors?.finding_id ?? ""}`);
+
+    const details = await screen.findByRole("region", { name: "Finding details" });
+    expect(details).toHaveTextContent(clientErrors?.summary ?? "missing summary");
+    const help = within(details).getByRole("region", { name: "What to check" });
+    expect(help).toHaveTextContent(clientErrors?.help ?? "missing help");
+  });
+
   it("a custom rule finding shows the rule, its description and its threshold", async () => {
     const queue = customRulesReport.findings.find((f) => f.signal === "custom_email_queue");
     await renderAt(`${report(customRulesReport)}/findings/${queue?.finding_id ?? ""}`);

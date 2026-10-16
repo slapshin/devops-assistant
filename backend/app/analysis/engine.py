@@ -294,6 +294,8 @@ class RobustDetector:
             family=rule.family,
             signal=rule.name,
             title=rule.title(up=ep.up, threshold=threshold if ep.abs_level else None, unit=s.unit),
+            summary=rule.summary or None,
+            help=rule.help or None,
             entity=s.entity,
             start=start,
             end=end,

@@ -350,10 +350,10 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 2.6
+             * @default 2.7
              * @enum {string}
              */
-            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "2.6";
+            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "2.6" | "2.7";
             scope: components["schemas"]["Scope"];
             /** @description Deprecated: the first source; use sources. */
             source?: components["schemas"]["SourceInfo"] | null;
@@ -1075,6 +1075,11 @@ export interface components {
             family: components["schemas"]["SignalFamily"];
             /** Finding Id */
             finding_id: string;
+            /**
+             * Help
+             * @description What to check first (2.7); null for custom rules.
+             */
+            help?: string | null;
             method: components["schemas"]["DetectionMethod"];
             /** @description Peak observed value in the episode. */
             observed: components["schemas"]["ObservedValue"];
@@ -1106,6 +1111,11 @@ export interface components {
             start: string;
             /** @default resolved */
             state: components["schemas"]["FindingState"];
+            /**
+             * Summary
+             * @description What the finding means (2.7); null for custom rules.
+             */
+            summary?: string | null;
             /**
              * Threshold
              * @description Heuristic threshold for absolute checks.

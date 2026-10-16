@@ -110,7 +110,9 @@ class EventTotal(Contract):
 
 
 class AnalysisReport(Contract):
-    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6"] = REPORT_SCHEMA_VERSION
+    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7"] = (
+        REPORT_SCHEMA_VERSION
+    )
     analysis_id: str
     scope: Scope
     windows: AnalysisWindows
