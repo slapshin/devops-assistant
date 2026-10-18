@@ -9,7 +9,8 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from app.domain.common import STEP_SECONDS, EntityKind, LabelMatcher, MatchOp, Scope
+from app.domain.common import STEP_SECONDS, EntityKind, LabelMatcher, MatchOp, Scope, Unit
+from app.domain.custom_rules import CustomRule
 from app.domain.interfaces import CancellationToken, Cancelled, SourceError, SourceErrorKind
 from app.domain.jobs import StageProgress
 from app.domain.metrics import CapabilityStatus
@@ -18,6 +19,7 @@ from app.domain.report import AnalysisWindows, Exclusion
 from app.sources.base import ClientLimits
 from app.sources.prometheus.catalog import BY_SIGNAL, CATALOG
 from app.sources.prometheus.client import PrometheusClient, RangeResult
+from app.sources.prometheus.custom import custom_signal
 from app.sources.prometheus.promql import (
     QueryTemplate,
     ScopeViolation,
@@ -30,6 +32,7 @@ from app.sources.prometheus.source import (
     CollectionBudget,
     PrometheusMetricsSource,
     _to_grid,
+    collision_probes,
     entity_for,
 )
 from tests.helpers import make_scope
@@ -840,4 +843,102 @@ async def test_service_to_host_mapping_by_container_id_prefix() -> None:
     assert [(m.kind.value, m.service, m.host) for m in result.mappings] == [
         ("otel_service", "checkout-api", "shop-production-2"),
         ("swarm_service", "shop_checkout-api", "shop-production-2"),
+    ]
+
+
+GO_PRESENT = NODE_ONLY | {"go_info", "go_gc_duration_seconds_sum", "process_cpu_seconds_total"}
+
+
+def go_handler(range_series: httpx.Response, colliding: httpx.Response) -> Handler:
+    """Go counters return ``range_series``; their collision probes return ``colliding``."""
+    base = present_handler(
+        GO_PRESENT,
+        {"go_gc_duration_seconds_sum": range_series, "process_cpu_seconds_total": range_series},
+    )
+
+    def handler(path: str, params: dict[str, list[str]]) -> httpx.Response:
+        if params.get("query", [""])[0].startswith("max by (job, instance) ((resets("):
+            return colliding
+        return base(path, params)
+
+    return handler
+
+
+def go_series(*values: tuple[str, str]) -> httpx.Response:
+    t0 = int(T.timestamp()) - 28 * 86400 + STEP_SECONDS
+    return matrix(
+        *[
+            ({"job": "app", "instance": instance}, [(t0, value), (int(T.timestamp()), value)])
+            for instance, value in values
+        ]
+    )
+
+
+def test_collision_probes_cover_each_rated_counter_once() -> None:
+    gc = BY_SIGNAL["go_gc_pause_ratio"]
+    p95 = BY_SIGNAL["http_latency_p95"]
+    disk = BY_SIGNAL["disk_io_bytes"]
+    rule = custom_signal(
+        CustomRule(
+            slug="checkout_failures",
+            title="Checkout failures",
+            query="sum by (job) (rate(orders_failed_total[5m]))",
+            unit=Unit.PER_SECOND,
+        )
+    )
+
+    [gc_probe] = collision_probes(gc, gc.query.render(SCOPE))
+    [p95_probe] = collision_probes(p95, p95.query.render(SCOPE))
+
+    assert gc_probe == (
+        "max by (job, instance) ((resets(go_gc_duration_seconds_sum"
+        '{env="production", project="shop"}[1d]) >= 10) / count_over_time('
+        'go_gc_duration_seconds_sum{env="production", project="shop"}[1d]))'
+    )
+    assert_scoped(gc_probe, SCOPE, ("go_gc_duration_seconds_sum",))
+    assert "http_server_request_duration_seconds_count{" in p95_probe
+    assert "_bucket" not in p95_probe
+    assert collision_probes(disk, disk.query.render(SCOPE)) == []
+    assert collision_probes(rule, rule.query.render(SCOPE)) == []
+    assert collision_probes(BY_SIGNAL["go_goroutines"], "max_over_time(go_goroutines{}[5m])") == []
+
+
+async def test_colliding_counters_drop_the_entity_and_are_disclosed_once() -> None:
+    series = go_series(("shared", "105"), ("ok", "0.01"))
+    colliding = vector(({"job": "app", "instance": "shared"}, "0.5"), ({"job": "app"}, "0.05"))
+    source = PrometheusMetricsSource(
+        FakeProm(go_handler(series, colliding)).client(), now=lambda: T
+    )
+
+    caps = await source.capabilities(SCOPE, WINDOWS)
+    result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
+    kept = {(s.signal, s.entity.labels["instance"]) for s in result.series}
+    assert kept == {("go_gc_pause_ratio", "ok"), ("go_cpu", "ok")}
+    [exclusion] = [e for e in result.exclusions if e.code == "counter_collision"]
+    assert exclusion.family == "golang"
+    assert exclusion.message.startswith("app · shared: counters reset in at least 10% ")
+    assert exclusion.message.endswith("not analysed: go_gc_pause_ratio, go_cpu.")
+
+
+async def test_samples_above_the_possible_maximum_become_gaps() -> None:
+    source = PrometheusMetricsSource(
+        FakeProm(go_handler(go_series(("app-1", "1.5")), vector())).client(), now=lambda: T
+    )
+
+    caps = await source.capabilities(SCOPE, WINDOWS)
+    result = await source.collect(SCOPE, WINDOWS, caps, Progress(), CancellationToken())
+
+    gc = next(s for s in result.series if s.signal == "go_gc_pause_ratio")
+    cpu = next(s for s in result.series if s.signal == "go_cpu")
+    assert gc.values[0] is None
+    assert gc.values[-1] is None
+    assert gc.coverage == 0
+    assert cpu.values[-1] == 1.5
+    assert [(e.code, e.message) for e in result.exclusions] == [
+        (
+            "invalid_values",
+            "go_gc_pause_ratio: app · app-1: 2 samples above the possible maximum 1 dropped as "
+            "invalid data.",
+        )
     ]

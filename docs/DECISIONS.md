@@ -277,6 +277,7 @@ Per bucket: `episode_count`, `anomalous_minutes`, `peak_severity`, `affected_ent
 | Concurrent queries per job | 4 |
 | Max series per query | 500 → stop, mark family `truncated`, job `partial` |
 | Max series per job | 5,000 |
+| Counter collision probes | one instant query per distinct rated counter selector and identity (about 60 for the full catalog), over the latest 24 h, cached per collection |
 | Max points per series | 30 days × 288 = 8,640 (source limit `search.maxPointsPerTimeseries=30000`, verified) |
 | Discovery lookback | 28 days, results cached 5 min per scope |
 | Label value cardinality guard | max 200 projects / 50 envs per project shown; excess reported |

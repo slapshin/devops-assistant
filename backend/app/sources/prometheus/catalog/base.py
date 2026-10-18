@@ -49,6 +49,8 @@ class SignalDef:
     gates: tuple[Gate, ...] = ()
     traffic: str | None = None
     """Request-count signal that ranks this signal's routes (top N kept, the rest summed)."""
+    max_value: float | None = None
+    """Physical upper bound; samples above it are invalid data and dropped as gaps."""
     description: str = ""
 
     def __post_init__(self) -> None:

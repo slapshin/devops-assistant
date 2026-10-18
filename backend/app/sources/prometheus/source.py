@@ -2,9 +2,10 @@
 
 import contextlib
 import logging
+import re
 from collections import defaultdict
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from app.domain.common import Entity, EntityKind, MatchOp, Scope, SignalFamily
@@ -51,6 +52,16 @@ _FALLBACK_REASON_PREFIX = "Fallback"
 _MEAN_LATENCY_FALLBACK_REASON = f"{_FALLBACK_REASON_PREFIX} only; percentiles are available."
 # service_instance_id and cAdvisor container ids are matched on Docker's 12-char short id.
 CONTAINER_ID_PREFIX_LENGTH = 12
+# Two targets written into one series (e.g. replicas sharing a fixed `instance`) interleave their
+# counters: every switch reads as a reset and `rate()` turns the whole counter into growth. A
+# restarting process resets a few times a day; colliding targets reset in up to every other
+# sample. Checked over the latest day, the window the findings come from.
+COLLISION_WINDOW = "1d"
+COLLISION_MIN_RESETS = 10
+COLLISION_RESET_RATIO = 0.1
+_RATED_SELECTOR = re.compile(
+    r'\b(?:rate|irate|increase)\(([A-Za-z_:][\w:]*)(\{(?:[^{}"]|"(?:[^"\\]|\\.)*")*\})\['
+)
 
 
 @dataclass(frozen=True)
@@ -313,6 +324,7 @@ class PrometheusMetricsSource:
         exclusions: list[Exclusion] = []
         series: list[MetricSeries] = []
         top_routes: dict[str, set[tuple[str, ...]]] = {}
+        collisions = _Collisions()
         started = self._now()
         for i, defn in enumerate(plan):
             cancel.raise_if_cancelled()
@@ -337,8 +349,9 @@ class PrometheusMetricsSource:
                 )
                 continue
             series += await self._collect_signal(
-                defn, scope, windows.end_time, grid, exclusions, top_routes
+                defn, scope, windows.end_time, grid, exclusions, top_routes, collisions
             )
+        exclusions += collisions.exclusions()
         await progress.update(
             StageProgress(
                 stage=StageName.COLLECTION,
@@ -376,8 +389,10 @@ class PrometheusMetricsSource:
         grid: _Grid,
         exclusions: list[Exclusion],
         top_routes: dict[str, set[tuple[str, ...]]],
+        collisions: _Collisions,
     ) -> list[MetricSeries]:
-        """Query one signal over the grid; failures and truncation become exclusions."""
+        """Query one signal over the grid; failures, truncation and invalid data become
+        exclusions."""
         query = defn.query.render(scope)
         grid_start = _ts(grid.start)
         try:
@@ -392,6 +407,7 @@ class PrometheusMetricsSource:
             return []
 
         results = self._scoped_results(results, scope, defn, exclusions)
+        results = await self._drop_collisions(defn, scope, query, end_time, results, collisions)
         max_series = self.budget.max_series_per_query
         if len(results) > max_series:
             exclusions.append(
@@ -411,6 +427,15 @@ class PrometheusMetricsSource:
         out: list[MetricSeries] = []
         for labels, values in grids:
             entity = entity_for(defn, dict(labels), scope)
+            if invalid := _drop_above(values, defn.max_value):
+                exclusions.append(
+                    Exclusion(
+                        code="invalid_values",
+                        family=defn.family,
+                        message=f"{defn.signal}: {entity.display_name}: {invalid} samples above "
+                        f"the possible maximum {defn.max_value:g} dropped as invalid data.",
+                    )
+                )
             out.append(
                 MetricSeries(
                     series_id=series_id(query, entity.key),
@@ -427,6 +452,50 @@ class PrometheusMetricsSource:
                 )
             )
         return out
+
+    async def _drop_collisions(
+        self,
+        defn: SignalDef,
+        scope: Scope,
+        query: str,
+        end_time: datetime,
+        results: list[RangeResult],
+        collisions: _Collisions,
+    ) -> list[RangeResult]:
+        """Drop entities whose rated counters collide; they are disclosed once per entity."""
+        flagged: set[tuple[str, ...]] = set()
+        for probe in collision_probes(defn, query):
+            if probe not in collisions.probes:
+                collisions.probes[probe] = await self._colliding(probe, scope, end_time, defn)
+            flagged |= collisions.probes[probe]
+        if not flagged:
+            return results
+
+        kept: list[RangeResult] = []
+        for r in results:
+            if _identity(r.labels, defn) not in flagged:
+                kept.append(r)
+                continue
+            entity = entity_for(defn, dict(r.labels), scope)
+            _, _, signals = collisions.dropped.setdefault(entity.key, (entity, defn.family, []))
+            if defn.signal not in signals:
+                signals.append(defn.signal)
+        return kept
+
+    async def _colliding(
+        self, probe: str, scope: Scope, end_time: datetime, defn: SignalDef
+    ) -> frozenset[tuple[str, ...]]:
+        """Identities over the reset ratio; a failed probe flags nothing."""
+        try:
+            results = await self._instant(probe, scope, _ts(end_time))
+        except SourceError as exc:
+            log.warning("counter collision probe failed for %s: %s", defn.signal, exc.message)
+            return frozenset()
+        return frozenset(
+            _identity(r.labels, defn)
+            for r in results
+            if (r.samples[0][1] or 0) >= COLLISION_RESET_RATIO
+        )
 
     @staticmethod
     def _scoped_results(
@@ -621,6 +690,62 @@ def preview_from_grids(
         series=series,
         message=message,
     )
+
+
+def collision_probes(defn: SignalDef, query: str) -> list[str]:
+    """One instant query per rated counter selector of ``query``: the largest share of samples
+    that reset among each entity's raw series, for entities with at least the minimum resets.
+
+    Custom rules are skipped (their identity is not known up front), as are ``__name__``
+    selectors (``resets`` drops the name, so their series would clash)."""
+    if defn.entity_kind is EntityKind.CUSTOM or not defn.identity:
+        return []
+    by = ", ".join(defn.identity)
+    probes: list[str] = []
+    for metric, matchers in _RATED_SELECTOR.findall(query):
+        # A histogram's count comes from the same target as its buckets, in fewer series.
+        if metric.endswith("_bucket"):
+            metric = metric.removesuffix("_bucket") + "_count"
+        rng = f"{metric}{matchers}[{COLLISION_WINDOW}]"
+        probes.append(
+            f"max by ({by}) ((resets({rng}) >= {COLLISION_MIN_RESETS}) / count_over_time({rng}))"
+        )
+    return list(dict.fromkeys(probes))
+
+
+def _identity(labels: Mapping[str, str], defn: SignalDef) -> tuple[str, ...]:
+    return tuple(labels.get(k, "") for k in defn.identity)
+
+
+def _drop_above(values: list[float | None], bound: float | None) -> int:
+    """Turn samples above ``bound`` into gaps in place; returns how many were dropped."""
+    if bound is None:
+        return 0
+    invalid = [i for i, v in enumerate(values) if v is not None and v > bound]
+    for i in invalid:
+        values[i] = None
+    return len(invalid)
+
+
+@dataclass
+class _Collisions:
+    """Counter collision probes of one collection, and the entities they dropped."""
+
+    probes: dict[str, frozenset[tuple[str, ...]]] = field(default_factory=dict)
+    dropped: dict[str, tuple[Entity, SignalFamily, list[str]]] = field(default_factory=dict)
+
+    def exclusions(self) -> list[Exclusion]:
+        return [
+            Exclusion(
+                code="counter_collision",
+                family=family,
+                message=f"{entity.display_name}: counters reset in at least "
+                f"{COLLISION_RESET_RATIO:.0%} of their samples over the latest 24 h, so several "
+                "targets probably share one label set (e.g. a fixed instance label); not "
+                f"analysed: {', '.join(signals)}.",
+            )
+            for entity, family, signals in self.dropped.values()
+        ]
 
 
 @dataclass(frozen=True)

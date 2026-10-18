@@ -66,6 +66,8 @@ GO_CATALOG: tuple[SignalDef, ...] = (
         EntityKind.PROCESS,
         GO,
         q(sum_rate(_GC_PAUSE_SECONDS, GO), _GC_PAUSE_SECONDS),
+        # One process cannot be stopped for longer than the wall-clock time.
+        max_value=1.0,
         description="Share of wall-clock time the program was stopped for GC (stop-the-world "
         "pauses only; concurrent marking is not included).",
     ),

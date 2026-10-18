@@ -43,6 +43,8 @@ PARTIAL_CODES = {
     "series_truncated",
     "evidence_dropped",
     "source_unavailable",
+    "counter_collision",
+    "invalid_values",
 }
 MAX_REPORT_BYTES = 20 * 1024 * 1024
 MAX_EPISODES_PER_DAY_WHEN_OVER_BUDGET = 50
