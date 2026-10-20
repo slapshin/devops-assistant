@@ -74,6 +74,13 @@ class CloudflareApi(Protocol):
         """Blocked and challenged firewall events per bucket."""
         ...
 
+    async def host_requests(
+        self, start: int, end: int, hostnames: list[str], limit: int
+    ) -> dict[str, float]:
+        """Eyeball requests per hostname in [start, end), at most ``limit`` hostnames, most
+        first; ``hostnames`` narrows it (empty: the whole zone)."""
+        ...
+
     async def daily_requests(self, first: date, last: date) -> dict[date, float]:
         """Requests per day of the whole zone (history probe)."""
         ...

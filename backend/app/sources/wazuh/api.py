@@ -68,9 +68,15 @@ class WazuhApi(Protocol):
         """Agents in each group in monitoring snapshots of [start, end)."""
         ...
 
-    async def agents(self, names: Sequence[str] | None, start: int, end: int) -> AgentList:
+    async def agents(
+        self,
+        names: Sequence[str] | None,
+        start: int,
+        end: int,
+        labels: Sequence[tuple[str, str]] | None = None,
+    ) -> AgentList:
         """Agents with alerts in [start, end): those in ``names`` (None: any name), narrowed by
-        the configured labels."""
+        ``labels`` (None: the configured labels; scope diagnostics drop one at a time)."""
         ...
 
     async def series(self, agents: Sequence[str], start: int, end: int) -> Chunk:

@@ -21,6 +21,13 @@ from app.domain.custom_rules import (
     CustomRulePreview,
     ThresholdOp,
 )
+from app.domain.diagnostics import (
+    CountUnit,
+    FilterCheck,
+    FilterField,
+    ScopeDiagnostics,
+    capped_available,
+)
 from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
@@ -35,6 +42,7 @@ from app.domain.report import AnalysisWindows, SourceInfo
 from app.sources.base import HISTORY_DAYS
 from app.sources.prometheus.catalog import BY_SIGNAL, CATALOG, SignalDef
 from app.sources.prometheus.custom import custom_signal
+from app.sources.prometheus.diagnostics import prometheus_diagnostics, varied_samples
 from app.sources.prometheus.source import entity_for, preview_from_grids, scope_labels
 
 DAY = 288
@@ -700,4 +708,30 @@ class SyntheticMetricsSource:
             exclusions=[],
             mappings=mappings,
             custom_rules=self.custom_rules,
+            diagnostics=[synthetic_diagnostics(scope, series)],
         )
+
+
+def synthetic_diagnostics(scope: Scope, series: Sequence[MetricSeries]) -> ScopeDiagnostics:
+    """The synthetic world holds only this project's series, so dropping a matcher finds
+    nothing more; values are those the generated series carry."""
+    checks = []
+    for m in scope.matchers:
+        values, truncated = capped_available([v for s in series if (v := s.labels.get(m.name))])
+        checks.append(
+            FilterCheck(
+                part=str(m),
+                field=FilterField.MATCHER,
+                matched=len(series),
+                matched_without=len(series),
+                unit=CountUnit.SERIES,
+                available=values,
+                available_truncated=truncated,
+                matching=[v for v in values if m.matches(v)],
+            )
+        )
+    samples: dict[tuple[SignalFamily, str], dict[str, str]] = {}
+    for s in series:
+        samples.setdefault((s.family, s.signal), s.labels)
+    queries = list(dict.fromkeys(s.query for s in series))
+    return prometheus_diagnostics(series, varied_samples(samples), checks, [], queries)

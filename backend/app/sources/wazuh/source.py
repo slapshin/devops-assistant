@@ -16,6 +16,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 
 from app.domain.common import Entity, EntityKind, Scope, SourceKind
+from app.domain.diagnostics import ScopeDiagnostics, diagnostic_failed
 from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
@@ -48,8 +49,14 @@ from app.sources.wazuh.catalog import (
     SIGNALS,
     WazuhSignal,
     chunk_seconds,
+    discovery_body,
     display_query,
+    members_body,
+    request_text,
+    search_path,
+    series_body,
 )
+from app.sources.wazuh.diagnostics import wazuh_diagnostics
 
 log = logging.getLogger("app.sources.wazuh")
 MAX_LISTED = 10
@@ -222,7 +229,10 @@ class WazuhMetricsSource:
             for defn in signals
         ]
         exclusions = _failure_exclusions(failures, len(plan), signals)
-        exclusions += self._selection_exclusions(found, await self.members(end))
+        members = await self.members(end)
+        exclusions += self._selection_exclusions(found, members)
+        cancel.raise_if_cancelled()
+        diagnostics = await self._diagnostics(found, members, grid_start, end, width)
 
         log.info(
             "collected project=%s wazuh agents=%d catalog=%s series=%d exclusions=%d requests=%d",
@@ -236,7 +246,54 @@ class WazuhMetricsSource:
         alerts = [s for s in series if s.signal == ALERTS_SIGNAL]
         alerts_total = event_total(SourceKind.WAZUH, ALERTS_SIGNAL, "Wazuh alerts", alerts, end)
         return CollectionResult(
-            series=series, exclusions=exclusions, totals=[alerts_total] if alerts_total else []
+            series=series,
+            exclusions=exclusions,
+            totals=[alerts_total] if alerts_total else [],
+            diagnostics=[diagnostics],
+        )
+
+    async def _diagnostics(
+        self, found: AgentList, members: GroupMembers | None, start: int, end: int, width: int
+    ) -> ScopeDiagnostics:
+        """Each label dropped in turn, and the agents with alerts whatever their name; a
+        failed search becomes a note."""
+        selection = await self.selection(end)
+        notes = []
+        without: list[int | None] = []
+        for i, label in enumerate(self.labels):
+            rest = [*self.labels[:i], *self.labels[i + 1 :]]
+            try:
+                without.append(len((await self.api.agents(selection, start, end, rest)).agents))
+            except SourceError as exc:
+                notes.append(diagnostic_failed(f"check of label {label[0]}={label[1]}", exc))
+                without.append(None)
+        any_name = None
+        if self.agents:
+            try:
+                any_name = await self.api.agents(None, start, end)
+            except SourceError as exc:
+                notes.append(diagnostic_failed("agent list", exc))
+        path = search_path(self.index_pattern)
+        names = [a.name for a in found.agents]
+        requests = [
+            *(
+                [request_text(path, members_body(self.groups, end - MEMBERSHIP_SECONDS, end))]
+                if self.groups
+                else []
+            ),
+            request_text(path, discovery_body(selection or [], self.labels, start, end)),
+            *(
+                [
+                    request_text(
+                        path, series_body(names, self.labels, start, min(start + width, end))
+                    )
+                ]
+                if names
+                else []
+            ),
+        ]
+        return wazuh_diagnostics(
+            found, members, self.agents, self.labels, without, any_name, requests, notes
         )
 
     def _series(

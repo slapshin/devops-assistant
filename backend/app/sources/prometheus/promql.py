@@ -60,7 +60,21 @@ def _mask_strings(query: str) -> str:
 
 def assert_scoped(query: str, scope: Scope, metrics: Sequence[str]) -> None:
     _require_restricting(scope)
-    required = [render_matchers([m]) for m in scope.matchers]
+    _assert_blocks(query, scope.matchers, metrics)
+
+
+def assert_leave_one_out(query: str, scope: Scope, dropped: LabelMatcher) -> None:
+    """Scope diagnostics (T022) only: every selector carries every scope matcher except
+    ``dropped``, which may leave no restricting matcher. Callers only count series or list
+    label values with it, never collect series data."""
+    _require_restricting(scope)
+    if dropped not in scope.matchers:
+        raise ScopeViolation(f"{dropped} is not a matcher of project {scope.project_id}")
+    _assert_blocks(query, [m for m in scope.matchers if m != dropped], ())
+
+
+def _assert_blocks(query: str, matchers: Sequence[LabelMatcher], metrics: Sequence[str]) -> None:
+    required = [render_matchers([m]) for m in matchers]
     masked = _mask_strings(query)
     blocks = [(m.start(), m.end()) for m in re.finditer(r"\{[^{}]*\}", masked)]
     if not blocks:
@@ -68,9 +82,9 @@ def assert_scoped(query: str, scope: Scope, metrics: Sequence[str]) -> None:
     for start, end in blocks:
         # Check against the original text: the masked text hides label values.
         block = query[start:end]
-        matchers = [m.strip() for m in _split_matchers(block[1:-1])]
-        if any(r not in matchers for r in required):
-            raise ScopeViolation(f"selector block {block} is not scoped to {scope.matchers}")
+        present = [m.strip() for m in _split_matchers(block[1:-1])]
+        if any(r not in present for r in required):
+            raise ScopeViolation(f"selector block {block} is not scoped to {list(matchers)}")
     for metric in metrics:
         for m in re.finditer(rf"(?<![A-Za-z0-9_:]){re.escape(metric)}(?![A-Za-z0-9_:])", masked):
             if not masked[m.end() :].startswith("{"):

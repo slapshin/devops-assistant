@@ -56,11 +56,12 @@ Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source 
 - `app/api/projects.py` — project CRUD, `test-connection`, `custom-rules/preview`, cached per-source health.
 - Credentials (T021): secrets live only in credentials. `app/domain/auth.py` has the per-kind secret mechanisms (`CREDENTIAL_AUTH_TYPES`); a source's `auth` is `none` or `{type: credential, credential_id}`. The rest: `app/domain/credentials.py`, `app/storage/auth.py` (public auth JSON + encrypted secret), `app/storage/credentials.py` (also the one-time move of pre-T021 source secrets), `app/api/credentials.py` (`/api/credentials`). A source's secret is resolved from its credential at each connection, so rotation needs no project edits.
 - Custom rules (T020): `app/domain/custom_rules.py` (model, preview contract), `app/domain/user_promql.py` (lexer that injects the scope into user PromQL and rejects `@`, negative `offset`, top-level comparisons), `app/sources/prometheus/custom.py` (rule → `SignalDef`), `app/analysis/rules/custom.py` (rule → analysis `Rule` with its own thresholds). Rules travel with `CollectionResult.custom_rules` to the detector and the report.
+- Scope diagnostics (T022): `app/domain/diagnostics.py` (`ScopeDiagnostics`, `FilterCheck`, bounds); each source kind has a `diagnostics.py` that builds its snapshot at the end of `collect`; it travels in `CollectionResult.diagnostics` to `AnalysisReport.diagnostics` (schema 2.8) and the report's Scope tab.
 - `app/analysis/` — `engine.py` (`RobustDetector`, trend summary), `baseline.py` (median/MAD), `detect.py`, `rules/` (`base.py` rule model + formatting; one module per category: `host`, `container`, `requests`, `proxy`, `database`, `nodejs`, `golang`, `edge`, `security`, `application`, `host_security`, `alerting`), `derive.py`.
 - `app/ai/` — `providers.py` (provider selection, `fake`), `prompt.py`, `validation.py` (validates model output references real finding IDs), `openai_adapter.py`.
 - `app/storage/` — SQLAlchemy Core (no ORM) + Alembic migrations in `backend/migrations/`, run upgrade-only at startup. Reports are stored as versioned JSON snapshots (`REPORT_SCHEMA_VERSION`).
 - `app/api/` — routes under `/api`; errors are RFC 9457 `application/problem+json` with a stable `code` (`problems.py`).
-- `frontend/src/` — routes `/` (project list), `/credentials` (credentials), `/analyses/:id` (job progress), `/reports/:id` with `findings`, `findings/:findingId`, `timeline`, `trends` children. Server state via TanStack Vue Query (no Pinia); API client typed from generated `schema.d.ts`; styling is plain CSS: tokens in `styles/tokens.css`, shared dashboard classes (panels, 24-column grid, chips) in `styles/base.css`; fonts are self-hosted IBM Plex via `@fontsource`.
+- `frontend/src/` — routes `/` (project list), `/credentials` (credentials), `/analyses/:id` (job progress), `/reports/:id` with `findings`, `findings/:findingId`, `timeline`, `trends`, `scope` children. Server state via TanStack Vue Query (no Pinia); API client typed from generated `schema.d.ts`; styling is plain CSS: tokens in `styles/tokens.css`, shared dashboard classes (panels, 24-column grid, chips) in `styles/base.css`; fonts are self-hosted IBM Plex via `@fontsource`.
 
 ## Invariants to preserve
 
@@ -70,6 +71,7 @@ Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source 
 - Baselines use only data preceding the analysed bucket. Severity reflects magnitude/duration; confidence reflects data quality — keep them separate.
 - HTTP 5xx and 4xx are analysed separately; `error_type` alone never makes a request a server failure. Latency requires histogram buckets; count-only data never yields latency.
 - Custom rule queries are always run through `scope_template` + `assert_scoped`; never send user PromQL unscoped.
+- The only Prometheus queries that may leave the scope are the T022 scope diagnostics (`app/sources/prometheus/diagnostics.py`): leave-one-matcher-out `count(...)` and label values over the catalog metrics, checked by `assert_leave_one_out`. Diagnostics never feed detection, and a failed check is a note, never a failed source.
 - Changing detector behaviour means bumping `DETECTOR_VERSION` in `app/domain/detector_config.py`. Detector defaults and the numerical policy are specified in `docs/DECISIONS.md` §5.
 - API conventions: `snake_case`, RFC 3339 UTC timestamps with `Z`, durations in integer seconds, UUIDv7 IDs.
 - Dependency versions are pinned exactly; TypeScript stays on 6.0.x until typescript-eslint supports 7 (see `docs/DECISIONS.md` §1).
@@ -80,4 +82,4 @@ Tests (backend pytest and frontend vitest) follow Arrange–Act–Assert, with o
 
 ## Docs
 
-`docs/DECISIONS.md` (versions, config, API/job conventions, numerical policy), `docs/ARCHITECTURE.md`, `docs/UI_SPEC.md`, `docs/OPERATIONS.md` (config, Docker networking, backups, troubleshooting), `docs/detection.md`, `docs/metrics-catalog.md`. Task history T001–T021 (all DONE) is in `docs/tasks/`; `docs/tasks/README.md` describes the task workflow if new tasks are added.
+`docs/DECISIONS.md` (versions, config, API/job conventions, numerical policy), `docs/ARCHITECTURE.md`, `docs/UI_SPEC.md`, `docs/OPERATIONS.md` (config, Docker networking, backups, troubleshooting), `docs/detection.md`, `docs/metrics-catalog.md`. Task history T001–T022 (all DONE) is in `docs/tasks/`; `docs/tasks/README.md` describes the task workflow if new tasks are added.

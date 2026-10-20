@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.7",
+  "schema_version": "2.8",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000cf",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000c1",
@@ -5239,5 +5239,68 @@
     "validation_notes": []
   },
   "custom_rules": [],
-  "totals": []
+  "totals": [],
+  "diagnostics": [
+    {
+      "kind": "cloudflare",
+      "summary": "1 hostname, 1,662,086 requests in 24 h (zone: 3,462,680)",
+      "selection": [
+        {
+          "display_name": "shop.example.com",
+          "labels": {
+            "zone": "incident.example.com",
+            "hostname": "shop.example.com"
+          },
+          "count": 1662086,
+          "unit": "requests",
+          "families": [
+            "edge"
+          ]
+        }
+      ],
+      "selection_total": 1,
+      "samples": [
+        {
+          "hostname": "shop.example.com",
+          "requests": "1662086"
+        }
+      ],
+      "checks": [
+        {
+          "part": "incident.example.com",
+          "field": "zone",
+          "matched": 3462680,
+          "matched_without": null,
+          "unit": "requests",
+          "available": [],
+          "available_truncated": false,
+          "matching": []
+        },
+        {
+          "part": "shop.example.com",
+          "field": "hostname",
+          "matched": 1662086,
+          "matched_without": null,
+          "unit": "requests",
+          "available": [
+            "api.incident.example.com",
+            "shop.example.com",
+            "static.incident.example.com",
+            "www.incident.example.com"
+          ],
+          "available_truncated": false,
+          "matching": [
+            "shop.example.com"
+          ]
+        }
+      ],
+      "requests": [
+        "# Cloudflare GraphQL, one request per 86400 s chunk [$start, $end)\n{\n  viewer {\n    zones(filter: {zoneTag: \"0123456789abcdef0123456789abcdef\"}) {\n      events: firewallEventsAdaptiveGroups(\n        limit: 10000\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", clientRequestHTTPHost_in: [\"shop.example.com\"]}\n        orderBy: [datetimeFiveMinutes_ASC]\n      ) {\n        count\n        dimensions { datetimeFiveMinutes action }\n      }\n    }\n  }\n}",
+        "# Cloudflare GraphQL, one request per 86400 s chunk [$start, $end)\n{\n  viewer {\n    zones(filter: {zoneTag: \"0123456789abcdef0123456789abcdef\"}) {\n      timing: httpRequestsAdaptiveGroups(\n        limit: 10000\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", requestSource: \"eyeball\", clientRequestHTTPHost_in: [\"shop.example.com\"]}\n        orderBy: [datetimeFiveMinutes_ASC]\n      ) {\n        quantiles { edgeTimeToFirstByteMsP95 edgeTimeToFirstByteMsP99 originResponseDurationMsP95 }\n        dimensions { datetimeFiveMinutes }\n      }\n    }\n  }\n}",
+        "# Cloudflare GraphQL, one request per 86400 s chunk [$start, $end)\n{\n  viewer {\n    zones(filter: {zoneTag: \"0123456789abcdef0123456789abcdef\"}) {\n      requests: httpRequestsAdaptiveGroups(\n        limit: 10000\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", requestSource: \"eyeball\", clientRequestHTTPHost_in: [\"shop.example.com\"]}\n        orderBy: [datetimeFiveMinutes_ASC]\n      ) {\n        count\n        avg { sampleInterval }\n        dimensions { datetimeFiveMinutes }\n      }\n      status5xx: httpRequestsAdaptiveGroups(\n        limit: 10000\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", requestSource: \"eyeball\", clientRequestHTTPHost_in: [\"shop.example.com\"], edgeResponseStatus_geq: 500, edgeResponseStatus_lt: 600}\n        orderBy: [datetimeFiveMinutes_ASC]\n      ) {\n        count\n        dimensions { datetimeFiveMinutes }\n      }\n      origin52x: httpRequestsAdaptiveGroups(\n        limit: 10000\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", requestSource: \"eyeball\", clientRequestHTTPHost_in: [\"shop.example.com\"], edgeResponseStatus_geq: 520, edgeResponseStatus_lt: 531}\n        orderBy: [datetimeFiveMinutes_ASC]\n      ) {\n        count\n        dimensions { datetimeFiveMinutes }\n      }\n      status404: httpRequestsAdaptiveGroups(\n        limit: 10000\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", requestSource: \"eyeball\", clientRequestHTTPHost_in: [\"shop.example.com\"], edgeResponseStatus: 404}\n        orderBy: [datetimeFiveMinutes_ASC]\n      ) {\n        count\n        dimensions { datetimeFiveMinutes }\n      }\n      status4xx: httpRequestsAdaptiveGroups(\n        limit: 10000\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", requestSource: \"eyeball\", clientRequestHTTPHost_in: [\"shop.example.com\"], edgeResponseStatus_geq: 400, edgeResponseStatus_lt: 500}\n        orderBy: [datetimeFiveMinutes_ASC]\n      ) {\n        count\n        dimensions { datetimeFiveMinutes }\n      }\n      cacheHits: httpRequestsAdaptiveGroups(\n        limit: 10000\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", requestSource: \"eyeball\", clientRequestHTTPHost_in: [\"shop.example.com\"], cacheStatus_in: [\"hit\", \"stale\", \"updating\", \"revalidated\"]}\n        orderBy: [datetimeFiveMinutes_ASC]\n      ) {\n        count\n        dimensions { datetimeFiveMinutes }\n      }\n    }\n  }\n}",
+        "# Cloudflare GraphQL, requests per hostname\n{\n  viewer {\n    zones(filter: {zoneTag: \"0123456789abcdef0123456789abcdef\"}) {\n      hosts: httpRequestsAdaptiveGroups(\n        limit: 50\n        filter: {datetime_geq: \"$start\", datetime_lt: \"$end\", requestSource: \"eyeball\", clientRequestHTTPHost_in: [\"shop.example.com\"]}\n        orderBy: [count_DESC]\n      ) {\n        count\n        dimensions { clientRequestHTTPHost }\n      }\n    }\n  }\n}"
+      ],
+      "notes": []
+    }
+  ]
 }

@@ -61,6 +61,7 @@ from app.sources.grafana.catalog import (
     shown_annotations,
     signals_of,
 )
+from app.sources.grafana.diagnostics import grafana_diagnostics
 from app.sources.totals import event_total
 
 log = logging.getLogger("app.sources.grafana")
@@ -135,6 +136,7 @@ class GrafanaMetricsSource:
         self.instance_labels = list(instance_labels)
         self._now = now or (lambda: datetime.now(UTC))
         self._selection: Selection | None = None
+        self._rules: list[AlertRule] = []
 
     async def source_info(self) -> SourceInfo:
         return SourceInfo(
@@ -146,10 +148,9 @@ class GrafanaMetricsSource:
     async def selection(self) -> Selection:
         """The configured rules, read once per source (one analysis or probe)."""
         if self._selection is None:
+            self._rules = await self.api.rules()
             rules = [
-                r
-                for r in await self.api.rules()
-                if selects(r, self.folders, self.rule_uids, self.rule_labels)
+                r for r in self._rules if selects(r, self.folders, self.rule_uids, self.rule_labels)
             ]
             rules.sort(key=lambda r: (r.folder, r.title, r.uid))
             self._selection = Selection(rules[:MAX_RULES], truncated=len(rules) > MAX_RULES)
@@ -304,8 +305,19 @@ class GrafanaMetricsSource:
             end,
             lambda s, lo, hi: sum(start < hi and stop > lo for start, stop in firings[s.series_id]),
         )
+        diagnostics = grafana_diagnostics(
+            self._rules,
+            selection.rules,
+            self.folders,
+            self.rule_uids,
+            self.rule_labels,
+            self.instance_labels,
+        )
         return CollectionResult(
-            series=series, exclusions=exclusions, totals=[firings_total] if firings_total else []
+            series=series,
+            exclusions=exclusions,
+            totals=[firings_total] if firings_total else [],
+            diagnostics=[diagnostics],
         )
 
     def _instances(self, rule: AlertRule, history: History) -> tuple[dict[str, _Instance], int]:

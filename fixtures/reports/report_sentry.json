@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.7",
+  "schema_version": "2.8",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e5",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -5241,6 +5241,135 @@
           "coverage": 1.0
         }
       ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "kind": "sentry",
+      "summary": "2 projects, 13,557 error events in 24 h",
+      "selection": [
+        {
+          "display_name": "shop-api",
+          "labels": {
+            "project": "shop-api",
+            "project_id": "1",
+            "environment": "production",
+            "tag:team": "shop"
+          },
+          "count": 9246,
+          "unit": "events",
+          "families": [
+            "app_errors"
+          ]
+        },
+        {
+          "display_name": "shop-web",
+          "labels": {
+            "project": "shop-web",
+            "project_id": "2",
+            "environment": "production",
+            "tag:team": "shop"
+          },
+          "count": 4311,
+          "unit": "events",
+          "families": [
+            "app_errors"
+          ]
+        }
+      ],
+      "selection_total": 2,
+      "samples": [
+        {
+          "project": "shop-api",
+          "issue": "SHOP-API-4",
+          "title": "TypeError: 'NoneType' object is not subscriptable"
+        },
+        {
+          "project": "shop-api",
+          "issue": "SHOP-API-1",
+          "title": "TimeoutError: upstream request timed out after 30s"
+        },
+        {
+          "project": "shop-api",
+          "issue": "SHOP-API-2",
+          "title": "KeyError: 'currency'"
+        },
+        {
+          "project": "shop-api",
+          "issue": "SHOP-API-3",
+          "title": "ValidationError: invalid email address"
+        },
+        {
+          "project": "shop-web",
+          "issue": "SHOP-WEB-1",
+          "title": "TimeoutError: upstream request timed out after 30s"
+        }
+      ],
+      "checks": [
+        {
+          "part": "shop-api",
+          "field": "project",
+          "matched": 9246,
+          "matched_without": null,
+          "unit": "events",
+          "available": [],
+          "available_truncated": false,
+          "matching": []
+        },
+        {
+          "part": "shop-web",
+          "field": "project",
+          "matched": 4311,
+          "matched_without": null,
+          "unit": "events",
+          "available": [],
+          "available_truncated": false,
+          "matching": []
+        },
+        {
+          "part": "production",
+          "field": "environment",
+          "matched": 13557,
+          "matched_without": 13557,
+          "unit": "events",
+          "available": [
+            "production",
+            "staging"
+          ],
+          "available_truncated": false,
+          "matching": [
+            "production"
+          ]
+        },
+        {
+          "part": "team:shop",
+          "field": "tag",
+          "matched": 13557,
+          "matched_without": 13557,
+          "unit": "events",
+          "available": [],
+          "available_truncated": false,
+          "matching": []
+        }
+      ],
+      "requests": [
+        "# Sentry events-timeseries, one request per 604800 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=1&environment=production&query=team:%22shop%22&yAxis=count()&yAxis=count_unique(user)&interval=5m&start=$start&end=$end",
+        "# Sentry events-timeseries, one request per 259200 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=1&environment=production&query=issue:[SHOP-API-4,SHOP-API-1,SHOP-API-2,SHOP-API-3]+team:%22shop%22&yAxis=count()&groupBy=issue&topEvents=4&sort=-count()&excludeOther=1&interval=5m&start=$start&end=$end",
+        "# All error events minus those of SHOP-API-4, SHOP-API-1, SHOP-API-2, SHOP-API-3\n# Sentry events-timeseries, one request per 604800 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=1&environment=production&query=team:%22shop%22&yAxis=count()&yAxis=count_unique(user)&interval=5m&start=$start&end=$end",
+        "# Sentry events-timeseries, one request per 604800 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=2&environment=production&query=team:%22shop%22&yAxis=count()&yAxis=count_unique(user)&interval=5m&start=$start&end=$end",
+        "# Sentry events-timeseries, one request per 259200 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=2&environment=production&query=issue:[SHOP-WEB-1,SHOP-WEB-2,SHOP-WEB-3]+team:%22shop%22&yAxis=count()&groupBy=issue&topEvents=3&sort=-count()&excludeOther=1&interval=5m&start=$start&end=$end",
+        "# All error events minus those of SHOP-WEB-1, SHOP-WEB-2, SHOP-WEB-3\n# Sentry events-timeseries, one request per 604800 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=2&environment=production&query=team:%22shop%22&yAxis=count()&yAxis=count_unique(user)&interval=5m&start=$start&end=$end",
+        "# Sentry events-timeseries, one request per 604800 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=spans&project=1&environment=production&query=is_transaction:true+team:%22shop%22&yAxis=count()&yAxis=failure_rate()&yAxis=p95(span.duration)&yAxis=p99(span.duration)&interval=5m&start=$start&end=$end",
+        "# Sentry events-timeseries, one request per 604800 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=spans&project=2&environment=production&query=is_transaction:true+team:%22shop%22&yAxis=count()&yAxis=failure_rate()&yAxis=p95(span.duration)&yAxis=p99(span.duration)&interval=5m&start=$start&end=$end",
+        "# Sentry events-timeseries, one request per 604800 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=1&environment=production&query=error.unhandled:true+team:%22shop%22&yAxis=count()&interval=5m&start=$start&end=$end",
+        "# Sentry events-timeseries, one request per 604800 s chunk [$start, $end)\nGET /api/0/organizations/acme/events-timeseries/?dataset=errors&project=2&environment=production&query=error.unhandled:true+team:%22shop%22&yAxis=count()&interval=5m&start=$start&end=$end",
+        "GET /api/0/organizations/acme/events/?dataset=errors&project=1&project=2&environment=production&query=team:%22shop%22&field=count()&start=$start&end=$end",
+        "GET /api/0/projects/acme/shop-api/environments/",
+        "GET /api/0/projects/acme/shop-web/environments/",
+        "GET /api/0/organizations/acme/events/?dataset=errors&project=1&project=2&query=team:%22shop%22&field=count()&start=$start&end=$end",
+        "GET /api/0/organizations/acme/events/?dataset=errors&project=1&project=2&environment=production&field=count()&start=$start&end=$end"
+      ],
+      "notes": []
     }
   ]
 }

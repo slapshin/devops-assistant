@@ -1457,6 +1457,51 @@ describe("report", () => {
     await waitFor(() => expect(router.currentRoute.value.name).toBe("findings"));
     await waitFor(() => expect(screen.getByRole("tab", { name: /Findings/ })).toHaveFocus());
   });
+
+  it("scope tab shows what each filter part selected", async () => {
+    await renderAt(`${report(grafanaReport)}/scope`);
+
+    const panel = await screen.findByRole("region", { name: "Grafana" });
+    const checks = within(panel).getByRole("table", { name: "Filter checks of Grafana" });
+
+    expect(within(panel).getByText(/4 of 5 rules/)).toBeInTheDocument();
+    expect(within(checks).getAllByRole("row")).toHaveLength(1 + (grafanaReport.diagnostics[0]?.checks.length ?? 0));
+    expect(within(checks).getByRole("rowheader", { name: /Folder Shop/ })).toBeInTheDocument();
+    expect(within(checks).getAllByText("OK")).toHaveLength(2);
+    expect(within(panel).getByRole("table", { name: "Selected by Grafana" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Scope" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("scope tab flags a filter part that excludes all data", async () => {
+    const [diagnostics] = sentryReport.diagnostics;
+    const env = { part: "prod", field: "environment", matched: 0, matched_without: 432, unit: "events", available: ["production", "staging"], available_truncated: false, matching: [] };
+    const wrong = { ...sentryReport, analysis_id: "wrong-env", diagnostics: [{ ...diagnostics, checks: [env] }] };
+
+    await renderAt(`${report(wrong)}/scope`);
+
+    const row = await screen.findByRole("row", { name: /Environment prod/ });
+    expect(within(row).getByText("Excludes all data")).toHaveClass("v-critical");
+    expect(within(row).getByText("432 events")).toBeInTheDocument();
+    expect(within(row).getByText("production")).not.toHaveClass("on");
+    expect(screen.getByRole("tab", { name: "Scope 1" })).toBeInTheDocument();
+  });
+
+  it("scope tab explains old reports and shows failed sources", async () => {
+    await renderAt(`${report(healthy)}/scope`);
+
+    expect(await screen.findByText(/predates scope diagnostics/)).toBeInTheDocument();
+
+    const failed = {
+      ...sentryReport,
+      analysis_id: "failed-source",
+      exclusions: [{ code: "source_unavailable", message: "prometheus source failed (timeout): no answer", family: "cpu" }],
+    };
+    await renderAt(`${report(failed)}/scope`);
+
+    const panel = await screen.findByRole("region", { name: "Prometheus" });
+    expect(within(panel).getByText("prometheus source failed (timeout): no answer")).toBeInTheDocument();
+    expect(screen.getAllByRole("region", { name: "Sentry" })).toHaveLength(1);
+  });
 });
 
 describe("theme", () => {

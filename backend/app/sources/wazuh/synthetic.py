@@ -157,7 +157,14 @@ class SyntheticWazuhApi:
     async def group_members(self, groups: Sequence[str], start: int, end: int) -> GroupMembers:
         return GroupMembers({group: list(SYNTHETIC_GROUPS.get(group, [])) for group in groups})
 
-    async def agents(self, names: Sequence[str] | None, start: int, end: int) -> AgentList:
+    async def agents(
+        self,
+        names: Sequence[str] | None,
+        start: int,
+        end: int,
+        labels: Sequence[tuple[str, str]] | None = None,
+    ) -> AgentList:
+        """Synthetic agents carry no labels, so ``labels`` changes nothing."""
         grid_start = self._grid_start()
         span = self._range(start, end)
         found = []

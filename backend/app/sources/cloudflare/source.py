@@ -27,6 +27,7 @@ from app.domain.report import AnalysisWindows, Exclusion, SourceInfo
 from app.sources.base import HISTORY_DAYS
 from app.sources.cloudflare.api import (
     DATASETS,
+    HTTP_DATASET,
     SECONDS_PER_DAY,
     Chunk,
     CloudflareApi,
@@ -40,6 +41,7 @@ from app.sources.cloudflare.catalog import (
     Query,
     display_query,
 )
+from app.sources.cloudflare.diagnostics import cloudflare_diagnostics
 
 log = logging.getLogger("app.sources.cloudflare")
 
@@ -309,7 +311,17 @@ class CloudflareMetricsSource:
             len(exclusions),
             total,
         )
-        return CollectionResult(series=series, exclusions=exclusions)
+        cancel.raise_if_cancelled()
+        diagnostics = await cloudflare_diagnostics(
+            self.api,
+            self.zone_id,
+            self.zone_name,
+            self.hostnames,
+            end,
+            settings[HTTP_DATASET].max_duration,
+            [s.query for s in series],
+        )
+        return CollectionResult(series=series, exclusions=exclusions, diagnostics=[diagnostics])
 
     def _series(
         self,

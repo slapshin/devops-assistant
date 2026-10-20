@@ -464,8 +464,8 @@ async def test_failed_chunks_are_unknown_and_disclosed() -> None:
 
 async def test_too_many_agents_are_truncated_and_silent_agents_disclosed() -> None:
     class Many(SyntheticWazuhApi):
-        async def agents(self, names: Any, start: int, end: int) -> AgentList:
-            found = await super().agents(names, start, end)
+        async def agents(self, names: Any, start: int, end: int, labels: Any = None) -> AgentList:
+            found = await super().agents(names, start, end, labels)
             return AgentList(found.agents, truncated=True)
 
     many = Many("healthy", INDEX, ["web-1"])
@@ -475,8 +475,8 @@ async def test_too_many_agents_are_truncated_and_silent_agents_disclosed() -> No
     assert [e.code for e in result.exclusions] == ["series_truncated"]
 
     class Quiet(SyntheticWazuhApi):
-        async def agents(self, names: Any, start: int, end: int) -> AgentList:
-            found = await super().agents(names, start, end)
+        async def agents(self, names: Any, start: int, end: int, labels: Any = None) -> AgentList:
+            found = await super().agents(names, start, end, labels)
             return AgentList([a for a in found.agents if a.name != "gone"])
 
     quiet = Quiet("healthy", INDEX, ["gone", "web-1"])
@@ -527,7 +527,7 @@ async def test_a_truncated_group_makes_the_report_partial() -> None:
 
 async def test_no_alerts_at_all_is_unsupported_not_healthy() -> None:
     class Empty(SyntheticWazuhApi):
-        async def agents(self, names: Any, start: int, end: int) -> AgentList:
+        async def agents(self, names: Any, start: int, end: int, labels: Any = None) -> AgentList:
             return AgentList([])
 
     result, caps = await collect(WazuhMetricsSource(Empty("healthy", INDEX, ["x"]), INDEX, ["x"]))

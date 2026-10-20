@@ -38,6 +38,9 @@ const onCredentials = computed(() => route.path.startsWith("/credentials"));
       <RouterLink :to="`/reports/${reportId}/trends`" :class="{ on: reportView === 'trends' }" aria-label="Report trends" title="Trends">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h12" /><path d="M5 12V9M9 12V5M13 12V7" /></svg>
       </RouterLink>
+      <RouterLink :to="`/reports/${reportId}/scope`" :class="{ on: reportView === 'scope' }" aria-label="Report scope" title="Scope">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h13l-5 6v5l-3 1.5V9.5z" /></svg>
+      </RouterLink>
     </template>
   </nav>
 </template>

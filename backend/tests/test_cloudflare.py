@@ -353,6 +353,12 @@ class FakeApi:
     async def daily_requests(self, first: date, last: date) -> dict[date, float]:
         return {last - timedelta(days=d): 86400.0 for d in range(10)}
 
+    async def host_requests(
+        self, start: int, end: int, hostnames: list[str], limit: int
+    ) -> dict[str, float]:
+        hosts = {"shop.example.com": float(end - start), "www.example.com": 10.0}
+        return {h: n for h, n in hosts.items() if not hostnames or h in hostnames}
+
 
 async def collect(api: FakeApi) -> tuple[list[Any], Any]:
     source = CloudflareMetricsSource(api, ZONE, ["shop.example.com"])

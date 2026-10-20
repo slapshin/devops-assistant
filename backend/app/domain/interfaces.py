@@ -14,6 +14,7 @@ from pydantic import Field
 from app.domain.common import Contract, Scope, Severity, SourceKind, UtcDatetime
 from app.domain.custom_rules import CustomRule
 from app.domain.detector_config import DetectorConfig
+from app.domain.diagnostics import ScopeDiagnostics
 from app.domain.explanation import Explanation, ExplanationInput, ExplanationStatus
 from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
 from app.domain.jobs import AnalysisJob, JobError, JobState, StageProgress
@@ -106,6 +107,9 @@ class CollectionResult(Contract):
     )
     totals: list[EventTotal] = Field(
         default_factory=list, description="Daily event totals the source counted."
+    )
+    diagnostics: list[ScopeDiagnostics] = Field(
+        default_factory=list, description="What the source's filter selected (T022)."
     )
 
 

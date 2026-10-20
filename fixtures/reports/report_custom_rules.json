@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.7",
+  "schema_version": "2.8",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e8",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -3876,5 +3876,400 @@
       "identity_labels": []
     }
   ],
-  "totals": []
+  "totals": [],
+  "diagnostics": [
+    {
+      "kind": "prometheus",
+      "summary": "6 databases, 2 nodes, 2 filesystems, 2 routes, 2 containers, 2 proxies, 2 processes, 1 upstream, 1 custom, 85 series",
+      "selection": [
+        {
+          "display_name": "redis · redis://redis-replica:6379",
+          "labels": {
+            "kind": "database",
+            "job": "redis",
+            "instance": "redis://redis-replica:6379"
+          },
+          "count": 11,
+          "unit": "series",
+          "families": [
+            "database"
+          ]
+        },
+        {
+          "display_name": "redis · redis://redis-master:6379",
+          "labels": {
+            "kind": "database",
+            "job": "redis",
+            "instance": "redis://redis-master:6379"
+          },
+          "count": 10,
+          "unit": "series",
+          "families": [
+            "database"
+          ]
+        },
+        {
+          "display_name": "mysql · mysql-replica:9104",
+          "labels": {
+            "kind": "database",
+            "job": "mysql",
+            "instance": "mysql-replica:9104"
+          },
+          "count": 9,
+          "unit": "series",
+          "families": [
+            "database"
+          ]
+        },
+        {
+          "display_name": "mysql · mysql-primary:9104",
+          "labels": {
+            "kind": "database",
+            "job": "mysql",
+            "instance": "mysql-primary:9104"
+          },
+          "count": 7,
+          "unit": "series",
+          "families": [
+            "database"
+          ]
+        },
+        {
+          "display_name": "inventory · inventory:2112",
+          "labels": {
+            "kind": "process",
+            "job": "inventory",
+            "instance": "inventory:2112"
+          },
+          "count": 6,
+          "unit": "series",
+          "families": [
+            "golang"
+          ]
+        },
+        {
+          "display_name": "storefront · storefront:9464",
+          "labels": {
+            "kind": "process",
+            "job": "storefront",
+            "instance": "storefront:9464"
+          },
+          "count": 6,
+          "unit": "series",
+          "families": [
+            "nodejs"
+          ]
+        },
+        {
+          "display_name": "traefik · checkout@swarm · checkout-api@swarm",
+          "labels": {
+            "kind": "proxy",
+            "job": "traefik",
+            "router": "checkout@swarm",
+            "service": "checkout-api@swarm"
+          },
+          "count": 6,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "request_failures",
+            "client_errors",
+            "latency"
+          ]
+        },
+        {
+          "display_name": "checkout-api · GET /api/v1/orders/:order",
+          "labels": {
+            "kind": "route",
+            "job": "checkout-api",
+            "http_route": "/api/v1/orders/:order",
+            "http_request_method": "GET"
+          },
+          "count": 5,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "client_errors",
+            "latency"
+          ]
+        },
+        {
+          "display_name": "checkout-api · GET /internal/order-sla",
+          "labels": {
+            "kind": "route",
+            "job": "checkout-api",
+            "http_route": "/internal/order-sla",
+            "http_request_method": "GET"
+          },
+          "count": 5,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "client_errors",
+            "latency"
+          ]
+        },
+        {
+          "display_name": "postgres · pg-primary:9187 · checkout",
+          "labels": {
+            "kind": "database",
+            "job": "postgres",
+            "instance": "pg-primary:9187",
+            "datname": "checkout"
+          },
+          "count": 5,
+          "unit": "series",
+          "families": [
+            "database"
+          ]
+        },
+        {
+          "display_name": "postgres · pg-primary:9187",
+          "labels": {
+            "kind": "database",
+            "job": "postgres",
+            "instance": "pg-primary:9187"
+          },
+          "count": 3,
+          "unit": "series",
+          "families": [
+            "database"
+          ]
+        },
+        {
+          "display_name": "checkout-api",
+          "labels": {
+            "kind": "custom",
+            "job": "checkout-api"
+          },
+          "count": 2,
+          "unit": "series",
+          "families": [
+            "custom"
+          ]
+        },
+        {
+          "display_name": "node · shop-production",
+          "labels": {
+            "kind": "node",
+            "job": "node",
+            "instance": "shop-production"
+          },
+          "count": 2,
+          "unit": "series",
+          "families": [
+            "cpu",
+            "memory"
+          ]
+        },
+        {
+          "display_name": "node · shop-production-2",
+          "labels": {
+            "kind": "node",
+            "job": "node",
+            "instance": "shop-production-2"
+          },
+          "count": 2,
+          "unit": "series",
+          "families": [
+            "cpu",
+            "memory"
+          ]
+        },
+        {
+          "display_name": "shop-production · / (/dev/sda1)",
+          "labels": {
+            "kind": "filesystem",
+            "job": "node",
+            "instance": "shop-production",
+            "device": "/dev/sda1",
+            "mountpoint": "/"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "filesystem"
+          ]
+        },
+        {
+          "display_name": "shop-production-2 · / (/dev/sda1)",
+          "labels": {
+            "kind": "filesystem",
+            "job": "node",
+            "instance": "shop-production-2",
+            "device": "/dev/sda1",
+            "mountpoint": "/"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "filesystem"
+          ]
+        },
+        {
+          "display_name": "shop_checkout-api.1 @ shop-production",
+          "labels": {
+            "kind": "container",
+            "instance": "shop-production",
+            "container": "shop_checkout-api.1"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "container"
+          ]
+        },
+        {
+          "display_name": "shop_checkout-api.1 @ shop-production-2",
+          "labels": {
+            "kind": "container",
+            "instance": "shop-production-2",
+            "container": "shop_checkout-api.1"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "container"
+          ]
+        },
+        {
+          "display_name": "traefik · checkout-api@swarm → http://10.0.1.7:8080",
+          "labels": {
+            "kind": "upstream",
+            "job": "traefik",
+            "service": "checkout-api@swarm",
+            "url": "http://10.0.1.7:8080"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "proxy"
+          ]
+        },
+        {
+          "display_name": "traefik · websecure",
+          "labels": {
+            "kind": "proxy",
+            "job": "traefik",
+            "entrypoint": "websecure"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "proxy"
+          ]
+        }
+      ],
+      "selection_total": 20,
+      "samples": [
+        {
+          "project": "shop",
+          "job": "node",
+          "instance": "shop-production"
+        },
+        {
+          "project": "shop",
+          "job": "node",
+          "instance": "shop-production",
+          "device": "/dev/sda1",
+          "mountpoint": "/"
+        },
+        {
+          "project": "shop",
+          "job": "checkout-api",
+          "http_route": "/api/v1/orders/:order",
+          "http_request_method": "GET"
+        },
+        {
+          "project": "shop",
+          "instance": "shop-production",
+          "container": "shop_checkout-api.1"
+        },
+        {
+          "project": "shop",
+          "job": "traefik",
+          "router": "checkout@swarm",
+          "service": "checkout-api@swarm"
+        }
+      ],
+      "checks": [
+        {
+          "part": "project=\"shop\"",
+          "field": "matcher",
+          "matched": 85,
+          "matched_without": 85,
+          "unit": "series",
+          "available": [
+            "shop"
+          ],
+          "available_truncated": false,
+          "matching": [
+            "shop"
+          ]
+        }
+      ],
+      "requests": [
+        "1 - avg by (job, instance) (rate(node_cpu_seconds_total{project=\"shop\", mode=\"idle\"}[5m]))",
+        "1 - max by (job, instance) (node_memory_MemAvailable_bytes{project=\"shop\"}) / max by (job, instance) (node_memory_MemTotal_bytes{project=\"shop\"} > 0)",
+        "1 - max by (job, instance, device, mountpoint) (node_filesystem_avail_bytes{project=\"shop\", fstype=~\"ext[234]|xfs|btrfs|zfs\", mountpoint!~\"/(run|dev|sys|proc)($|/).*\"}) / max by (job, instance, device, mountpoint) (node_filesystem_size_bytes{project=\"shop\", fstype=~\"ext[234]|xfs|btrfs|zfs\", mountpoint!~\"/(run|dev|sys|proc)($|/).*\"} > 0)",
+        "sum by (job, http_route, http_request_method, server_address) (rate(http_server_request_duration_seconds_count{project=\"shop\"}[5m]))",
+        "sum by (job, http_route, http_request_method, server_address) (rate(http_server_request_duration_seconds_count{project=\"shop\", http_response_status_code=\"404\"}[5m]))",
+        "sum by (job, http_route, http_request_method, server_address) (rate(http_server_request_duration_seconds_count{project=\"shop\", http_response_status_code=~\"4..\"}[5m]))",
+        "histogram_quantile(0.95, sum by (job, http_route, http_request_method, server_address, le) (rate(http_server_request_duration_seconds_bucket{project=\"shop\"}[5m])))",
+        "histogram_quantile(0.99, sum by (job, http_route, http_request_method, server_address, le) (rate(http_server_request_duration_seconds_bucket{project=\"shop\"}[5m])))",
+        "sum by (instance, container) (label_replace(rate(container_cpu_usage_seconds_total{project=\"shop\", name!=\"\"}[5m]), \"container\", \"$1\", \"name\", \"(.+?)(\\\\.[a-z0-9]{25})?\"))",
+        "(sum by (job, router, service) (rate(traefik_router_requests_total{project=\"shop\"}[5m]))) or (sum by (job, service) (rate(traefik_service_requests_total{project=\"shop\"}[5m])) unless on (job, service) rate(traefik_router_requests_total{project=\"shop\"}[5m]))",
+        "(sum by (job, router, service) (rate(traefik_router_requests_total{project=\"shop\", code=~\"5..\"}[5m]))) or (sum by (job, service) (rate(traefik_service_requests_total{project=\"shop\", code=~\"5..\"}[5m])) unless on (job, service) rate(traefik_router_requests_total{project=\"shop\"}[5m]))",
+        "(sum by (job, router, service) (rate(traefik_router_requests_total{project=\"shop\", code=\"404\"}[5m]))) or (sum by (job, service) (rate(traefik_service_requests_total{project=\"shop\", code=\"404\"}[5m])) unless on (job, service) rate(traefik_router_requests_total{project=\"shop\"}[5m]))",
+        "(sum by (job, router, service) (rate(traefik_router_requests_total{project=\"shop\", code=~\"4..\"}[5m]))) or (sum by (job, service) (rate(traefik_service_requests_total{project=\"shop\", code=~\"4..\"}[5m])) unless on (job, service) rate(traefik_router_requests_total{project=\"shop\"}[5m]))",
+        "1 - min by (job, service, url) (traefik_service_server_up{project=\"shop\"})",
+        "histogram_quantile(0.95, (sum by (job, router, service, le) (rate(traefik_router_request_duration_seconds_bucket{project=\"shop\"}[5m]))) or (sum by (job, service, le) (rate(traefik_service_request_duration_seconds_bucket{project=\"shop\"}[5m])) unless on (job, service) rate(traefik_router_requests_total{project=\"shop\"}[5m])))",
+        "histogram_quantile(0.99, (sum by (job, router, service, le) (rate(traefik_router_request_duration_seconds_bucket{project=\"shop\"}[5m]))) or (sum by (job, service, le) (rate(traefik_service_request_duration_seconds_bucket{project=\"shop\"}[5m])) unless on (job, service) rate(traefik_router_requests_total{project=\"shop\"}[5m])))",
+        "sum by (job, entrypoint) (traefik_open_connections{project=\"shop\"})",
+        "1 - max by (job, instance) (pg_up{project=\"shop\"})",
+        "sum by (job, instance) (pg_stat_database_numbackends{project=\"shop\"}) / max by (job, instance) (pg_settings_max_connections{project=\"shop\"} > 0)",
+        "max by (job, instance) (pg_replication_lag_seconds{project=\"shop\"})",
+        "sum by (job, instance, datname) (rate(pg_stat_database_xact_commit{project=\"shop\", datname!~\"|template[01]\"}[5m])) + sum by (job, instance, datname) (rate(pg_stat_database_xact_rollback{project=\"shop\", datname!~\"|template[01]\"}[5m]))",
+        "sum by (job, instance, datname) (rate(pg_stat_database_xact_rollback{project=\"shop\", datname!~\"|template[01]\"}[5m]))",
+        "sum by (job, instance, datname) (increase(pg_stat_database_deadlocks{project=\"shop\", datname!~\"|template[01]\"}[5m]))",
+        "sum by (job, instance, datname) (rate(pg_stat_database_temp_bytes{project=\"shop\", datname!~\"|template[01]\"}[5m]))",
+        "max by (job, instance, datname) (pg_stat_activity_max_tx_duration{project=\"shop\", datname!~\"|template[01]\"})",
+        "1 - max by (job, instance) (mysql_up{project=\"shop\"})",
+        "max by (job, instance) (mysql_global_status_threads_connected{project=\"shop\"}) / max by (job, instance) (mysql_global_variables_max_connections{project=\"shop\"} > 0)",
+        "sum by (job, instance) (increase(mysql_global_status_connection_errors_total{project=\"shop\", error=\"max_connections\"}[5m]))",
+        "sum by (job, instance) (rate(mysql_global_status_questions{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(mysql_global_status_slow_queries{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(mysql_global_status_innodb_row_lock_waits{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(mysql_global_status_created_tmp_disk_tables{project=\"shop\"}[5m]))",
+        "max by (job, instance) (mysql_slave_status_seconds_behind_master{project=\"shop\"})",
+        "1 - min by (job, instance) (mysql_slave_status_slave_sql_running{project=\"shop\"} * mysql_slave_status_slave_io_running{project=\"shop\"})",
+        "1 - max by (job, instance) (redis_up{project=\"shop\"})",
+        "max by (job, instance) (redis_connected_clients{project=\"shop\"}) / (max by (job, instance) (redis_max_clients{project=\"shop\"} > 0) or max by (job, instance) (redis_config_maxclients{project=\"shop\"} > 0))",
+        "sum by (job, instance) (increase(redis_rejected_connections_total{project=\"shop\"}[5m]))",
+        "max by (job, instance) (redis_memory_used_bytes{project=\"shop\"}) / max by (job, instance) (redis_memory_max_bytes{project=\"shop\"} > 0)",
+        "sum by (job, instance) (rate(redis_evicted_keys_total{project=\"shop\"}[5m]))",
+        "1 - min by (job, instance) (redis_rdb_last_bgsave_status{project=\"shop\"} * redis_aof_last_write_status{project=\"shop\"})",
+        "sum by (job, instance) (rate(redis_commands_processed_total{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(redis_commands_duration_seconds_total{project=\"shop\"}[5m])) / (sum by (job, instance) (rate(redis_commands_total{project=\"shop\"}[5m])) > 0)",
+        "sum by (job, instance) (rate(redis_keyspace_hits_total{project=\"shop\"}[5m])) + sum by (job, instance) (rate(redis_keyspace_misses_total{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(redis_keyspace_misses_total{project=\"shop\"}[5m]))",
+        "1 - min by (job, instance) (redis_master_link_up{project=\"shop\"})",
+        "max by (job, instance) (max_over_time(nodejs_eventloop_lag_p99_seconds{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (avg_over_time(nodejs_heap_size_used_bytes{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(nodejs_gc_duration_seconds_sum{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (max_over_time(nodejs_active_handles_total{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(process_cpu_seconds_total{project=\"shop\"}[5m])) and on (job, instance) count by (job, instance) (nodejs_version_info{project=\"shop\"})",
+        "sum by (job, instance) (process_open_fds{project=\"shop\"}) / sum by (job, instance) (process_max_fds{project=\"shop\"} > 0) and on (job, instance) count by (job, instance) (nodejs_version_info{project=\"shop\"})",
+        "sum by (job, instance) (max_over_time(go_goroutines{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (max_over_time(go_threads{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (avg_over_time(go_memstats_heap_alloc_bytes{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(go_gc_duration_seconds_sum{project=\"shop\"}[5m]))",
+        "sum by (job, instance) (rate(process_cpu_seconds_total{project=\"shop\"}[5m])) and on (job, instance) count by (job, instance) (go_info{project=\"shop\"})",
+        "sum by (job, instance) (process_open_fds{project=\"shop\"}) / sum by (job, instance) (process_max_fds{project=\"shop\"} > 0) and on (job, instance) count by (job, instance) (go_info{project=\"shop\"})",
+        "sum by (job) (rate(shop_orders_failed_total{project=\"shop\"}[5m]))",
+        "max by (job) (shop_email_queue_messages{project=\"shop\"})"
+      ],
+      "notes": []
+    }
+  ]
 }

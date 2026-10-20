@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.7",
+  "schema_version": "2.8",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e7",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -3833,6 +3833,149 @@
           "coverage": 1.0
         }
       ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "kind": "grafana",
+      "summary": "4 of 5 rules, 5 current instances",
+      "selection": [
+        {
+          "display_name": "Checkout 5xx errors",
+          "labels": {
+            "folder": "Shop",
+            "group": "Sites",
+            "rule_uid": "shop-5xx",
+            "severity": "critical",
+            "team": "web"
+          },
+          "count": 2,
+          "unit": "instances",
+          "families": [
+            "alerting"
+          ]
+        },
+        {
+          "display_name": "Disk almost full",
+          "labels": {
+            "folder": "Shop",
+            "group": "Node",
+            "rule_uid": "shop-disk",
+            "team": "ops"
+          },
+          "count": 1,
+          "unit": "instances",
+          "families": [
+            "alerting"
+          ]
+        },
+        {
+          "display_name": "Queue consumer lag",
+          "labels": {
+            "folder": "Shop",
+            "group": "Jobs",
+            "rule_uid": "shop-queue",
+            "severity": "warning"
+          },
+          "count": 1,
+          "unit": "instances",
+          "families": [
+            "alerting"
+          ]
+        },
+        {
+          "display_name": "Worker exceptions",
+          "labels": {
+            "folder": "Shop",
+            "group": "Jobs",
+            "rule_uid": "shop-worker",
+            "severity": "info"
+          },
+          "count": 1,
+          "unit": "instances",
+          "families": [
+            "alerting"
+          ]
+        }
+      ],
+      "selection_total": 4,
+      "samples": [
+        {
+          "alertname": "Checkout 5xx errors",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "instance": "shop-web-1",
+          "project": "shop"
+        },
+        {
+          "alertname": "Checkout 5xx errors",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "instance": "shop-web-2",
+          "project": "shop"
+        },
+        {
+          "alertname": "Disk almost full",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "instance": "shop-db-1",
+          "project": "shop"
+        },
+        {
+          "alertname": "Queue consumer lag",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "project": "shop",
+          "queue": "orders"
+        },
+        {
+          "alertname": "Worker exceptions",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "exception": "Lost connection to the queue, retrying\n  at consume (worker.js:42)",
+          "project": "shop"
+        }
+      ],
+      "checks": [
+        {
+          "part": "Shop",
+          "field": "folder",
+          "matched": 4,
+          "matched_without": null,
+          "unit": "rules",
+          "available": [
+            "Platform",
+            "Shop"
+          ],
+          "available_truncated": false,
+          "matching": [
+            "Shop"
+          ]
+        },
+        {
+          "part": "project=\"shop\"",
+          "field": "instance_label",
+          "matched": 5,
+          "matched_without": 6,
+          "unit": "instances",
+          "available": [
+            "blog",
+            "shop"
+          ],
+          "available_truncated": false,
+          "matching": [
+            "shop"
+          ]
+        }
+      ],
+      "requests": [
+        "GET /api/prometheus/grafana/api/v1/rules",
+        "GET /api/annotations?type=alert&alertUID=shop-5xx&from=$start&to=$end",
+        "GET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end",
+        "GET /api/annotations?type=alert&alertUID=shop-queue&from=$start&to=$end",
+        "GET /api/annotations?type=alert&alertUID=shop-worker&from=$start&to=$end"
+      ],
+      "notes": []
     }
   ]
 }

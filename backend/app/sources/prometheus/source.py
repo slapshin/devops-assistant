@@ -15,6 +15,7 @@ from app.domain.custom_rules import (
     CustomRulePreview,
     CustomRulePreviewSeries,
 )
+from app.domain.diagnostics import ScopeDiagnostics
 from app.domain.ids import series_id
 from app.domain.interfaces import (
     CancellationToken,
@@ -38,6 +39,11 @@ from app.sources.prometheus.catalog import (
 )
 from app.sources.prometheus.client import PrometheusClient, RangeResult
 from app.sources.prometheus.custom import custom_identity, custom_signal, custom_signals
+from app.sources.prometheus.diagnostics import (
+    matcher_checks,
+    prometheus_diagnostics,
+    varied_samples,
+)
 from app.sources.prometheus.promql import ScopeViolation, assert_scoped, scope_matchers
 
 log = logging.getLogger("app.sources.prometheus")
@@ -147,8 +153,7 @@ class PrometheusMetricsSource:
     async def capabilities(self, scope: Scope, windows: AnalysisWindows) -> list[MetricCapability]:
         at = _ts(windows.end_time)
         s = scope_matchers(scope)
-        custom_metrics = {m for d in self.custom for m in d.required_metrics}
-        names_regex = "|".join(sorted({*ALL_REQUIRED_METRICS, *custom_metrics}))
+        names_regex = self._names_regex()
         present = {
             r.labels.get("__name__", "")
             for r in await self._instant(
@@ -164,6 +169,11 @@ class PrometheusMetricsSource:
         for defn in self.custom:
             caps.append(await self._custom_capability(defn, scope, at, present, history_days))
         return _mark_mean_latency_fallback(caps)
+
+    def _names_regex(self) -> str:
+        """Every metric the catalog and the custom rules need, as one name regex."""
+        custom_metrics = {m for d in self.custom for m in d.required_metrics}
+        return "|".join(sorted({*ALL_REQUIRED_METRICS, *custom_metrics}))
 
     async def _history_days(self, scope: Scope, at: int) -> float | None:
         query = f"count(up{{{scope_matchers(scope)}}})"
@@ -325,6 +335,7 @@ class PrometheusMetricsSource:
         series: list[MetricSeries] = []
         top_routes: dict[str, set[tuple[str, ...]]] = {}
         collisions = _Collisions()
+        samples: dict[tuple[SignalFamily, str], dict[str, str]] = {}
         started = self._now()
         for i, defn in enumerate(plan):
             cancel.raise_if_cancelled()
@@ -349,7 +360,7 @@ class PrometheusMetricsSource:
                 )
                 continue
             series += await self._collect_signal(
-                defn, scope, windows.end_time, grid, exclusions, top_routes, collisions
+                defn, scope, windows.end_time, grid, exclusions, top_routes, collisions, samples
             )
         exclusions += collisions.exclusions()
         await progress.update(
@@ -364,6 +375,8 @@ class PrometheusMetricsSource:
         )
 
         mappings = await self._mappings(scope, windows, exclusions)
+        cancel.raise_if_cancelled()
+        diagnostics = await self._diagnostics(scope, windows, plan, series, samples)
 
         log.info(
             "collected project=%s matchers=%s catalog=%s series=%d exclusions=%d requests=%d",
@@ -379,7 +392,25 @@ class PrometheusMetricsSource:
             exclusions=exclusions,
             mappings=mappings,
             custom_rules=self.custom_rules,
+            diagnostics=[diagnostics],
         )
+
+    async def _diagnostics(
+        self,
+        scope: Scope,
+        windows: AnalysisWindows,
+        plan: Sequence[SignalDef],
+        series: Sequence[MetricSeries],
+        samples: dict[tuple[SignalFamily, str], dict[str, str]],
+    ) -> ScopeDiagnostics:
+        """What the matchers selected; checks run after collection and never fail it."""
+        names_regex = self._names_regex()
+        discovery = f'count by (__name__) ({{__name__=~"{names_regex}", {scope_matchers(scope)}}})'
+        checks, notes, requests = await matcher_checks(
+            self.client, scope, windows.end_time, names_regex
+        )
+        queries = [discovery, *requests, *(d.query.render(scope) for d in plan)]
+        return prometheus_diagnostics(series, varied_samples(samples), checks, notes, queries)
 
     async def _collect_signal(
         self,
@@ -390,6 +421,7 @@ class PrometheusMetricsSource:
         exclusions: list[Exclusion],
         top_routes: dict[str, set[tuple[str, ...]]],
         collisions: _Collisions,
+        samples: dict[tuple[SignalFamily, str], dict[str, str]],
     ) -> list[MetricSeries]:
         """Query one signal over the grid; failures, truncation and invalid data become
         exclusions."""
@@ -408,6 +440,8 @@ class PrometheusMetricsSource:
 
         results = self._scoped_results(results, scope, defn, exclusions)
         results = await self._drop_collisions(defn, scope, query, end_time, results, collisions)
+        if results:
+            samples.setdefault((defn.family, defn.signal), dict(results[0].labels))
         max_series = self.budget.max_series_per_query
         if len(results) > max_series:
             exclusions.append(

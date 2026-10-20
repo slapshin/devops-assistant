@@ -267,6 +267,14 @@
             "title": "Detector Version",
             "type": "string"
           },
+          "diagnostics": {
+            "description": "What each source's filter selected at analysis time (2.8).",
+            "items": {
+              "$ref": "#/components/schemas/ScopeDiagnostics"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
           "evidence": {
             "items": {
               "$ref": "#/components/schemas/Evidence"
@@ -296,7 +304,7 @@
             "type": "string"
           },
           "schema_version": {
-            "default": "2.7",
+            "default": "2.8",
             "enum": [
               "2.0",
               "2.1",
@@ -305,7 +313,8 @@
               "2.4",
               "2.5",
               "2.6",
-              "2.7"
+              "2.7",
+              "2.8"
             ],
             "title": "Schema Version",
             "type": "string"
@@ -828,6 +837,19 @@
         ],
         "title": "ConnectionTestRequest",
         "type": "object"
+      },
+      "CountUnit": {
+        "enum": [
+          "series",
+          "requests",
+          "events",
+          "alerts",
+          "agents",
+          "rules",
+          "instances"
+        ],
+        "title": "CountUnit",
+        "type": "string"
       },
       "Credential": {
         "additionalProperties": false,
@@ -2034,6 +2056,100 @@
         ],
         "title": "FamilyCapability",
         "type": "object"
+      },
+      "FilterCheck": {
+        "additionalProperties": false,
+        "description": "One filter part: data matched with the full filter versus with this part dropped.\n\nA listed item (a folder, rule UID, Sentry project, Wazuh agent or group, Cloudflare\nhostname) widens the selection instead of narrowing it: its `matched` is what the item\nselects within the rest of the filter and `matched_without` is null.",
+        "properties": {
+          "available": {
+            "description": "Values that exist for this field within the rest of the filter.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Available",
+            "type": "array"
+          },
+          "available_truncated": {
+            "default": false,
+            "title": "Available Truncated",
+            "type": "boolean"
+          },
+          "field": {
+            "$ref": "#/components/schemas/FilterField"
+          },
+          "matched": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "With the full filter; null when unknown.",
+            "title": "Matched"
+          },
+          "matched_without": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "With this part dropped; null when not applicable or failed.",
+            "title": "Matched Without"
+          },
+          "matching": {
+            "description": "The values of `available` this part accepts.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Matching",
+            "type": "array"
+          },
+          "part": {
+            "description": "The part as configured, e.g. env=~\"prod|qa\".",
+            "minLength": 1,
+            "title": "Part",
+            "type": "string"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/CountUnit"
+          }
+        },
+        "required": [
+          "part",
+          "field",
+          "matched",
+          "matched_without",
+          "unit"
+        ],
+        "title": "FilterCheck",
+        "type": "object"
+      },
+      "FilterField": {
+        "enum": [
+          "matcher",
+          "zone",
+          "hostname",
+          "project",
+          "environment",
+          "tag",
+          "agent",
+          "group",
+          "label",
+          "folder",
+          "rule_uid",
+          "rule_label",
+          "instance_label"
+        ],
+        "title": "FilterField",
+        "type": "string"
       },
       "Finding": {
         "additionalProperties": false,
@@ -3595,6 +3711,119 @@
           "matchers"
         ],
         "title": "Scope",
+        "type": "object"
+      },
+      "ScopeDiagnostics": {
+        "additionalProperties": false,
+        "description": "Snapshot of one source's selection at analysis time (2.8).",
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/FilterCheck"
+            },
+            "maxItems": 160,
+            "title": "Checks",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "requests": {
+            "description": "Requests sent; no secrets.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 120,
+            "title": "Requests",
+            "type": "array"
+          },
+          "samples": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "maxItems": 5,
+            "title": "Samples",
+            "type": "array"
+          },
+          "selection": {
+            "items": {
+              "$ref": "#/components/schemas/SelectedEntity"
+            },
+            "maxItems": 50,
+            "title": "Selection",
+            "type": "array"
+          },
+          "selection_total": {
+            "description": "Selected entities before the cap.",
+            "minimum": 0.0,
+            "title": "Selection Total",
+            "type": "integer"
+          },
+          "summary": {
+            "description": "E.g. '3 jobs, 12 instances, 418 series'.",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "summary",
+          "selection_total"
+        ],
+        "title": "ScopeDiagnostics",
+        "type": "object"
+      },
+      "SelectedEntity": {
+        "additionalProperties": false,
+        "description": "One thing the filter selected, e.g. a host, a Sentry project, an agent or an alert rule.",
+        "properties": {
+          "count": {
+            "description": "Data the entity had, in `unit`.",
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "display_name": {
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "families": {
+            "items": {
+              "$ref": "#/components/schemas/SignalFamily"
+            },
+            "title": "Families",
+            "type": "array"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Identity labels or identifying fields.",
+            "title": "Labels",
+            "type": "object"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/CountUnit"
+          }
+        },
+        "required": [
+          "display_name",
+          "labels",
+          "count",
+          "unit"
+        ],
+        "title": "SelectedEntity",
         "type": "object"
       },
       "SentrySource": {

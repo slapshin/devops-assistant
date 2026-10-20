@@ -64,6 +64,11 @@ def _window(end_hours_before: int, hours: float) -> slice:
     return slice(stop - int(hours * HOUR), stop)
 
 
+DEMO_HOST = "shop.example.com"
+"""The hostname of the demo projects (app/bootstrap.py)."""
+SYNTHETIC_HOSTS = ("www", "api", "static")
+
+
 class SyntheticCloudflareApi:
     def __init__(self, scenario: str, zone_id: str, hostnames: list[str]) -> None:
         self.name = scenario
@@ -209,6 +214,17 @@ class SyntheticCloudflareApi:
             self.zone_id, self.hostnames, self._iso(start), self._iso(end), page_size
         )
         return self._chunk(query, ("cf_blocked", "cf_challenged"), start, end)
+
+    async def host_requests(
+        self, start: int, end: int, hostnames: list[str], limit: int
+    ) -> dict[str, float]:
+        """The zone's requests split over its fixed hostnames; a configured hostname outside
+        them (e.g. a typo) has none."""
+        hosts = [DEMO_HOST, *(f"{h}.{self.name}.example.com" for h in SYNTHETIC_HOSTS)]
+        total = sum(float(self._data["cf_requests"][i]) for i in self._indices(start, end))
+        weights = [1 / (n + 1) for n in range(len(hosts))]
+        split = {h: round(total * w / sum(weights)) for h, w in zip(hosts, weights, strict=True)}
+        return {h: float(v) for h, v in split.items() if not hostnames or h in hostnames}
 
     async def daily_requests(self, first: date, last: date) -> dict[date, float]:
         assert self._anchor is not None

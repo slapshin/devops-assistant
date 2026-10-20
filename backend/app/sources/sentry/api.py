@@ -82,4 +82,20 @@ class SentryApi(Protocol):
         """Error events of each issue (short IDs) per 5-minute bucket of [start, end)."""
         ...
 
+    async def environments(self, project: str) -> list[str]:
+        """Environment names of one project (slug), in name order."""
+        ...
+
+    async def error_count(
+        self,
+        project_ids: Sequence[str],
+        start: int,
+        end: int,
+        environment: str | None,
+        tags: Sequence[tuple[str, str]],
+    ) -> int:
+        """Error events in [start, end) with exactly these filters (scope diagnostics, which
+        drop one filter at a time)."""
+        ...
+
     async def aclose(self) -> None: ...

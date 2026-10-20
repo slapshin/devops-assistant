@@ -55,6 +55,7 @@ from app.sources.sentry.catalog import (
     issue_spec,
     query_spec,
 )
+from app.sources.sentry.diagnostics import sentry_diagnostics
 from app.sources.totals import event_total
 
 log = logging.getLogger("app.sources.sentry")
@@ -439,8 +440,22 @@ class SentryMetricsSource:
         total_errors = event_total(
             SourceKind.SENTRY, ERRORS_SIGNAL, "Sentry error events", project_errors, end
         )
+        cancel.raise_if_cancelled()
+        diagnostics = await sentry_diagnostics(
+            self.api,
+            self.organization,
+            infos,
+            self.environment,
+            tags,
+            kinds,
+            end,
+            [s.query for s in series],
+        )
         return CollectionResult(
-            series=series, exclusions=exclusions, totals=[total_errors] if total_errors else []
+            series=series,
+            exclusions=exclusions,
+            totals=[total_errors] if total_errors else [],
+            diagnostics=[diagnostics],
         )
 
     @staticmethod

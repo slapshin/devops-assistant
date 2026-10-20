@@ -72,6 +72,9 @@ def _window(end_hours_before: int, hours: float) -> slice:
     return slice(stop - int(hours * HOUR), stop)
 
 
+SYNTHETIC_ENVIRONMENTS = ("production", "staging")
+
+
 class SyntheticSentryApi:
     """Projects get IDs 1, 2, ... in slug order; anomalies happen in the first project only."""
 
@@ -200,6 +203,26 @@ class SyntheticSentryApi:
         lo = max((start - grid_start) // STEP, self._first_index(), 0)
         hi = min((end - grid_start) // STEP, N)
         return range(lo, max(hi, lo))
+
+    async def environments(self, project: str) -> list[str]:
+        return list(SYNTHETIC_ENVIRONMENTS)
+
+    async def error_count(
+        self,
+        project_ids: Sequence[str],
+        start: int,
+        end: int,
+        environment: str | None,
+        tags: Sequence[tuple[str, str]],
+    ) -> int:
+        """Synthetic events carry no environment or tags, so the filters change nothing."""
+        span = self._range(start, end)
+        return int(
+            sum(
+                self._data[pid]["sentry_errors"][span.start : span.stop].sum()
+                for pid in project_ids
+            )
+        )
 
     async def top_issues(
         self, project_ids: Sequence[str], start: int, end: int, limit: int

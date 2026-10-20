@@ -196,6 +196,19 @@ def security_document(zone_id: str, hostnames: list[str], start: str, end: str, 
     return _zone(zone_id, _group("events", FIREWALL_DATASET, base, limit, fields))
 
 
+def hosts_document(zone_id: str, hostnames: list[str], start: str, end: str, limit: int) -> str:
+    """Eyeball requests per hostname, most first (scope diagnostics)."""
+    filt = _range(start, end) + ', requestSource: "eyeball"' + _hosts(hostnames)
+    body = (
+        f"      hosts: {HTTP_DATASET}(\n"
+        f"        limit: {limit}\n"
+        f"        filter: {{{filt}}}\n"
+        "        orderBy: [count_DESC]\n"
+        "      ) {\n        count\n        dimensions { clientRequestHTTPHost }\n      }\n"
+    )
+    return _zone(zone_id, body)
+
+
 def settings_document(zone_id: str) -> str:
     fields = "enabled maxDuration notOlderThan maxPageSize"
     body = "      settings {\n"

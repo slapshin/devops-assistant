@@ -24,6 +24,8 @@ from app.sources.sentry.catalog import (
     ISSUE_ID,
     SPANS_DATASET,
     Query,
+    environments_path,
+    error_count_params,
     events_path,
     issue_rank_params,
     issue_spec,
@@ -288,6 +290,27 @@ class SentryClient:
             if issue in issues:
                 chunk.groups[issue] = {b: v for b, v in values.items() if v is not None}
         return chunk
+
+    async def environments(self, project: str) -> list[str]:
+        raw = await self.get(environments_path(self.conn.organization, project))
+        if not isinstance(raw, list):
+            raise SourceError(SourceErrorKind.BAD_QUERY, "unexpected environments response")
+        return sorted({str(e["name"]) for e in raw if isinstance(e, dict) and e.get("name")})
+
+    async def error_count(
+        self,
+        project_ids: Sequence[str],
+        start: int,
+        end: int,
+        environment: str | None,
+        tags: Sequence[tuple[str, str]],
+    ) -> int:
+        params = error_count_params(project_ids, environment, tags, _utc(start), _utc(end))
+        raw = await self.get(events_path(self.conn.organization), params)
+        rows = raw.get("data") if isinstance(raw, dict) else None
+        if not isinstance(rows, list):
+            raise SourceError(SourceErrorKind.BAD_QUERY, "unexpected events response")
+        return int(sum(float(r.get("count()") or 0) for r in rows if isinstance(r, dict)))
 
 
 def _timeseries(raw: Any) -> list[dict[str, Any]]:

@@ -339,6 +339,11 @@ export interface components {
             custom_rules?: components["schemas"]["CustomRule"][];
             /** Detector Version */
             detector_version: string;
+            /**
+             * Diagnostics
+             * @description What each source's filter selected at analysis time (2.8).
+             */
+            diagnostics?: components["schemas"]["ScopeDiagnostics"][];
             /** Evidence */
             evidence: components["schemas"]["Evidence"][];
             /** Exclusions */
@@ -350,10 +355,10 @@ export interface components {
             generated_at: string;
             /**
              * Schema Version
-             * @default 2.7
+             * @default 2.8
              * @enum {string}
              */
-            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "2.6" | "2.7";
+            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "2.6" | "2.7" | "2.8";
             scope: components["schemas"]["Scope"];
             /** @description Deprecated: the first source; use sources. */
             source?: components["schemas"]["SourceInfo"] | null;
@@ -564,6 +569,11 @@ export interface components {
             /** Source */
             source: components["schemas"]["PrometheusSourceInput"] | components["schemas"]["CloudflareSourceInput"] | components["schemas"]["SentrySourceInput"] | components["schemas"]["WazuhSourceInput"] | components["schemas"]["GrafanaSourceInput"];
         };
+        /**
+         * CountUnit
+         * @enum {string}
+         */
+        CountUnit: "series" | "requests" | "events" | "alerts" | "agents" | "rules" | "instances";
         /** Credential */
         Credential: {
             /** Auth */
@@ -1031,6 +1041,53 @@ export interface components {
             reason?: string | null;
             status: components["schemas"]["CapabilityStatus"];
         };
+        /**
+         * FilterCheck
+         * @description One filter part: data matched with the full filter versus with this part dropped.
+         *
+         *     A listed item (a folder, rule UID, Sentry project, Wazuh agent or group, Cloudflare
+         *     hostname) widens the selection instead of narrowing it: its `matched` is what the item
+         *     selects within the rest of the filter and `matched_without` is null.
+         */
+        FilterCheck: {
+            /**
+             * Available
+             * @description Values that exist for this field within the rest of the filter.
+             */
+            available?: string[];
+            /**
+             * Available Truncated
+             * @default false
+             */
+            available_truncated: boolean;
+            field: components["schemas"]["FilterField"];
+            /**
+             * Matched
+             * @description With the full filter; null when unknown.
+             */
+            matched: number | null;
+            /**
+             * Matched Without
+             * @description With this part dropped; null when not applicable or failed.
+             */
+            matched_without: number | null;
+            /**
+             * Matching
+             * @description The values of `available` this part accepts.
+             */
+            matching?: string[];
+            /**
+             * Part
+             * @description The part as configured, e.g. env=~"prod|qa".
+             */
+            part: string;
+            unit: components["schemas"]["CountUnit"];
+        };
+        /**
+         * FilterField
+         * @enum {string}
+         */
+        FilterField: "matcher" | "zone" | "hostname" | "project" | "environment" | "tag" | "agent" | "group" | "label" | "folder" | "rule_uid" | "rule_label" | "instance_label";
         /** Finding */
         Finding: {
             /**
@@ -1660,6 +1717,61 @@ export interface components {
             project_id: string;
             /** Project Name */
             project_name: string;
+        };
+        /**
+         * ScopeDiagnostics
+         * @description Snapshot of one source's selection at analysis time (2.8).
+         */
+        ScopeDiagnostics: {
+            /** Checks */
+            checks?: components["schemas"]["FilterCheck"][];
+            kind: components["schemas"]["SourceKind"];
+            /** Notes */
+            notes?: components["schemas"]["Reason"][];
+            /**
+             * Requests
+             * @description Requests sent; no secrets.
+             */
+            requests?: string[];
+            /** Samples */
+            samples?: {
+                [key: string]: string;
+            }[];
+            /** Selection */
+            selection?: components["schemas"]["SelectedEntity"][];
+            /**
+             * Selection Total
+             * @description Selected entities before the cap.
+             */
+            selection_total: number;
+            /**
+             * Summary
+             * @description E.g. '3 jobs, 12 instances, 418 series'.
+             */
+            summary: string;
+        };
+        /**
+         * SelectedEntity
+         * @description One thing the filter selected, e.g. a host, a Sentry project, an agent or an alert rule.
+         */
+        SelectedEntity: {
+            /**
+             * Count
+             * @description Data the entity had, in `unit`.
+             */
+            count: number;
+            /** Display Name */
+            display_name: string;
+            /** Families */
+            families?: components["schemas"]["SignalFamily"][];
+            /**
+             * Labels
+             * @description Identity labels or identifying fields.
+             */
+            labels: {
+                [key: string]: string;
+            };
+            unit: components["schemas"]["CountUnit"];
         };
         /** SentrySource */
         SentrySource: {

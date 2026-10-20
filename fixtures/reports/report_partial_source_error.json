@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.7",
+  "schema_version": "2.8",
   "analysis_id": "01999a2b-0000-7000-8000-000000000005",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -724,5 +724,6 @@
     "validation_notes": []
   },
   "custom_rules": [],
-  "totals": []
+  "totals": [],
+  "diagnostics": []
 }

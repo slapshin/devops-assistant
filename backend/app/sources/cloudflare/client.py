@@ -29,6 +29,7 @@ from app.sources.cloudflare.catalog import (
     TRAFFIC_ALIASES,
     action_signal,
     daily_document,
+    hosts_document,
     security_document,
     settings_document,
     timing_document,
@@ -294,6 +295,18 @@ class CloudflareClient:
             values = chunk.values[signal]
             values[bucket] = values.get(bucket, 0.0) + float(row.get("count") or 0)
         return chunk
+
+    async def host_requests(
+        self, start: int, end: int, hostnames: list[str], limit: int
+    ) -> dict[str, float]:
+        document = hosts_document(self.conn.zone_id, hostnames, _utc(start), _utc(end), limit)
+        rows = (await self._zone(document)).get("hosts") or []
+        out: dict[str, float] = {}
+        for row in rows:
+            host = str((row.get("dimensions") or {}).get("clientRequestHTTPHost") or "")
+            if host:
+                out[host] = out.get(host, 0.0) + float(row.get("count") or 0)
+        return out
 
     async def daily_requests(self, first: date, last: date) -> dict[date, float]:
         zone = await self._zone(

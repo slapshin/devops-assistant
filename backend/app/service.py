@@ -146,6 +146,7 @@ class AnalysisPipeline:
             explanation=explanation,
             custom_rules=collection.custom_rules,
             totals=collection.totals,
+            diagnostics=collection.diagnostics,
         )
         return self._fit(report)
 
@@ -205,7 +206,7 @@ async def _gather(
         )
     )
 
-    series, exclusions, mappings, custom_rules, totals = [], [], [], [], []
+    series, exclusions, mappings, custom_rules, totals, diagnostics = [], [], [], [], [], []
     for item, caps in discovered:
         try:
             collected = await item.source.collect(scope, windows, caps, progress, cancel)
@@ -217,6 +218,7 @@ async def _gather(
         mappings += collected.mappings
         custom_rules += collected.custom_rules
         totals += collected.totals
+        diagnostics += [d.model_copy(update={"kind": item.kind}) for d in collected.diagnostics]
         cancel.raise_if_cancelled()
 
     if failures and len(failures) == len(opened):
@@ -237,6 +239,7 @@ async def _gather(
         mappings=mappings,
         custom_rules=custom_rules,
         totals=totals,
+        diagnostics=diagnostics,
     )
     return result
 

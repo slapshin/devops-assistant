@@ -25,6 +25,7 @@ INTERVAL = "5m"
 TIMESERIES_PATH = "/api/0/organizations/{organization}/events-timeseries/"
 EVENTS_PATH = "/api/0/organizations/{organization}/events/"
 PROJECT_PATH = "/api/0/projects/{organization}/{project}/"
+ENVIRONMENTS_PATH = "/api/0/projects/{organization}/{project}/environments/"
 
 
 class Query(StrEnum):
@@ -229,6 +230,35 @@ def issue_rank_params(
     params += [("field", f) for f in (ISSUE_FIELD, "title", "count()")]
     params += [("sort", "-count()"), ("per_page", str(limit * 2)), ("start", start), ("end", end)]
     return params
+
+
+def error_count_params(
+    project_ids: Sequence[str],
+    environment: str | None,
+    tags: Sequence[tuple[str, str]],
+    start: str,
+    end: str,
+) -> list[tuple[str, str]]:
+    """Error events in [start, end) as one total (scope diagnostics)."""
+    params = _scope_params(QuerySpec("errors", "", ()), project_ids, environment, tags)
+    params += [("field", "count()"), ("start", start), ("end", end)]
+    return params
+
+
+def error_count_text(
+    organization: str,
+    project_ids: Sequence[str],
+    environment: str | None,
+    tags: Sequence[tuple[str, str]],
+) -> str:
+    params = error_count_params(project_ids, environment, tags, *CHUNK_PLACEHOLDER)
+    return f"GET {events_path(organization)}?{urlencode(params, safe='()$:,[]')}"
+
+
+def environments_path(organization: str, project: str) -> str:
+    return ENVIRONMENTS_PATH.format(
+        organization=quote(organization, safe=""), project=quote(project, safe="")
+    )
 
 
 def events_path(organization: str) -> str:

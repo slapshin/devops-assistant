@@ -5,6 +5,7 @@ import JobView from "./views/JobView.vue";
 import FindingsView from "./views/report/FindingsView.vue";
 import OverviewView from "./views/report/OverviewView.vue";
 import ReportLayout from "./views/report/ReportLayout.vue";
+import ScopeView from "./views/report/ScopeView.vue";
 import TimelineView from "./views/report/TimelineView.vue";
 import TrendsView from "./views/report/TrendsView.vue";
 import ProjectFormView from "./views/projects/ProjectFormView.vue";
@@ -34,6 +35,7 @@ export const routes: RouteRecordRaw[] = [
       { path: "findings/:findingId", name: "evidence", component: FindingsView, props: true },
       { path: "timeline", name: "timeline", component: TimelineView },
       { path: "trends", name: "trends", component: TrendsView },
+      { path: "scope", name: "scope", component: ScopeView },
     ],
   },
   { path: "/:pathMatch(.*)*", name: "not-found", component: NotImplemented, props: { view: "Page not found", task: "—" } },

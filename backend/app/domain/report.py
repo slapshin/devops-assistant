@@ -19,6 +19,7 @@ from app.domain.common import (
     UtcDatetime,
 )
 from app.domain.custom_rules import CustomRule
+from app.domain.diagnostics import ScopeDiagnostics
 from app.domain.explanation import ExplanationResult
 from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
 from app.domain.metrics import MetricCapability
@@ -110,7 +111,7 @@ class EventTotal(Contract):
 
 
 class AnalysisReport(Contract):
-    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7"] = (
+    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8"] = (
         REPORT_SCHEMA_VERSION
     )
     analysis_id: str
@@ -141,6 +142,10 @@ class AnalysisReport(Contract):
     totals: list[EventTotal] = Field(
         default_factory=list,
         description="Daily event totals of the Sentry, Wazuh and Grafana sources (2.6).",
+    )
+    diagnostics: list[ScopeDiagnostics] = Field(
+        default_factory=list,
+        description="What each source's filter selected at analysis time (2.8).",
     )
 
     @property

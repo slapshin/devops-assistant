@@ -18,6 +18,7 @@ Interface language: English (default; strings are kept in one module so they can
 | `/reports/:id/findings/:findingId` | Findings list + **Evidence** detail (a full-width page on narrow screens) |
 | `/reports/:id/timeline` | **Timeline**: the full state timeline; `?source=` (comma-separated source kinds, absent = all) |
 | `/reports/:id/trends` | **Trends**; `?entity=&category=` filters |
+| `/reports/:id/scope` | **Scope**: what each source's filter selected (T022) |
 
 Every report URL can be shared and reloaded and works after a process restart, because it is read from the saved snapshot. The browser Back button moves between the list and the detail view without losing filters.
 
@@ -25,13 +26,13 @@ Every report URL can be shared and reloaded and works after a process restart, b
 
 Visual design: the "DevOps Assistant UI" canvas in Claude Design (Overview, Findings + evidence, Trends boards). It is a dense, Grafana-like dashboard: IBM Plex Sans/Mono (self-hosted via `@fontsource`, no external font requests), panels on a 24-column grid, 4 px radii, solid severity fills for stat panels and chips.
 
-Every page has a left **icon rail** (home, Projects, and Overview / Findings / Timeline / Trends while a report is open; a top row below 700 px) and a **top bar** with breadcrumbs (`Projects › <project> › <page>`), page badges such as *Synthetic data*, and the theme switch.
+Every page has a left **icon rail** (home, Projects, and Overview / Findings / Timeline / Trends / Scope while a report is open; a top row below 700 px) and a **top bar** with breadcrumbs (`Projects › <project> › <page>`), page badges such as *Synthetic data*, and the theme switch.
 
 Report routes add a toolbar and tabs under the top bar:
 
 ```
 [env | production] [project | shop] [baseline | 14 days]   Completed · detectors-2026.09.1 · saved 30 Sep 10:07 UTC   [◷ 29 Sep 10:05 – 30 Sep 10:05 | UTC ▾] [Run again]
-Tabs:  Overview | Findings 12 | Timeline | Trends
+Tabs:  Overview | Findings 12 | Timeline | Trends | Scope 1
 ```
 
 - The project's label matchers, the longest baseline used, and the frozen latest-day window are always visible. Times are shown in the viewer's local time by default, with a Local/UTC select next to the window; tooltips always include UTC.
@@ -161,6 +162,13 @@ Unsupported or insufficient signals have no chart. They show a text block explai
 - Filters: entity, category.
 - **Recurring problems** lists entity/signal pairs with episodes on ≥ 3 of the 14 days as a 14-cell status history: latest-day episode (red), earlier episode (amber), evaluated without an episode (dim green), no baseline or data (hatched).
 - Every chart has a "Show data" table alternative.
+
+## 8a. Scope (T022)
+
+- One panel per analysed source, in report order: icon, name, base URL and the snapshot's summary (e.g. "4 of 5 rules, 5 current instances").
+- **Filter checks** table: filter part (kind and value), *Matched*, *Without this part* (— for listed items), the values that exist in the source as chips (the ones the part accepts highlighted, "and more" when cut) and a verdict: **Excludes all data** (matches nothing, but dropping it finds data), **No such value** (the values exist but none is accepted), **Matches nothing**, **No effect** (dropping it changes nothing) or OK. The first three are in the critical colour, and the tab counts them ("Scope 1").
+- **Selected** (largest first, "showing 50 of N" when capped), **Samples** (label sets) and **Requests** (copy per request) follow as disclosures; notes such as `nothing_selected` or `diagnostic_failed` are listed above the table.
+- A source that failed shows its error instead. Reports before schema 2.8 say they predate scope diagnostics and suggest a new analysis.
 
 ## 9. Responsive and keyboard behaviour
 

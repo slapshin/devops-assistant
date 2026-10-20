@@ -5,6 +5,7 @@ import { ApiError, type AnalysisReport } from "../../api/client";
 import { useReport, useSubmit } from "../../api/queries";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import type { Crumb } from "../../components/shell/crumbs";
+import { problemCount } from "../../lib/diagnostics";
 import { longestBaselineDays } from "../../lib/findings";
 import { formatTime, timezone, utcTooltip } from "../../lib/format";
 import { reportSources } from "../../lib/projects";
@@ -34,11 +35,14 @@ provideReport({
   evidenceById: computed(() => new Map((query.data.value?.evidence ?? []).map((e) => [e.evidence_id, e]))),
 });
 
+/** Filter parts that look wrong; the Scope tab shows how many. */
+const scopeProblems = computed(() => (query.data.value ? problemCount(query.data.value as AnalysisReport) : 0));
 const tabs = computed(() => [
   { name: "overview", label: "Overview", to: `/reports/${props.id}`, count: null },
   { name: "findings", label: "Findings", to: `/reports/${props.id}/findings`, count: query.data.value?.findings.length ?? 0 },
   { name: "timeline", label: "Timeline", to: `/reports/${props.id}/timeline`, count: null },
   { name: "trends", label: "Trends", to: `/reports/${props.id}/trends`, count: null },
+  { name: "scope", label: "Scope", to: `/reports/${props.id}/scope`, count: scopeProblems.value || null },
 ]);
 const activeTab = computed(() => (route.name === "evidence" ? "findings" : String(route.name)));
 const error = computed(() => (query.error.value instanceof ApiError ? query.error.value.problem : null));

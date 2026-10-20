@@ -34,6 +34,9 @@ export type CustomRulePreviewRequest = Schemas["CustomRulePreviewRequest"];
 export type Credential = Schemas["Credential"];
 export type CredentialList = Schemas["CredentialList"];
 export type CredentialInput = Schemas["CredentialInput"];
+export type ScopeDiagnostics = Schemas["ScopeDiagnostics"];
+export type FilterCheck = Schemas["FilterCheck"];
+export type SelectedEntity = Schemas["SelectedEntity"];
 
 /** Error carrying an RFC 9457 problem body, or a synthetic one for network failures. */
 export class ApiError extends Error {

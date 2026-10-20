@@ -2,7 +2,7 @@
 
 This is the execution index for the first usable DevOps AI assistant release. Read [the product plan](../PRODUCT_PLAN.md) and [architecture](../ARCHITECTURE.md) before starting. Web UI, project/env selection, 24-hour analysis, two-week trends, and OpenAI-first explanations are confirmed. The Vue.js frontend is an owner decision (2026-09-30); Python/FastAPI, TypeScript, SQLite, and Docker are proposed defaults made concrete in T001.
 
-All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. Multiple data sources with Cloudflare as the second kind (T014–T016) are DONE; Sentry is the third kind (T017, DONE), Wazuh the fourth (T018, DONE) and Grafana alerts the fifth (T019, DONE). Custom PromQL rules per project (T020) and credentials (T021) are DONE. The first release is validated; see [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for evidence and remaining limitations. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
+All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. Multiple data sources with Cloudflare as the second kind (T014–T016) are DONE; Sentry is the third kind (T017, DONE), Wazuh the fourth (T018, DONE) and Grafana alerts the fifth (T019, DONE). Custom PromQL rules per project (T020), credentials (T021) and scope diagnostics (T022) are DONE. The first release is validated; see [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for evidence and remaining limitations. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
 
 ## Ordered backlog
 
@@ -29,6 +29,7 @@ All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. Mult
 | T019 | [Grafana alerts source: alert rule state history](T019-grafana-alerts-source.md) | T018 | DONE |
 | T020 | [Custom rules: user PromQL analysed with the catalog](T020-custom-rules.md) | T019 | DONE |
 | T021 | [Credentials and per-kind source authentication](T021-shared-credentials.md) | T020 | DONE |
+| T022 | [Scope diagnostics: what each source's filter selected](T022-scope-diagnostics.md) | T021 | DONE |
 
 ## How the next agent should work
 

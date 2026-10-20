@@ -256,10 +256,17 @@ class WazuhClient:
                 members[group] = names[:MAX_GROUP_MEMBERS]
         return GroupMembers(members, truncated)
 
-    async def agents(self, names: Sequence[str] | None, start: int, end: int) -> AgentList:
+    async def agents(
+        self,
+        names: Sequence[str] | None,
+        start: int,
+        end: int,
+        labels: Sequence[tuple[str, str]] | None = None,
+    ) -> AgentList:
         if names is not None and not names:
             return AgentList([])  # an empty selection is no agents, never every agent
-        raw = await self.search(discovery_body(names or [], self._labels, start, end))
+        chosen = self._labels if labels is None else labels
+        raw = await self.search(discovery_body(names or [], chosen, start, end))
         found = []
         for bucket in _buckets(raw, "agents"):
             first = (bucket.get("first") or {}).get("value")

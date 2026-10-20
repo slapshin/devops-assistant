@@ -509,6 +509,22 @@ class FakeApi:
         buckets = range(start, end, 600)
         return Chunk(query="GET fake", groups={i: dict.fromkeys(buckets, 1.0) for i in issues})
 
+    async def environments(self, project: str) -> list[str]:
+        return ["production", "staging"]
+
+    async def error_count(
+        self,
+        project_ids: Sequence[str],
+        start: int,
+        end: int,
+        environment: str | None,
+        tags: Sequence[tuple[str, str]],
+    ) -> int:
+        """3 errors per 10 minutes in ``production`` only, whatever the tags."""
+        if environment not in (None, "production"):
+            return 0
+        return 3 * len(project_ids) * len(range(start, end, 600))
+
 
 async def collect(api: FakeApi) -> tuple[list[Any], Any]:
     source = SentryMetricsSource(

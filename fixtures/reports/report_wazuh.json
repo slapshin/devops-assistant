@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.7",
+  "schema_version": "2.8",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e6",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -3899,6 +3899,79 @@
           "coverage": 1.0
         }
       ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "kind": "wazuh",
+      "summary": "3 agents with alerts, 145,237 alerts",
+      "selection": [
+        {
+          "display_name": "shop-db-1",
+          "labels": {
+            "agent": "shop-db-1"
+          },
+          "count": 49975,
+          "unit": "alerts",
+          "families": [
+            "host_security",
+            "file_integrity"
+          ]
+        },
+        {
+          "display_name": "shop-web-2",
+          "labels": {
+            "agent": "shop-web-2"
+          },
+          "count": 47908,
+          "unit": "alerts",
+          "families": [
+            "host_security",
+            "file_integrity"
+          ]
+        },
+        {
+          "display_name": "shop-web-1",
+          "labels": {
+            "agent": "shop-web-1"
+          },
+          "count": 47354,
+          "unit": "alerts",
+          "families": [
+            "host_security",
+            "file_integrity"
+          ]
+        }
+      ],
+      "selection_total": 3,
+      "samples": [
+        {
+          "agent": "shop-db-1"
+        },
+        {
+          "agent": "shop-web-2"
+        },
+        {
+          "agent": "shop-web-1"
+        }
+      ],
+      "checks": [
+        {
+          "part": "project=shop",
+          "field": "label",
+          "matched": 3,
+          "matched_without": 3,
+          "unit": "agents",
+          "available": [],
+          "available_truncated": false,
+          "matching": []
+        }
+      ],
+      "requests": [
+        "POST /wazuh-alerts-4.x-*/_search {\"aggs\": {\"agents\": {\"aggs\": {\"first\": {\"min\": {\"field\": \"timestamp\"}}}, \"terms\": {\"field\": \"agent.name\", \"order\": {\"_key\": \"asc\"}, \"size\": 51}}}, \"query\": {\"bool\": {\"filter\": [{\"range\": {\"timestamp\": {\"format\": \"epoch_second\", \"gte\": 1788343500, \"lt\": 1790762700}}}, {\"term\": {\"agent.labels.project\": \"shop\"}}]}}, \"size\": 0, \"track_total_hits\": true}",
+        "POST /wazuh-alerts-4.x-*/_search {\"aggs\": {\"agents\": {\"aggs\": {\"time\": {\"aggs\": {\"signals\": {\"filters\": {\"filters\": {\"wazuh_auth_failures\": {\"terms\": {\"rule.groups\": [\"authentication_failed\", \"authentication_failures\", \"invalid_login\"]}}, \"wazuh_fim_changes\": {\"term\": {\"rule.groups\": \"syscheck\"}}, \"wazuh_high_alerts\": {\"range\": {\"rule.level\": {\"gte\": 12}}}}}}}, \"date_histogram\": {\"field\": \"timestamp\", \"fixed_interval\": \"5m\"}}}, \"terms\": {\"field\": \"agent.name\", \"size\": 3}}}, \"query\": {\"bool\": {\"filter\": [{\"range\": {\"timestamp\": {\"format\": \"epoch_second\", \"gte\": 1788343500, \"lt\": 1788948300}}}, {\"terms\": {\"agent.name\": [\"shop-db-1\", \"shop-web-1\", \"shop-web-2\"]}}, {\"term\": {\"agent.labels.project\": \"shop\"}}]}}, \"size\": 0}"
+      ],
+      "notes": []
     }
   ]
 }
