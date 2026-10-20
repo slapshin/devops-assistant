@@ -6,7 +6,7 @@ import SourceIcon from "../../components/projects/SourceIcon.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
 import { instancesText } from "../../lib/alerts";
 import { errorKindsText } from "../../lib/errors";
-import { recurrenceText, sourceByFamily } from "../../lib/findings";
+import { dayPartText, daySpans, recurrenceText, sourceByFamily } from "../../lib/findings";
 import { sourceKindLabel } from "../../lib/projects";
 import { FAMILY_LABELS, SEVERITIES, capitalize, formatDuration, formatTime, formatValue, utcTooltip } from "../../lib/format";
 import { useReportContext } from "./context";
@@ -178,7 +178,7 @@ watch(
         <table class="gt">
           <thead>
             <tr>
-              <th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Source</th><th scope="col">Entity</th><th scope="col">Started</th>
+              <th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Source</th><th scope="col">Entity</th><th scope="col">Started</th><th scope="col">Time of day</th>
               <th scope="col" class="num">Duration</th><th scope="col" class="num">Peak</th><th scope="col" class="num">Usual</th>
               <th scope="col">Confidence</th><th scope="col">State</th>
             </tr>
@@ -210,6 +210,16 @@ watch(
                   <span v-if="f.error_kinds?.length" class="instances" :title="f.error_kinds[0]?.title ?? undefined">· {{ errorKindsText(f) }}</span>
                 </td>
                 <td :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</td>
+                <td :title="`${formatTime(f.start, false)} – ${formatTime(f.end, false)}`">
+                  <span class="daypart">
+                    <svg class="day" viewBox="0 0 24 6" preserveAspectRatio="none" aria-hidden="true">
+                      <rect class="day-bg" width="24" height="6" />
+                      <line v-for="h in [6, 12, 18]" :key="h" class="day-tick" :x1="h" :x2="h" y1="0" y2="6" />
+                      <rect v-for="([from, to], i) in daySpans(f)" :key="i" class="day-span" :class="`d-${f.severity}`" :x="from" :width="Math.max(to - from, 0.25)" height="6" />
+                    </svg>
+                    {{ dayPartText(f) }}
+                  </span>
+                </td>
                 <td class="num">{{ formatDuration(f.duration_seconds) }}</td>
                 <td class="num peak" :class="`v-${f.severity}`">{{ formatValue(f.observed.value, f.observed.unit) }}</td>
                 <td class="num muted">{{ usualCell(f) }}</td>
@@ -217,7 +227,7 @@ watch(
                 <td><span class="tag" :class="{ new: f.recurrence === 'new' }">{{ recurrenceText(f) }}</span></td>
               </tr>
               <tr v-if="selected && f.finding_id === selected.finding_id" class="detail">
-                <td colspan="10">
+                <td colspan="11">
                   <div class="detail-body">
                     <EvidencePanel :key="selected.finding_id" :finding="selected" />
                   </div>
@@ -259,6 +269,14 @@ watch(
 @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 .source { display: inline-flex; align-items: center; gap: 6px; }
 .peak { font-weight: 600; }
+.daypart { display: inline-flex; align-items: center; gap: 8px; }
+.day { flex: none; width: 72px; height: 8px; border-radius: var(--radius-sm); overflow: hidden; }
+.day-bg { fill: var(--f-none); }
+.day-tick { stroke: var(--panel); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.day-span { fill: var(--f-low); }
+.day-span.d-critical { fill: var(--f-crit); }
+.day-span.d-high { fill: var(--f-high); }
+.day-span.d-medium { fill: var(--f-med); }
 .keys { margin: 0; padding: 8px 12px; }
 kbd { font-size: 11px; padding: 0 4px; border: 1px solid var(--border2); border-radius: var(--radius-sm); }
 </style>
