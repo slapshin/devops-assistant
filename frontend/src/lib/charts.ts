@@ -104,6 +104,8 @@ export function evidenceOption(evidence: Evidence, finding: Finding, palette: Ch
       axisTick: { show: false },
       splitLine: { show: true, lineStyle: { color: palette.grid } },
       axisLabel: { color: palette.muted, formatter: (v: string) => formatTime(v, false, false) },
+      // Also the axis tooltip's header; without it ECharts shows the raw UTC category.
+      axisPointer: { label: { formatter: (p: { value: string }) => formatTime(p.value) } },
     },
     yAxis: {
       type: "value", scale: true,
