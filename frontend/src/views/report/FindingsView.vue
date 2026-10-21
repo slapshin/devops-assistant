@@ -6,7 +6,7 @@ import SourceIcon from "../../components/projects/SourceIcon.vue";
 import SeverityChip from "../../components/SeverityChip.vue";
 import { instancesText } from "../../lib/alerts";
 import { errorKindsText } from "../../lib/errors";
-import { dayPartText, daySpans, recurrenceText, sourceByFamily } from "../../lib/findings";
+import { agoRangeText, recurrenceText, sourceByFamily, windowSpan } from "../../lib/findings";
 import { sourceKindLabel } from "../../lib/projects";
 import { FAMILY_LABELS, SEVERITIES, capitalize, formatDuration, formatTime, formatValue, utcTooltip } from "../../lib/format";
 import { useReportContext } from "./context";
@@ -35,6 +35,8 @@ const filtered = computed(() => report.value.findings.filter(matchesFilters));
 const sourceOf = computed(() => sourceByFamily(report.value.capabilities));
 /** Only sources that produced findings, so every option narrows to something. */
 const sources = computed(() => [...new Set(report.value.findings.flatMap((f) => sourceOf.value.get(f.family) ?? []))]);
+/** The analysed day ends here; "ago" in the When column counts back from it. */
+const windowEnd = computed(() => report.value.windows.latest_day.end);
 const selected = computed(() => (props.findingId ? findingById.value.get(props.findingId) ?? null : null));
 const listLink = computed(() => ({ path: `/reports/${props.id}/findings`, query: route.query }));
 const recurrenceOptions = computed(() => {
@@ -52,6 +54,12 @@ function usualCell(f: Finding): string {
   if (f.expected) return `${formatValue(f.expected.lower, f.expected.unit)}–${formatValue(f.expected.upper, f.expected.unit)}`;
   if (f.threshold !== null) return `heuristic ${formatValue(f.threshold, f.observed.unit)}`;
   return "—";
+}
+
+/** The episode's place on the When strip; a very short one stays visible. */
+function spanRect(f: Finding): { x: number; width: number } {
+  const [from, to] = windowSpan(f, windowEnd.value);
+  return { x: from, width: Math.max(to - from, 0.25) };
 }
 
 function matchesFilters(f: Finding): boolean {
@@ -178,7 +186,7 @@ watch(
         <table class="gt">
           <thead>
             <tr>
-              <th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Source</th><th scope="col">Entity</th><th scope="col">Started</th><th scope="col">Time of day</th>
+              <th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Source</th><th scope="col">Entity</th><th scope="col">Started</th><th scope="col">When</th>
               <th scope="col" class="num">Duration</th><th scope="col" class="num">Peak</th><th scope="col" class="num">Usual</th>
               <th scope="col">Confidence</th><th scope="col">State</th>
             </tr>
@@ -210,14 +218,14 @@ watch(
                   <span v-if="f.error_kinds?.length" class="instances" :title="f.error_kinds[0]?.title ?? undefined">· {{ errorKindsText(f) }}</span>
                 </td>
                 <td :title="utcTooltip(f.start)">{{ formatTime(f.start) }}</td>
-                <td :title="`${formatTime(f.start, false)} – ${formatTime(f.end, false)}`">
-                  <span class="daypart">
+                <td :title="`${formatTime(f.start)} – ${formatTime(f.end)}`">
+                  <span class="when">
                     <svg class="day" viewBox="0 0 24 6" preserveAspectRatio="none" aria-hidden="true">
                       <rect class="day-bg" width="24" height="6" />
                       <line v-for="h in [6, 12, 18]" :key="h" class="day-tick" :x1="h" :x2="h" y1="0" y2="6" />
-                      <rect v-for="([from, to], i) in daySpans(f)" :key="i" class="day-span" :class="`d-${f.severity}`" :x="from" :width="Math.max(to - from, 0.25)" height="6" />
+                      <rect class="day-span" :class="`d-${f.severity}`" v-bind="spanRect(f)" height="6" />
                     </svg>
-                    {{ dayPartText(f) }}
+                    {{ agoRangeText(f, windowEnd) }}
                   </span>
                 </td>
                 <td class="num">{{ formatDuration(f.duration_seconds) }}</td>
@@ -269,7 +277,7 @@ watch(
 @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 .source { display: inline-flex; align-items: center; gap: 6px; }
 .peak { font-weight: 600; }
-.daypart { display: inline-flex; align-items: center; gap: 8px; }
+.when { display: inline-flex; align-items: center; gap: 8px; }
 .day { flex: none; width: 72px; height: 8px; border-radius: var(--radius-sm); overflow: hidden; }
 .day-bg { fill: var(--f-none); }
 .day-tick { stroke: var(--panel); stroke-width: 1; vector-effect: non-scaling-stroke; }

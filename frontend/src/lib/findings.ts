@@ -1,15 +1,13 @@
 import type { Finding, MetricCapability, SignalCoverage, SourceKind } from "../api/client";
-import { FAMILY_LABELS, formatDuration, formatValue, timezone } from "./format";
+import { FAMILY_LABELS, formatDuration, formatValue } from "./format";
 
 /** The 14-day trend window minus the latest day. */
 const EARLIER_DAY_COUNT = 13;
 /** Below this, "N× the usual" reads as noise rather than a meaningful jump. */
 const MIN_MEANINGFUL_RATIO = 1.5;
 const HOURS_PER_DAY = 24;
+const MINUTES_PER_HOUR = 60;
 const MS_PER_HOUR = 3_600_000;
-/** Six-hour parts of the day, in order from midnight. */
-const DAY_PARTS = ["Night", "Morning", "Afternoon", "Evening"] as const;
-const HOURS_PER_DAY_PART = HOURS_PER_DAY / DAY_PARTS.length;
 
 const RECURRENCE_LABELS: Record<Exclude<Finding["recurrence"], "new">, string> = {
   recurring: "Recurring",
@@ -68,35 +66,25 @@ export function sourceByFamily(capabilities: MetricCapability[]): Map<Finding["f
   return new Map(capabilities.map((c) => [c.family, c.source]));
 }
 
-/** Hour of the day (fractional) in the viewer's chosen time zone. */
-function hourOfDay(iso: string): number {
-  const date = new Date(iso);
-  return timezone.value === "utc"
-    ? date.getUTCHours() + date.getUTCMinutes() / 60
-    : date.getHours() + date.getMinutes() / 60;
+const hoursBetween = (from: string, to: string) => (Date.parse(to) - Date.parse(from)) / MS_PER_HOUR;
+
+/** The episode as a [from, to] span on the analysed day's 0–24 axis, where 24 is the report's end time. */
+export function windowSpan(finding: Finding, end: string): [number, number] {
+  const clamp = (hours: number) => Math.min(HOURS_PER_DAY, Math.max(0, HOURS_PER_DAY - hours));
+  return [clamp(hoursBetween(finding.start, end)), clamp(hoursBetween(finding.end, end))];
 }
 
-const dayPart = (hour: number) => DAY_PARTS[Math.floor(hour / HOURS_PER_DAY_PART) % DAY_PARTS.length]!;
-
-/** The hours of the day an episode covers, as [from, to] spans on a 0–24 axis; an episode over midnight wraps. */
-export function daySpans(finding: Finding): [number, number][] {
-  const hours = (Date.parse(finding.end) - Date.parse(finding.start)) / MS_PER_HOUR;
-  if (hours >= HOURS_PER_DAY) return [[0, HOURS_PER_DAY]];
-
-  const from = hourOfDay(finding.start);
-  const to = from + hours;
-  return to <= HOURS_PER_DAY ? [[from, to]] : [[from, HOURS_PER_DAY], [0, to - HOURS_PER_DAY]];
+/** "35 min" or "5 h": a time before the report's end, rounded to what a glance needs. */
+function agoText(hours: number): string {
+  return hours < 1 ? `${Math.round(hours * MINUTES_PER_HOUR)} min` : `${Math.round(hours)} h`;
 }
 
-/** "Morning", "Evening → Night", or "All day": when in the day an episode happened. */
-export function dayPartText(finding: Finding): string {
-  const hours = (Date.parse(finding.end) - Date.parse(finding.start)) / MS_PER_HOUR;
-  if (hours >= HOURS_PER_DAY) return "All day";
+/** "19 h → 4 h ago" or "3 h ago → now": when an episode ran, relative to the report's end time. */
+export function agoRangeText(finding: Finding, end: string): string {
+  const from = agoText(hoursBetween(finding.start, end));
+  const toHours = hoursBetween(finding.end, end);
+  if (toHours < 1 / MINUTES_PER_HOUR) return `${from} ago → now`;
 
-  const from = hourOfDay(finding.start);
-  // A minute before the end, so an episode ending at 06:00 ends the night rather than starting the morning.
-  const to = from + Math.max(0, hours - 1 / 60);
-  const first = dayPart(from);
-  const last = dayPart(to % HOURS_PER_DAY);
-  return first === last ? first : `${first} → ${last}`;
+  const to = agoText(toHours);
+  return from === to ? `${from} ago` : `${from} → ${to} ago`;
 }

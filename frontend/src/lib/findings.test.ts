@@ -1,54 +1,36 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { Finding } from "../api/client";
-import { dayPartText, daySpans } from "./findings";
-import { timezone } from "./format";
+import { agoRangeText, windowSpan } from "./findings";
 
 const episode = (start: string, end: string) => ({ start, end }) as Finding;
 
-beforeEach(() => {
-  timezone.value = "utc";
-});
+const END = "2026-10-21T12:00:00Z";
 
-afterEach(() => {
-  timezone.value = "local";
-});
-
-describe("daySpans", () => {
-  it("places an episode on the 24-hour axis", () => {
-    expect(daySpans(episode("2026-10-19T10:30:00Z", "2026-10-19T12:00:00Z"))).toEqual([[10.5, 12]]);
+describe("windowSpan", () => {
+  it("places an episode on the analysed day, ending at the report's end time", () => {
+    expect(windowSpan(episode("2026-10-20T18:00:00Z", "2026-10-21T06:30:00Z"), END)).toEqual([6, 18.5]);
   });
 
-  it("wraps an episode over midnight", () => {
-    expect(daySpans(episode("2026-10-19T22:00:00Z", "2026-10-20T02:00:00Z"))).toEqual([[22, 24], [0, 2]]);
-  });
-
-  it("fills the whole day for an episode of a day or more", () => {
-    expect(daySpans(episode("2026-10-19T10:00:00Z", "2026-10-20T11:00:00Z"))).toEqual([[0, 24]]);
+  it("clamps an episode to the analysed day", () => {
+    expect(windowSpan(episode("2026-10-20T10:00:00Z", END), END)).toEqual([0, 24]);
   });
 });
 
-describe("dayPartText", () => {
-  it("names the part of the day an episode falls in", () => {
-    expect(dayPartText(episode("2026-10-19T03:00:00Z", "2026-10-19T04:00:00Z"))).toBe("Night");
-    expect(dayPartText(episode("2026-10-19T09:00:00Z", "2026-10-19T09:05:00Z"))).toBe("Morning");
-    expect(dayPartText(episode("2026-10-19T14:55:00Z", "2026-10-19T15:30:00Z"))).toBe("Afternoon");
-    expect(dayPartText(episode("2026-10-19T20:25:00Z", "2026-10-20T00:00:00Z"))).toBe("Evening");
+describe("agoRangeText", () => {
+  it("says how long before the report's end an episode started and ended", () => {
+    expect(agoRangeText(episode("2026-10-20T16:55:00Z", "2026-10-21T08:00:00Z"), END)).toBe("19 h → 4 h ago");
   });
 
-  it("names the first and last part of an episode that spans several", () => {
-    expect(dayPartText(episode("2026-10-19T10:50:00Z", "2026-10-20T02:30:00Z"))).toBe("Morning → Night");
+  it("ends at now for an episode still running at the report's end", () => {
+    expect(agoRangeText(episode("2026-10-21T09:00:00Z", END), END)).toBe("3 h ago → now");
   });
 
-  it("says all day for an episode of a day or more", () => {
-    expect(dayPartText(episode("2026-10-19T10:00:00Z", "2026-10-20T10:00:00Z"))).toBe("All day");
+  it("counts minutes within the last hour", () => {
+    expect(agoRangeText(episode("2026-10-21T11:15:00Z", "2026-10-21T11:40:00Z"), END)).toBe("45 min → 20 min ago");
   });
 
-  it("follows the chosen time zone", () => {
-    timezone.value = "local";
-    const start = new Date(2026, 9, 19, 19, 0);
-    const end = new Date(2026, 9, 19, 20, 0);
-
-    expect(dayPartText(episode(start.toISOString(), end.toISOString()))).toBe("Evening");
+  it("names one time for an episode shorter than the rounding", () => {
+    expect(agoRangeText(episode("2026-10-21T02:10:00Z", "2026-10-21T02:20:00Z"), END)).toBe("10 h ago");
   });
 });
