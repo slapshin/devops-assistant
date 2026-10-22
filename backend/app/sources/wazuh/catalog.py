@@ -101,8 +101,18 @@ def scope_filters(agents: Sequence[str], labels: Sequence[tuple[str, str]]) -> l
     return filters
 
 
-def members_body(groups: Sequence[str], start: int, end: int) -> dict[str, Any]:
-    """Agent names per configured group in monitoring snapshots of [start, end)."""
+def members_body(
+    groups: Sequence[str],
+    start: int,
+    end: int,
+    group_field: str = MONITORING_GROUP_FIELD,
+    name_field: str = MONITORING_NAME_FIELD,
+) -> dict[str, Any]:
+    """Agent names per configured group in monitoring snapshots of [start, end).
+
+    The fields are keywords in the dashboard's index template; an index created without it
+    maps them as text with a ``.keyword`` subfield, which the client then passes instead.
+    """
     return {
         "size": 0,
         "query": {
@@ -117,21 +127,21 @@ def members_body(groups: Sequence[str], start: int, end: int) -> dict[str, Any]:
                             }
                         }
                     },
-                    {"terms": {MONITORING_GROUP_FIELD: list(groups)}},
+                    {"terms": {group_field: list(groups)}},
                 ]
             }
         },
         "aggs": {
             "groups": {
                 "terms": {
-                    "field": MONITORING_GROUP_FIELD,
+                    "field": group_field,
                     "include": list(groups),
                     "size": max(1, len(groups)),
                 },
                 "aggs": {
                     "agents": {
                         "terms": {
-                            "field": MONITORING_NAME_FIELD,
+                            "field": name_field,
                             "size": MAX_GROUP_MEMBERS + 1,
                             "order": {"_key": "asc"},
                         }

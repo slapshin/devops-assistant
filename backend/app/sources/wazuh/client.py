@@ -9,6 +9,7 @@ so missing alerts are never reported as a quiet period.
 
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Sequence
 from datetime import datetime
@@ -25,6 +26,8 @@ from app.sources.wazuh.catalog import (
     FILTERED,
     MAX_AGENTS,
     MAX_GROUP_MEMBERS,
+    MONITORING_GROUP_FIELD,
+    MONITORING_NAME_FIELD,
     discovery_body,
     members_body,
     request_text,
@@ -46,6 +49,8 @@ MIN_REDIRECT_STATUS = 300
 MIN_CLIENT_ERROR_STATUS = 400
 MIN_SERVER_ERROR_STATUS = 500
 TOTAL_SIGNAL = "wazuh_alerts"
+KEYWORD_SUBFIELD = ".keyword"
+_TEXT_FIELD = re.compile(r"fielddata=true on \[([^\]]+)\]")
 
 
 def _reason(body: bytes) -> tuple[str, str]:
@@ -152,6 +157,8 @@ class WazuhClient:
                 SourceError(SourceErrorKind.UNAVAILABLE, "Wazuh indexer is overloaded (HTTP 429)"),
                 _retry_after(headers.get("retry-after")),
             )
+        if kind == "illegal_argument_exception" and (text := _TEXT_FIELD.search(reason)):
+            raise TextFieldError(text.group(1), f"HTTP {status}{suffix}")
         if kind == "too_many_buckets_exception":
             raise SourceError(SourceErrorKind.TOO_LARGE, f"too many aggregation buckets{suffix}")
         if status >= MIN_SERVER_ERROR_STATUS:
@@ -240,13 +247,31 @@ class WazuhClient:
         found = raw.get("version") if isinstance(raw, dict) else None
         return str(found["number"]) if isinstance(found, dict) and "number" in found else None
 
+    async def _members_search(self, groups: Sequence[str], start: int, end: int) -> dict[str, Any]:
+        """The members search, on the ``.keyword`` subfields where the index maps text."""
+        fields = {f: f for f in (MONITORING_GROUP_FIELD, MONITORING_NAME_FIELD)}
+        while True:
+            try:
+                return await self.search(
+                    members_body(
+                        groups,
+                        start,
+                        end,
+                        fields[MONITORING_GROUP_FIELD],
+                        fields[MONITORING_NAME_FIELD],
+                    ),
+                    self.conn.monitoring_index_pattern,
+                    "; groups are read from the agent snapshots the Wazuh dashboard writes "
+                    "when wazuh.monitoring.enabled is on",
+                )
+            except TextFieldError as exc:
+                base = next((k for k, v in fields.items() if v == exc.field), None)
+                if base is None or exc.field.endswith(KEYWORD_SUBFIELD):
+                    raise
+                fields[base] = base + KEYWORD_SUBFIELD
+
     async def group_members(self, groups: Sequence[str], start: int, end: int) -> GroupMembers:
-        raw = await self.search(
-            members_body(groups, start, end),
-            self.conn.monitoring_index_pattern,
-            "; groups are read from the agent snapshots the Wazuh dashboard writes when "
-            "wazuh.monitoring.enabled is on",
-        )
+        raw = await self._members_search(groups, start, end)
         members: dict[str, list[str]] = {group: [] for group in groups}
         truncated = False
         for bucket in _buckets(raw, "groups"):
@@ -298,6 +323,14 @@ def _buckets(raw: dict[str, Any], name: str) -> list[dict[str, Any]]:
     if not isinstance(found, list):
         raise SourceError(SourceErrorKind.BAD_QUERY, f"search response lacks the {name} buckets")
     return found
+
+
+class TextFieldError(SourceError):
+    """The index maps ``field`` as text, which cannot be aggregated."""
+
+    def __init__(self, field: str, message: str) -> None:
+        super().__init__(SourceErrorKind.BAD_QUERY, message)
+        self.field = field
 
 
 class _Retry(Exception):

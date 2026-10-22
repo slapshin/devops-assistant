@@ -198,6 +198,44 @@ async def test_group_members_come_from_the_monitoring_index() -> None:
     assert body["aggs"]["groups"]["terms"]["include"] == ["db", "web"]
 
 
+async def test_group_members_use_keyword_subfields_of_text_fields() -> None:
+    bodies: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        bodies.append(body)
+        group_terms = body["aggs"]["groups"]["terms"]
+        aggregated = (
+            group_terms["field"],
+            body["aggs"]["groups"]["aggs"]["agents"]["terms"]["field"],
+        )
+        for field in aggregated:
+            if field in ("group", "name"):
+                reason = (
+                    "Text fields are not optimised for operations that require per-document "
+                    "field data like aggregations and sorting, so these operations are disabled "
+                    "by default. Please use a keyword field instead. Alternatively, set "
+                    f"fielddata=true on [{field}] in order to load field data by uninverting "
+                    "the inverted index."
+                )
+                cause = {"type": "illegal_argument_exception", "reason": reason}
+                return httpx.Response(400, json={"error": {"root_cause": [cause]}})
+        agents = [{"key": "web-1", "doc_count": 96}]
+        return ok({"groups": {"buckets": [{"key": "web", "agents": {"buckets": agents}}]}})
+
+    client = make_client(handler)
+
+    members = await client.group_members(["web"], 0, 86400)
+    await client.aclose()
+
+    assert members == GroupMembers({"web": ["web-1"]})
+    assert len(bodies) == 3
+    final = bodies[-1]
+    assert {"terms": {"group.keyword": ["web"]}} in final["query"]["bool"]["filter"]
+    assert final["aggs"]["groups"]["terms"]["field"] == "group.keyword"
+    assert final["aggs"]["groups"]["aggs"]["agents"]["terms"]["field"] == "name.keyword"
+
+
 async def test_missing_monitoring_index_explains_dashboard_monitoring() -> None:
     client = make_client(lambda request: ok({}, _shards={"total": 0, "failed": 0}))
 
