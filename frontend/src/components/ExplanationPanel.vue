@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { AnalysisReport } from "../api/client";
+import type { ReportSummary } from "../api/client";
 
 /** `only` narrows the panel to the hypotheses that cite one finding (evidence detail view). */
-const props = defineProps<{ report: AnalysisReport; findingLink: (id: string) => string; only?: string }>();
+const props = defineProps<{ report: ReportSummary; findingLink: (id: string) => string; only?: string }>();
 
 const explanationResult = computed(() => props.report.explanation);
 const findingTitles = computed(() => new Map(props.report.findings.map((f) => [f.finding_id, f.title])));

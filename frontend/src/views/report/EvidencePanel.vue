@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
 import type { Finding } from "../../api/client";
+import { useFindingDetail } from "../../api/queries";
 import ChartBox from "../../components/ChartBox.vue";
 import DataTable from "../../components/DataTable.vue";
 import ExplanationPanel from "../../components/ExplanationPanel.vue";
@@ -22,19 +23,16 @@ const SECONDS_PER_MINUTE = 60;
 
 const props = defineProps<{ finding: Finding }>();
 
-const { report, evidenceById } = useReportContext();
+const { report } = useReportContext();
 const heading = ref<HTMLElement | null>(null);
 const copied = ref(false);
 
 const f = computed(() => props.finding);
+const detail = useFindingDetail(() => report.value.analysis_id, () => f.value.finding_id);
 const rule = computed(() => findingRule(report.value, f.value));
 /** Custom rules have the user's thresholds; catalog thresholds are diagnostic heuristics. */
 const thresholdLabel = computed(() => (rule.value ? "Threshold" : "Heuristic"));
-const evidence = computed(() =>
-  f.value.evidence_ids
-    .map((id) => evidenceById.value.get(id))
-    .filter((e) => !!e),
-);
+const evidence = computed(() => detail.data.value?.evidence ?? []);
 const primaryEvidence = computed(() => evidence.value[0] ?? null);
 const stepMinutes = computed(() => Math.round((primaryEvidence.value?.series.step_seconds ?? 0) / SECONDS_PER_MINUTE));
 const rows = computed(() => {
@@ -90,6 +88,11 @@ onMounted(async () => {
           </div>
           <DataTable :caption="`Evidence values for ${f.title}`" :columns="EVIDENCE_COLUMNS" :rows="rows" />
         </template>
+        <div v-else-if="detail.isPending.value" aria-busy="true" class="skeleton chart-loading" />
+        <p v-else-if="detail.error.value" role="alert" class="banner error">
+          Could not load the charts of this finding: {{ detail.error.value.message }}.
+          <button type="button" @click="detail.refetch()">Retry</button>
+        </p>
         <p v-else class="banner">Evidence for this finding was not stored (see report exclusions).</p>
       </div>
     </section>
@@ -170,7 +173,7 @@ onMounted(async () => {
 
     <AlertInstancesPanel v-if="f.alert_instances?.length" :finding="f" />
     <ErrorKindsPanel v-if="f.error_kinds?.length" :finding="f" />
-    <RelatedMetricsPanel :finding="f" />
+    <RelatedMetricsPanel v-if="detail.data.value" :finding="f" :detail="detail.data.value" />
 
     <section class="panel s24" aria-labelledby="query-title">
       <div class="ph">
@@ -214,6 +217,7 @@ onMounted(async () => {
 
 <style scoped>
 h2:focus { outline: none; }
+.chart-loading { height: 380px; }
 h2:focus-visible { outline: 2px solid var(--primary); }
 .caption { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
 .details { gap: 14px; }

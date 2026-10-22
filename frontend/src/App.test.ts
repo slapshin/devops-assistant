@@ -25,9 +25,10 @@ import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
 import relatedReport from "../../fixtures/reports/report_related.json";
-import type { AnalysisJob, Credential, ProjectSummary } from "./api/client";
+import type { AnalysisJob, AnalysisReport, Credential, ProjectSummary } from "./api/client";
 import App from "./App.vue";
 import { makeRouter } from "./router";
+import { findingDetail, reportSummary } from "./test-report";
 
 type Handler = (init?: RequestInit) => Response | Promise<Response>;
 
@@ -104,9 +105,13 @@ async function renderAt(path: string): Promise<Router> {
   return router;
 }
 
+/** Serves a full report fixture as the API does: its summary, and each finding's detail. */
 function report(fixture: { analysis_id: string }) {
-  routes[`GET /api/analyses/${fixture.analysis_id}/report`] = () => json(fixture);
-  return `/reports/${fixture.analysis_id}`;
+  const full = fixture as unknown as AnalysisReport;
+  const path = `/api/analyses/${full.analysis_id}/report`;
+  routes[`GET ${path}/summary`] = () => json(reportSummary(full));
+  for (const f of full.findings) routes[`GET ${path}/findings/${f.finding_id}`] = () => json(findingDetail(full, f.finding_id));
+  return `/reports/${full.analysis_id}`;
 }
 
 type Summary = ProjectSummary;
@@ -1152,7 +1157,7 @@ describe("report", () => {
     await fireEvent.click(screen.getByRole("link", { name: /404 increase/ }));
 
     const panel = await screen.findByRole("region", { name: "404 increase" });
-    expect(within(panel).getByRole("img", { name: /Evidence chart for 404 increase/ })).toBeInTheDocument();
+    expect(await within(panel).findByRole("img", { name: /Evidence chart for 404 increase/ })).toBeInTheDocument();
     expect(within(panel).getByText(/rate\(http_server_request_duration_seconds_count/)).toBeInTheDocument();
 
     await fireEvent.click(within(panel).getByRole("button", { name: "Show data" }));
@@ -1317,13 +1322,13 @@ describe("report", () => {
   });
 
   it("explains unavailable and incompatible reports", async () => {
-    routes["GET /api/analyses/gone/report"] = () => problem(404, "report_unavailable", "No report", "Analysis cancelled.");
+    routes["GET /api/analyses/gone/report/summary"] = () => problem(404, "report_unavailable", "No report", "Analysis cancelled.");
 
     await renderAt("/reports/gone");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("No report was saved for this analysis");
 
-    routes["GET /api/analyses/old/report"] = () => problem(404, "schema_unsupported", "Unsupported", "Saved with schema 2.0.");
+    routes["GET /api/analyses/old/report/summary"] = () => problem(404, "schema_unsupported", "Unsupported", "Saved with schema 2.0.");
   });
 
   it("overview leads with the worst finding, blind spots and a timeline", async () => {
@@ -1546,6 +1551,48 @@ describe("report", () => {
     expect(within(panel).getByText("No other collected metric had an unusual change around this finding.")).toBeInTheDocument();
     expect(within(panel).getByText(/0 with an unusual change in the window · 0 compared/)).toBeInTheDocument();
     expect(within(panel).queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("loads the summary first and chart data only for the findings shown", async () => {
+    const many = {
+      ...cloudflareReport,
+      analysis_id: "many",
+      findings: [...cloudflareReport.findings, ...sentryReport.findings],
+      evidence: [...cloudflareReport.evidence, ...sentryReport.evidence],
+    };
+    const detailCalls = () => calls.filter((c) => c.url.includes("/report/findings/")).map((c) => c.url.split("/").pop());
+    const router = await renderAt(report(many));
+
+    await waitFor(() => expect(detailCalls()).toHaveLength(6));
+    expect(detailCalls()).toEqual(many.findings.slice(0, 6).map((f) => f.finding_id));
+    expect(calls.filter((c) => c.url.endsWith("/report"))).toEqual([]);
+
+    const seventh = many.findings[6]!;
+    await router.push(`/reports/many/findings/${seventh.finding_id}`);
+
+    const panel = await screen.findByRole("region", { name: seventh.title });
+    expect(await within(panel).findByRole("img", { name: `Evidence chart for ${seventh.title}` })).toBeInTheDocument();
+    expect(detailCalls()).toEqual(many.findings.slice(0, 7).map((f) => f.finding_id));
+  });
+
+  it("a finding whose chart data fails to load says so and retries", async () => {
+    const finding = anomalies.findings[0]!;
+    const path = `/reports/${anomalies.analysis_id}/findings/${finding.finding_id}`;
+    report(anomalies);
+    const detailRoute = `GET /api/analyses/${anomalies.analysis_id}/report/findings/${finding.finding_id}`;
+    const loaded = routes[detailRoute]!;
+    routes[detailRoute] = () => problem(500, "internal_error", "Internal error");
+    await renderAt(path);
+
+    const alert = await screen.findByText(/Could not load the charts of this finding/);
+
+    expect(screen.queryByRole("region", { name: "Related metrics" })).not.toBeInTheDocument();
+
+    routes[detailRoute] = loaded;
+    await fireEvent.click(within(alert).getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByRole("img", { name: `Evidence chart for ${finding.title}` })).toBeInTheDocument();
+    expect(screen.queryByText(/Could not load the charts of this finding/)).not.toBeInTheDocument();
   });
 
   it("scope tab explains old reports and shows failed sources", async () => {

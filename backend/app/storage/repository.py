@@ -2,6 +2,7 @@
 
 import asyncio
 import zlib
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,6 +19,8 @@ from app.storage.db import analysis_jobs, make_engine, migrate, projects, report
 ACTIVE = (JobState.QUEUED.value, JobState.RUNNING.value)
 MAX_REPORT_BYTES = 20 * 1024 * 1024
 REPORT_COMPRESSION_LEVEL = 6
+CACHED_REPORTS = 4
+"""Parsed snapshots kept in memory: a report view reads its summary, then finding by finding."""
 
 
 class SchemaUnsupported(Exception):
@@ -37,6 +40,8 @@ class SqliteReportRepository:
         self.engine = make_engine(path)
         migrate(self.engine)
         self._lock = asyncio.Lock()
+        # Snapshots are immutable (and frozen models), so a parsed one never goes stale.
+        self._parsed: OrderedDict[str, AnalysisReport] = OrderedDict()
 
     def close(self) -> None:
         self.engine.dispose()
@@ -256,23 +261,31 @@ class SqliteReportRepository:
         )
 
     async def get_report(self, analysis_id: str) -> AnalysisReport | None:
-        def q(conn: sa.Connection) -> tuple[str, bytes] | None:
+        if (cached := self._parsed.get(analysis_id)) is not None:
+            self._parsed.move_to_end(analysis_id)
+            return cached
+
+        def q(conn: sa.Connection) -> AnalysisReport | None:
             row = conn.execute(
                 sa.select(reports.c.schema_version, reports.c.body).where(
                     reports.c.analysis_id == analysis_id
                 )
             ).first()
-            return (row[0], row[1]) if row else None
+            if row is None:
+                return None
 
-        row = await self._run(q)
-        if row is None:
-            return None
+            version, body = row
+            # Only a major schema change breaks reading; minor versions stay compatible.
+            if version.split(".")[0] != REPORT_SCHEMA_VERSION.split(".")[0]:
+                raise SchemaUnsupported(version)
+            return AnalysisReport.model_validate_json(zlib.decompress(body))
 
-        version, body = row
-        # Only a major schema change breaks reading; minor versions stay compatible.
-        if version.split(".")[0] != REPORT_SCHEMA_VERSION.split(".")[0]:
-            raise SchemaUnsupported(version)
-        return AnalysisReport.model_validate_json(zlib.decompress(body))
+        report = await self._run(q)
+        if report is not None:
+            self._parsed[analysis_id] = report
+            while len(self._parsed) > CACHED_REPORTS:
+                self._parsed.popitem(last=False)
+        return report
 
     async def prune_reports(self, project_id: str) -> int:
         """Apply the project's ``keep_reports``: delete finished analyses older than its newest

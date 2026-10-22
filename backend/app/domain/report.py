@@ -18,7 +18,13 @@ from app.domain.common import (
     TimeRange,
     UtcDatetime,
 )
-from app.domain.correlation import RelatedMetrics
+from app.domain.correlation import (
+    RelatedChart,
+    RelatedEvaluation,
+    RelatedMetric,
+    RelatedMetrics,
+    RelatedPolicy,
+)
 from app.domain.custom_rules import CustomRule
 from app.domain.diagnostics import ScopeDiagnostics
 from app.domain.explanation import ExplanationResult
@@ -111,7 +117,13 @@ class EventTotal(Contract):
         return self
 
 
-class AnalysisReport(Contract):
+class ReportSummary(Contract):
+    """A report without its chart data (T024): everything the report views need up front.
+
+    The full snapshot is ``AnalysisReport``; a finding's evidence and related metrics come from
+    its ``FindingDetail``, so opening a report does not download every finding's charts.
+    """
+
     schema_version: Literal[
         "2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"
     ] = REPORT_SCHEMA_VERSION
@@ -133,7 +145,6 @@ class AnalysisReport(Contract):
     findings: list[Finding]
     trends: list[DailyTrend] = Field(min_length=TREND_DAYS, max_length=TREND_DAYS)
     trend_summary: TrendSummary | None = None
-    evidence: list[Evidence]
     exclusions: list[Exclusion]
     explanation: ExplanationResult
     custom_rules: list[CustomRule] = Field(
@@ -148,16 +159,57 @@ class AnalysisReport(Contract):
         default_factory=list,
         description="What each source's filter selected at analysis time (2.8).",
     )
+
+    @property
+    def all_sources(self) -> list[SourceInfo]:
+        """Sources of 2.1 reports, or the single source of a 2.0 report."""
+        return self.sources or ([self.source] if self.source else [])
+
+
+class AnalysisReport(ReportSummary):
+    """The saved report snapshot: the summary plus every finding's chart data."""
+
+    evidence: list[Evidence]
     related_metrics: RelatedMetrics | None = Field(
         default=None,
         description="Other collected series compared with each finding (2.9); null in older "
         "reports.",
     )
 
-    @property
-    def all_sources(self) -> list[SourceInfo]:
-        """Sources of 2.1 reports, or the single source of a 2.0 report."""
-        return self.sources or ([self.source] if self.source else [])
+    def summary(self) -> ReportSummary:
+        return ReportSummary.model_validate(
+            {name: getattr(self, name) for name in ReportSummary.model_fields}
+        )
+
+    def finding_detail(self, finding_id: str) -> FindingDetail | None:
+        """One finding's evidence and related metrics; None for an unknown finding."""
+        finding = next((f for f in self.findings if f.finding_id == finding_id), None)
+        if finding is None:
+            return None
+
+        evidence = {e.evidence_id: e for e in self.evidence}
+        return FindingDetail(
+            analysis_id=self.analysis_id,
+            finding_id=finding_id,
+            evidence=[evidence[eid] for eid in finding.evidence_ids],
+            related=self._related_of(finding_id),
+        )
+
+    def _related_of(self, finding_id: str) -> FindingRelatedMetrics | None:
+        related = self.related_metrics
+        if related is None:
+            return None
+
+        comparisons = sorted(
+            (c for c in related.comparisons if c.finding_id == finding_id), key=lambda c: c.rank
+        )
+        chart_ids = {cid for c in comparisons for cid in (c.anchor.chart_id, c.candidate.chart_id)}
+        return FindingRelatedMetrics(
+            policy=related.policy,
+            evaluation=next((e for e in related.evaluations if e.finding_id == finding_id), None),
+            comparisons=comparisons,
+            charts=[c for c in related.charts if c.chart_id in chart_ids],
+        )
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Self:
@@ -198,3 +250,25 @@ class AnalysisReport(Contract):
                 if missing := set(ids) - finding_ids:
                     raise ValueError(f"explanation references unknown findings {sorted(missing)}")
         return self
+
+
+class FindingRelatedMetrics(Contract):
+    """The related metrics of one finding: its evaluation, kept comparisons and their charts."""
+
+    policy: RelatedPolicy
+    evaluation: RelatedEvaluation | None = Field(
+        description="Null when the finding was not compared."
+    )
+    comparisons: list[RelatedMetric] = Field(description="Ordered by rank.")
+    charts: list[RelatedChart] = Field(description="The charts the comparisons reference.")
+
+
+class FindingDetail(Contract):
+    """The chart data of one finding of a saved report (T024)."""
+
+    analysis_id: str
+    finding_id: str
+    evidence: list[Evidence] = Field(description="In the order of the finding's evidence_ids.")
+    related: FindingRelatedMetrics | None = Field(
+        description="Null when the report predates related metrics (schema < 2.9)."
+    )

@@ -47,8 +47,51 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Report */
+        /**
+         * Get Report
+         * @description The full snapshot, with every finding's chart data.
+         */
         get: operations["get_report_api_analyses__analysis_id__report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analyses/{analysis_id}/report/findings/{finding_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Finding Detail
+         * @description One finding's evidence and related metrics.
+         */
+        get: operations["get_finding_detail_api_analyses__analysis_id__report_findings__finding_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analyses/{analysis_id}/report/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Report Summary
+         * @description The report without evidence and related metrics: what the report views load first.
+         */
+        get: operations["get_report_summary_api_analyses__analysis_id__report_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -322,7 +365,10 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
-        /** AnalysisReport */
+        /**
+         * AnalysisReport
+         * @description The saved report snapshot: the summary plus every finding's chart data.
+         */
         AnalysisReport: {
             /** Analysis Id */
             analysis_id: string;
@@ -918,7 +964,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "credential_not_found" | "credential_name_taken" | "credential_in_use" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
+        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "credential_not_found" | "credential_name_taken" | "credential_in_use" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "finding_not_found" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
         /**
          * ErrorKindActivity
          * @description One error kind (Sentry issue) and its error events during a finding on its project.
@@ -1192,6 +1238,42 @@ export interface components {
             threshold: number | null;
             /** Title */
             title: string;
+        };
+        /**
+         * FindingDetail
+         * @description The chart data of one finding of a saved report (T024).
+         */
+        FindingDetail: {
+            /** Analysis Id */
+            analysis_id: string;
+            /**
+             * Evidence
+             * @description In the order of the finding's evidence_ids.
+             */
+            evidence: components["schemas"]["Evidence"][];
+            /** Finding Id */
+            finding_id: string;
+            /** @description Null when the report predates related metrics (schema < 2.9). */
+            related: components["schemas"]["FindingRelatedMetrics"] | null;
+        };
+        /**
+         * FindingRelatedMetrics
+         * @description The related metrics of one finding: its evaluation, kept comparisons and their charts.
+         */
+        FindingRelatedMetrics: {
+            /**
+             * Charts
+             * @description The charts the comparisons reference.
+             */
+            charts: components["schemas"]["RelatedChart"][];
+            /**
+             * Comparisons
+             * @description Ordered by rank.
+             */
+            comparisons: components["schemas"]["RelatedMetric"][];
+            /** @description Null when the finding was not compared. */
+            evaluation: components["schemas"]["RelatedEvaluation"] | null;
+            policy: components["schemas"]["RelatedPolicy"];
         };
         /**
          * FindingState
@@ -1901,6 +1983,66 @@ export interface components {
          */
         ReportState: "completed" | "partial";
         /**
+         * ReportSummary
+         * @description A report without its chart data (T024): everything the report views need up front.
+         *
+         *     The full snapshot is ``AnalysisReport``; a finding's evidence and related metrics come from
+         *     its ``FindingDetail``, so opening a report does not download every finding's charts.
+         */
+        ReportSummary: {
+            /** Analysis Id */
+            analysis_id: string;
+            /** Capabilities */
+            capabilities: components["schemas"]["MetricCapability"][];
+            /** Config Hash */
+            config_hash: string;
+            /** Coverage */
+            coverage: components["schemas"]["SignalCoverage"][];
+            /**
+             * Custom Rules
+             * @description The project's custom rules as they were when analysed (2.5).
+             */
+            custom_rules?: components["schemas"]["CustomRule"][];
+            /** Detector Version */
+            detector_version: string;
+            /**
+             * Diagnostics
+             * @description What each source's filter selected at analysis time (2.8).
+             */
+            diagnostics?: components["schemas"]["ScopeDiagnostics"][];
+            /** Exclusions */
+            exclusions: components["schemas"]["Exclusion"][];
+            explanation: components["schemas"]["ExplanationResult"];
+            /** Findings */
+            findings: components["schemas"]["Finding"][];
+            /** Generated At */
+            generated_at: string;
+            /**
+             * Schema Version
+             * @default 2.9
+             * @enum {string}
+             */
+            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "2.6" | "2.7" | "2.8" | "2.9";
+            scope: components["schemas"]["Scope"];
+            /** @description Deprecated: the first source; use sources. */
+            source?: components["schemas"]["SourceInfo"] | null;
+            /**
+             * Sources
+             * @description Every source analysed (2.1); empty in 2.0 reports.
+             */
+            sources?: components["schemas"]["SourceInfo"][];
+            state: components["schemas"]["ReportState"];
+            /**
+             * Totals
+             * @description Daily event totals of the Sentry, Wazuh and Grafana sources (2.6).
+             */
+            totals?: components["schemas"]["EventTotal"][];
+            trend_summary?: components["schemas"]["TrendSummary"] | null;
+            /** Trends */
+            trends: components["schemas"]["DailyTrend"][];
+            windows: components["schemas"]["AnalysisWindows"];
+        };
+        /**
          * ResourceAssociation
          * @description How the two series' resources are connected, from identity labels or verified mappings
          *     only; never from matching names across sources.
@@ -2604,6 +2746,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisReport"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_finding_detail_api_analyses__analysis_id__report_findings__finding_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                analysis_id: string;
+                finding_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingDetail"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_summary_api_analyses__analysis_id__report_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                analysis_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSummary"];
                 };
             };
             /** @description Problem */

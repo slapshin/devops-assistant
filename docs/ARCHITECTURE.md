@@ -89,7 +89,7 @@ Discover histogram buckets/native histograms before enabling p95/p99 latency. Co
 
 ## API and job lifecycle
 
-Routes: project management under `/api/projects` (T011), `POST /api/analyses` with a `project_id`, `GET /api/analyses/{id}`, `GET /api/analyses/{id}/report`, and `DELETE /api/analyses/{id}` for cancellation. T001 freezes exact route/error conventions; T002 supplies contract examples.
+Routes: project management under `/api/projects` (T011), `POST /api/analyses` with a `project_id`, `GET /api/analyses/{id}`, `GET /api/analyses/{id}/report` (with `/report/summary` and `/report/findings/{finding_id}` views, T024), and `DELETE /api/analyses/{id}` for cancellation. T001 freezes exact route/error conventions; T002 supplies contract examples.
 
 Persist queued/running/completed/partial/failed/cancelled state and expose collection/detection/explanation progress. T001 specifies duplicate requests, queue limits, cancellation, and restart handling. Recovery must not leave abandoned jobs permanently running. AI failure does not erase numerical results.
 

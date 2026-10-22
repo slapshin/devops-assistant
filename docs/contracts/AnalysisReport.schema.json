@@ -2663,6 +2663,7 @@
     }
   },
   "additionalProperties": false,
+  "description": "The saved report snapshot: the summary plus every finding's chart data.",
   "properties": {
     "analysis_id": {
       "title": "Analysis Id",
@@ -2833,9 +2834,9 @@
     "coverage",
     "findings",
     "trends",
-    "evidence",
     "exclusions",
-    "explanation"
+    "explanation",
+    "evidence"
   ],
   "title": "AnalysisReport",
   "type": "object"

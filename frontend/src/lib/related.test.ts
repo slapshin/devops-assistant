@@ -3,16 +3,24 @@ import { describe, expect, it } from "vitest";
 import related from "../../../fixtures/reports/report_related.json";
 import anomalies from "../../../fixtures/reports/report_anomalies.json";
 import type { AnalysisReport, RelatedMetric } from "../api/client";
-import { evaluationCounts, evaluationMessage, pairRows, relatedFor, similarityText, timingText } from "./related";
+import { evaluationCounts, evaluationMessage, pairRows, relatedFor, relatedPairOption, similarityText, timingText } from "./related";
+import { timestamps } from "./charts";
+import type { ChartPalette } from "./theme";
+import { findingDetail } from "../test-report";
 
 const report = related as unknown as AnalysisReport;
 const errors = report.findings.find((f) => f.signal === "server_error_ratio")!;
 
-const comparison = (changes: Partial<RelatedMetric>) => ({ ...relatedFor(report, errors.finding_id).comparisons[0], ...changes }) as RelatedMetric;
+const palette: ChartPalette = {
+  font: "sans-serif", bg: "#fff", text: "#000", muted: "#666", border: "#ccc", grid: "#eee",
+  observed: "#00f", expected: "#00f", band: "#ddf", severity: {},
+};
+
+const comparison = (changes: Partial<RelatedMetric>) => ({ ...relatedFor(findingDetail(report, errors.finding_id)).comparisons[0], ...changes }) as RelatedMetric;
 
 describe("relatedFor", () => {
   it("lists a finding's comparisons best first with its evaluation", () => {
-    const found = relatedFor(report, errors.finding_id);
+    const found = relatedFor(findingDetail(report, errors.finding_id));
 
     expect(found.comparisons.map((c) => [c.rank, c.candidate.signal])).toEqual([
       [1, "latency_p95"],
@@ -25,14 +33,14 @@ describe("relatedFor", () => {
   it("explains reports that predate related metrics", () => {
     const old = anomalies as unknown as AnalysisReport;
 
-    const found = relatedFor(old, old.findings[0]!.finding_id);
+    const found = relatedFor(findingDetail(old, old.findings[0]!.finding_id));
 
     expect(found.related).toBeNull();
     expect(evaluationMessage(found)).toMatch(/predates related metrics/);
   });
 
   it("never reads an empty result as healthy and states what was considered", () => {
-    const found = relatedFor(report, errors.finding_id);
+    const found = relatedFor(findingDetail(report, errors.finding_id));
     const evaluation = { ...found.evaluation!, retained: 0, candidates: 4, evaluated: 4, omitted: 0, shared_input: 1, unavailable: [{ code: "insufficient_pairs", count: 2 }] };
 
     const message = evaluationMessage({ ...found, comparisons: [], evaluation });
@@ -44,7 +52,7 @@ describe("relatedFor", () => {
   });
 
   it("states budget skips and drops", () => {
-    const found = relatedFor(report, errors.finding_id);
+    const found = relatedFor(findingDetail(report, errors.finding_id));
 
     expect(evaluationMessage({ ...found, evaluation: { ...found.evaluation!, state: "skipped_budget" } })).toMatch(/budget/);
     expect(evaluationMessage({ ...found, evaluation: { ...found.evaluation!, state: "dropped_budget" } })).toMatch(/size budget/);
@@ -71,7 +79,7 @@ describe("similarity and timing", () => {
 
 describe("pairRows", () => {
   it("aligns both series on the window's steps and keeps gaps", () => {
-    const c = relatedFor(report, errors.finding_id).comparisons[0]!;
+    const c = relatedFor(findingDetail(report, errors.finding_id)).comparisons[0]!;
     const charts = new Map(report.related_metrics!.charts.map((x) => [x.chart_id, x]));
     const anchor = charts.get(c.anchor.chart_id)!;
     const candidate = charts.get(c.candidate.chart_id)!;
@@ -80,5 +88,25 @@ describe("pairRows", () => {
 
     expect(rows).toHaveLength(anchor.series.values.length);
     expect(rows[0]![3]).toBe("—");
+  });
+});
+
+describe("relatedPairOption", () => {
+  it("opens zoomed to the episode ± 15 min with the whole window reachable", () => {
+    const c = relatedFor(findingDetail(report, errors.finding_id)).comparisons[0]!;
+    const charts = new Map(report.related_metrics!.charts.map((x) => [x.chart_id, x]));
+    const anchor = charts.get(c.anchor.chart_id)!;
+    const candidate = charts.get(c.candidate.chart_id)!;
+    const categories = timestamps(anchor);
+    const minutes = (t: string) => new Date(t).getTime() / 60_000;
+
+    const option = relatedPairOption(c, anchor, candidate, "values", palette, errors) as { dataZoom: { xAxisIndex: number[]; startValue: number; endValue: number }[] };
+
+    for (const zoom of option.dataZoom) {
+      expect(zoom.xAxisIndex).toEqual([0, 1]);
+      expect(minutes(errors.start) - minutes(categories[zoom.startValue]!)).toBe(15);
+      expect(minutes(categories[zoom.endValue]!) - minutes(errors.end)).toBe(15);
+    }
+    expect(categories.length).toBeGreaterThan(option.dataZoom[0]!.endValue - option.dataZoom[0]!.startValue + 1);
   });
 });

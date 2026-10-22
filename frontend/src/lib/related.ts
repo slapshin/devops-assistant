@@ -1,10 +1,13 @@
-import type { AnalysisReport, RelatedChart, RelatedEvaluation, RelatedMetric, RelatedMetrics } from "../api/client";
+import type { FindingDetail, FindingRelatedMetrics, RelatedChart, RelatedEvaluation, RelatedMetric } from "../api/client";
 import { timestamps } from "./charts";
 import { formatDuration, formatTime, formatValue } from "./format";
 import type { ChartPalette } from "./theme";
 
 const SECONDS_PER_MINUTE = 60;
 const PERCENT = 100;
+const MS_PER_MINUTE = 60_000;
+/** The pair chart opens on the finding's episode ± this; the rest of the window is a zoom-out away. */
+export const RELATED_ZOOM_PAD_MINUTES = 15;
 /** Rows shown before "Show all". */
 export const RELATED_DEFAULT_ROWS = 3;
 
@@ -12,20 +15,16 @@ export type RelatedView = "values" | "deviation";
 
 export interface FindingRelated {
   /** Null when the report predates related metrics (schema < 2.9). */
-  related: RelatedMetrics | null;
+  related: FindingRelatedMetrics | null;
   evaluation: RelatedEvaluation | null;
   comparisons: RelatedMetric[];
 }
 
-export function relatedFor(report: AnalysisReport, findingId: string): FindingRelated {
-  const related = report.related_metrics ?? null;
+export function relatedFor(detail: FindingDetail): FindingRelated {
+  const related = detail.related ?? null;
   if (!related) return { related: null, evaluation: null, comparisons: [] };
 
-  return {
-    related,
-    evaluation: related.evaluations.find((e) => e.finding_id === findingId) ?? null,
-    comparisons: related.comparisons.filter((c) => c.finding_id === findingId).sort((a, b) => a.rank - b.rank),
-  };
+  return { related, evaluation: related.evaluation ?? null, comparisons: [...related.comparisons].sort((a, b) => a.rank - b.rank) };
 }
 
 export const ASSOCIATION_LABELS: Record<RelatedMetric["association"], string> = {
@@ -193,6 +192,14 @@ export function relatedPairOption(
   const episodeColor = palette.severity[finding.severity] ?? palette.muted;
   const first = (t: string) => categories.find((x) => x >= t) ?? categories[categories.length - 1];
   const units = sides.map((s) => s.chart.series.unit);
+  // Initial zoom by step index (inclusive), so it never depends on category string formats.
+  const padMs = RELATED_ZOOM_PAD_MINUTES * MS_PER_MINUTE;
+  const times = categories.map((t) => new Date(t).getTime());
+  const from = new Date(finding.start).getTime() - padMs;
+  const to = new Date(finding.end).getTime() + padMs;
+  const startIndex = Math.max(0, times.findIndex((t) => t >= from));
+  const after = times.findIndex((t) => t > to);
+  const endIndex = after === -1 ? categories.length - 1 : Math.max(startIndex, after - 1);
   const format = (i: number) => (v: number) => (view === "deviation" ? v.toFixed(1) : formatValue(v, units[i] ?? "count"));
 
   const xAxis = sides.map((_, i) => ({
@@ -236,8 +243,23 @@ export function relatedPairOption(
     animation: false,
     axisPointer: { link: [{ xAxisIndex: "all" }] },
     grid: [
-      { left: 72, right: 16, top: 28, height: "34%" },
-      { left: 72, right: 16, top: "56%", height: "34%" },
+      { left: 72, right: 16, top: 28, height: "31%" },
+      { left: 72, right: 16, top: "52%", height: "31%" },
+    ],
+    dataZoom: [
+      { type: "inside", xAxisIndex: [0, 1], startValue: startIndex, endValue: endIndex },
+      {
+        type: "slider",
+        xAxisIndex: [0, 1],
+        startValue: startIndex,
+        endValue: endIndex,
+        height: 18,
+        bottom: 8,
+        borderColor: palette.border,
+        fillerColor: palette.band,
+        textStyle: { color: palette.muted },
+        labelFormatter: (i: number) => formatTime(categories[i] ?? "", false, false),
+      },
     ],
     textStyle: { color: palette.muted, fontFamily: palette.font },
     tooltip: {

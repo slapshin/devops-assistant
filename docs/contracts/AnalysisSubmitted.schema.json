@@ -155,6 +155,7 @@
         "analysis_not_found",
         "report_not_ready",
         "report_unavailable",
+        "finding_not_found",
         "schema_unsupported",
         "analysis_not_active",
         "queue_full",

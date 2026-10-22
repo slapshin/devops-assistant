@@ -1124,6 +1124,286 @@
     "previous_episodes": 7,
     "reason": "Anomalous share 0.81% over the last 7 days vs 0.35% over the previous 7 (similar); 11 vs 7 episodes."
   },
+  "exclusions": [],
+  "explanation": {
+    "status": "succeeded",
+    "explanation": {
+      "summary": "5 finding(s) in the latest day; most severe: Critical Grafana alert firing on Checkout 5xx errors.",
+      "hypotheses": [
+        {
+          "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_820d77f74d3e430e"
+          ],
+          "likelihood": "possible"
+        },
+        {
+          "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_b62616f329ef4870"
+          ],
+          "likelihood": "possible"
+        },
+        {
+          "text": "Grafana alert firing on Disk almost full may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_f1b591c185080d43"
+          ],
+          "likelihood": "possible"
+        }
+      ],
+      "investigation_steps": [
+        {
+          "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_820d77f74d3e430e"
+          ]
+        },
+        {
+          "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_b62616f329ef4870"
+          ]
+        },
+        {
+          "text": "Open the evidence chart for Grafana alert firing and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_f1b591c185080d43"
+          ]
+        }
+      ],
+      "uncertainty": "Template explanation; causes are not inferred from data.",
+      "provider": "fake",
+      "model": "deterministic-template",
+      "generated_at": "2026-09-30T10:05:00Z"
+    },
+    "reason": null,
+    "validation_notes": []
+  },
+  "custom_rules": [],
+  "totals": [
+    {
+      "source": "grafana",
+      "signal": "grafana_alert_firing",
+      "title": "Grafana alert firings",
+      "entities": 4,
+      "days": [
+        {
+          "bucket_index": 0,
+          "count": 5,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 1,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 2,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 3,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 4,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 5,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 6,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 7,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 8,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 9,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 10,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 11,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 12,
+          "count": 1,
+          "coverage": 1.0
+        },
+        {
+          "bucket_index": 13,
+          "count": 1,
+          "coverage": 1.0
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "kind": "grafana",
+      "summary": "4 of 5 rules, 5 current instances",
+      "selection": [
+        {
+          "display_name": "Checkout 5xx errors",
+          "labels": {
+            "folder": "Shop",
+            "group": "Sites",
+            "rule_uid": "shop-5xx",
+            "severity": "critical",
+            "team": "web"
+          },
+          "count": 2,
+          "unit": "instances",
+          "families": [
+            "alerting"
+          ]
+        },
+        {
+          "display_name": "Disk almost full",
+          "labels": {
+            "folder": "Shop",
+            "group": "Node",
+            "rule_uid": "shop-disk",
+            "team": "ops"
+          },
+          "count": 1,
+          "unit": "instances",
+          "families": [
+            "alerting"
+          ]
+        },
+        {
+          "display_name": "Queue consumer lag",
+          "labels": {
+            "folder": "Shop",
+            "group": "Jobs",
+            "rule_uid": "shop-queue",
+            "severity": "warning"
+          },
+          "count": 1,
+          "unit": "instances",
+          "families": [
+            "alerting"
+          ]
+        },
+        {
+          "display_name": "Worker exceptions",
+          "labels": {
+            "folder": "Shop",
+            "group": "Jobs",
+            "rule_uid": "shop-worker",
+            "severity": "info"
+          },
+          "count": 1,
+          "unit": "instances",
+          "families": [
+            "alerting"
+          ]
+        }
+      ],
+      "selection_total": 4,
+      "samples": [
+        {
+          "alertname": "Checkout 5xx errors",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "instance": "shop-web-1",
+          "project": "shop"
+        },
+        {
+          "alertname": "Checkout 5xx errors",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "instance": "shop-web-2",
+          "project": "shop"
+        },
+        {
+          "alertname": "Disk almost full",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "instance": "shop-db-1",
+          "project": "shop"
+        },
+        {
+          "alertname": "Queue consumer lag",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "project": "shop",
+          "queue": "orders"
+        },
+        {
+          "alertname": "Worker exceptions",
+          "grafana_folder": "Shop",
+          "env": "production",
+          "exception": "Lost connection to the queue, retrying\n  at consume (worker.js:42)",
+          "project": "shop"
+        }
+      ],
+      "checks": [
+        {
+          "part": "Shop",
+          "field": "folder",
+          "matched": 4,
+          "matched_without": null,
+          "unit": "rules",
+          "available": [
+            "Platform",
+            "Shop"
+          ],
+          "available_truncated": false,
+          "matching": [
+            "Shop"
+          ]
+        },
+        {
+          "part": "project=\"shop\"",
+          "field": "instance_label",
+          "matched": 5,
+          "matched_without": 6,
+          "unit": "instances",
+          "available": [
+            "blog",
+            "shop"
+          ],
+          "available_truncated": false,
+          "matching": [
+            "shop"
+          ]
+        }
+      ],
+      "requests": [
+        "GET /api/prometheus/grafana/api/v1/rules",
+        "GET /api/annotations?type=alert&alertUID=shop-5xx&from=$start&to=$end",
+        "GET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end",
+        "GET /api/annotations?type=alert&alertUID=shop-queue&from=$start&to=$end",
+        "GET /api/annotations?type=alert&alertUID=shop-worker&from=$start&to=$end"
+      ],
+      "notes": []
+    }
+  ],
   "evidence": [
     {
       "evidence_id": "evd_d74f3df58c6dfd4a",
@@ -3696,286 +3976,6 @@
       ],
       "threshold": 0.5,
       "threshold_label": "Grafana alert rule cannot evaluate: diagnostic heuristic (not an SLO)"
-    }
-  ],
-  "exclusions": [],
-  "explanation": {
-    "status": "succeeded",
-    "explanation": {
-      "summary": "5 finding(s) in the latest day; most severe: Critical Grafana alert firing on Checkout 5xx errors.",
-      "hypotheses": [
-        {
-          "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
-          "finding_ids": [
-            "fnd_820d77f74d3e430e"
-          ],
-          "likelihood": "possible"
-        },
-        {
-          "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
-          "finding_ids": [
-            "fnd_b62616f329ef4870"
-          ],
-          "likelihood": "possible"
-        },
-        {
-          "text": "Grafana alert firing on Disk almost full may reflect a workload or configuration change around its start time.",
-          "finding_ids": [
-            "fnd_f1b591c185080d43"
-          ],
-          "likelihood": "possible"
-        }
-      ],
-      "investigation_steps": [
-        {
-          "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
-          "finding_ids": [
-            "fnd_820d77f74d3e430e"
-          ]
-        },
-        {
-          "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
-          "finding_ids": [
-            "fnd_b62616f329ef4870"
-          ]
-        },
-        {
-          "text": "Open the evidence chart for Grafana alert firing and compare with deploy and log history.",
-          "finding_ids": [
-            "fnd_f1b591c185080d43"
-          ]
-        }
-      ],
-      "uncertainty": "Template explanation; causes are not inferred from data.",
-      "provider": "fake",
-      "model": "deterministic-template",
-      "generated_at": "2026-09-30T10:05:00Z"
-    },
-    "reason": null,
-    "validation_notes": []
-  },
-  "custom_rules": [],
-  "totals": [
-    {
-      "source": "grafana",
-      "signal": "grafana_alert_firing",
-      "title": "Grafana alert firings",
-      "entities": 4,
-      "days": [
-        {
-          "bucket_index": 0,
-          "count": 5,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 1,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 2,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 3,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 4,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 5,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 6,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 7,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 8,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 9,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 10,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 11,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 12,
-          "count": 1,
-          "coverage": 1.0
-        },
-        {
-          "bucket_index": 13,
-          "count": 1,
-          "coverage": 1.0
-        }
-      ]
-    }
-  ],
-  "diagnostics": [
-    {
-      "kind": "grafana",
-      "summary": "4 of 5 rules, 5 current instances",
-      "selection": [
-        {
-          "display_name": "Checkout 5xx errors",
-          "labels": {
-            "folder": "Shop",
-            "group": "Sites",
-            "rule_uid": "shop-5xx",
-            "severity": "critical",
-            "team": "web"
-          },
-          "count": 2,
-          "unit": "instances",
-          "families": [
-            "alerting"
-          ]
-        },
-        {
-          "display_name": "Disk almost full",
-          "labels": {
-            "folder": "Shop",
-            "group": "Node",
-            "rule_uid": "shop-disk",
-            "team": "ops"
-          },
-          "count": 1,
-          "unit": "instances",
-          "families": [
-            "alerting"
-          ]
-        },
-        {
-          "display_name": "Queue consumer lag",
-          "labels": {
-            "folder": "Shop",
-            "group": "Jobs",
-            "rule_uid": "shop-queue",
-            "severity": "warning"
-          },
-          "count": 1,
-          "unit": "instances",
-          "families": [
-            "alerting"
-          ]
-        },
-        {
-          "display_name": "Worker exceptions",
-          "labels": {
-            "folder": "Shop",
-            "group": "Jobs",
-            "rule_uid": "shop-worker",
-            "severity": "info"
-          },
-          "count": 1,
-          "unit": "instances",
-          "families": [
-            "alerting"
-          ]
-        }
-      ],
-      "selection_total": 4,
-      "samples": [
-        {
-          "alertname": "Checkout 5xx errors",
-          "grafana_folder": "Shop",
-          "env": "production",
-          "instance": "shop-web-1",
-          "project": "shop"
-        },
-        {
-          "alertname": "Checkout 5xx errors",
-          "grafana_folder": "Shop",
-          "env": "production",
-          "instance": "shop-web-2",
-          "project": "shop"
-        },
-        {
-          "alertname": "Disk almost full",
-          "grafana_folder": "Shop",
-          "env": "production",
-          "instance": "shop-db-1",
-          "project": "shop"
-        },
-        {
-          "alertname": "Queue consumer lag",
-          "grafana_folder": "Shop",
-          "env": "production",
-          "project": "shop",
-          "queue": "orders"
-        },
-        {
-          "alertname": "Worker exceptions",
-          "grafana_folder": "Shop",
-          "env": "production",
-          "exception": "Lost connection to the queue, retrying\n  at consume (worker.js:42)",
-          "project": "shop"
-        }
-      ],
-      "checks": [
-        {
-          "part": "Shop",
-          "field": "folder",
-          "matched": 4,
-          "matched_without": null,
-          "unit": "rules",
-          "available": [
-            "Platform",
-            "Shop"
-          ],
-          "available_truncated": false,
-          "matching": [
-            "Shop"
-          ]
-        },
-        {
-          "part": "project=\"shop\"",
-          "field": "instance_label",
-          "matched": 5,
-          "matched_without": 6,
-          "unit": "instances",
-          "available": [
-            "blog",
-            "shop"
-          ],
-          "available_truncated": false,
-          "matching": [
-            "shop"
-          ]
-        }
-      ],
-      "requests": [
-        "GET /api/prometheus/grafana/api/v1/rules",
-        "GET /api/annotations?type=alert&alertUID=shop-5xx&from=$start&to=$end",
-        "GET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end",
-        "GET /api/annotations?type=alert&alertUID=shop-queue&from=$start&to=$end",
-        "GET /api/annotations?type=alert&alertUID=shop-worker&from=$start&to=$end"
-      ],
-      "notes": []
     }
   ],
   "related_metrics": {

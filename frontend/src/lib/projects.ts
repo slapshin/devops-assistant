@@ -1,4 +1,4 @@
-import type { AnalysisReport, ConnectionTest, LabelMatcher, Problem, ProjectInput, ProjectSummary, ReportSchedule, SourceInfo, SourceKind, Weekday } from "../api/client";
+import type { ConnectionTest, LabelMatcher, Problem, ProjectInput, ProjectSummary, ReportSchedule, ReportSummary, SourceInfo, SourceKind, Weekday } from "../api/client";
 import { credentialIdOf, sourceAuthInput, validateSourceCredential } from "./auth";
 import { type CustomRuleDraft, ruleDraftFrom, ruleInput, validateCustomRules } from "./customRules";
 
@@ -732,7 +732,7 @@ export function testVolume(test: ConnectionTest): string | null {
 }
 
 /** Every source of a report; 2.0 reports only have ``source``. */
-export function reportSources(report: AnalysisReport): SourceInfo[] {
+export function reportSources(report: ReportSummary): SourceInfo[] {
   if (report.sources?.length) return report.sources;
   return report.source ? [report.source] : [];
 }

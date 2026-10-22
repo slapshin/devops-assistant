@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ApiError, type AnalysisReport } from "../../api/client";
+import { ApiError, type ReportSummary } from "../../api/client";
 import { useReport, useSubmit } from "../../api/queries";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
 import type { Crumb } from "../../components/shell/crumbs";
@@ -28,15 +28,14 @@ const query = useReport(() => props.id);
 const submit = useSubmit();
 const tabRefs = ref<HTMLElement[]>([]);
 
-const report = computed(() => query.data.value as AnalysisReport);
+const report = computed(() => query.data.value as ReportSummary);
 provideReport({
   report,
   findingById: computed(() => new Map((query.data.value?.findings ?? []).map((f) => [f.finding_id, f]))),
-  evidenceById: computed(() => new Map((query.data.value?.evidence ?? []).map((e) => [e.evidence_id, e]))),
 });
 
 /** Filter parts that look wrong; the Scope tab shows how many. */
-const scopeProblems = computed(() => (query.data.value ? problemCount(query.data.value as AnalysisReport) : 0));
+const scopeProblems = computed(() => (query.data.value ? problemCount(query.data.value as ReportSummary) : 0));
 const tabs = computed(() => [
   { name: "overview", label: "Overview", to: `/reports/${props.id}`, count: null },
   { name: "findings", label: "Findings", to: `/reports/${props.id}/findings`, count: query.data.value?.findings.length ?? 0 },

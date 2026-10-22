@@ -952,6 +952,52 @@
     "previous_episodes": 1,
     "reason": "Anomalous share 1.79% over the last 7 days vs 0.22% over the previous 7 (higher); 4 vs 1 episodes."
   },
+  "exclusions": [],
+  "explanation": {
+    "status": "succeeded",
+    "explanation": {
+      "summary": "Sustained CPU saturation on shop-production for 3 h and an earlier, separate increase of 404 responses on checkout-api GET /api/v1/orders/:order.",
+      "hypotheses": [
+        {
+          "text": "A batch or runaway process saturated CPU on shop-production.",
+          "finding_ids": [
+            "fnd_94618458f042af24"
+          ],
+          "likelihood": "plausible"
+        },
+        {
+          "text": "A client is polling for task IDs that no longer exist.",
+          "finding_ids": [
+            "fnd_88ef880662054415"
+          ],
+          "likelihood": "possible"
+        }
+      ],
+      "investigation_steps": [
+        {
+          "text": "List top CPU consumers on shop-production for 05:05-08:05 UTC.",
+          "finding_ids": [
+            "fnd_94618458f042af24"
+          ]
+        },
+        {
+          "text": "Group 404 requests on /api/v1/orders/:order by client.",
+          "finding_ids": [
+            "fnd_88ef880662054415"
+          ]
+        }
+      ],
+      "uncertainty": "No established mapping between node shop-production and checkout-api instances; the two findings are treated as unrelated.",
+      "provider": "openai",
+      "model": "configured-model",
+      "generated_at": "2026-09-30T10:07:00Z"
+    },
+    "reason": null,
+    "validation_notes": []
+  },
+  "custom_rules": [],
+  "totals": [],
+  "diagnostics": [],
   "evidence": [
     {
       "evidence_id": "evd_b1f1922124c54502",
@@ -2215,51 +2261,5 @@
       "threshold_label": null
     }
   ],
-  "exclusions": [],
-  "explanation": {
-    "status": "succeeded",
-    "explanation": {
-      "summary": "Sustained CPU saturation on shop-production for 3 h and an earlier, separate increase of 404 responses on checkout-api GET /api/v1/orders/:order.",
-      "hypotheses": [
-        {
-          "text": "A batch or runaway process saturated CPU on shop-production.",
-          "finding_ids": [
-            "fnd_94618458f042af24"
-          ],
-          "likelihood": "plausible"
-        },
-        {
-          "text": "A client is polling for task IDs that no longer exist.",
-          "finding_ids": [
-            "fnd_88ef880662054415"
-          ],
-          "likelihood": "possible"
-        }
-      ],
-      "investigation_steps": [
-        {
-          "text": "List top CPU consumers on shop-production for 05:05-08:05 UTC.",
-          "finding_ids": [
-            "fnd_94618458f042af24"
-          ]
-        },
-        {
-          "text": "Group 404 requests on /api/v1/orders/:order by client.",
-          "finding_ids": [
-            "fnd_88ef880662054415"
-          ]
-        }
-      ],
-      "uncertainty": "No established mapping between node shop-production and checkout-api instances; the two findings are treated as unrelated.",
-      "provider": "openai",
-      "model": "configured-model",
-      "generated_at": "2026-09-30T10:07:00Z"
-    },
-    "reason": null,
-    "validation_notes": []
-  },
-  "custom_rules": [],
-  "totals": [],
-  "diagnostics": [],
   "related_metrics": null
 }

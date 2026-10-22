@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 import numpy as np
 from numpy.typing import NDArray
 
-from app.analysis.charts import opt, slice_series
+from app.analysis.charts import chart_value, slice_series
 from app.analysis.detect import TREND_STEPS, Episode, SeriesEvaluation
 from app.analysis.relations import HostMappings, association, component_association, hosts_for
 from app.analysis.rules import RuleKind
@@ -737,7 +737,7 @@ def _chart(run: _Run, chart_id: str, p: _Prepared, window: _Window) -> RelatedCh
     spread = run.config.z_threshold * ev.scale
 
     def band(a: NDArray[np.float64]) -> list[float | None] | None:
-        values = [opt(v) for v in a[lo:hi]]
+        values = [chart_value(v) for v in a[lo:hi]]
         return values if any(v is not None for v in values) else None
 
     return RelatedChart(

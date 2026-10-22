@@ -7,7 +7,7 @@ import { formatDuration, formatTime, formatValue, isLatencyMean, utcTooltip } fr
 import EvidenceSparkline from "./EvidenceSparkline.vue";
 import SeverityChip from "./SeverityChip.vue";
 
-const props = defineProps<{ finding: Finding; to: string; evidence?: Evidence | null }>();
+const props = defineProps<{ finding: Finding; to: string; evidence?: Evidence | null; loading?: boolean }>();
 
 const f = computed(() => props.finding);
 const threshold = computed(() => props.evidence?.threshold ?? f.value.threshold);
@@ -28,6 +28,7 @@ const threshold = computed(() => props.evidence?.threshold ?? f.value.threshold)
       <p v-if="f.summary" class="summary">{{ f.summary }}</p>
       <span v-if="isLatencyMean(f.signal)" class="lbl">Mean latency (no histogram)</span>
       <EvidenceSparkline v-if="evidence" :evidence="evidence" :finding="f" />
+      <div v-else-if="loading" class="skeleton spark-loading" aria-hidden="true" />
       <div class="legend">
         <span><span class="sw" style="background: var(--s1)" /><span class="mono">{{ f.entity.display_name }}</span></span>
         <span v-if="threshold !== null && threshold !== undefined">
@@ -55,4 +56,6 @@ const threshold = computed(() => props.evidence?.threshold ?? f.value.threshold)
 .summary { margin: 0; font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .band { background: var(--info); opacity: 0.35; }
 .current { background: currentColor; }
+/* The sparkline's own aspect ratio (EvidenceSparkline), so the card does not jump when it loads. */
+.spark-loading { height: auto; aspect-ratio: 400 / 134; margin: 0; }
 </style>

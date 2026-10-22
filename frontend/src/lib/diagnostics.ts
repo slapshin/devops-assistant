@@ -1,4 +1,4 @@
-import type { AnalysisReport, FilterCheck, ScopeDiagnostics, SourceKind } from "../api/client";
+import type { FilterCheck, ReportSummary, ScopeDiagnostics, SourceKind } from "../api/client";
 import { SOURCE_KIND_LABELS, reportSources } from "./projects";
 
 /** Mirrors the `source_unavailable` exclusion message of backend/app/service.py. */
@@ -55,7 +55,7 @@ export const countText = (n: number | null | undefined, unit: string) =>
   n === null || n === undefined ? "—" : `${n.toLocaleString("en")} ${n === 1 && unit !== "series" ? unit.replace(/s$/, "") : unit}`;
 
 /** Each analysed source in report order with its snapshot (null: the source failed or the report predates 2.8). */
-export function sourceDiagnostics(report: AnalysisReport): { kind: SourceKind; baseUrl: string; diagnostics: Required<ScopeDiagnostics> | null; failures: string[] }[] {
+export function sourceDiagnostics(report: ReportSummary): { kind: SourceKind; baseUrl: string; diagnostics: Required<ScopeDiagnostics> | null; failures: string[] }[] {
   const byKind = new Map((report.diagnostics ?? []).map((d) => [d.kind, withDefaults(d)]));
   const failed = report.exclusions.filter((e) => e.code === "source_unavailable");
   const seen = new Set<SourceKind>();
@@ -86,5 +86,5 @@ const withDefaults = (d: ScopeDiagnostics): Required<ScopeDiagnostics> => ({
 });
 
 /** Filter checks pointing at a wrong filter, over every source. */
-export const problemCount = (report: AnalysisReport) =>
+export const problemCount = (report: ReportSummary) =>
   (report.diagnostics ?? []).flatMap((d) => d.checks ?? []).filter((c) => PROBLEM_VERDICTS.has(checkVerdict(c))).length;

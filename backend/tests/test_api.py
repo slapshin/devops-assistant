@@ -519,3 +519,78 @@ def test_reports_without_related_metrics_still_load() -> None:
     old = AnalysisReport.model_validate(report)
 
     assert old.related_metrics is None
+
+
+def test_report_summary_and_finding_detail_split_the_snapshot(client: TestClient) -> None:
+    analysis_id = submit(client).json()["analysis"]["analysis_id"]
+    wait(client, analysis_id, "completed")
+    full = client.get(f"/api/analyses/{analysis_id}/report").json()
+
+    summary = client.get(f"/api/analyses/{analysis_id}/report/summary").json()
+
+    assert "evidence" not in summary and "related_metrics" not in summary
+    assert summary == {k: v for k, v in full.items() if k not in ("evidence", "related_metrics")}
+
+    evidence = {e["evidence_id"]: e for e in full["evidence"]}
+    charts = {c["chart_id"]: c for c in full["related_metrics"]["charts"]}
+    for finding in full["findings"]:
+        fid = finding["finding_id"]
+
+        detail = client.get(f"/api/analyses/{analysis_id}/report/findings/{fid}").json()
+
+        assert detail["evidence"] == [evidence[e] for e in finding["evidence_ids"]]
+        related = detail["related"]
+        comparisons = [c for c in full["related_metrics"]["comparisons"] if c["finding_id"] == fid]
+        assert related["comparisons"] == sorted(comparisons, key=lambda c: c["rank"])
+        referenced = {s[k]["chart_id"] for s in comparisons for k in ("anchor", "candidate")}
+        assert related["charts"] == [c for c in charts.values() if c["chart_id"] in referenced]
+        assert related["evaluation"]["finding_id"] == fid
+
+
+def test_finding_detail_problems(tmp_path: Path) -> None:
+    source = GatedSource()
+    with make_client(tmp_path, source=source) as client:
+        analysis_id = submit(client).json()["analysis"]["analysis_id"]
+
+        running = client.get(f"/api/analyses/{analysis_id}/report/findings/fnd_0000000000000000")
+
+        assert running.status_code == 409 and running.json()["code"] == "report_not_ready"
+
+        source.gate.set()
+        wait(client, analysis_id, "completed")
+        unknown = client.get(f"/api/analyses/{analysis_id}/report/findings/fnd_0000000000000000")
+
+        assert unknown.status_code == 404 and unknown.json()["code"] == "finding_not_found"
+
+
+def test_finding_detail_of_a_report_without_related_metrics() -> None:
+    data = run_pipeline().model_dump(mode="json")
+    data["schema_version"] = "2.8"
+    del data["related_metrics"]
+    report = AnalysisReport.model_validate(data)
+    finding = report.findings[0]
+
+    detail = report.finding_detail(finding.finding_id)
+
+    assert detail is not None and detail.related is None
+    assert [e.evidence_id for e in detail.evidence] == finding.evidence_ids
+
+
+def test_chart_data_keeps_five_significant_digits() -> None:
+    report = run_pipeline()
+    assert report.related_metrics is not None
+    arrays = [
+        values
+        for e in report.evidence
+        for values in (e.series.values, e.expected, e.lower, e.upper)
+        if values is not None
+    ] + [
+        values
+        for c in report.related_metrics.charts
+        for values in (c.series.values, c.expected, c.lower, c.upper, c.deviation)
+        if values is not None
+    ]
+
+    numbers = [v for values in arrays for v in values if v is not None]
+
+    assert numbers and all(v == float(f"{v:.5g}") for v in numbers)

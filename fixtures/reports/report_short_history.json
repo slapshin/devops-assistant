@@ -799,6 +799,16 @@
     "previous_episodes": 0,
     "reason": "Only 2 recent and 0 earlier days have a full baseline and coverage (need ≥ 4 each)."
   },
+  "exclusions": [],
+  "explanation": {
+    "status": "disabled",
+    "explanation": null,
+    "reason": "AI_PROVIDER=none",
+    "validation_notes": []
+  },
+  "custom_rules": [],
+  "totals": [],
+  "diagnostics": [],
   "evidence": [
     {
       "evidence_id": "evd_936682c7b9ea1d20",
@@ -1370,15 +1380,5 @@
       "threshold_label": "Diagnostic heuristic: 90 % for ≥ 15 min (not an SLO)"
     }
   ],
-  "exclusions": [],
-  "explanation": {
-    "status": "disabled",
-    "explanation": null,
-    "reason": "AI_PROVIDER=none",
-    "validation_notes": []
-  },
-  "custom_rules": [],
-  "totals": [],
-  "diagnostics": [],
   "related_metrics": null
 }

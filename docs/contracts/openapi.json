@@ -232,6 +232,7 @@
       },
       "AnalysisReport": {
         "additionalProperties": false,
+        "description": "The saved report snapshot: the summary plus every finding's chart data.",
         "properties": {
           "analysis_id": {
             "title": "Analysis Id",
@@ -399,9 +400,9 @@
           "coverage",
           "findings",
           "trends",
-          "evidence",
           "exclusions",
-          "explanation"
+          "explanation",
+          "evidence"
         ],
         "title": "AnalysisReport",
         "type": "object"
@@ -1680,6 +1681,7 @@
           "analysis_not_found",
           "report_not_ready",
           "report_unavailable",
+          "finding_not_found",
           "schema_unsupported",
           "analysis_not_active",
           "queue_full",
@@ -2418,6 +2420,91 @@
           "evidence_ids"
         ],
         "title": "Finding",
+        "type": "object"
+      },
+      "FindingDetail": {
+        "additionalProperties": false,
+        "description": "The chart data of one finding of a saved report (T024).",
+        "properties": {
+          "analysis_id": {
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "evidence": {
+            "description": "In the order of the finding's evidence_ids.",
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "related": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindingRelatedMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the report predates related metrics (schema < 2.9)."
+          }
+        },
+        "required": [
+          "analysis_id",
+          "finding_id",
+          "evidence",
+          "related"
+        ],
+        "title": "FindingDetail",
+        "type": "object"
+      },
+      "FindingRelatedMetrics": {
+        "additionalProperties": false,
+        "description": "The related metrics of one finding: its evaluation, kept comparisons and their charts.",
+        "properties": {
+          "charts": {
+            "description": "The charts the comparisons reference.",
+            "items": {
+              "$ref": "#/components/schemas/RelatedChart"
+            },
+            "title": "Charts",
+            "type": "array"
+          },
+          "comparisons": {
+            "description": "Ordered by rank.",
+            "items": {
+              "$ref": "#/components/schemas/RelatedMetric"
+            },
+            "title": "Comparisons",
+            "type": "array"
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelatedEvaluation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the finding was not compared."
+          },
+          "policy": {
+            "$ref": "#/components/schemas/RelatedPolicy"
+          }
+        },
+        "required": [
+          "policy",
+          "evaluation",
+          "comparisons",
+          "charts"
+        ],
+        "title": "FindingRelatedMetrics",
         "type": "object"
       },
       "FindingState": {
@@ -4178,6 +4265,164 @@
         "title": "ReportState",
         "type": "string"
       },
+      "ReportSummary": {
+        "additionalProperties": false,
+        "description": "A report without its chart data (T024): everything the report views need up front.\n\nThe full snapshot is ``AnalysisReport``; a finding's evidence and related metrics come from\nits ``FindingDetail``, so opening a report does not download every finding's charts.",
+        "properties": {
+          "analysis_id": {
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/MetricCapability"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "config_hash": {
+            "title": "Config Hash",
+            "type": "string"
+          },
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/SignalCoverage"
+            },
+            "title": "Coverage",
+            "type": "array"
+          },
+          "custom_rules": {
+            "description": "The project's custom rules as they were when analysed (2.5).",
+            "items": {
+              "$ref": "#/components/schemas/CustomRule"
+            },
+            "title": "Custom Rules",
+            "type": "array"
+          },
+          "detector_version": {
+            "title": "Detector Version",
+            "type": "string"
+          },
+          "diagnostics": {
+            "description": "What each source's filter selected at analysis time (2.8).",
+            "items": {
+              "$ref": "#/components/schemas/ScopeDiagnostics"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/Exclusion"
+            },
+            "title": "Exclusions",
+            "type": "array"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/ExplanationResult"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "2.9",
+            "enum": [
+              "2.0",
+              "2.1",
+              "2.2",
+              "2.3",
+              "2.4",
+              "2.5",
+              "2.6",
+              "2.7",
+              "2.8",
+              "2.9"
+            ],
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deprecated: the first source; use sources."
+          },
+          "sources": {
+            "description": "Every source analysed (2.1); empty in 2.0 reports.",
+            "items": {
+              "$ref": "#/components/schemas/SourceInfo"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReportState"
+          },
+          "totals": {
+            "description": "Daily event totals of the Sentry, Wazuh and Grafana sources (2.6).",
+            "items": {
+              "$ref": "#/components/schemas/EventTotal"
+            },
+            "title": "Totals",
+            "type": "array"
+          },
+          "trend_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrendSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trends": {
+            "items": {
+              "$ref": "#/components/schemas/DailyTrend"
+            },
+            "maxItems": 14,
+            "minItems": 14,
+            "title": "Trends",
+            "type": "array"
+          },
+          "windows": {
+            "$ref": "#/components/schemas/AnalysisWindows"
+          }
+        },
+        "required": [
+          "analysis_id",
+          "scope",
+          "windows",
+          "generated_at",
+          "detector_version",
+          "config_hash",
+          "state",
+          "capabilities",
+          "coverage",
+          "findings",
+          "trends",
+          "exclusions",
+          "explanation"
+        ],
+        "title": "ReportSummary",
+        "type": "object"
+      },
       "ResourceAssociation": {
         "description": "How the two series' resources are connected, from identity labels or verified mappings\nonly; never from matching names across sources.",
         "enum": [
@@ -5558,6 +5803,7 @@
     },
     "/api/analyses/{analysis_id}/report": {
       "get": {
+        "description": "The full snapshot, with every finding's chart data.",
         "operationId": "get_report_api_analyses__analysis_id__report_get",
         "parameters": [
           {
@@ -5615,6 +5861,139 @@
           }
         },
         "summary": "Get Report"
+      }
+    },
+    "/api/analyses/{analysis_id}/report/findings/{finding_id}": {
+      "get": {
+        "description": "One finding's evidence and related metrics.",
+        "operationId": "get_finding_detail_api_analyses__analysis_id__report_findings__finding_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "title": "Finding Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Finding Detail"
+      }
+    },
+    "/api/analyses/{analysis_id}/report/summary": {
+      "get": {
+        "description": "The report without evidence and related metrics: what the report views load first.",
+        "operationId": "get_report_summary_api_analyses__analysis_id__report_summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Report Summary"
       }
     },
     "/api/config": {

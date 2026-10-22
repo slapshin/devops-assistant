@@ -877,6 +877,16 @@
     "previous_episodes": 0,
     "reason": "Anomalous share 1.34% over the last 7 days vs 0.00% over the previous 7 (higher); 2 vs 0 episodes."
   },
+  "exclusions": [],
+  "explanation": {
+    "status": "failed",
+    "explanation": null,
+    "reason": "timeout after 60 s (1 retry)",
+    "validation_notes": []
+  },
+  "custom_rules": [],
+  "totals": [],
+  "diagnostics": [],
   "evidence": [
     {
       "evidence_id": "evd_05ec6dee30dba5d4",
@@ -2140,15 +2150,5 @@
       "threshold_label": null
     }
   ],
-  "exclusions": [],
-  "explanation": {
-    "status": "failed",
-    "explanation": null,
-    "reason": "timeout after 60 s (1 retry)",
-    "validation_notes": []
-  },
-  "custom_rules": [],
-  "totals": [],
-  "diagnostics": [],
   "related_metrics": null
 }

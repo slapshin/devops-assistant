@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import {
   apiDelete,
@@ -7,7 +7,6 @@ import {
   apiPut,
   type AnalysisJob,
   type AnalysisList,
-  type AnalysisReport,
   type AnalysisSubmitted,
   type ConnectionTest,
   type Credential,
@@ -16,9 +15,11 @@ import {
   type ConnectionTestRequest,
   type CustomRulePreview,
   type CustomRulePreviewRequest,
+  type FindingDetail,
   type ProjectInput,
   type ProjectList,
   type ProjectSummary,
+  type ReportSummary,
   type RuntimeConfig,
 } from "./client";
 
@@ -163,12 +164,34 @@ export function useAnalysis(id: MaybeRefOrGetter<string>) {
   });
 }
 
+const reportPath = (id: string) => `/api/analyses/${encodeURIComponent(id)}/report` as const;
+
+/** The report without chart data; each finding's charts come from useFindingDetail. */
 export function useReport(id: MaybeRefOrGetter<string>) {
   return useQuery({
     queryKey: computed(() => ["report", toValue(id)]),
-    queryFn: () => apiGet<AnalysisReport>(`/api/analyses/${encodeURIComponent(toValue(id))}/report`),
+    queryFn: () => apiGet<ReportSummary>(`${reportPath(toValue(id))}/summary`),
     staleTime: Infinity, // snapshots are immutable
     retry: false,
+  });
+}
+
+const findingDetailQuery = (analysisId: string, findingId: string) => ({
+  queryKey: ["finding-detail", analysisId, findingId],
+  queryFn: () => apiGet<FindingDetail>(`${reportPath(analysisId)}/findings/${encodeURIComponent(findingId)}`),
+  staleTime: Infinity, // snapshots are immutable
+  retry: false,
+});
+
+/** One finding's evidence and related metrics. */
+export function useFindingDetail(analysisId: MaybeRefOrGetter<string>, findingId: MaybeRefOrGetter<string>) {
+  return useQuery(computed(() => findingDetailQuery(toValue(analysisId), toValue(findingId))));
+}
+
+/** Details of several findings at once (the Overview's finding cards). */
+export function useFindingDetails(analysisId: MaybeRefOrGetter<string>, findingIds: MaybeRefOrGetter<string[]>) {
+  return useQueries({
+    queries: computed(() => toValue(findingIds).map((id) => findingDetailQuery(toValue(analysisId), id))),
   });
 }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { Finding } from "../../api/client";
+import { useFindingDetails } from "../../api/queries";
 import CoverageGrid from "../../components/CoverageGrid.vue";
 import CoverageTable from "../../components/CoverageTable.vue";
 import EventTotalPanel from "../../components/EventTotalPanel.vue";
@@ -23,7 +24,7 @@ const BLIND_SPOT_REASONS = {
 /** Critical, high and medium always get a stat panel; low only when present. */
 const ALWAYS_SHOWN_SEVERITIES = new Set(["critical", "high", "medium"]);
 
-const { report, evidenceById } = useReportContext();
+const { report } = useReportContext();
 
 const episodesOpen = ref(true);
 const coverageOpen = ref(true);
@@ -40,6 +41,11 @@ const evaluatedCount = computed(() => report.value.coverage.filter((c) => c.stat
 /** One row of event totals: three share it, fewer widen to fill it. */
 const totalSpan = computed(() => `s${24 / Math.min(3, Math.max(1, report.value.totals?.length ?? 1))}`);
 const topFindings = computed(() => report.value.findings.slice(0, TOP_FINDINGS_COUNT));
+/** Only the cards' findings: the rest of the report's chart data loads when a finding opens. */
+const topDetails = useFindingDetails(
+  () => report.value.analysis_id,
+  () => topFindings.value.map((f) => f.finding_id),
+);
 const worst = computed(() => report.value.findings[0] ?? null);
 const lede = computed(() => {
   const f = worst.value;
@@ -57,7 +63,7 @@ const blindSpots = computed(() =>
 );
 
 const link = (id: string) => `/reports/${report.value.analysis_id}/findings/${id}`;
-const evidenceFor = (ids: string[]) => (ids[0] ? evidenceById.value.get(ids[0]) ?? null : null);
+const evidenceFor = (index: number) => topDetails.value[index]?.data?.evidence[0] ?? null;
 
 /** "CPU · new" for a single finding, "2 new · 1 seen before" for several. */
 function severityDetail(findings: Finding[]): string {
@@ -169,7 +175,7 @@ function listSeparator(index: number, length: number): string {
           :link="link"
           :full-to="`/reports/${report.analysis_id}/timeline`"
         />
-        <FindingCard v-for="f in topFindings" :key="f.finding_id" class="s8" :finding="f" :to="link(f.finding_id)" :evidence="evidenceFor(f.evidence_ids)" />
+        <FindingCard v-for="(f, i) in topFindings" :key="f.finding_id" class="s8" :finding="f" :to="link(f.finding_id)" :evidence="evidenceFor(i)" :loading="topDetails[i]?.isPending" />
       </div>
     </template>
 

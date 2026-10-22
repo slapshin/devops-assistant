@@ -1,4 +1,4 @@
-import type { AnalysisReport, CustomRule, Finding, Schemas } from "../api/client";
+import type { CustomRule, Finding, ReportSummary, Schemas } from "../api/client";
 import type { FieldErrors } from "./projects";
 import { formatValue } from "./format";
 
@@ -229,7 +229,7 @@ export function ruleSummary(rule: CustomRule): string {
 }
 
 /** The custom rule a finding came from, as it was when the report was made. */
-export function findingRule(report: AnalysisReport, finding: Finding): CustomRule | null {
+export function findingRule(report: ReportSummary, finding: Finding): CustomRule | null {
   if (finding.family !== "custom") return null;
   return (report.custom_rules ?? []).find((r) => `${CUSTOM_SIGNAL_PREFIX}${r.slug}` === finding.signal) ?? null;
 }

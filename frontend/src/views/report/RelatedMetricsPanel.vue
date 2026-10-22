@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import type { Finding } from "../../api/client";
+import type { Finding, FindingDetail } from "../../api/client";
 import ChartBox from "../../components/ChartBox.vue";
 import DataTable from "../../components/DataTable.vue";
 import SourceIcon from "../../components/projects/SourceIcon.vue";
@@ -25,14 +25,14 @@ import {
 import { chartPalette } from "../../lib/theme";
 import { useReportContext } from "./context";
 
-const props = defineProps<{ finding: Finding }>();
+const props = defineProps<{ finding: Finding; detail: FindingDetail }>();
 
 const { report, findingById } = useReportContext();
 const showAll = ref(false);
 const selectedId = ref<string | null>(null);
 const view = ref<RelatedView>("values");
 
-const found = computed(() => relatedFor(report.value, props.finding.finding_id));
+const found = computed(() => relatedFor(props.detail));
 const comparisons = computed(() => found.value.comparisons);
 const visible = computed(() => (showAll.value ? comparisons.value : comparisons.value.slice(0, RELATED_DEFAULT_ROWS)));
 const message = computed(() => evaluationMessage(found.value));

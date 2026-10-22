@@ -6,6 +6,8 @@ All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. Mult
 
 Related metrics for incident investigation (T023) are DONE; their numerical defaults are validated on synthetic data only.
 
+Fast report loading (T024: report summary and per-finding chart data, rounded chart values) is DONE.
+
 ## Ordered backlog
 
 | ID | Task | Dependencies | Status |
@@ -33,6 +35,7 @@ Related metrics for incident investigation (T023) are DONE; their numerical defa
 | T021 | [Credentials and per-kind source authentication](T021-shared-credentials.md) | T020 | DONE |
 | T022 | [Scope diagnostics: what each source's filter selected](T022-scope-diagnostics.md) | T021 | DONE |
 | T023 | [Related metrics for incident investigation](T023-related-metrics.md) | T022 | DONE |
+| T024 | [Fast report loading](T024-report-loading.md) | T023 | DONE |
 
 ## How the next agent should work
 

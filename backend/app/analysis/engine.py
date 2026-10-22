@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from app.analysis.baseline import STEPS_PER_DAY
-from app.analysis.charts import opt, sample_coverage, slice_series
+from app.analysis.charts import chart_value, opt, sample_coverage, slice_series
 from app.analysis.correlation import related_metrics
 from app.analysis.derive import AnalysisSeries, derive, to_array
 from app.analysis.detect import (
@@ -382,7 +382,7 @@ class RobustDetector:
         start = windows.trend.start + timedelta(seconds=lo * windows.step_seconds)
 
         def band(a: np.ndarray) -> list[float | None]:
-            return [opt(v) for v in a[lo:hi]]
+            return [chart_value(v) for v in a[lo:hi]]
 
         s = ev.series
         main = slice_series(
@@ -854,7 +854,7 @@ def _error_kinds_during(s: AnalysisSeries, lo: int, hi: int) -> list[ErrorKindAc
 
 
 def _slice_series_raw(src: MetricSeries, values: np.ndarray, start: datetime) -> MetricSeries:
-    vals = [opt(v) for v in values]
+    vals = [chart_value(v) for v in values]
     return src.model_copy(
         update={"start": start, "values": vals, "coverage": sample_coverage(vals)}
     )

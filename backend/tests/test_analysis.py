@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from app.analysis.baseline import STEPS_PER_DAY, bucket_baseline
+from app.analysis.charts import chart_value
 from app.analysis.derive import _TRAFFIC_SPECS, DIRECT, SWARM_FAILED_TASKS, AnalysisSeries, derive
 from app.analysis.detect import TREND_STEPS, evaluate
 from app.analysis.engine import RobustDetector, severity_from_points, trend_summary
@@ -803,3 +804,13 @@ async def test_findings_carry_their_rules_summary_and_help() -> None:
     for f in result.findings:
         assert f.summary == RULES[f.signal].summary
         assert f.help == RULES[f.signal].help
+
+
+def test_chart_values_round_to_significant_digits_and_keep_gaps() -> None:
+    assert [chart_value(v) for v in (0.26067831333331315, 123456789.0, -0.000123456, 0.0)] == [
+        0.26068,
+        123460000.0,
+        -0.00012346,
+        0.0,
+    ]
+    assert chart_value(float("nan")) is None

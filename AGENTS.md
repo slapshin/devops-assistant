@@ -62,7 +62,7 @@ Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source 
 - `app/ai/` — `providers.py` (provider selection, `fake`), `prompt.py`, `validation.py` (validates model output references real finding IDs), `openai_adapter.py`.
 - `app/storage/` — SQLAlchemy Core (no ORM) + Alembic migrations in `backend/migrations/`, run upgrade-only at startup. Reports are stored as versioned JSON snapshots (`REPORT_SCHEMA_VERSION`).
 - `app/api/` — routes under `/api`; errors are RFC 9457 `application/problem+json` with a stable `code` (`problems.py`).
-- `frontend/src/` — routes `/` (project list), `/credentials` (credentials), `/analyses/:id` (job progress), `/reports/:id` with `findings`, `findings/:findingId`, `timeline`, `trends`, `scope` children. Server state via TanStack Vue Query (no Pinia); API client typed from generated `schema.d.ts`; styling is plain CSS: tokens in `styles/tokens.css`, shared dashboard classes (panels, 24-column grid, chips) in `styles/base.css`; fonts are self-hosted IBM Plex via `@fontsource`.
+- `frontend/src/` — routes `/` (project list), `/credentials` (credentials), `/analyses/:id` (job progress), `/reports/:id` with `findings`, `findings/:findingId`, `timeline`, `trends`, `scope` children. Server state via TanStack Vue Query (no Pinia); a report view loads `/report/summary`, and a finding's evidence and related metrics come from `/report/findings/{finding_id}` only when it is shown (T024: full reports are many MB); API client typed from generated `schema.d.ts`; styling is plain CSS: tokens in `styles/tokens.css`, shared dashboard classes (panels, 24-column grid, chips) in `styles/base.css`; fonts are self-hosted IBM Plex via `@fontsource`.
 
 ## Invariants to preserve
 
@@ -84,4 +84,4 @@ Tests (backend pytest and frontend vitest) follow Arrange–Act–Assert, with o
 
 ## Docs
 
-`docs/DECISIONS.md` (versions, config, API/job conventions, numerical policy), `docs/ARCHITECTURE.md`, `docs/UI_SPEC.md`, `docs/OPERATIONS.md` (config, Docker networking, backups, troubleshooting), `docs/detection.md`, `docs/metrics-catalog.md`. Task history T001–T022 (all DONE) is in `docs/tasks/`; `docs/tasks/README.md` describes the task workflow if new tasks are added.
+`docs/DECISIONS.md` (versions, config, API/job conventions, numerical policy), `docs/ARCHITECTURE.md`, `docs/UI_SPEC.md`, `docs/OPERATIONS.md` (config, Docker networking, backups, troubleshooting), `docs/detection.md`, `docs/metrics-catalog.md`. Task history T001–T024 (all DONE) is in `docs/tasks/`; `docs/tasks/README.md` describes the task workflow if new tasks are added.

@@ -21,7 +21,7 @@ from app.domain.jobs import (
     Limits,
     RuntimeConfig,
 )
-from app.domain.report import AnalysisReport
+from app.domain.report import AnalysisReport, FindingDetail, ReportSummary
 from app.jobs import NotActive, QueueFull
 from app.settings import AIProvider, Settings
 from app.sources.base import ClientLimits
@@ -198,12 +198,7 @@ async def get_analysis(analysis_id: str, services: ServicesDep) -> AnalysisJob:
     return await _job(services, analysis_id)
 
 
-@router.get(
-    "/analyses/{analysis_id}/report",
-    response_model=AnalysisReport,
-    responses=problem_responses(404, 409),
-)
-async def get_report(analysis_id: str, services: ServicesDep) -> AnalysisReport:
+async def _report(services: Services, analysis_id: str) -> AnalysisReport:
     job = await _job(services, analysis_id)
     if job.state.active:
         raise ProblemError(
@@ -227,6 +222,46 @@ async def get_report(analysis_id: str, services: ServicesDep) -> AnalysisReport:
             f"Analysis {job.state.value}" + (f": {job.error.message}" if job.error else "."),
         )
     return report
+
+
+@router.get(
+    "/analyses/{analysis_id}/report",
+    response_model=AnalysisReport,
+    responses=problem_responses(404, 409),
+)
+async def get_report(analysis_id: str, services: ServicesDep) -> AnalysisReport:
+    """The full snapshot, with every finding's chart data."""
+    return await _report(services, analysis_id)
+
+
+@router.get(
+    "/analyses/{analysis_id}/report/summary",
+    response_model=ReportSummary,
+    responses=problem_responses(404, 409),
+)
+async def get_report_summary(analysis_id: str, services: ServicesDep) -> ReportSummary:
+    """The report without evidence and related metrics: what the report views load first."""
+    return (await _report(services, analysis_id)).summary()
+
+
+@router.get(
+    "/analyses/{analysis_id}/report/findings/{finding_id}",
+    response_model=FindingDetail,
+    responses=problem_responses(404, 409),
+)
+async def get_finding_detail(
+    analysis_id: str, finding_id: str, services: ServicesDep
+) -> FindingDetail:
+    """One finding's evidence and related metrics."""
+    detail = (await _report(services, analysis_id)).finding_detail(finding_id)
+    if detail is None:
+        raise ProblemError(
+            404,
+            ErrorCode.FINDING_NOT_FOUND,
+            "Finding not found",
+            f"No finding {finding_id} in this report.",
+        )
+    return detail
 
 
 @router.delete(

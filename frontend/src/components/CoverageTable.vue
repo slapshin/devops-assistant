@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { AnalysisReport } from "../api/client";
+import type { ReportSummary } from "../api/client";
 import { FAMILY_LABELS } from "../lib/format";
 import StatusBadge from "./StatusBadge.vue";
 
-defineProps<{ report: AnalysisReport }>();
+defineProps<{ report: ReportSummary }>();
 </script>
 
 <template>

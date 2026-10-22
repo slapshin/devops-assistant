@@ -4,6 +4,8 @@ export type Schemas = components["schemas"];
 export type Problem = Schemas["Problem"];
 export type RuntimeConfig = Schemas["RuntimeConfig"];
 export type AnalysisReport = Schemas["AnalysisReport"];
+export type ReportSummary = Schemas["ReportSummary"];
+export type FindingDetail = Schemas["FindingDetail"];
 export type AnalysisJob = Schemas["AnalysisJob"];
 export type AnalysisList = Schemas["AnalysisList"];
 export type AnalysisSubmitted = Schemas["AnalysisSubmitted"];
@@ -42,6 +44,7 @@ export type RelatedMetric = Schemas["RelatedMetric"];
 export type RelatedChart = Schemas["RelatedChart"];
 export type RelatedEvaluation = Schemas["RelatedEvaluation"];
 export type RelatedSeries = Schemas["RelatedSeries"];
+export type FindingRelatedMetrics = Schemas["FindingRelatedMetrics"];
 
 /** Error carrying an RFC 9457 problem body, or a synthetic one for network failures. */
 export class ApiError extends Error {

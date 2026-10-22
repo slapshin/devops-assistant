@@ -66,6 +66,7 @@ class ErrorCode(StrEnum):
     ANALYSIS_NOT_FOUND = "analysis_not_found"
     REPORT_NOT_READY = "report_not_ready"
     REPORT_UNAVAILABLE = "report_unavailable"
+    FINDING_NOT_FOUND = "finding_not_found"
     SCHEMA_UNSUPPORTED = "schema_unsupported"
     ANALYSIS_NOT_ACTIVE = "analysis_not_active"
     QUEUE_FULL = "queue_full"

@@ -712,7 +712,6 @@
     "previous_episodes": 0,
     "reason": "Anomalous share 0.00% over the last 7 days vs 0.00% over the previous 7 (similar); 0 vs 0 episodes."
   },
-  "evidence": [],
   "exclusions": [],
   "explanation": {
     "status": "skipped_no_findings",
@@ -723,5 +722,6 @@
   "custom_rules": [],
   "totals": [],
   "diagnostics": [],
+  "evidence": [],
   "related_metrics": null
 }
