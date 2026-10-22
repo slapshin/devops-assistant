@@ -141,6 +141,6 @@ Exercise persistence with real SQLite and old report fixtures, reference integri
   - Regenerated contracts, `schema.d.ts` and fixtures (new `fixtures/reports/report_related.json`).
   - Docs: `DECISIONS.md` (§5 Related metrics policy and validation, §6 budget), `detection.md`, `contracts.md`, `ARCHITECTURE.md`, `UI_SPEC.md` (§7 4d), `AGENTS.md`.
 - Checks:
-  - `make contracts`, `make fixtures`, `make check`: see the result below.
+  - `make contracts`, `make fixtures` and `make check` pass: backend 1574 passed, 6 skipped; frontend 90 vitest tests, vue-tsc, eslint and build pass.
   - Synthetic validation of the statistic (scripted, not committed): Pearson vs Spearman on 400 unrelated AR(1) pairs and 72 weak related changes; results in DECISIONS §5.
   - Live run of the native app with `DEMO_PROJECTS=true AI_PROVIDER=fake` (not the Docker `make demo`): an incident analysis (schema 2.9, 55 findings, 245 comparisons). The 5xx finding's panel showed p95 latency (same resource, r = +0.79, began about 10 min earlier, no finding of its own), Deadlocks and a Grafana alert (unknown association; the alert flagged as possibly the same data), synchronized charts in both views, at 1400 px and 390 px (screenshots checked). That fixed overflowing table cells and the episode tint on the second plot.
