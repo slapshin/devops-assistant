@@ -5,7 +5,6 @@ import { useFindingDetail } from "../../api/queries";
 import ChartBox from "../../components/ChartBox.vue";
 import DataTable from "../../components/DataTable.vue";
 import ExplanationPanel from "../../components/ExplanationPanel.vue";
-import SeverityChip from "../../components/SeverityChip.vue";
 import { instancesText } from "../../lib/alerts";
 import { findingRule, ruleSummary } from "../../lib/customRules";
 import { errorKindsText } from "../../lib/errors";
@@ -70,12 +69,11 @@ onMounted(async () => {
 <template>
   <section class="dash-sub" aria-labelledby="evidence-title">
     <section class="panel s16" aria-label="Evidence chart">
-      <div class="ph">
-        <SeverityChip :severity="f.severity" />
-        <h2 id="evidence-title" ref="heading" tabindex="-1">{{ f.title }}</h2>
-        <span class="sub mono">· {{ f.entity.display_name }}</span>
-        <span v-if="f.alert_instances?.length" class="sub mono">· {{ instancesText(f) }}</span>
-        <span v-if="f.error_kinds?.length" class="sub mono">· {{ errorKindsText(f) }}</span>
+      <h2 id="evidence-title" ref="heading" tabindex="-1" class="sr-only">{{ f.title }}</h2>
+      <div v-if="f.alert_instances?.length || f.error_kinds?.length" class="ph">
+        <span v-if="f.alert_instances?.length" class="sub mono">{{ instancesText(f) }}</span>
+        <span v-if="f.alert_instances?.length && f.error_kinds?.length" class="sub mono">·</span>
+        <span v-if="f.error_kinds?.length" class="sub mono">{{ errorKindsText(f) }}</span>
       </div>
       <div class="pb">
         <template v-if="primaryEvidence">
