@@ -37,6 +37,11 @@ export type CredentialInput = Schemas["CredentialInput"];
 export type ScopeDiagnostics = Schemas["ScopeDiagnostics"];
 export type FilterCheck = Schemas["FilterCheck"];
 export type SelectedEntity = Schemas["SelectedEntity"];
+export type RelatedMetrics = Schemas["RelatedMetrics"];
+export type RelatedMetric = Schemas["RelatedMetric"];
+export type RelatedChart = Schemas["RelatedChart"];
+export type RelatedEvaluation = Schemas["RelatedEvaluation"];
+export type RelatedSeries = Schemas["RelatedSeries"];
 
 /** Error carrying an RFC 9457 problem body, or a synthetic one for network failures. */
 export class ApiError extends Error {

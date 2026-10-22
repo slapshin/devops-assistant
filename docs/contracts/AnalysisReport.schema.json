@@ -119,6 +119,24 @@
       "title": "ChangeDirection",
       "type": "string"
     },
+    "ComparisonMethod": {
+      "enum": [
+        "deviation_correlation",
+        "interval_overlap"
+      ],
+      "title": "ComparisonMethod",
+      "type": "string"
+    },
+    "ComparisonTiming": {
+      "enum": [
+        "simultaneous",
+        "candidate_leads",
+        "candidate_lags",
+        "inconclusive"
+      ],
+      "title": "ComparisonTiming",
+      "type": "string"
+    },
     "ConfidenceLevel": {
       "enum": [
         "low",
@@ -1625,12 +1643,566 @@
       "title": "Recurrence",
       "type": "string"
     },
+    "RelatedChart": {
+      "additionalProperties": false,
+      "description": "Chart data of one side of a comparison over its window, stored once per series and\nwindow so a report reopens without the source.",
+      "properties": {
+        "chart_id": {
+          "pattern": "^rch_[0-9a-f]{16}$",
+          "title": "Chart Id",
+          "type": "string"
+        },
+        "deviation": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Robust z (clipped); null without an adequate baseline.",
+          "title": "Deviation"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "lower": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lower"
+        },
+        "series": {
+          "$ref": "#/$defs/MetricSeries"
+        },
+        "upper": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Upper"
+        }
+      },
+      "required": [
+        "chart_id",
+        "series"
+      ],
+      "title": "RelatedChart",
+      "type": "object"
+    },
+    "RelatedDirection": {
+      "enum": [
+        "same",
+        "opposite"
+      ],
+      "title": "RelatedDirection",
+      "type": "string"
+    },
+    "RelatedEvaluation": {
+      "additionalProperties": false,
+      "description": "What happened when looking for related metrics of one finding.",
+      "properties": {
+        "candidates": {
+          "description": "Series with an unusual change in the window (eligible).",
+          "minimum": 0,
+          "title": "Candidates",
+          "type": "integer"
+        },
+        "evaluated": {
+          "minimum": 0,
+          "title": "Evaluated",
+          "type": "integer"
+        },
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "not_evaluated": {
+          "description": "Eligible candidates over the per-finding cap.",
+          "minimum": 0,
+          "title": "Not Evaluated",
+          "type": "integer"
+        },
+        "omitted": {
+          "description": "Qualifying comparisons beyond the kept limit.",
+          "minimum": 0,
+          "title": "Omitted",
+          "type": "integer"
+        },
+        "reasons": {
+          "items": {
+            "$ref": "#/$defs/Reason"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "retained": {
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Retained",
+          "type": "integer"
+        },
+        "shared_input": {
+          "description": "Candidates excluded because they share a known input (operands).",
+          "minimum": 0,
+          "title": "Shared Input",
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/RelatedState"
+        },
+        "unavailable": {
+          "description": "Candidates whose comparison was unavailable, by code.",
+          "items": {
+            "$ref": "#/$defs/UnavailableCount"
+          },
+          "title": "Unavailable",
+          "type": "array"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "finding_id",
+        "state",
+        "candidates",
+        "evaluated",
+        "retained",
+        "omitted",
+        "not_evaluated",
+        "shared_input"
+      ],
+      "title": "RelatedEvaluation",
+      "type": "object"
+    },
+    "RelatedMetric": {
+      "additionalProperties": false,
+      "description": "One retained comparison between a finding and another collected series.",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/RelatedSeries"
+        },
+        "association": {
+          "$ref": "#/$defs/ResourceAssociation"
+        },
+        "association_basis": {
+          "description": "The labels or mapping behind it.",
+          "minLength": 1,
+          "title": "Association Basis",
+          "type": "string"
+        },
+        "candidate": {
+          "$ref": "#/$defs/RelatedSeries"
+        },
+        "candidate_onset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Candidate Onset"
+        },
+        "coefficient": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": -1.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Signed Pearson coefficient of the deviations at `lag_seconds` (0 unless a lead or lag is estimated); null for interval overlap. Not a probability.",
+          "title": "Coefficient"
+        },
+        "comparison_id": {
+          "pattern": "^cmp_[0-9a-f]{16}$",
+          "title": "Comparison Id",
+          "type": "string"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelatedDirection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finding_id": {
+          "description": "The anchor finding.",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "lag_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Estimated shift; positive when the candidate leads. Null unless timing is candidate_leads or candidate_lags.",
+          "title": "Lag Seconds"
+        },
+        "longest_gap_seconds": {
+          "description": "Longest run of unpaired steps.",
+          "minimum": 0,
+          "title": "Longest Gap Seconds",
+          "type": "integer"
+        },
+        "method": {
+          "$ref": "#/$defs/ComparisonMethod"
+        },
+        "onset_lead_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Observed difference of change onsets, positive when the candidate's unusual change began first; null when it has no onset near the finding.",
+          "title": "Onset Lead Seconds"
+        },
+        "overlap_steps": {
+          "description": "Steps where both series are unusual (within the overlap slack).",
+          "minimum": 0,
+          "title": "Overlap Steps",
+          "type": "integer"
+        },
+        "paired_coverage": {
+          "description": "paired_samples / steps in the window.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Paired Coverage",
+          "type": "number"
+        },
+        "paired_samples": {
+          "description": "Jointly observed steps at the reported lag.",
+          "minimum": 0,
+          "title": "Paired Samples",
+          "type": "integer"
+        },
+        "rank": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "reasons": {
+          "description": "Data-quality limits, e.g. gaps, clipping.",
+          "items": {
+            "$ref": "#/$defs/Reason"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "selection": {
+          "description": "Why this comparison was kept.",
+          "minLength": 1,
+          "title": "Selection",
+          "type": "string"
+        },
+        "shared_input": {
+          "$ref": "#/$defs/SharedInput",
+          "default": "none"
+        },
+        "step_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Step Seconds",
+          "type": "integer"
+        },
+        "timing": {
+          "$ref": "#/$defs/ComparisonTiming"
+        },
+        "window": {
+          "$ref": "#/$defs/TimeRange",
+          "description": "Steps compared, the same for every candidate."
+        }
+      },
+      "required": [
+        "comparison_id",
+        "finding_id",
+        "rank",
+        "anchor",
+        "candidate",
+        "selection",
+        "association",
+        "association_basis",
+        "method",
+        "window",
+        "step_seconds",
+        "coefficient",
+        "direction",
+        "timing",
+        "lag_seconds",
+        "onset_lead_seconds",
+        "candidate_onset",
+        "overlap_steps",
+        "paired_samples",
+        "paired_coverage",
+        "longest_gap_seconds"
+      ],
+      "title": "RelatedMetric",
+      "type": "object"
+    },
+    "RelatedMetrics": {
+      "additionalProperties": false,
+      "description": "Related metrics of every latest-day finding (2.9).",
+      "properties": {
+        "charts": {
+          "items": {
+            "$ref": "#/$defs/RelatedChart"
+          },
+          "title": "Charts",
+          "type": "array"
+        },
+        "comparisons": {
+          "items": {
+            "$ref": "#/$defs/RelatedMetric"
+          },
+          "title": "Comparisons",
+          "type": "array"
+        },
+        "evaluations": {
+          "items": {
+            "$ref": "#/$defs/RelatedEvaluation"
+          },
+          "title": "Evaluations",
+          "type": "array"
+        },
+        "policy": {
+          "$ref": "#/$defs/RelatedPolicy"
+        }
+      },
+      "required": [
+        "policy",
+        "evaluations",
+        "comparisons",
+        "charts"
+      ],
+      "title": "RelatedMetrics",
+      "type": "object"
+    },
+    "RelatedPolicy": {
+      "additionalProperties": false,
+      "description": "The numerical policy the comparisons used (also in config_hash).",
+      "properties": {
+        "change_z": {
+          "exclusiveMinimum": 0,
+          "title": "Change Z",
+          "type": "number"
+        },
+        "max_lag_seconds": {
+          "minimum": 0,
+          "title": "Max Lag Seconds",
+          "type": "integer"
+        },
+        "max_per_finding": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Max Per Finding",
+          "type": "integer"
+        },
+        "max_window_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Max Window Seconds",
+          "type": "integer"
+        },
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "min_coefficient": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Min Coefficient",
+          "type": "number"
+        },
+        "window_pad_seconds": {
+          "minimum": 0,
+          "title": "Window Pad Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "method",
+        "window_pad_seconds",
+        "max_window_seconds",
+        "max_lag_seconds",
+        "change_z",
+        "min_coefficient",
+        "max_per_finding"
+      ],
+      "title": "RelatedPolicy",
+      "type": "object"
+    },
+    "RelatedSeries": {
+      "additionalProperties": false,
+      "description": "One side of a comparison: which series, from which source, on which resource.",
+      "properties": {
+        "chart_id": {
+          "pattern": "^rch_[0-9a-f]{16}$",
+          "title": "Chart Id",
+          "type": "string"
+        },
+        "entity": {
+          "$ref": "#/$defs/Entity"
+        },
+        "family": {
+          "$ref": "#/$defs/SignalFamily"
+        },
+        "finding_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The series' own latest-day finding overlapping the window, if any.",
+          "title": "Finding Id"
+        },
+        "label": {
+          "description": "What the signal measures, e.g. 'CPU'.",
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "signal": {
+          "minLength": 1,
+          "title": "Signal",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit"
+        }
+      },
+      "required": [
+        "source",
+        "family",
+        "signal",
+        "label",
+        "entity",
+        "unit",
+        "finding_id",
+        "chart_id"
+      ],
+      "title": "RelatedSeries",
+      "type": "object"
+    },
+    "RelatedState": {
+      "enum": [
+        "evaluated",
+        "insufficient_data",
+        "skipped_budget",
+        "dropped_budget"
+      ],
+      "title": "RelatedState",
+      "type": "string"
+    },
     "ReportState": {
       "enum": [
         "completed",
         "partial"
       ],
       "title": "ReportState",
+      "type": "string"
+    },
+    "ResourceAssociation": {
+      "description": "How the two series' resources are connected, from identity labels or verified mappings\nonly; never from matching names across sources.",
+      "enum": [
+        "same_entity",
+        "same_service",
+        "same_database_server",
+        "same_storage_cluster",
+        "shared_host",
+        "unknown"
+      ],
+      "title": "ResourceAssociation",
       "type": "string"
     },
     "Scope": {
@@ -1783,6 +2355,14 @@
         "critical"
       ],
       "title": "Severity",
+      "type": "string"
+    },
+    "SharedInput": {
+      "enum": [
+        "none",
+        "possible"
+      ],
+      "title": "SharedInput",
       "type": "string"
     },
     "SignalCoverage": {
@@ -2047,6 +2627,27 @@
       "title": "TrendSummary",
       "type": "object"
     },
+    "UnavailableCount": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "count": {
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "count"
+      ],
+      "title": "UnavailableCount",
+      "type": "object"
+    },
     "Unit": {
       "enum": [
         "ratio",
@@ -2133,8 +2734,20 @@
       "title": "Generated At",
       "type": "string"
     },
+    "related_metrics": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RelatedMetrics"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Other collected series compared with each finding (2.9); null in older reports."
+    },
     "schema_version": {
-      "default": "2.8",
+      "default": "2.9",
       "enum": [
         "2.0",
         "2.1",
@@ -2144,7 +2757,8 @@
         "2.5",
         "2.6",
         "2.7",
-        "2.8"
+        "2.8",
+        "2.9"
       ],
       "title": "Schema Version",
       "type": "string"

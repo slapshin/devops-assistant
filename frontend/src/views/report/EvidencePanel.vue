@@ -14,6 +14,7 @@ import { capitalize, formatDuration, formatTime, formatValue, isLatencyMean, tim
 import { chartPalette } from "../../lib/theme";
 import AlertInstancesPanel from "./AlertInstancesPanel.vue";
 import ErrorKindsPanel from "./ErrorKindsPanel.vue";
+import RelatedMetricsPanel from "./RelatedMetricsPanel.vue";
 import { useReportContext } from "./context";
 
 const EVIDENCE_COLUMNS = ["Time", "Observed", "Expected", "Lower", "Upper", "Gap"];
@@ -169,6 +170,7 @@ onMounted(async () => {
 
     <AlertInstancesPanel v-if="f.alert_instances?.length" :finding="f" />
     <ErrorKindsPanel v-if="f.error_kinds?.length" :finding="f" />
+    <RelatedMetricsPanel :finding="f" />
 
     <section class="panel s24" aria-labelledby="query-title">
       <div class="ph">

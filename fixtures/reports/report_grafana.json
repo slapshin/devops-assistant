@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.8",
+  "schema_version": "2.9",
   "analysis_id": "01999a3c-0000-7000-8000-0000000000e7",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-0000000000e1",
@@ -19,8 +19,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.22",
-  "config_hash": "df0729ffa10b",
+  "detector_version": "detectors-2026.10.22.1",
+  "config_hash": "4856d4783d08",
   "sources": [
     {
       "kind": "grafana",
@@ -115,9 +115,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_539dda2632010df7",
+      "finding_id": "fnd_820d77f74d3e430e",
       "detector": "event:alert_firing_critical",
-      "detector_version": "detectors-2026.10.22",
+      "detector_version": "detectors-2026.10.22.1",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_critical",
@@ -150,7 +150,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_e058665f1e50f422"
+        "evd_3d7b09cc4e42225c"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -201,9 +201,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_afac48935050cea8",
+      "finding_id": "fnd_b62616f329ef4870",
       "detector": "event:alert_firing_critical",
-      "detector_version": "detectors-2026.10.22",
+      "detector_version": "detectors-2026.10.22.1",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_critical",
@@ -236,7 +236,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_556b1be6ea0887cc"
+        "evd_2475427d60fa9bbe"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -269,9 +269,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_772832f4044882e1",
+      "finding_id": "fnd_f1b591c185080d43",
       "detector": "event:alert_firing",
-      "detector_version": "detectors-2026.10.22",
+      "detector_version": "detectors-2026.10.22.1",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing",
@@ -304,7 +304,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_b692f2bbc34cc9d2"
+        "evd_d74f3df58c6dfd4a"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -338,9 +338,9 @@
       "prior_episode_days": 13
     },
     {
-      "finding_id": "fnd_8e4d14f2d271d42d",
+      "finding_id": "fnd_e39554e175e3bd77",
       "detector": "event:alert_firing_info",
-      "detector_version": "detectors-2026.10.22",
+      "detector_version": "detectors-2026.10.22.1",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_info",
@@ -373,7 +373,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_eaf668ce7eff2028"
+        "evd_ec084c02b27174b5"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -404,9 +404,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_915215fe76d01921",
+      "finding_id": "fnd_949a2b61412148e5",
       "detector": "event:alert_nodata",
-      "detector_version": "detectors-2026.10.22",
+      "detector_version": "detectors-2026.10.22.1",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_nodata",
@@ -439,7 +439,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_1fec3998a711415e"
+        "evd_106fe5c8ef2bf38b"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -493,8 +493,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_539dda2632010df7",
-          "finding_id": "fnd_539dda2632010df7",
+          "episode_id": "eps_820d77f74d3e430e",
+          "finding_id": "fnd_820d77f74d3e430e",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-5xx",
@@ -513,8 +513,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_afac48935050cea8",
-          "finding_id": "fnd_afac48935050cea8",
+          "episode_id": "eps_b62616f329ef4870",
+          "finding_id": "fnd_b62616f329ef4870",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-5xx",
@@ -533,8 +533,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_772832f4044882e1",
-          "finding_id": "fnd_772832f4044882e1",
+          "episode_id": "eps_f1b591c185080d43",
+          "finding_id": "fnd_f1b591c185080d43",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-disk",
@@ -553,8 +553,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_8e4d14f2d271d42d",
-          "finding_id": "fnd_8e4d14f2d271d42d",
+          "episode_id": "eps_e39554e175e3bd77",
+          "finding_id": "fnd_e39554e175e3bd77",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-worker",
@@ -573,8 +573,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_915215fe76d01921",
-          "finding_id": "fnd_915215fe76d01921",
+          "episode_id": "eps_949a2b61412148e5",
+          "finding_id": "fnd_949a2b61412148e5",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-queue",
@@ -613,7 +613,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_845c9eea55835531",
+          "episode_id": "eps_388f04914f5e5bb1",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -653,7 +653,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_8ddaa705e5469ab0",
+          "episode_id": "eps_adc74bc74df753e6",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -693,7 +693,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_fc950616c4e5d177",
+          "episode_id": "eps_ec4e091c79690caa",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -733,7 +733,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_8b10669789f9c206",
+          "episode_id": "eps_5361b43541d680d0",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -773,7 +773,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_0600cbe9ac8fc96c",
+          "episode_id": "eps_56fbea626bdc75c9",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -813,7 +813,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_0f3835481a660498",
+          "episode_id": "eps_739b6f73ecc16888",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -853,7 +853,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_2aaa652d9cc88a94",
+          "episode_id": "eps_25f841780540abb0",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -893,7 +893,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_3e50addb7bdcc3e9",
+          "episode_id": "eps_3c78ec560cd306e2",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -933,7 +933,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_b8bedaf882cea46b",
+          "episode_id": "eps_addfd7ed8d3ca878",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -973,7 +973,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_1e5305ef9bde5606",
+          "episode_id": "eps_71c8e1bd475d5f34",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1013,7 +1013,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_2e882e14f7d923de",
+          "episode_id": "eps_95039c8c6c7051b0",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1053,7 +1053,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_0fe485efc1054548",
+          "episode_id": "eps_c27c75751d064207",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1093,7 +1093,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_d765f3a230078fd9",
+          "episode_id": "eps_b0df9c3f40051189",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1126,8 +1126,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_b692f2bbc34cc9d2",
-      "finding_id": "fnd_772832f4044882e1",
+      "evidence_id": "evd_d74f3df58c6dfd4a",
+      "finding_id": "fnd_f1b591c185080d43",
       "series": {
         "series_id": "ser_dd17d96bed1588f7",
         "family": "alerting",
@@ -1614,8 +1614,8 @@
       "threshold_label": "Grafana alert firing: diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_e058665f1e50f422",
-      "finding_id": "fnd_539dda2632010df7",
+      "evidence_id": "evd_3d7b09cc4e42225c",
+      "finding_id": "fnd_820d77f74d3e430e",
       "series": {
         "series_id": "ser_2aba015a13b8d343",
         "family": "alerting",
@@ -2110,8 +2110,8 @@
       "threshold_label": "Grafana alert firing (severity critical): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_556b1be6ea0887cc",
-      "finding_id": "fnd_afac48935050cea8",
+      "evidence_id": "evd_2475427d60fa9bbe",
+      "finding_id": "fnd_b62616f329ef4870",
       "series": {
         "series_id": "ser_2aba015a13b8d343",
         "family": "alerting",
@@ -2462,8 +2462,8 @@
       "threshold_label": "Grafana alert firing (severity critical): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_eaf668ce7eff2028",
-      "finding_id": "fnd_8e4d14f2d271d42d",
+      "evidence_id": "evd_ec084c02b27174b5",
+      "finding_id": "fnd_e39554e175e3bd77",
       "series": {
         "series_id": "ser_d7d124f4399fca6e",
         "family": "alerting",
@@ -3094,8 +3094,8 @@
       "threshold_label": "Grafana alert firing (severity info): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_1fec3998a711415e",
-      "finding_id": "fnd_915215fe76d01921",
+      "evidence_id": "evd_106fe5c8ef2bf38b",
+      "finding_id": "fnd_949a2b61412148e5",
       "series": {
         "series_id": "ser_4ec1b7e3c79addf3",
         "family": "alerting",
@@ -3707,21 +3707,21 @@
         {
           "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_539dda2632010df7"
+            "fnd_820d77f74d3e430e"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_afac48935050cea8"
+            "fnd_b62616f329ef4870"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Grafana alert firing on Disk almost full may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_772832f4044882e1"
+            "fnd_f1b591c185080d43"
           ],
           "likelihood": "possible"
         }
@@ -3730,19 +3730,19 @@
         {
           "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_539dda2632010df7"
+            "fnd_820d77f74d3e430e"
           ]
         },
         {
           "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_afac48935050cea8"
+            "fnd_b62616f329ef4870"
           ]
         },
         {
           "text": "Open the evidence chart for Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_772832f4044882e1"
+            "fnd_f1b591c185080d43"
           ]
         }
       ],
@@ -3977,5 +3977,613 @@
       ],
       "notes": []
     }
-  ]
+  ],
+  "related_metrics": {
+    "policy": {
+      "method": "Pearson correlation of baseline deviations (robust z, clipped) over jointly observed steps at bounded lags; overlap of unusual intervals for events and series without an adequate baseline.",
+      "window_pad_seconds": 7200,
+      "max_window_seconds": 86400,
+      "max_lag_seconds": 1800,
+      "change_z": 3.0,
+      "min_coefficient": 0.6,
+      "max_per_finding": 5
+    },
+    "evaluations": [
+      {
+        "finding_id": "fnd_820d77f74d3e430e",
+        "state": "evaluated",
+        "window": {
+          "start": "2026-09-30T04:35:00Z",
+          "end": "2026-09-30T10:05:00Z"
+        },
+        "candidates": 1,
+        "evaluated": 1,
+        "retained": 1,
+        "omitted": 0,
+        "not_evaluated": 0,
+        "shared_input": 0,
+        "unavailable": [],
+        "reasons": []
+      },
+      {
+        "finding_id": "fnd_b62616f329ef4870",
+        "state": "evaluated",
+        "window": {
+          "start": "2026-09-30T07:35:00Z",
+          "end": "2026-09-30T10:05:00Z"
+        },
+        "candidates": 0,
+        "evaluated": 0,
+        "retained": 0,
+        "omitted": 0,
+        "not_evaluated": 0,
+        "shared_input": 0,
+        "unavailable": [],
+        "reasons": [
+          {
+            "code": "window_clipped",
+            "message": "The window ends at the analysis end: later observations do not exist yet."
+          }
+        ]
+      },
+      {
+        "finding_id": "fnd_f1b591c185080d43",
+        "state": "evaluated",
+        "window": {
+          "start": "2026-09-30T04:45:00Z",
+          "end": "2026-09-30T09:05:00Z"
+        },
+        "candidates": 1,
+        "evaluated": 1,
+        "retained": 1,
+        "omitted": 0,
+        "not_evaluated": 0,
+        "shared_input": 0,
+        "unavailable": [],
+        "reasons": []
+      },
+      {
+        "finding_id": "fnd_e39554e175e3bd77",
+        "state": "evaluated",
+        "window": {
+          "start": "2026-09-29T23:45:00Z",
+          "end": "2026-09-30T04:05:00Z"
+        },
+        "candidates": 0,
+        "evaluated": 0,
+        "retained": 0,
+        "omitted": 0,
+        "not_evaluated": 0,
+        "shared_input": 0,
+        "unavailable": [],
+        "reasons": []
+      },
+      {
+        "finding_id": "fnd_949a2b61412148e5",
+        "state": "evaluated",
+        "window": {
+          "start": "2026-09-30T02:20:00Z",
+          "end": "2026-09-30T07:05:00Z"
+        },
+        "candidates": 0,
+        "evaluated": 0,
+        "retained": 0,
+        "omitted": 0,
+        "not_evaluated": 0,
+        "shared_input": 0,
+        "unavailable": [],
+        "reasons": []
+      }
+    ],
+    "comparisons": [
+      {
+        "comparison_id": "cmp_90814025f9295a43",
+        "finding_id": "fnd_820d77f74d3e430e",
+        "rank": 1,
+        "anchor": {
+          "source": "grafana",
+          "family": "alerting",
+          "signal": "alert_firing_critical",
+          "label": "Grafana alert firing (severity critical)",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-5xx",
+            "display_name": "Checkout 5xx errors",
+            "labels": {
+              "rule_uid": "shop-5xx"
+            }
+          },
+          "unit": "count",
+          "finding_id": "fnd_820d77f74d3e430e",
+          "chart_id": "rch_2fac541bccc446f3"
+        },
+        "candidate": {
+          "source": "grafana",
+          "family": "alerting",
+          "signal": "alert_firing",
+          "label": "Grafana alert firing",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-disk",
+            "display_name": "Disk almost full",
+            "labels": {
+              "rule_uid": "shop-disk"
+            }
+          },
+          "unit": "count",
+          "finding_id": "fnd_f1b591c185080d43",
+          "chart_id": "rch_fbd9e8b783f86c4d"
+        },
+        "selection": "Resource association unknown; unusual for 4 steps around the finding.",
+        "association": "unknown",
+        "association_basis": "No verified connection between these resources; they only share the project.",
+        "shared_input": "possible",
+        "method": "interval_overlap",
+        "window": {
+          "start": "2026-09-30T04:35:00Z",
+          "end": "2026-09-30T10:05:00Z"
+        },
+        "step_seconds": 300,
+        "coefficient": null,
+        "direction": null,
+        "timing": "simultaneous",
+        "lag_seconds": null,
+        "onset_lead_seconds": -600,
+        "candidate_onset": "2026-09-30T06:45:00Z",
+        "overlap_steps": 4,
+        "paired_samples": 66,
+        "paired_coverage": 1.0,
+        "longest_gap_seconds": 0,
+        "reasons": [
+          {
+            "code": "possible_shared_input",
+            "message": "An alert rule or custom rule may be computed from the same data: not independent confirmation."
+          }
+        ]
+      },
+      {
+        "comparison_id": "cmp_4d5531f5d8992cf5",
+        "finding_id": "fnd_f1b591c185080d43",
+        "rank": 1,
+        "anchor": {
+          "source": "grafana",
+          "family": "alerting",
+          "signal": "alert_firing",
+          "label": "Grafana alert firing",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-disk",
+            "display_name": "Disk almost full",
+            "labels": {
+              "rule_uid": "shop-disk"
+            }
+          },
+          "unit": "count",
+          "finding_id": "fnd_f1b591c185080d43",
+          "chart_id": "rch_ffd195687da812bd"
+        },
+        "candidate": {
+          "source": "grafana",
+          "family": "alerting",
+          "signal": "alert_firing_critical",
+          "label": "Grafana alert firing (severity critical)",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-5xx",
+            "display_name": "Checkout 5xx errors",
+            "labels": {
+              "rule_uid": "shop-5xx"
+            }
+          },
+          "unit": "count",
+          "finding_id": "fnd_820d77f74d3e430e",
+          "chart_id": "rch_1a0adc660272cf3c"
+        },
+        "selection": "Resource association unknown; unusual for 12 steps around the finding.",
+        "association": "unknown",
+        "association_basis": "No verified connection between these resources; they only share the project.",
+        "shared_input": "possible",
+        "method": "interval_overlap",
+        "window": {
+          "start": "2026-09-30T04:45:00Z",
+          "end": "2026-09-30T09:05:00Z"
+        },
+        "step_seconds": 300,
+        "coefficient": null,
+        "direction": null,
+        "timing": "simultaneous",
+        "lag_seconds": null,
+        "onset_lead_seconds": 600,
+        "candidate_onset": "2026-09-30T06:35:00Z",
+        "overlap_steps": 12,
+        "paired_samples": 52,
+        "paired_coverage": 1.0,
+        "longest_gap_seconds": 0,
+        "reasons": [
+          {
+            "code": "possible_shared_input",
+            "message": "An alert rule or custom rule may be computed from the same data: not independent confirmation."
+          }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "chart_id": "rch_1a0adc660272cf3c",
+        "series": {
+          "series_id": "ser_2aba015a13b8d343",
+          "family": "alerting",
+          "signal": "alert_firing_critical",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-5xx",
+            "display_name": "Checkout 5xx errors",
+            "labels": {
+              "rule_uid": "shop-5xx"
+            }
+          },
+          "labels": {
+            "rule_uid": "shop-5xx",
+            "alert_folder": "Shop",
+            "alert_group": "Sites",
+            "severity": "critical"
+          },
+          "unit": "count",
+          "query": "# Grafana alert rule shop-5xx: firing instances of rules labelled severity=critical, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-5xx\nGET /api/annotations?type=alert&alertUID=shop-5xx&from=$start&to=$end&limit=5000",
+          "step_seconds": 300,
+          "start": "2026-09-30T04:45:00Z",
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "coverage": 1.0,
+          "sample_interval": null,
+          "alert_instances": []
+        },
+        "expected": null,
+        "lower": null,
+        "upper": null,
+        "deviation": null
+      },
+      {
+        "chart_id": "rch_2fac541bccc446f3",
+        "series": {
+          "series_id": "ser_2aba015a13b8d343",
+          "family": "alerting",
+          "signal": "alert_firing_critical",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-5xx",
+            "display_name": "Checkout 5xx errors",
+            "labels": {
+              "rule_uid": "shop-5xx"
+            }
+          },
+          "labels": {
+            "rule_uid": "shop-5xx",
+            "alert_folder": "Shop",
+            "alert_group": "Sites",
+            "severity": "critical"
+          },
+          "unit": "count",
+          "query": "# Grafana alert rule shop-5xx: firing instances of rules labelled severity=critical, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-5xx\nGET /api/annotations?type=alert&alertUID=shop-5xx&from=$start&to=$end&limit=5000",
+          "step_seconds": 300,
+          "start": "2026-09-30T04:35:00Z",
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "coverage": 1.0,
+          "sample_interval": null,
+          "alert_instances": []
+        },
+        "expected": null,
+        "lower": null,
+        "upper": null,
+        "deviation": null
+      },
+      {
+        "chart_id": "rch_fbd9e8b783f86c4d",
+        "series": {
+          "series_id": "ser_dd17d96bed1588f7",
+          "family": "alerting",
+          "signal": "alert_firing",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-disk",
+            "display_name": "Disk almost full",
+            "labels": {
+              "rule_uid": "shop-disk"
+            }
+          },
+          "labels": {
+            "rule_uid": "shop-disk",
+            "alert_folder": "Shop",
+            "alert_group": "Node",
+            "alert_summary": "Less than 10% of the data disk is free"
+          },
+          "unit": "count",
+          "query": "# Grafana alert rule shop-disk: firing instances, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-disk\nGET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end&limit=5000",
+          "step_seconds": 300,
+          "start": "2026-09-30T04:35:00Z",
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "coverage": 1.0,
+          "sample_interval": null,
+          "alert_instances": []
+        },
+        "expected": null,
+        "lower": null,
+        "upper": null,
+        "deviation": null
+      },
+      {
+        "chart_id": "rch_ffd195687da812bd",
+        "series": {
+          "series_id": "ser_dd17d96bed1588f7",
+          "family": "alerting",
+          "signal": "alert_firing",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-disk",
+            "display_name": "Disk almost full",
+            "labels": {
+              "rule_uid": "shop-disk"
+            }
+          },
+          "labels": {
+            "rule_uid": "shop-disk",
+            "alert_folder": "Shop",
+            "alert_group": "Node",
+            "alert_summary": "Less than 10% of the data disk is free"
+          },
+          "unit": "count",
+          "query": "# Grafana alert rule shop-disk: firing instances, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-disk\nGET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end&limit=5000",
+          "step_seconds": 300,
+          "start": "2026-09-30T04:45:00Z",
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "coverage": 1.0,
+          "sample_interval": null,
+          "alert_instances": []
+        },
+        "expected": null,
+        "lower": null,
+        "upper": null,
+        "deviation": null
+      }
+    ]
+  }
 }

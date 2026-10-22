@@ -341,6 +341,10 @@ def _add_route_series(
         p95 = np.clip(gen.base(0.08, 0.01, 0.004), 0.001, None)
         if scenario.latency_shift and is_task_route:
             p95[N - 72 :] = 0.4 + gen.rng.normal(0, 0.01, 72)
+        if scenario.server_error_burst and is_task_route:
+            # Latency rises 30 % from 10 min before the 5xx burst: below its own heuristic
+            # (1.5x), so no finding, but a related metric of the 5xx finding (T023).
+            p95[N - 32 : N - 18] *= 1.3
         builder.add("http_latency_p95", labels, gen.available(p95))
         builder.add("http_latency_p99", labels, gen.available(p95 * 1.6))
     else:

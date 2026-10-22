@@ -42,3 +42,11 @@ def episode_id(analysis_key: str, entity_key: str, signal: str, start_iso: str) 
 
 def evidence_id(finding: str, series: str) -> str:
     return f"evd_{_digest(finding, series)}"
+
+
+def comparison_id(finding: str, entity_key: str, signal: str) -> str:
+    return f"cmp_{_digest(finding, entity_key, signal)}"
+
+
+def related_chart_id(analysis_key: str, entity_key: str, signal: str, window: str) -> str:
+    return f"rch_{_digest(analysis_key, entity_key, signal, window)}"

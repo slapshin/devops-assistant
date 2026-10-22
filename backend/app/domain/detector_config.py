@@ -10,7 +10,7 @@ from pydantic import Field
 
 from app.domain.common import STEP_SECONDS, Contract
 
-DETECTOR_VERSION = "detectors-2026.10.22"
+DETECTOR_VERSION = "detectors-2026.10.22.1"
 CONFIG_HASH_HEX_CHARS = 12
 
 
@@ -136,6 +136,39 @@ _DEFAULT_SIGNALS: dict[str, SignalThresholds] = {
 }
 
 
+class RelatedConfig(Contract):
+    """Related metrics (T023): bounds and thresholds of the deterministic comparisons."""
+
+    window_pad_minutes: int = Field(default=120, ge=0)
+    """Observations compared on each side of the finding's episode."""
+    max_window_minutes: int = Field(default=1440, gt=0)
+    """Longer windows keep their latest part (with the episode's end)."""
+    max_lag_minutes: int = Field(default=30, ge=0)
+    """Shifts tried, in steps, in both directions."""
+    change_z: float = Field(default=3.0, gt=0)
+    """|robust z| from which a step counts as an unusual change (candidate eligibility)."""
+    deviation_clip: float = Field(default=10.0, gt=0)
+    """Deviations are clipped to ±this, so a floored scale cannot dominate the coefficient."""
+    min_coefficient: float = Field(default=0.6, gt=0, le=1)
+    """|coefficient| from which a correlation comparison is kept."""
+    min_episode_deviation: float = Field(default=1.0, gt=0)
+    """Mean |robust z| the candidate needs during the episode, in the direction the
+    coefficient implies."""
+    min_overlap_share: float = Field(default=0.5, gt=0, le=1)
+    """Share of the candidate's unusual window steps that must lie near the finding's
+    (interval overlap)."""
+    lag_tolerance: float = Field(default=0.05, ge=0)
+    """Shifts within this of the best |coefficient| count as equally good."""
+    min_paired_steps: int = Field(default=24, ge=3)
+    min_paired_coverage: float = Field(default=0.5, gt=0, le=1)
+    duplicate_coefficient: float = Field(default=0.98, gt=0, le=1)
+    """Raw values agreeing this closely may be the same measurement."""
+    max_candidates_per_finding: int = Field(default=40, ge=1)
+    max_evaluations: int = Field(default=4000, ge=1)
+    """Comparisons per run; findings are served in report order (most severe first)."""
+    max_per_finding: int = Field(default=5, ge=1, le=5)
+
+
 class DetectorConfig(Contract):
     version: str = DETECTOR_VERSION
     step_seconds: int = STEP_SECONDS
@@ -156,6 +189,7 @@ class DetectorConfig(Contract):
     client_error_max_severity: str = "medium"
     shortfall_min_minutes: int = 15
     relation_slack_minutes: int = 30
+    related: RelatedConfig = Field(default_factory=RelatedConfig)
     signals: dict[str, SignalThresholds] = Field(default_factory=lambda: dict(_DEFAULT_SIGNALS))
 
     @property

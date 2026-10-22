@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 from app.ai.providers import explain_findings
 from app.domain.common import SOURCE_FAMILIES, Scope
+from app.domain.correlation import RelatedState
 from app.domain.detector_config import DetectorConfig
 from app.domain.explanation import ExplanationStatus
 from app.domain.interfaces import (
@@ -147,6 +148,7 @@ class AnalysisPipeline:
             custom_rules=collection.custom_rules,
             totals=collection.totals,
             diagnostics=collection.diagnostics,
+            related_metrics=result.related_metrics,
         )
         return self._fit(report)
 
@@ -155,7 +157,9 @@ class AnalysisPipeline:
         if self._fits(report):
             return report
 
-        slim = _keep_primary_evidence(report)
+        slim = _drop_related_metrics(report)
+        if not self._fits(slim):
+            slim = _keep_primary_evidence(slim)
         if not self._fits(slim):
             slim = _truncate_daily_episodes(slim)
         return AnalysisReport.model_validate(slim.model_dump())
@@ -242,6 +246,36 @@ async def _gather(
         diagnostics=diagnostics,
     )
     return result
+
+
+def _drop_related_metrics(report: AnalysisReport) -> AnalysisReport:
+    """Drop the supplementary related-metric comparisons and charts, disclosing it per finding;
+    the findings and their own evidence stay complete."""
+    related = report.related_metrics
+    if related is None or not related.comparisons:
+        return report
+
+    evaluations = [
+        e.model_copy(
+            update={
+                "state": RelatedState.DROPPED_BUDGET,
+                "retained": 0,
+                "omitted": e.omitted + e.retained,
+            }
+        )
+        if e.retained
+        else e
+        for e in related.evaluations
+    ]
+    exclusion = Exclusion(
+        code="related_dropped",
+        message=f"{len(related.comparisons)} related-metric comparisons and their charts dropped "
+        "to respect the report size budget.",
+    )
+    slim = related.model_copy(update={"evaluations": evaluations, "comparisons": [], "charts": []})
+    return report.model_copy(
+        update={"related_metrics": slim, "exclusions": [*report.exclusions, exclusion]}
+    )
 
 
 def _keep_primary_evidence(report: AnalysisReport) -> AnalysisReport:

@@ -4,7 +4,8 @@ import type { ChartPalette } from "./theme";
 
 const MS_PER_SECOND = 1000;
 
-export function timestamps(evidence: Evidence): string[] {
+/** Step timestamps of stored chart data (finding evidence or a related-metric chart). */
+export function timestamps(evidence: Pick<Evidence, "series">): string[] {
   const startMs = new Date(evidence.series.start).getTime();
   const stepMs = evidence.series.step_seconds * MS_PER_SECOND;
   // Same RFC 3339 form as the API, so markArea bounds match category values exactly.

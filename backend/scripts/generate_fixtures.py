@@ -1066,6 +1066,7 @@ def build() -> dict[str, BaseModel]:
         "reports/report_wazuh.json": wazuh_report(),
         "reports/report_grafana.json": grafana_report(),
         "reports/report_custom_rules.json": custom_rules_report(),
+        "reports/report_related.json": related_report(),
         "jobs/job_running.json": job(
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
@@ -1271,6 +1272,35 @@ def custom_rules_report() -> AnalysisReport:
     )
     return pipeline_report(
         OpenedSource(SourceKind.PROMETHEUS, source), project, CUSTOM_RULES_ANALYSIS_ID
+    )
+
+
+RELATED_ANALYSIS_ID = "01999a3c-0000-7000-8000-0000000000e9"
+
+
+def related_report() -> AnalysisReport:
+    """A Prometheus project whose 5xx burst has related metrics: the route's latency rising
+    first without a finding of its own, and a PostgreSQL lock pile-up nearby (T023)."""
+    scenario = replace(
+        PROMETHEUS_SCENARIOS["healthy"],
+        server_error_burst=True,
+        database_pileup=True,
+        proxies=False,
+        mysql=False,
+        redis=False,
+        nodejs=False,
+        go=False,
+        seaweedfs=False,
+    )
+    project = Scope(
+        project_id="01999a3c-0000-7000-8000-0000000000e1",
+        project_name="Shop related metrics",
+        matchers=[LabelMatcher(name="project", value="shop")],
+    )
+    return pipeline_report(
+        OpenedSource(SourceKind.PROMETHEUS, SyntheticMetricsSource(scenario)),
+        project,
+        RELATED_ANALYSIS_ID,
     )
 
 

@@ -12,6 +12,7 @@ from typing import Protocol
 from pydantic import Field
 
 from app.domain.common import Contract, Scope, Severity, SourceKind, UtcDatetime
+from app.domain.correlation import RelatedMetrics
 from app.domain.custom_rules import CustomRule
 from app.domain.detector_config import DetectorConfig
 from app.domain.diagnostics import ScopeDiagnostics
@@ -155,6 +156,7 @@ class DetectionResult(Contract):
     trend_summary: TrendSummary | None = None
     coverage: list[SignalCoverage]
     exclusions: list[Exclusion]
+    related_metrics: RelatedMetrics | None = None
 
 
 class Detector(Protocol):

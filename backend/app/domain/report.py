@@ -18,6 +18,7 @@ from app.domain.common import (
     TimeRange,
     UtcDatetime,
 )
+from app.domain.correlation import RelatedMetrics
 from app.domain.custom_rules import CustomRule
 from app.domain.diagnostics import ScopeDiagnostics
 from app.domain.explanation import ExplanationResult
@@ -111,9 +112,9 @@ class EventTotal(Contract):
 
 
 class AnalysisReport(Contract):
-    schema_version: Literal["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8"] = (
-        REPORT_SCHEMA_VERSION
-    )
+    schema_version: Literal[
+        "2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"
+    ] = REPORT_SCHEMA_VERSION
     analysis_id: str
     scope: Scope
     windows: AnalysisWindows
@@ -147,6 +148,11 @@ class AnalysisReport(Contract):
         default_factory=list,
         description="What each source's filter selected at analysis time (2.8).",
     )
+    related_metrics: RelatedMetrics | None = Field(
+        default=None,
+        description="Other collected series compared with each finding (2.9); null in older "
+        "reports.",
+    )
 
     @property
     def all_sources(self) -> list[SourceInfo]:
@@ -165,6 +171,19 @@ class AnalysisReport(Contract):
         for e in self.evidence:
             if e.finding_id not in finding_ids:
                 raise ValueError(f"{e.evidence_id} references unknown finding {e.finding_id}")
+        if self.related_metrics is not None:
+            related = self.related_metrics
+            evaluated = {e.finding_id for e in related.evaluations}
+            if missing := evaluated - finding_ids:
+                raise ValueError(f"related metrics reference unknown findings {sorted(missing)}")
+            linked = {
+                fid
+                for c in related.comparisons
+                for fid in (c.anchor.finding_id, c.candidate.finding_id)
+                if fid is not None
+            }
+            if missing := linked - finding_ids:
+                raise ValueError(f"related metrics reference unknown findings {sorted(missing)}")
         bucket_indexes = [t.bucket_index for t in self.trends]
         if bucket_indexes != list(range(TREND_DAYS)):
             raise ValueError(

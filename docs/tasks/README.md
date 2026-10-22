@@ -4,7 +4,7 @@ This is the execution index for the first usable DevOps AI assistant release. Re
 
 All tasks T001–T010 are DONE; the projects feature (T011–T013) is DONE. Multiple data sources with Cloudflare as the second kind (T014–T016) are DONE; Sentry is the third kind (T017, DONE), Wazuh the fourth (T018, DONE) and Grafana alerts the fifth (T019, DONE). Custom PromQL rules per project (T020), credentials (T021) and scope diagnostics (T022) are DONE. The first release is validated; see [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) for evidence and remaining limitations. This index is the single source of task status; acceptance checkboxes and completion evidence live in each task file. Creating these documents does not start or complete any task.
 
-T023 records the proposed Related metrics feature for future incident investigation work. Its numerical defaults remain subject to implementation-time validation.
+Related metrics for incident investigation (T023) are DONE; their numerical defaults are validated on synthetic data only.
 
 ## Ordered backlog
 
@@ -32,7 +32,7 @@ T023 records the proposed Related metrics feature for future incident investigat
 | T020 | [Custom rules: user PromQL analysed with the catalog](T020-custom-rules.md) | T019 | DONE |
 | T021 | [Credentials and per-kind source authentication](T021-shared-credentials.md) | T020 | DONE |
 | T022 | [Scope diagnostics: what each source's filter selected](T022-scope-diagnostics.md) | T021 | DONE |
-| T023 | [Related metrics for incident investigation](T023-related-metrics.md) | T022 | TODO |
+| T023 | [Related metrics for incident investigation](T023-related-metrics.md) | T022 | DONE |
 
 ## How the next agent should work
 
@@ -76,6 +76,6 @@ Shared fixtures allow UI design/prototyping while backend work proceeds, but T00
 
 ## Suggested assignment for the next agent
 
-> When implementation is assigned, start with T023: add Related metrics to finding details using deterministic comparisons, explicit resource associations and persisted chart evidence. Read its proposal and settle the numerical policy and contracts before implementing the UI. The current assignment only records the proposal.
+> All tasks T001–T023 are DONE. Natural next steps: tune the related-metric thresholds against live data, and optionally pass retained comparisons to the AI explanation through validated references (see T023 follow-ups).
 
 Other suggested follow-ups from the first release remain: live OpenAI verification (`scripts.check_openai --structured`), threshold tuning with the owner (paas-gpu noise), a CI pipeline running `make check` and `docker build`, access control before any non-local exposure, and the deferred CLI (reuse `app.service.AnalysisPipeline`). Read `docs/RELEASE_CHECKLIST.md` for remaining validation issues; scheduled analyses are now implemented by `ReportScheduler`.

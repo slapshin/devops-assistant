@@ -70,8 +70,9 @@ Logical flow: browser → API/job runner → metrics source → deterministic an
 | `MetricCapability` | Supported/unsupported/partial, required metrics/labels, reason, available history |
 | `Finding` | Stable ID, detector/version, entity, start/end, severity, confidence/reasons, observed and expected values, evidence references |
 | `DailyTrend` | Bucket bounds, episodes, anomalous minutes, affected entities, observation denominator, coverage |
-| `AnalysisReport` | Scope, windows, capabilities, findings, trends, evidence/chart series, exclusions, configuration version, AI status/output, scope diagnostics |
+| `AnalysisReport` | Scope, windows, capabilities, findings, trends, evidence/chart series, exclusions, configuration version, AI status/output, scope diagnostics, related metrics |
 | `ScopeDiagnostics` | Per source (T022): selected entities with their data, sample label sets, one check per filter part (matched, matched with the part dropped, existing values), the requests sent, notes |
+| `RelatedMetrics` | Per finding (T023): evaluation status and counts, up to 5 comparisons with resource association, similarity (signed coefficient or interval overlap), timing (onset difference, estimated lag) and data quality kept apart, and the chart data of both series |
 | `Explanation` | Summary, hypotheses with finding IDs, investigation steps, uncertainty, provider/model metadata |
 
 Freeze units, nullable fields, error codes, JSON examples, and ownership of evidence IDs. Define `MetricsSource`, `AnalysisService`, `ExplanationProvider`, and report repository interfaces. Use an explicit schema version for saved reports.

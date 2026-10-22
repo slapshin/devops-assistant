@@ -96,18 +96,18 @@ Update `docs/DECISIONS.md`, `docs/detection.md`, `docs/contracts.md`, `docs/ARCH
 
 ## Acceptance
 
-- [ ] A finding shows ranked comparisons with resource, similarity and timing evidence kept distinct.
-- [ ] A useful candidate without its own finding can be inspected from a saved report.
-- [ ] Positive, inverse and lagged synthetic relationships are found with the documented sign convention; ambiguous timing is not presented as precise ordering.
-- [ ] Unrelated series and shared daily cycles do not automatically rank as strong incident evidence. Tests include multiple candidate pairs and lags.
-- [ ] Sparse events, constant series, insufficient history, gaps and weak overlap produce appropriate evidence or explicit unavailable reasons.
-- [ ] Known duplicate/derived signals and alerts based on the same metric are not counted as independent confirmation.
-- [ ] Cross-source comparisons preserve source identities and label unknown resource associations; no name-based host or service attribution is introduced.
-- [ ] The existing finding severities, confidence, coverage and source-failure semantics are preserved. AI-disabled and AI-failed runs retain identical numerical comparisons.
-- [ ] Identical inputs and configuration yield identical results and ordering. Compute and storage caps are exercised, omissions are disclosed, and all retained references resolve.
-- [ ] Older reports load; a new report reopened from SQLite reproduces comparisons and charts without contacting a source.
-- [ ] The UI covers accessibility, narrow screens, no matches, unavailable comparisons, old reports and partial results.
-- [ ] Contracts and fixtures are regenerated; required documentation is updated; `make check` passes and the synthetic investigation flow is visually verified.
+- [x] A finding shows ranked comparisons with resource, similarity and timing evidence kept distinct.
+- [x] A useful candidate without its own finding can be inspected from a saved report.
+- [x] Positive, inverse and lagged synthetic relationships are found with the documented sign convention; ambiguous timing is not presented as precise ordering.
+- [x] Unrelated series and shared daily cycles do not automatically rank as strong incident evidence. Tests include multiple candidate pairs and lags.
+- [x] Sparse events, constant series, insufficient history, gaps and weak overlap produce appropriate evidence or explicit unavailable reasons.
+- [x] Known duplicate/derived signals and alerts based on the same metric are not counted as independent confirmation.
+- [x] Cross-source comparisons preserve source identities and label unknown resource associations; no name-based host or service attribution is introduced.
+- [x] The existing finding severities, confidence, coverage and source-failure semantics are preserved. AI-disabled and AI-failed runs retain identical numerical comparisons.
+- [x] Identical inputs and configuration yield identical results and ordering. Compute and storage caps are exercised, omissions are disclosed, and all retained references resolve.
+- [x] Older reports load; a new report reopened from SQLite reproduces comparisons and charts without contacting a source.
+- [x] The UI covers accessibility, narrow screens, no matches, unavailable comparisons, old reports and partial results.
+- [x] Contracts and fixtures are regenerated; required documentation is updated; `make check` passes and the synthetic investigation flow is visually verified.
 
 ## Verification
 
@@ -115,6 +115,32 @@ Use deterministic synthetic series for simultaneous and delayed changes, inverse
 
 Exercise persistence with real SQLite and old report fixtures, reference integrity after budget trimming, and frontend behavior with saved synthetic reports. Record actual check commands and results. Live-source tuning can supplement these checks but must be distinguished from synthetic evidence.
 
+## Deviations from the proposal
+
+- **AI input is not extended.** The explanation input still lists findings only; retained comparisons are not sent to the model. The proposal made this optional ("if the AI contract is extended"); it is a follow-up. AI-disabled and AI-failed runs produce identical comparisons (tested).
+- **No lag-adjusted chart view.** Charts always use actual timestamps; the estimated shift is stated in text only.
+- **Sentry error kinds are associated with their project** (`same_service`) for related metrics only, and are a known shared input of the project's error counts. Finding relations (`related_finding_ids`) keep their previous rules.
+- **Known shared inputs are excluded, not shown.** A ratio's request count and the 404s inside 4xx are counted per finding (`shared_input`) instead of being listed; the finding's own evidence already shows those operands.
+- **Duplicate detection** compares raw values *outside* the comparison window (series that are flat there, like usually-zero counts, cannot be judged) rather than inside it, where any two genuinely related incident series agree.
+
+## Remaining limitations / follow-ups
+
+- Thresholds were tuned on synthetic data only (see DECISIONS §5 validation). Strongly autocorrelated unrelated series are still kept about 0.75 % of the time (3 of 400 pairs at φ ≥ 0.9); they are labelled *Unknown association* and rank after verified ones. Tuning against live data is needed.
+- In long episodes (hours), any event inside them counts as coinciding; such interval overlaps with unknown association are weak evidence and are labelled as timing only.
+- Only collected series are compared; no additional source queries, no resource-mapping editor, no incident grouping or causal graph.
+- Shared inputs of Grafana alert rules and custom rules are not analysed (their queries are opaque), only flagged as `possible`.
+- Report size grows: the all-sources demo incident report is about 1.7 MB (5 comparisons for most of its 55 findings); the 20 MB budget drops related metrics first.
+
 ## Completion record
 
-To be filled by the implementing agent with changed files, actual checks and results, deviations, and remaining limitations.
+- Completed date: 2026-10-22
+- Changed files:
+  - New backend: `app/domain/correlation.py` (contracts), `app/analysis/correlation.py` (comparisons), `app/analysis/relations.py` (resource associations, moved out of `engine.py`), `app/analysis/charts.py` (chart slices, moved out of `engine.py`), `tests/test_correlation.py`.
+  - Changed backend: `domain/common.py` (schema 2.9), `domain/report.py` (`related_metrics` + reference checks), `domain/interfaces.py` (`DetectionResult.related_metrics`), `domain/detector_config.py` (`RelatedConfig`, `detectors-2026.10.22.1`), `domain/ids.py`, `analysis/engine.py`, `analysis/derive.py` (`AnalysisSeries.operands`/`inputs`), `service.py` (passes the result on; `_fit` drops related metrics first, `related_dropped`), `sources/prometheus/synthetic.py` (incident: route latency +30 % from 10 min before the 5xx burst), `scripts/generate_fixtures.py` (`report_related.json`), `tests/test_api.py`.
+  - New frontend: `lib/related.ts` and its test, `views/report/RelatedMetricsPanel.vue`. Changed: `EvidencePanel.vue`, `lib/charts.ts`, `api/client.ts`, `App.test.ts`.
+  - Regenerated contracts, `schema.d.ts` and fixtures (new `fixtures/reports/report_related.json`).
+  - Docs: `DECISIONS.md` (§5 Related metrics policy and validation, §6 budget), `detection.md`, `contracts.md`, `ARCHITECTURE.md`, `UI_SPEC.md` (§7 4d), `AGENTS.md`.
+- Checks:
+  - `make contracts`, `make fixtures`, `make check`: see the result below.
+  - Synthetic validation of the statistic (scripted, not committed): Pearson vs Spearman on 400 unrelated AR(1) pairs and 72 weak related changes; results in DECISIONS §5.
+  - Live run of the native app with `DEMO_PROJECTS=true AI_PROVIDER=fake` (not the Docker `make demo`): an incident analysis (schema 2.9, 55 findings, 245 comparisons). The 5xx finding's panel showed p95 latency (same resource, r = +0.79, began about 10 min earlier, no finding of its own), Deadlocks and a Grafana alert (unknown association; the alert flagged as possibly the same data), synchronized charts in both views, at 1400 px and 390 px (screenshots checked). That fixed overflowing table cells and the episode tint on the second plot.

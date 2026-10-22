@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.8",
+  "schema_version": "2.9",
   "analysis_id": "01999a2b-0000-7000-8000-000000000004",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -30,8 +30,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.22",
-  "config_hash": "df0729ffa10b",
+  "detector_version": "detectors-2026.10.22.1",
+  "config_hash": "4856d4783d08",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -469,9 +469,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_0d96248d2166efdb",
+      "finding_id": "fnd_55faef477f44aa32",
       "detector": "robust_baseline",
-      "detector_version": "detectors-2026.10.22",
+      "detector_version": "detectors-2026.10.22.1",
       "method": "relative",
       "family": "cpu",
       "signal": "cpu_utilization",
@@ -515,7 +515,7 @@
       "baseline_days": 4,
       "baseline_mode": "whole_baseline",
       "evidence_ids": [
-        "evd_b82359b4984fe432"
+        "evd_936682c7b9ea1d20"
       ],
       "related_finding_ids": [],
       "attributes": {},
@@ -546,8 +546,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_0d96248d2166efdb",
-          "finding_id": "fnd_0d96248d2166efdb",
+          "episode_id": "eps_55faef477f44aa32",
+          "finding_id": "fnd_55faef477f44aa32",
           "entity": {
             "kind": "node",
             "key": "node|job=node|instance=shop-production",
@@ -801,8 +801,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_b82359b4984fe432",
-      "finding_id": "fnd_0d96248d2166efdb",
+      "evidence_id": "evd_936682c7b9ea1d20",
+      "finding_id": "fnd_55faef477f44aa32",
       "series": {
         "series_id": "ser_6d64ca1e1032319f",
         "family": "cpu",
@@ -1379,5 +1379,6 @@
   },
   "custom_rules": [],
   "totals": [],
-  "diagnostics": []
+  "diagnostics": [],
+  "related_metrics": null
 }

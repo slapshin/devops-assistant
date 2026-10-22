@@ -25,10 +25,10 @@ from app.domain.interfaces import (
 )
 from app.domain.jobs import StageProgress
 from app.domain.metrics import MetricCapability
-from app.domain.report import AnalysisRequest, AnalysisWindows, Exclusion
+from app.domain.report import AnalysisReport, AnalysisRequest, AnalysisWindows, Exclusion
 from app.jobs import RunnerLimits
 from app.main import create_app
-from app.service import AnalysisPipeline
+from app.service import MAX_REPORT_BYTES, AnalysisPipeline
 from app.settings import load_settings
 from app.sources.prometheus.synthetic import SyntheticMetricsSource
 from tests.helpers import StaticSources, make_scope
@@ -441,3 +441,81 @@ def test_report_size_budget_disclosed() -> None:
     assert report.state.value == "partial"
     assert any(e.code == "evidence_dropped" for e in report.exclusions)
     assert all(len(f.evidence_ids) == 1 for f in report.findings)
+
+
+def run_pipeline(provider: Any = None, max_report_bytes: int = MAX_REPORT_BYTES) -> AnalysisReport:
+    config = DetectorConfig()
+    pipeline = AnalysisPipeline(
+        StaticSources(SyntheticMetricsSource("incident")),
+        RobustDetector(),
+        config,
+        provider,
+        max_report_bytes=max_report_bytes,
+    )
+    request = AnalysisRequest(
+        scope=make_scope(),
+        end_time=datetime(2026, 9, 30, 10, 5, tzinfo=UTC),
+        detector_version=config.version,
+        config_hash=config.config_hash,
+    )
+
+    class Nop:
+        async def update(self, progress: StageProgress) -> None:
+            pass
+
+    return asyncio.run(
+        pipeline.run("01999a2b-0000-7000-8000-00000000000c", request, Nop(), CancellationToken())
+    )
+
+
+def test_related_metrics_do_not_depend_on_ai() -> None:
+    disabled = run_pipeline()
+    failed = run_pipeline(FakeExplanationProvider(fail_with="timeout"))
+
+    assert failed.explanation.status.value == "failed"
+    assert disabled.related_metrics is not None and disabled.related_metrics.comparisons
+    assert failed.related_metrics == disabled.related_metrics
+
+
+def test_size_budget_drops_related_metrics_first() -> None:
+    full = run_pipeline()
+    assert full.related_metrics is not None
+    without_related = len(full.model_copy(update={"related_metrics": None}).model_dump_json())
+
+    report = run_pipeline(max_report_bytes=without_related + 64 * 1024)
+
+    related = report.related_metrics
+    assert related is not None and not related.comparisons and not related.charts
+    assert any(e.code == "related_dropped" for e in report.exclusions)
+    assert not any(e.code == "evidence_dropped" for e in report.exclusions)
+    assert report.findings == full.findings and report.evidence == full.evidence
+    dropped = [e for e in related.evaluations if e.state.value == "dropped_budget"]
+    assert dropped and all(e.retained == 0 and e.omitted > 0 for e in dropped)
+
+
+def test_related_metrics_reopen_from_sqlite_without_the_source(tmp_path: Path) -> None:
+    with make_client(tmp_path) as client:
+        done_id = submit(client).json()["analysis"]["analysis_id"]
+        wait(client, done_id, "completed")
+        original = client.get(f"/api/analyses/{done_id}/report").json()
+
+    with make_client(tmp_path, source=DownSource()) as client:
+        reopened = client.get(f"/api/analyses/{done_id}/report").json()
+
+    related = reopened["related_metrics"]
+    charts = {c["chart_id"] for c in related["charts"]}
+    assert reopened == original and related["comparisons"]
+    assert all(
+        {c["anchor"]["chart_id"], c["candidate"]["chart_id"]} <= charts
+        for c in related["comparisons"]
+    )
+
+
+def test_reports_without_related_metrics_still_load() -> None:
+    report = run_pipeline().model_dump(mode="json")
+    report["schema_version"] = "2.8"
+    del report["related_metrics"]
+
+    old = AnalysisReport.model_validate(report)
+
+    assert old.related_metrics is None

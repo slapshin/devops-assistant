@@ -1,6 +1,6 @@
 # Detection engine (T005)
 
-`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.22`, identified by `config_hash`). Every catalog threshold is a provisional diagnostic heuristic, not an SLO; custom rules (T020) carry the user's own thresholds.
+`backend/app/analysis/` implements `Detector` as `RobustDetector`: pure numerical code with no AI, UI or I/O. The configuration is `DetectorConfig` (`detectors-2026.10.22.1`, identified by `config_hash`). Every catalog threshold is a provisional diagnostic heuristic, not an SLO; custom rules (T020) carry the user's own thresholds.
 
 ## Pipeline
 
@@ -58,7 +58,8 @@
    - `anomalous_share`, the median baseline days, and coverage relative to all entities seen in the 28 days.
 
    The status is `insufficient_data` when coverage < 50 %, and `insufficient_baseline` when the median baseline days of its level series are < 3 (a bucket with only event series, such as Grafana alerts, needs no baseline). The **trend summary** compares the anomalous share of buckets 0–6 with 7–13 (worsening/improving needs ≥ 1.5× and ≥ 0.5 pp). With fewer than 4 OK buckets on either side it is `inconclusive`.
-8. **Coverage rows** per family: `unsupported` (capabilities), `anomalous`, `source_error` (collection exclusions), `insufficient_data` (latest-day coverage < 50 % or no baseline), or `no_anomaly`.
+8. **Related metrics** (T023, `correlation.py`): each latest-day finding is compared with the other analysed series that had an unusual change during its episode, over the episode ± 2 h. Level series with adequate baselines: Pearson correlation of their clipped robust z at shifts of ±30 min (lead/lag only when unambiguous; positive = the candidate leads), kept at |r| ≥ 0.6 when the candidate itself deviates during the episode in the implied direction. Events and series without a baseline: overlap of unusual intervals. Known shared inputs (ratio operands, Sentry error kinds) are excluded; alert rules, custom rules and near-identical series are flagged `possible`. Resource associations come from `relations.py` (the same rules as relations, plus a Sentry project and its error kinds). Up to 5 per finding, verified associations first, with per-finding evaluation counts and charts of both series over the window. The numerical policy and its validation are in [DECISIONS §5](DECISIONS.md#related-metrics-t023).
+9. **Coverage rows** per family: `unsupported` (capabilities), `anomalous`, `source_error` (collection exclusions), `insufficient_data` (latest-day coverage < 50 % or no baseline), or `no_anomaly`.
 
 IDs are derived from `project|env|T|config_hash` (plus a hash of the custom rules when the project has any, so an edited rule starts new IDs) plus entity, signal and start time, so identical inputs give identical findings, episodes and evidence IDs.
 

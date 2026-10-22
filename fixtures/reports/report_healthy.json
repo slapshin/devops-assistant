@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.8",
+  "schema_version": "2.9",
   "analysis_id": "01999a2b-0000-7000-8000-000000000001",
   "scope": {
     "project_id": "01999a3c-0000-7000-8000-000000000001",
@@ -30,8 +30,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:07:00Z",
-  "detector_version": "detectors-2026.10.22",
-  "config_hash": "df0729ffa10b",
+  "detector_version": "detectors-2026.10.22.1",
+  "config_hash": "4856d4783d08",
   "sources": [],
   "source": {
     "kind": "prometheus",
@@ -722,5 +722,6 @@
   },
   "custom_rules": [],
   "totals": [],
-  "diagnostics": []
+  "diagnostics": [],
+  "related_metrics": null
 }

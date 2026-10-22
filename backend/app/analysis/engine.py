@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from app.analysis.baseline import STEPS_PER_DAY
+from app.analysis.charts import opt, sample_coverage, slice_series
+from app.analysis.correlation import related_metrics
 from app.analysis.derive import AnalysisSeries, derive, to_array
 from app.analysis.detect import (
     ABS_LEVEL_CRITICAL,
@@ -22,11 +24,11 @@ from app.analysis.detect import (
     evaluate,
     rule_thresholds,
 )
+from app.analysis.relations import HostMappings, association, host_mappings, hosts_for
 from app.analysis.rules import SEVERITY_ORDER, Dir, Rule, RuleKind, format_value
 from app.analysis.rules.custom import custom_rules as build_custom_rules
 from app.domain.common import (
     ConfidenceLevel,
-    Entity,
     EntityKind,
     Reason,
     Severity,
@@ -34,6 +36,7 @@ from app.domain.common import (
     TimeRange,
     Unit,
 )
+from app.domain.correlation import ResourceAssociation
 from app.domain.custom_rules import CustomRule
 from app.domain.detector_config import DetectorConfig, SignalThresholds
 from app.domain.findings import (
@@ -52,8 +55,8 @@ from app.domain.findings import (
     TrendDirection,
     TrendSummary,
 )
-from app.domain.ids import episode_id, evidence_id, finding_id, series_id
-from app.domain.interfaces import CollectionResult, DetectionResult, MappingKind
+from app.domain.ids import episode_id, evidence_id, finding_id
+from app.domain.interfaces import CollectionResult, DetectionResult
 from app.domain.metrics import (
     ERROR_KIND_LABEL,
     ERROR_TITLE_LABEL,
@@ -74,9 +77,6 @@ MINUTES_PER_DAY = 24 * 60
 MAX_REPORTED_BASELINE_DAYS = 14
 """Upper bound of DailyTrend.baseline_days_used in the report contract."""
 
-OTEL_MAPPING_PREFIX = "otel"
-SWARM_MAPPING_PREFIX = "swarm"
-JOB_LABEL = "job"
 HOST_ATTRIBUTE = "host"
 
 # Upper bound of severity points per severity; anything above is critical.
@@ -98,11 +98,6 @@ LATENCY_HISTOGRAM_TOP_SECONDS = 10.0
 """Top finite histogram bucket: p95 at or above it is only a lower bound."""
 _WIDE_HISTOGRAM_KINDS = {EntityKind.STORAGE}
 """SeaweedFS histograms reach far beyond 10 s, so their quantiles are no lower bounds there."""
-_PROXY_KINDS = {EntityKind.PROXY, EntityKind.UPSTREAM}
-_SERVICE_KINDS = {EntityKind.ROUTE, EntityKind.PROCESS}
-"""A service's routes and its runtime processes share the service's ``job``."""
-"""A proxy's zones, services and upstreams share its scrape job; overlaps there are related."""
-INSTANCE_LABEL = "instance"
 
 # Trend summary: last 7 buckets vs the 7 before.
 RECENT_BUCKETS = range(7)
@@ -140,35 +135,6 @@ def severity_from_points(points: int, cap: Severity | None) -> Severity:
     if cap is not None and SEVERITY_ORDER.index(severity) > SEVERITY_ORDER.index(cap):
         return cap
     return severity
-
-
-def _opt(value: float) -> float | None:
-    return None if np.isnan(value) else float(value)
-
-
-def _mapping_key(prefix: str, service: str) -> str:
-    return f"{prefix}:{service}"
-
-
-def hosts_for(entity: Entity, mappings: dict[str, set[str]]) -> set[str]:
-    """Hosts an entity verifiably runs on, from identity labels or label-based mappings."""
-    labels = entity.labels
-    match entity.kind:
-        case (
-            EntityKind.NODE
-            | EntityKind.FILESYSTEM
-            | EntityKind.DISK
-            | EntityKind.NETWORK_INTERFACE
-            | EntityKind.CONTAINER
-            | EntityKind.CUSTOM
-        ):
-            return {labels["instance"]} if labels.get("instance") else set()
-        case EntityKind.SERVICE:
-            key = _mapping_key(SWARM_MAPPING_PREFIX, labels.get("service_name", ""))
-            return mappings.get(key, set())
-        case EntityKind.ROUTE:
-            return mappings.get(_mapping_key(OTEL_MAPPING_PREFIX, labels.get(JOB_LABEL, "")), set())
-    return set()
 
 
 @dataclass(frozen=True)
@@ -218,11 +184,7 @@ class RobustDetector:
         )
         evaluations = [evaluate(s, config) for s in analysed]
 
-        mappings: dict[str, set[str]] = defaultdict(set)
-        for m in collection.mappings:
-            is_otel = m.kind is MappingKind.OTEL_SERVICE
-            prefix = OTEL_MAPPING_PREFIX if is_otel else SWARM_MAPPING_PREFIX
-            mappings[_mapping_key(prefix, m.service)].add(m.host)
+        mappings = host_mappings(collection.mappings)
 
         trend_start = windows.trend.start
 
@@ -245,6 +207,9 @@ class RobustDetector:
         findings.sort(key=lambda f: (-SEVERITY_ORDER.index(f.severity), f.start, f.finding_id))
 
         trends = self._trends(key, evaluations, finding_for_episode, at, config)
+        related = related_metrics(
+            key, evaluations, findings, finding_for_episode, mappings, windows, config
+        )
 
         return DetectionResult(
             findings=findings,
@@ -255,6 +220,7 @@ class RobustDetector:
                 capabilities, collection.exclusions, evaluations, findings, config
             ),
             exclusions=[],
+            related_metrics=related,
         )
 
     # --- findings -------------------------------------------------------------------------
@@ -416,10 +382,12 @@ class RobustDetector:
         start = windows.trend.start + timedelta(seconds=lo * windows.step_seconds)
 
         def band(a: np.ndarray) -> list[float | None]:
-            return [_opt(v) for v in a[lo:hi]]
+            return [opt(v) for v in a[lo:hi]]
 
         s = ev.series
-        main = _slice_series(s, s.values[ev.offset + lo : ev.offset + hi], start, windows)
+        main = slice_series(
+            s, s.values[ev.offset + lo : ev.offset + hi], start, windows.step_seconds
+        )
         spread = z_threshold * ev.scale
         out = [
             Evidence(
@@ -450,7 +418,7 @@ class RobustDetector:
 
     @staticmethod
     def _relate(
-        findings: list[Finding], mappings: dict[str, set[str]], config: DetectorConfig
+        findings: list[Finding], mappings: HostMappings, config: DetectorConfig
     ) -> list[Finding]:
         hosts = {f.finding_id: hosts_for(f.entity, mappings) for f in findings}
         related = _related_finding_ids(findings, hosts, config)
@@ -694,19 +662,8 @@ def _related_finding_ids(
             if not overlap:
                 continue
 
-            same_entity = a.entity.key == b.entity.key
-            same_service = (
-                {a.entity.kind, b.entity.kind} <= _SERVICE_KINDS
-                or {a.entity.kind, b.entity.kind} <= _PROXY_KINDS
-            ) and a.entity.labels.get(JOB_LABEL) == b.entity.labels.get(JOB_LABEL)
-            same_database_server = a.entity.kind is b.entity.kind is EntityKind.DATABASE and all(
-                a.entity.labels.get(k) == b.entity.labels.get(k)
-                for k in (JOB_LABEL, INSTANCE_LABEL)
-            )
-            # A scope holds one SeaweedFS cluster: a full disk shows up as S3 errors elsewhere.
-            same_storage = a.entity.kind is b.entity.kind is EntityKind.STORAGE
-            shared_host = bool(hosts[a.finding_id] & hosts[b.finding_id])
-            if same_entity or same_service or same_database_server or same_storage or shared_host:
+            kind, _ = association(a.entity, b.entity, hosts[a.finding_id], hosts[b.finding_id])
+            if kind is not ResourceAssociation.UNKNOWN:
                 related[a.finding_id].add(b.finding_id)
                 related[b.finding_id].add(a.finding_id)
     return related
@@ -766,7 +723,7 @@ def _episode_summary(
         context.finding_for_episode.get((evaluation_index, id(ep))) if bucket_index == 0 else None
     )
     peak_observed = float(np.nanmax(in_bucket)) if ep.up else float(np.nanmin(in_bucket))
-    expected_median = _opt(float(ev.median[ep.peak])) if lo <= ep.peak < hi else None
+    expected_median = opt(float(ev.median[ep.peak])) if lo <= ep.peak < hi else None
 
     return EpisodeSummary(
         episode_id=episode_id(
@@ -867,10 +824,6 @@ def _trend_confidence(ok_buckets: int) -> ConfidenceLevel:
     return ConfidenceLevel.LOW
 
 
-def _sample_coverage(values: list[float | None]) -> float:
-    return sum(v is not None for v in values) / len(values) if values else 0.0
-
-
 def _active_during(
     instances: Sequence[AlertInstanceActivity], start: datetime, end: datetime
 ) -> list[AlertInstanceActivity]:
@@ -900,29 +853,10 @@ def _error_kinds_during(s: AnalysisSeries, lo: int, hi: int) -> list[ErrorKindAc
     return sorted(out, key=lambda k: (-k.events, k.title is None, k.issue))
 
 
-def _slice_series(
-    s: AnalysisSeries, values: np.ndarray, start: datetime, windows: AnalysisWindows
-) -> MetricSeries:
-    vals = [_opt(v) for v in values]
-    return MetricSeries(
-        series_id=series_id(s.query, f"{s.entity.key}|{s.rule.name}"),
-        family=s.rule.family,
-        signal=s.rule.name,
-        entity=s.entity,
-        labels=dict(s.source.labels),
-        unit=s.unit,
-        query=s.query,
-        step_seconds=windows.step_seconds,
-        start=start,
-        values=vals,
-        coverage=_sample_coverage(vals),
-    )
-
-
 def _slice_series_raw(src: MetricSeries, values: np.ndarray, start: datetime) -> MetricSeries:
-    vals = [_opt(v) for v in values]
+    vals = [opt(v) for v in values]
     return src.model_copy(
-        update={"start": start, "values": vals, "coverage": _sample_coverage(vals)}
+        update={"start": start, "values": vals, "coverage": sample_coverage(vals)}
     )
 
 

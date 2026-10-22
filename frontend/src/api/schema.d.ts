@@ -353,12 +353,14 @@ export interface components {
             findings: components["schemas"]["Finding"][];
             /** Generated At */
             generated_at: string;
+            /** @description Other collected series compared with each finding (2.9); null in older reports. */
+            related_metrics?: components["schemas"]["RelatedMetrics"] | null;
             /**
              * Schema Version
-             * @default 2.8
+             * @default 2.9
              * @enum {string}
              */
-            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "2.6" | "2.7" | "2.8";
+            schema_version: "2.0" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "2.6" | "2.7" | "2.8" | "2.9";
             scope: components["schemas"]["Scope"];
             /** @description Deprecated: the first source; use sources. */
             source?: components["schemas"]["SourceInfo"] | null;
@@ -523,6 +525,16 @@ export interface components {
              */
             zone_id: string;
         };
+        /**
+         * ComparisonMethod
+         * @enum {string}
+         */
+        ComparisonMethod: "deviation_correlation" | "interval_overlap";
+        /**
+         * ComparisonTiming
+         * @enum {string}
+         */
+        ComparisonTiming: "simultaneous" | "candidate_leads" | "candidate_lags" | "inconclusive";
         /**
          * ConfidenceLevel
          * @enum {string}
@@ -1651,6 +1663,214 @@ export interface components {
          */
         Recurrence: "new" | "repeated" | "recurring";
         /**
+         * RelatedChart
+         * @description Chart data of one side of a comparison over its window, stored once per series and
+         *     window so a report reopens without the source.
+         */
+        RelatedChart: {
+            /** Chart Id */
+            chart_id: string;
+            /**
+             * Deviation
+             * @description Robust z (clipped); null without an adequate baseline.
+             */
+            deviation?: (number | null)[] | null;
+            /** Expected */
+            expected?: (number | null)[] | null;
+            /** Lower */
+            lower?: (number | null)[] | null;
+            series: components["schemas"]["MetricSeries"];
+            /** Upper */
+            upper?: (number | null)[] | null;
+        };
+        /**
+         * RelatedDirection
+         * @enum {string}
+         */
+        RelatedDirection: "same" | "opposite";
+        /**
+         * RelatedEvaluation
+         * @description What happened when looking for related metrics of one finding.
+         */
+        RelatedEvaluation: {
+            /**
+             * Candidates
+             * @description Series with an unusual change in the window (eligible).
+             */
+            candidates: number;
+            /** Evaluated */
+            evaluated: number;
+            /** Finding Id */
+            finding_id: string;
+            /**
+             * Not Evaluated
+             * @description Eligible candidates over the per-finding cap.
+             */
+            not_evaluated: number;
+            /**
+             * Omitted
+             * @description Qualifying comparisons beyond the kept limit.
+             */
+            omitted: number;
+            /** Reasons */
+            reasons?: components["schemas"]["Reason"][];
+            /** Retained */
+            retained: number;
+            /**
+             * Shared Input
+             * @description Candidates excluded because they share a known input (operands).
+             */
+            shared_input: number;
+            state: components["schemas"]["RelatedState"];
+            /**
+             * Unavailable
+             * @description Candidates whose comparison was unavailable, by code.
+             */
+            unavailable?: components["schemas"]["UnavailableCount"][];
+            window?: components["schemas"]["TimeRange"] | null;
+        };
+        /**
+         * RelatedMetric
+         * @description One retained comparison between a finding and another collected series.
+         */
+        RelatedMetric: {
+            anchor: components["schemas"]["RelatedSeries"];
+            association: components["schemas"]["ResourceAssociation"];
+            /**
+             * Association Basis
+             * @description The labels or mapping behind it.
+             */
+            association_basis: string;
+            candidate: components["schemas"]["RelatedSeries"];
+            /** Candidate Onset */
+            candidate_onset: string | null;
+            /**
+             * Coefficient
+             * @description Signed Pearson coefficient of the deviations at `lag_seconds` (0 unless a lead or lag is estimated); null for interval overlap. Not a probability.
+             */
+            coefficient: number | null;
+            /** Comparison Id */
+            comparison_id: string;
+            direction: components["schemas"]["RelatedDirection"] | null;
+            /**
+             * Finding Id
+             * @description The anchor finding.
+             */
+            finding_id: string;
+            /**
+             * Lag Seconds
+             * @description Estimated shift; positive when the candidate leads. Null unless timing is candidate_leads or candidate_lags.
+             */
+            lag_seconds: number | null;
+            /**
+             * Longest Gap Seconds
+             * @description Longest run of unpaired steps.
+             */
+            longest_gap_seconds: number;
+            method: components["schemas"]["ComparisonMethod"];
+            /**
+             * Onset Lead Seconds
+             * @description Observed difference of change onsets, positive when the candidate's unusual change began first; null when it has no onset near the finding.
+             */
+            onset_lead_seconds: number | null;
+            /**
+             * Overlap Steps
+             * @description Steps where both series are unusual (within the overlap slack).
+             */
+            overlap_steps: number;
+            /**
+             * Paired Coverage
+             * @description paired_samples / steps in the window.
+             */
+            paired_coverage: number;
+            /**
+             * Paired Samples
+             * @description Jointly observed steps at the reported lag.
+             */
+            paired_samples: number;
+            /** Rank */
+            rank: number;
+            /**
+             * Reasons
+             * @description Data-quality limits, e.g. gaps, clipping.
+             */
+            reasons?: components["schemas"]["Reason"][];
+            /**
+             * Selection
+             * @description Why this comparison was kept.
+             */
+            selection: string;
+            /** @default none */
+            shared_input: components["schemas"]["SharedInput"];
+            /** Step Seconds */
+            step_seconds: number;
+            timing: components["schemas"]["ComparisonTiming"];
+            /** @description Steps compared, the same for every candidate. */
+            window: components["schemas"]["TimeRange"];
+        };
+        /**
+         * RelatedMetrics
+         * @description Related metrics of every latest-day finding (2.9).
+         */
+        RelatedMetrics: {
+            /** Charts */
+            charts: components["schemas"]["RelatedChart"][];
+            /** Comparisons */
+            comparisons: components["schemas"]["RelatedMetric"][];
+            /** Evaluations */
+            evaluations: components["schemas"]["RelatedEvaluation"][];
+            policy: components["schemas"]["RelatedPolicy"];
+        };
+        /**
+         * RelatedPolicy
+         * @description The numerical policy the comparisons used (also in config_hash).
+         */
+        RelatedPolicy: {
+            /** Change Z */
+            change_z: number;
+            /** Max Lag Seconds */
+            max_lag_seconds: number;
+            /** Max Per Finding */
+            max_per_finding: number;
+            /** Max Window Seconds */
+            max_window_seconds: number;
+            /** Method */
+            method: string;
+            /** Min Coefficient */
+            min_coefficient: number;
+            /** Window Pad Seconds */
+            window_pad_seconds: number;
+        };
+        /**
+         * RelatedSeries
+         * @description One side of a comparison: which series, from which source, on which resource.
+         */
+        RelatedSeries: {
+            /** Chart Id */
+            chart_id: string;
+            entity: components["schemas"]["Entity"];
+            family: components["schemas"]["SignalFamily"];
+            /**
+             * Finding Id
+             * @description The series' own latest-day finding overlapping the window, if any.
+             */
+            finding_id: string | null;
+            /**
+             * Label
+             * @description What the signal measures, e.g. 'CPU'.
+             */
+            label: string;
+            /** Signal */
+            signal: string;
+            source: components["schemas"]["SourceKind"];
+            unit: components["schemas"]["Unit"];
+        };
+        /**
+         * RelatedState
+         * @enum {string}
+         */
+        RelatedState: "evaluated" | "insufficient_data" | "skipped_budget" | "dropped_budget";
+        /**
          * ReportSchedule
          * @description Run an analysis automatically at ``time`` (local to ``timezone``) on ``weekdays``.
          *
@@ -1680,6 +1900,13 @@ export interface components {
          * @enum {string}
          */
         ReportState: "completed" | "partial";
+        /**
+         * ResourceAssociation
+         * @description How the two series' resources are connected, from identity labels or verified mappings
+         *     only; never from matching names across sources.
+         * @enum {string}
+         */
+        ResourceAssociation: "same_entity" | "same_service" | "same_database_server" | "same_storage_cluster" | "shared_host" | "unknown";
         /**
          * RuntimeConfig
          * @description GET /api/config — public runtime facts, never secrets.
@@ -1866,6 +2093,11 @@ export interface components {
          */
         Severity: "low" | "medium" | "high" | "critical";
         /**
+         * SharedInput
+         * @enum {string}
+         */
+        SharedInput: "none" | "possible";
+        /**
          * SignalCoverage
          * @description One row of the report coverage table.
          */
@@ -2011,6 +2243,13 @@ export interface components {
             recent_episodes: number;
             /** Recent Share */
             recent_share: number | null;
+        };
+        /** UnavailableCount */
+        UnavailableCount: {
+            /** Code */
+            code: string;
+            /** Count */
+            count: number;
         };
         /**
          * Unit

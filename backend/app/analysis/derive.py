@@ -253,10 +253,20 @@ class AnalysisSeries:
     attributes: dict[str, str] = field(default_factory=dict)
     error_kinds: list[MetricSeries] = field(default_factory=list)
     """Error-kind series (error events per second) that a project's error total splits into."""
+    operands: tuple[str, ...] = ()
+    """IDs of further collected series whose values this one is computed from (a ratio's
+    request count, the 404s subtracted from 4xx); volume guards are masks, not operands."""
 
     @property
     def key(self) -> tuple[str, str]:
         return (self.rule.name, self.entity.key)
+
+    @property
+    def inputs(self) -> frozenset[str]:
+        """Collected series this one is computed from or split into (a Sentry project's error
+        kinds are parts of its error counts): series sharing one agree mechanically."""
+        kinds = (k.series_id for k in self.error_kinds)
+        return frozenset((self.source.series_id, *self.operands, *kinds))
 
 
 def to_array(series: MetricSeries) -> Array:
@@ -435,6 +445,7 @@ def _error_ratio(
         source,
         volume=volume,
         extra_evidence=[requests],
+        operands=(requests.series_id,),
     )
 
 
@@ -480,6 +491,7 @@ def _client_error_series(
             client_error_source,
             extra_evidence=[requests],
             attributes={STATUS_CODE_ATTRIBUTE: "4xx excl. 404"},
+            operands=(not_found_source.series_id,),
         ),
     ]
 

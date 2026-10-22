@@ -24,6 +24,7 @@ import customRulesReport from "../../fixtures/reports/report_custom_rules.json";
 import healthy from "../../fixtures/reports/report_healthy.json";
 import partial from "../../fixtures/reports/report_partial_source_error.json";
 import shortHistory from "../../fixtures/reports/report_short_history.json";
+import relatedReport from "../../fixtures/reports/report_related.json";
 import type { AnalysisJob, Credential, ProjectSummary } from "./api/client";
 import App from "./App.vue";
 import { makeRouter } from "./router";
@@ -1484,6 +1485,67 @@ describe("report", () => {
     expect(within(row).getByText("432 events")).toBeInTheDocument();
     expect(within(row).getByText("production")).not.toHaveClass("on");
     expect(screen.getByRole("tab", { name: "Scope 1" })).toBeInTheDocument();
+  });
+
+  it("a finding lists related metrics with resource, similarity and timing kept apart", async () => {
+    const errors = relatedReport.findings.find((f) => f.signal === "server_error_ratio")!;
+    const deadlocks = relatedReport.findings.find((f) => f.signal === "database_deadlocks")!;
+    const router = await renderAt(`${report(relatedReport)}/findings/${errors.finding_id}`);
+
+    const panel = await screen.findByRole("region", { name: "Related metrics" });
+    const latency = within(panel).getByRole("button", { name: "p95 latency" });
+    expect(latency).toHaveAttribute("aria-pressed", "true");
+    expect(within(panel).getByText("Same resource")).toBeInTheDocument();
+    expect(within(panel).getByText("moves together · r = +0.83")).toBeInTheDocument();
+    expect(within(panel).getAllByText("began about 10 min earlier · no clear lead or lag").length).toBeGreaterThan(0);
+    expect(within(panel).getByText(/has no finding of its own/)).toBeInTheDocument();
+    expect(within(panel).getByRole("img", { name: /p95 latency .* on one time axis/ })).toBeInTheDocument();
+
+    await fireEvent.click(within(panel).getByRole("button", { name: "Show data" }));
+
+    expect(within(panel).getByRole("columnheader", { name: "p95 latency" })).toBeInTheDocument();
+
+    await fireEvent.click(within(panel).getByRole("button", { name: "Deviation from usual" }));
+
+    expect(within(panel).getByText(/robust z: distance from the usual median/)).toBeInTheDocument();
+
+    await fireEvent.click(within(panel).getByRole("button", { name: "Deadlocks" }));
+
+    expect(within(panel).getAllByText("Unknown association").length).toBeGreaterThan(0);
+    expect(within(panel).getByText(/No verified connection between these resources/)).toBeInTheDocument();
+
+    await fireEvent.click(within(panel).getByRole("link", { name: "Open" }));
+
+    await waitFor(() => expect(router.currentRoute.value.params.findingId).toBe(deadlocks.finding_id));
+  });
+
+  it("related metrics explain old reports", async () => {
+    await renderAt(`${report(anomalies)}/findings/${anomalies.findings[0]!.finding_id}`);
+
+    const panel = await screen.findByRole("region", { name: "Related metrics" });
+
+    expect(within(panel).getByText(/predates related metrics/)).toBeInTheDocument();
+  });
+
+  it("related metrics never read an empty result as healthy", async () => {
+    const related = relatedReport.related_metrics;
+    const empty = {
+      ...relatedReport,
+      analysis_id: "no-related",
+      related_metrics: {
+        ...related,
+        comparisons: [],
+        evaluations: related.evaluations.map((e) => ({ ...e, retained: 0, omitted: 0, candidates: 0, evaluated: 0 })),
+      },
+    };
+    const errors = empty.findings.find((f) => f.signal === "server_error_ratio")!;
+    await renderAt(`${report(empty)}/findings/${errors.finding_id}`);
+
+    const panel = await screen.findByRole("region", { name: "Related metrics" });
+
+    expect(within(panel).getByText("No other collected metric had an unusual change around this finding.")).toBeInTheDocument();
+    expect(within(panel).getByText(/0 with an unusual change in the window · 0 compared/)).toBeInTheDocument();
+    expect(within(panel).queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("scope tab explains old reports and shows failed sources", async () => {
