@@ -10,7 +10,7 @@ from pydantic import Field
 
 from app.domain.common import STEP_SECONDS, Contract
 
-DETECTOR_VERSION = "detectors-2026.10.17"
+DETECTOR_VERSION = "detectors-2026.10.22"
 CONFIG_HASH_HEX_CHARS = 12
 
 
@@ -108,6 +108,16 @@ _DEFAULT_SIGNALS: dict[str, SignalThresholds] = {
         absolute_critical=0.95,
         absolute_min_minutes=5,
     ),
+    "storage_volume_slots_ratio": _T(
+        min_abs_effect=0.05,
+        abs_floor=0.005,
+        absolute_high=0.90,
+        absolute_critical=0.98,
+        absolute_min_minutes=5,
+    ),
+    "storage_read_only_volumes": _T(min_abs_effect=1.0, abs_floor=0.5),
+    "storage_assign_errors": _T(min_rel_factor=2.0, min_abs_effect=0.05, abs_floor=0.01),
+    "storage_filer_failures": _T(min_rel_factor=2.0, min_abs_effect=0.05, abs_floor=0.01),
     "edge_origin_error_ratio": _T(
         min_abs_effect=0.01, abs_floor=0.001, absolute_high=0.02, absolute_min_minutes=5
     ),

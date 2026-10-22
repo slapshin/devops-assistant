@@ -19,8 +19,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.17",
-  "config_hash": "7bb67484c60b",
+  "detector_version": "detectors-2026.10.22",
+  "config_hash": "df0729ffa10b",
   "sources": [
     {
       "kind": "cloudflare",
@@ -250,63 +250,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_1ce80eecd13bdad4",
-      "detector": "level:security_blocked_rate",
-      "detector_version": "detectors-2026.10.17",
-      "method": "relative",
-      "family": "security",
-      "signal": "security_blocked_rate",
-      "title": "Surge of blocked requests (WAF/firewall)",
-      "summary": "The WAF or firewall blocked more requests than usual; this may be an attack.",
-      "help": "Review the zone's security events for the source IPs, countries and rules that matched, and check that legitimate users are not blocked.",
-      "entity": {
-        "kind": "zone",
-        "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
-        "display_name": "shop.example.com",
-        "labels": {
-          "zone_id": "0123456789abcdef0123456789abcdef",
-          "hostnames": "shop.example.com"
-        }
-      },
-      "start": "2026-09-30T02:05:00Z",
-      "end": "2026-09-30T04:05:00Z",
-      "peak_at": "2026-09-30T02:20:00Z",
-      "duration_seconds": 7200,
-      "severity": "high",
-      "severity_points": 5,
-      "confidence": "high",
-      "confidence_reasons": [],
-      "observed": {
-        "value": 3.69,
-        "unit": "per_second"
-      },
-      "expected": {
-        "median": 0.106667,
-        "lower": 0.066667,
-        "upper": 0.146667,
-        "unit": "per_second"
-      },
-      "peak_score": 358.33,
-      "threshold": null,
-      "baseline_days": 14,
-      "baseline_mode": "time_of_day",
-      "evidence_ids": [
-        "evd_43c790ef8ad38d6c"
-      ],
-      "related_finding_ids": [
-        "fnd_3b3a4dced64a2c95"
-      ],
-      "attributes": {},
-      "alert_instances": [],
-      "error_kinds": [],
-      "state": "resolved",
-      "recurrence": "new",
-      "prior_episode_days": 0
-    },
-    {
-      "finding_id": "fnd_3b3a4dced64a2c95",
+      "finding_id": "fnd_8c61127faffdff99",
       "detector": "level:security_challenge_rate",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "relative",
       "family": "security",
       "signal": "security_challenge_rate",
@@ -345,10 +291,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_c3da34d7217349ab"
+        "evd_5c7dc3d4857aefe6"
       ],
       "related_finding_ids": [
-        "fnd_1ce80eecd13bdad4"
+        "fnd_9c04b85d5e2af4ae"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -358,15 +304,15 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_04179b8e4c460255",
-      "detector": "level:edge_ttfb_p95",
-      "detector_version": "detectors-2026.10.17",
+      "finding_id": "fnd_9c04b85d5e2af4ae",
+      "detector": "level:security_blocked_rate",
+      "detector_version": "detectors-2026.10.22",
       "method": "relative",
-      "family": "edge",
-      "signal": "edge_ttfb_p95",
-      "title": "Edge time to first byte (p95) above expected range",
-      "summary": "The edge took longer to send the first byte to the slowest 5 % of visitors.",
-      "help": "Compare with the origin response time: if both rose, the origin is slow; otherwise look at cache hit share and edge routing.",
+      "family": "security",
+      "signal": "security_blocked_rate",
+      "title": "Surge of blocked requests (WAF/firewall)",
+      "summary": "The WAF or firewall blocked more requests than usual; this may be an attack.",
+      "help": "Review the zone's security events for the source IPs, countries and rules that matched, and check that legitimate users are not blocked.",
       "entity": {
         "kind": "zone",
         "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -376,37 +322,33 @@
           "hostnames": "shop.example.com"
         }
       },
-      "start": "2026-09-30T06:20:00Z",
-      "end": "2026-09-30T07:05:00Z",
-      "peak_at": "2026-09-30T06:55:00Z",
-      "duration_seconds": 2700,
+      "start": "2026-09-30T02:05:00Z",
+      "end": "2026-09-30T04:05:00Z",
+      "peak_at": "2026-09-30T02:20:00Z",
+      "duration_seconds": 7200,
       "severity": "high",
-      "severity_points": 4,
+      "severity_points": 5,
       "confidence": "high",
       "confidence_reasons": [],
       "observed": {
-        "value": 0.743445,
-        "unit": "seconds"
+        "value": 3.69,
+        "unit": "per_second"
       },
       "expected": {
-        "median": 0.1759825,
-        "lower": 0.1320263752,
-        "upper": 0.21993862479999998,
-        "unit": "seconds"
+        "median": 0.106667,
+        "lower": 0.066667,
+        "upper": 0.146667,
+        "unit": "per_second"
       },
-      "peak_score": 51.64,
+      "peak_score": 358.33,
       "threshold": null,
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_0fa25f7ce608804c",
-        "evd_c2356d7eab0b34f1",
-        "evd_059cf3fc986715c0"
+        "evd_15fc494a28080a4e"
       ],
       "related_finding_ids": [
-        "fnd_1172e297d8bfaf99",
-        "fnd_3609586c2684cd78",
-        "fnd_79e0b91b9a9f1797"
+        "fnd_8c61127faffdff99"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -416,9 +358,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_1172e297d8bfaf99",
+      "finding_id": "fnd_396c6e72442cfa41",
       "detector": "level:edge_server_error_ratio",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "absolute",
       "family": "edge",
       "signal": "edge_server_error_ratio",
@@ -457,13 +399,13 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_b31e37fb21964aaa",
-        "evd_4e0f00b851392158"
+        "evd_f4c1927ca2176b2a",
+        "evd_92225a9464b978c0"
       ],
       "related_finding_ids": [
-        "fnd_04179b8e4c460255",
-        "fnd_3609586c2684cd78",
-        "fnd_79e0b91b9a9f1797"
+        "fnd_50a6a4aa7a2d6cf6",
+        "fnd_8469d7b9a949443f",
+        "fnd_b91b236b8bf15a1d"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -473,9 +415,67 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_3609586c2684cd78",
+      "finding_id": "fnd_50a6a4aa7a2d6cf6",
+      "detector": "level:edge_ttfb_p95",
+      "detector_version": "detectors-2026.10.22",
+      "method": "relative",
+      "family": "edge",
+      "signal": "edge_ttfb_p95",
+      "title": "Edge time to first byte (p95) above expected range",
+      "summary": "The edge took longer to send the first byte to the slowest 5 % of visitors.",
+      "help": "Compare with the origin response time: if both rose, the origin is slow; otherwise look at cache hit share and edge routing.",
+      "entity": {
+        "kind": "zone",
+        "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
+        "display_name": "shop.example.com",
+        "labels": {
+          "zone_id": "0123456789abcdef0123456789abcdef",
+          "hostnames": "shop.example.com"
+        }
+      },
+      "start": "2026-09-30T06:20:00Z",
+      "end": "2026-09-30T07:05:00Z",
+      "peak_at": "2026-09-30T06:55:00Z",
+      "duration_seconds": 2700,
+      "severity": "high",
+      "severity_points": 4,
+      "confidence": "high",
+      "confidence_reasons": [],
+      "observed": {
+        "value": 0.743445,
+        "unit": "seconds"
+      },
+      "expected": {
+        "median": 0.1759825,
+        "lower": 0.1320263752,
+        "upper": 0.21993862479999998,
+        "unit": "seconds"
+      },
+      "peak_score": 51.64,
+      "threshold": null,
+      "baseline_days": 14,
+      "baseline_mode": "time_of_day",
+      "evidence_ids": [
+        "evd_48657d2752ca17f9",
+        "evd_1a3ce63b0bf3ed37",
+        "evd_a46ff841fd13c455"
+      ],
+      "related_finding_ids": [
+        "fnd_396c6e72442cfa41",
+        "fnd_8469d7b9a949443f",
+        "fnd_b91b236b8bf15a1d"
+      ],
+      "attributes": {},
+      "alert_instances": [],
+      "error_kinds": [],
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
+    },
+    {
+      "finding_id": "fnd_8469d7b9a949443f",
       "detector": "level:edge_origin_error_ratio",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "absolute",
       "family": "edge",
       "signal": "edge_origin_error_ratio",
@@ -514,13 +514,13 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_e6d95b1fa9524841",
-        "evd_fe39fc6d38a4456f"
+        "evd_527fbd2285e38be1",
+        "evd_1d862250a448ea85"
       ],
       "related_finding_ids": [
-        "fnd_04179b8e4c460255",
-        "fnd_1172e297d8bfaf99",
-        "fnd_79e0b91b9a9f1797"
+        "fnd_396c6e72442cfa41",
+        "fnd_50a6a4aa7a2d6cf6",
+        "fnd_b91b236b8bf15a1d"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -530,9 +530,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_79e0b91b9a9f1797",
+      "finding_id": "fnd_b91b236b8bf15a1d",
       "detector": "level:edge_origin_time_p95",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "relative",
       "family": "edge",
       "signal": "edge_origin_time_p95",
@@ -571,13 +571,13 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_fed7ca6c3e4191c2",
-        "evd_c31aecb4f7fac4f5"
+        "evd_ec82e46551f829ed",
+        "evd_f2fabfe506852752"
       ],
       "related_finding_ids": [
-        "fnd_04179b8e4c460255",
-        "fnd_1172e297d8bfaf99",
-        "fnd_3609586c2684cd78"
+        "fnd_396c6e72442cfa41",
+        "fnd_50a6a4aa7a2d6cf6",
+        "fnd_8469d7b9a949443f"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -607,29 +607,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_1ce80eecd13bdad4",
-          "finding_id": "fnd_1ce80eecd13bdad4",
-          "entity": {
-            "kind": "zone",
-            "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
-            "display_name": "shop.example.com",
-            "labels": {
-              "zone_id": "0123456789abcdef0123456789abcdef",
-              "hostnames": "shop.example.com"
-            }
-          },
-          "family": "security",
-          "signal": "security_blocked_rate",
-          "start": "2026-09-30T02:05:00Z",
-          "end": "2026-09-30T04:05:00Z",
-          "severity": "high",
-          "peak_observed": 3.69,
-          "expected_median": 0.106667,
-          "unit": "per_second"
-        },
-        {
-          "episode_id": "eps_3b3a4dced64a2c95",
-          "finding_id": "fnd_3b3a4dced64a2c95",
+          "episode_id": "eps_8c61127faffdff99",
+          "finding_id": "fnd_8c61127faffdff99",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -649,8 +628,8 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_04179b8e4c460255",
-          "finding_id": "fnd_04179b8e4c460255",
+          "episode_id": "eps_9c04b85d5e2af4ae",
+          "finding_id": "fnd_9c04b85d5e2af4ae",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -660,18 +639,18 @@
               "hostnames": "shop.example.com"
             }
           },
-          "family": "edge",
-          "signal": "edge_ttfb_p95",
-          "start": "2026-09-30T06:20:00Z",
-          "end": "2026-09-30T07:05:00Z",
+          "family": "security",
+          "signal": "security_blocked_rate",
+          "start": "2026-09-30T02:05:00Z",
+          "end": "2026-09-30T04:05:00Z",
           "severity": "high",
-          "peak_observed": 0.747338,
-          "expected_median": 0.1759825,
-          "unit": "seconds"
+          "peak_observed": 3.69,
+          "expected_median": 0.106667,
+          "unit": "per_second"
         },
         {
-          "episode_id": "eps_1172e297d8bfaf99",
-          "finding_id": "fnd_1172e297d8bfaf99",
+          "episode_id": "eps_396c6e72442cfa41",
+          "finding_id": "fnd_396c6e72442cfa41",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -691,8 +670,29 @@
           "unit": "ratio"
         },
         {
-          "episode_id": "eps_3609586c2684cd78",
-          "finding_id": "fnd_3609586c2684cd78",
+          "episode_id": "eps_50a6a4aa7a2d6cf6",
+          "finding_id": "fnd_50a6a4aa7a2d6cf6",
+          "entity": {
+            "kind": "zone",
+            "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
+            "display_name": "shop.example.com",
+            "labels": {
+              "zone_id": "0123456789abcdef0123456789abcdef",
+              "hostnames": "shop.example.com"
+            }
+          },
+          "family": "edge",
+          "signal": "edge_ttfb_p95",
+          "start": "2026-09-30T06:20:00Z",
+          "end": "2026-09-30T07:05:00Z",
+          "severity": "high",
+          "peak_observed": 0.747338,
+          "expected_median": 0.1759825,
+          "unit": "seconds"
+        },
+        {
+          "episode_id": "eps_8469d7b9a949443f",
+          "finding_id": "fnd_8469d7b9a949443f",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -712,8 +712,8 @@
           "unit": "ratio"
         },
         {
-          "episode_id": "eps_79e0b91b9a9f1797",
-          "finding_id": "fnd_79e0b91b9a9f1797",
+          "episode_id": "eps_b91b236b8bf15a1d",
+          "finding_id": "fnd_b91b236b8bf15a1d",
           "entity": {
             "kind": "zone",
             "key": "zone|zone_id=0123456789abcdef0123456789abcdef|hostnames=shop.example.com",
@@ -967,8 +967,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_43c790ef8ad38d6c",
-      "finding_id": "fnd_1ce80eecd13bdad4",
+      "evidence_id": "evd_15fc494a28080a4e",
+      "finding_id": "fnd_9c04b85d5e2af4ae",
       "series": {
         "series_id": "ser_bf75d5337b427a4c",
         "family": "security",
@@ -1678,8 +1678,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_c3da34d7217349ab",
-      "finding_id": "fnd_3b3a4dced64a2c95",
+      "evidence_id": "evd_5c7dc3d4857aefe6",
+      "finding_id": "fnd_8c61127faffdff99",
       "series": {
         "series_id": "ser_7cd98843d09ca54d",
         "family": "security",
@@ -2389,8 +2389,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_b31e37fb21964aaa",
-      "finding_id": "fnd_1172e297d8bfaf99",
+      "evidence_id": "evd_f4c1927ca2176b2a",
+      "finding_id": "fnd_396c6e72442cfa41",
       "series": {
         "series_id": "ser_ba0e22a2d5eb20c9",
         "family": "edge",
@@ -2896,8 +2896,8 @@
       "threshold_label": "Edge server error rate (5xx): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_4e0f00b851392158",
-      "finding_id": "fnd_1172e297d8bfaf99",
+      "evidence_id": "evd_92225a9464b978c0",
+      "finding_id": "fnd_396c6e72442cfa41",
       "series": {
         "series_id": "ser_2764d646d8debc4e",
         "family": "edge",
@@ -3049,8 +3049,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_e6d95b1fa9524841",
-      "finding_id": "fnd_3609586c2684cd78",
+      "evidence_id": "evd_527fbd2285e38be1",
+      "finding_id": "fnd_8469d7b9a949443f",
       "series": {
         "series_id": "ser_57a76b3822b51dce",
         "family": "edge",
@@ -3556,8 +3556,8 @@
       "threshold_label": "Origin error rate (520-530): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_fe39fc6d38a4456f",
-      "finding_id": "fnd_3609586c2684cd78",
+      "evidence_id": "evd_1d862250a448ea85",
+      "finding_id": "fnd_8469d7b9a949443f",
       "series": {
         "series_id": "ser_2764d646d8debc4e",
         "family": "edge",
@@ -3709,8 +3709,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_0fa25f7ce608804c",
-      "finding_id": "fnd_04179b8e4c460255",
+      "evidence_id": "evd_48657d2752ca17f9",
+      "finding_id": "fnd_50a6a4aa7a2d6cf6",
       "series": {
         "series_id": "ser_5cc8386789b19d77",
         "family": "edge",
@@ -4216,8 +4216,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_c2356d7eab0b34f1",
-      "finding_id": "fnd_04179b8e4c460255",
+      "evidence_id": "evd_1a3ce63b0bf3ed37",
+      "finding_id": "fnd_50a6a4aa7a2d6cf6",
       "series": {
         "series_id": "ser_2725f13b4217854b",
         "family": "edge",
@@ -4369,8 +4369,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_059cf3fc986715c0",
-      "finding_id": "fnd_04179b8e4c460255",
+      "evidence_id": "evd_a46ff841fd13c455",
+      "finding_id": "fnd_50a6a4aa7a2d6cf6",
       "series": {
         "series_id": "ser_2764d646d8debc4e",
         "family": "edge",
@@ -4522,8 +4522,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_fed7ca6c3e4191c2",
-      "finding_id": "fnd_79e0b91b9a9f1797",
+      "evidence_id": "evd_ec82e46551f829ed",
+      "finding_id": "fnd_b91b236b8bf15a1d",
       "series": {
         "series_id": "ser_6ca1d27691083be9",
         "family": "edge",
@@ -5029,8 +5029,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_c31aecb4f7fac4f5",
-      "finding_id": "fnd_79e0b91b9a9f1797",
+      "evidence_id": "evd_f2fabfe506852752",
+      "finding_id": "fnd_b91b236b8bf15a1d",
       "series": {
         "series_id": "ser_2764d646d8debc4e",
         "family": "edge",
@@ -5186,47 +5186,47 @@
   "explanation": {
     "status": "succeeded",
     "explanation": {
-      "summary": "6 finding(s) in the latest day; most severe: Surge of blocked requests (WAF/firewall) on shop.example.com.",
+      "summary": "6 finding(s) in the latest day; most severe: Surge of challenged requests on shop.example.com.",
       "hypotheses": [
-        {
-          "text": "Surge of blocked requests (WAF/firewall) on shop.example.com may reflect a workload or configuration change around its start time.",
-          "finding_ids": [
-            "fnd_1ce80eecd13bdad4"
-          ],
-          "likelihood": "possible"
-        },
         {
           "text": "Surge of challenged requests on shop.example.com may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_3b3a4dced64a2c95"
+            "fnd_8c61127faffdff99"
           ],
           "likelihood": "possible"
         },
         {
-          "text": "Edge time to first byte (p95) above expected range on shop.example.com may reflect a workload or configuration change around its start time.",
+          "text": "Surge of blocked requests (WAF/firewall) on shop.example.com may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_04179b8e4c460255"
+            "fnd_9c04b85d5e2af4ae"
+          ],
+          "likelihood": "possible"
+        },
+        {
+          "text": "Edge server error rate (5xx) at or above 5.0 % (heuristic) on shop.example.com may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_396c6e72442cfa41"
           ],
           "likelihood": "possible"
         }
       ],
       "investigation_steps": [
         {
-          "text": "Open the evidence chart for Surge of blocked requests (WAF/firewall) and compare with deploy and log history.",
-          "finding_ids": [
-            "fnd_1ce80eecd13bdad4"
-          ]
-        },
-        {
           "text": "Open the evidence chart for Surge of challenged requests and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_3b3a4dced64a2c95"
+            "fnd_8c61127faffdff99"
           ]
         },
         {
-          "text": "Open the evidence chart for Edge time to first byte (p95) above expected range and compare with deploy and log history.",
+          "text": "Open the evidence chart for Surge of blocked requests (WAF/firewall) and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_04179b8e4c460255"
+            "fnd_9c04b85d5e2af4ae"
+          ]
+        },
+        {
+          "text": "Open the evidence chart for Edge server error rate (5xx) at or above 5.0 % (heuristic) and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_396c6e72442cfa41"
           ]
         }
       ],

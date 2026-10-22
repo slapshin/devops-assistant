@@ -73,6 +73,11 @@ REDIS_MASTER = {"job": "redis", "instance": "redis://redis-master:6379"}
 REDIS_REPLICA = {"job": "redis", "instance": "redis://redis-replica:6379"}
 NODEJS_APP = {"job": "storefront", "instance": "storefront:9464"}
 GO_APP = {"job": "inventory", "instance": "inventory:2112"}
+SEAWEEDFS_FILER = "seaweedfs-filer"
+SEAWEEDFS_MASTER = {"job": "seaweedfs-master"}
+SEAWEEDFS_VOLUMES = [
+    {"job": "seaweedfs-volume", "instance": f"10.0.2.{i}:9327"} for i in (11, 12, 13)
+]
 QUIET_ROUTE = {
     "job": SERVICE_JOB,
     "http_route": "/internal/order-sla",
@@ -130,6 +135,11 @@ class Scenario:
     go_goroutine_leak: bool = False
     """The inventory service leaks goroutines for 8 h until a restart 3 h before T: goroutines,
     heap and GC pauses climb steadily, then drop back."""
+    seaweedfs: bool = True
+    """A SeaweedFS cluster: master, three volume servers, a filer with the S3 gateway."""
+    seaweedfs_disk_full: bool = False
+    """One volume server's disk fills for 1 h, ending 11 h before T: its volumes turn read-only,
+    the master fails volume assignments and S3 uploads fail with 5xx."""
     recurring_404_days: tuple[int, ...] = ()
     """Trend buckets (1..13) with an extra 404 burst, for recurrence."""
     custom_incident: bool = False
@@ -151,6 +161,7 @@ SCENARIOS: dict[str, Scenario] = {
         redis_eviction_storm=True,
         nodejs_event_loop_block=True,
         go_goroutine_leak=True,
+        seaweedfs_disk_full=True,
         custom_incident=True,
     ),
     "short-history": Scenario(history_days=5, cpu_load=True, histogram=False),
@@ -255,6 +266,8 @@ def build_series(
         _add_nodejs_series(builder, gen)
     if scenario.go:
         _add_go_series(builder, gen)
+    if scenario.seaweedfs:
+        _add_seaweedfs_series(builder, gen)
     for rule in custom_rules:
         _add_custom_series(builder, scenario, rule)
 
@@ -489,6 +502,59 @@ def _add_go_series(builder: _SeriesBuilder, gen: _Gen) -> None:
     builder.add("go_fds_used_ratio", GO_APP, gen.available(fds))
 
 
+def _add_seaweedfs_series(builder: _SeriesBuilder, gen: _Gen) -> None:
+    full = slice(N - 144, N - 132)
+    disk_full = gen.scenario.seaweedfs_disk_full
+    for i, server in enumerate(SEAWEEDFS_VOLUMES):
+        disk = np.clip(gen.base(0.6 + 0.05 * i, 0.002, 0.001), 0, 1)
+        slots = np.clip(gen.base(0.4, 0.001, 0.001), 0, 1)
+        low = np.zeros(N)
+        if disk_full and i == 0:
+            disk[full] = 0.995
+            low[full] = 7.0
+        builder.add("seaweedfs_disk_used_ratio", {**server, "name": "/data"}, gen.available(disk))
+        builder.add("seaweedfs_volume_slots_used_ratio", server, gen.available(slots))
+        builder.add("seaweedfs_read_only_volumes", server, gen.available(low))
+        builder.add("seaweedfs_disk_space_low_volumes", server, gen.available(low))
+
+    assign_errors = np.zeros(N)
+    if disk_full:
+        assign_errors[full] = 3.0
+    builder.add("seaweedfs_master_no_leader", SEAWEEDFS_MASTER, gen.available(np.zeros(N)))
+    builder.add("seaweedfs_assign_errors", SEAWEEDFS_MASTER, gen.available(assign_errors))
+    builder.add(
+        "seaweedfs_filer_failures", {"job": SEAWEEDFS_FILER}, gen.available(assign_errors * 0.5)
+    )
+
+    for api, job, rps in (
+        ("s3", SEAWEEDFS_FILER, 15.0),
+        ("filer", SEAWEEDFS_FILER, 6.0),
+        ("volume", "seaweedfs-volume", 30.0),
+    ):
+        labels = {"job": job, "api": api}
+        req = np.clip(gen.base(rps, rps * 0.3, rps * 0.03), 0, None)
+        server_errors = np.clip(req * 0.0005 + gen.rng.normal(0, 0.002, N), 0, None)
+        if disk_full and api == "s3":
+            server_errors[full] = req[full] * 0.2
+        not_found = np.clip(req * 0.05 + gen.rng.normal(0, 0.05, N), 0, None)
+        p95 = np.clip(gen.base(0.04, 0.005, 0.002), 0.001, None)
+        builder.add(f"seaweedfs_{api}_requests", labels, gen.available(req))
+        builder.add(f"seaweedfs_{api}_5xx", labels, gen.available(server_errors))
+        builder.add(f"seaweedfs_{api}_404", labels, gen.available(not_found))
+        builder.add(f"seaweedfs_{api}_4xx", labels, gen.available(not_found + 0.002 * req))
+        builder.add(f"seaweedfs_{api}_latency_p95", labels, gen.available(p95))
+        builder.add(f"seaweedfs_{api}_latency_p99", labels, gen.available(p95 * 2))
+    store = {"job": SEAWEEDFS_FILER, "api": "filer_store"}
+    store_p95 = np.clip(gen.base(0.002, 0.0003, 0.0001), 0.0001, None)
+    builder.add(
+        "seaweedfs_filer_store_requests",
+        store,
+        gen.available(np.clip(gen.base(40.0, 12.0, 1.2), 0, None)),
+    )
+    builder.add("seaweedfs_filer_store_latency_p95", store, gen.available(store_p95))
+    builder.add("seaweedfs_filer_store_latency_p99", store, gen.available(store_p95 * 3))
+
+
 DEMO_CUSTOM_RULES = [
     CustomRule(
         slug="checkout_failures",
@@ -642,6 +708,11 @@ class SyntheticMetricsSource:
                 else ()
             ),
             *((d.signal for d in CATALOG if d.signal.startswith("go_")) if scenario.go else ()),
+            *(
+                (d.signal for d in CATALOG if d.signal.startswith("seaweedfs_"))
+                if scenario.seaweedfs
+                else ()
+            ),
         }
         caps = []
         for defn in CATALOG:

@@ -130,7 +130,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 
 **Report schema version:** `schema_version: "1.0"`. Minor bumps add optional fields; major bumps require a reader migration. Readers must open every saved major version they claim to support, or return `report_unavailable` with `code=schema_unsupported` — never a crash.
 
-## 5. Numerical policy (detector config `detectors-2026.10.17`)
+## 5. Numerical policy (detector config `detectors-2026.10.22`)
 
 All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
@@ -205,6 +205,13 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | Go process | time in GC stop-the-world pauses (`rate(go_gc_duration_seconds_sum)`) | up | ×2 and ≥ +0.5 pp | ≥ 5 % for ≥ 15 min |
 | Go process | CPU cores (`process_cpu_seconds_total`) | up | ×1.25 and ≥ +0.1 core | — |
 | Go process | open file descriptors vs `process_max_fds` | up | +10 pp | ≥ 80 % high, ≥ 95 % critical, for ≥ 5 min |
+| SeaweedFS API | S3, filer, volume server and filer store APIs (per job and API): request rate, 5xx ratio, 404 and other-4xx rates (not for the filer store), p95/p99. These reuse the HTTP rules above. | as HTTP | as HTTP | as HTTP |
+| SeaweedFS volume server | disk used by the data directory (`resource` used vs all) | up | as Filesystem | as Filesystem |
+| SeaweedFS volume server | volumes vs `max_volumes` | up | +5 pp | ≥ 90 % high, ≥ 98 % critical, for ≥ 5 min |
+| SeaweedFS volume server | read-only volumes (severity ≤ medium) | up | ≥ +1 volume | — |
+| SeaweedFS volume server | volumes read-only on low disk space (`isDiskSpaceLow`) | up | — | value ≥ 1 for ≥ 15 min (shortfall rule, 3 points) |
+| SeaweedFS cluster | no master is the Raft leader | up | — | value ≥ 1 for ≥ 15 min (shortfall rule, 3 points) |
+| SeaweedFS cluster | failed volume assignments on the master (`pick_for_write_error`); failed filer chunk assignments, uploads and downloads | up | ×2 and ≥ +0.05/s | — |
 | Cloudflare edge (zone) | request rate | both | ×2 or ÷2 and ≥ 0.2 req/s change | — |
 | Cloudflare edge (zone) | 5xx share (edge status 500–599, volume-guarded at ≥ 30 requests per step) | up | +2 pp | ≥ 5 % for ≥ 5 min |
 | Cloudflare edge (zone) | origin error share (520–530: origin down, timed out, TLS failure; volume-guarded) | up | +1 pp | ≥ 2 % for ≥ 5 min |

@@ -55,6 +55,7 @@
         "database",
         "nodejs",
         "golang",
+        "storage",
         "edge",
         "security",
         "app_errors",

@@ -195,6 +195,9 @@ class SignalFamily(StrEnum):
     GOLANG = "golang"
     """Go process health (client_golang default collectors): goroutines, threads, heap, GC
     pauses, CPU, file descriptors."""
+    STORAGE = "storage"
+    """Distributed storage health (SeaweedFS): disk and volume capacity, read-only volumes,
+    master leadership, failed volume assignments and chunk transfers."""
     EDGE = "edge"
     """CDN edge HTTP traffic: requests, 5xx/4xx, origin errors, cache hits, TTFB (Cloudflare)."""
     SECURITY = "security"
@@ -278,6 +281,9 @@ class EntityKind(StrEnum):
     """A database server (exporter target) or one database on it (PostgreSQL only)."""
     PROCESS = "process"
     """An instrumented application process (``job``, ``instance``), e.g. a Node.js or Go service."""
+    STORAGE = "storage"
+    """A SeaweedFS component: one API (``job``, ``api``), server (``job``, ``instance``), data
+    directory (plus ``name``) or cluster (``job``)."""
     ZONE = "zone"
     """A Cloudflare zone, optionally narrowed to some of its hostnames."""
     APPLICATION = "application"

@@ -96,6 +96,8 @@ LOW_CONFIDENCE_SUFFIX = "_low"
 RECURRING_MIN_PRIOR_DAYS = 3
 LATENCY_HISTOGRAM_TOP_SECONDS = 10.0
 """Top finite histogram bucket: p95 at or above it is only a lower bound."""
+_WIDE_HISTOGRAM_KINDS = {EntityKind.STORAGE}
+"""SeaweedFS histograms reach far beyond 10 s, so their quantiles are no lower bounds there."""
 _PROXY_KINDS = {EntityKind.PROXY, EntityKind.UPSTREAM}
 _SERVICE_KINDS = {EntityKind.ROUTE, EntityKind.PROCESS}
 """A service's routes and its runtime processes share the service's ``job``."""
@@ -282,7 +284,11 @@ class RobustDetector:
         prior = _prior_episode_days(ev, ep)
 
         attributes = dict(s.attributes)
-        if rule.name.endswith("latency_p95") and peak_value >= LATENCY_HISTOGRAM_TOP_SECONDS:
+        if (
+            rule.name.endswith("latency_p95")
+            and peak_value >= LATENCY_HISTOGRAM_TOP_SECONDS
+            and s.entity.kind not in _WIDE_HISTOGRAM_KINDS
+        ):
             attributes["latency_bound"] = ">= 10 s (top histogram bucket)"
 
         evs = self._evidence(fid, ev, ep, windows, threshold, rule, config.z_threshold)
@@ -697,8 +703,10 @@ def _related_finding_ids(
                 a.entity.labels.get(k) == b.entity.labels.get(k)
                 for k in (JOB_LABEL, INSTANCE_LABEL)
             )
+            # A scope holds one SeaweedFS cluster: a full disk shows up as S3 errors elsewhere.
+            same_storage = a.entity.kind is b.entity.kind is EntityKind.STORAGE
             shared_host = bool(hosts[a.finding_id] & hosts[b.finding_id])
-            if same_entity or same_service or same_database_server or shared_host:
+            if same_entity or same_service or same_database_server or same_storage or shared_host:
                 related[a.finding_id].add(b.finding_id)
                 related[b.finding_id].add(a.finding_id)
     return related

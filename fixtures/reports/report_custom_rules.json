@@ -25,8 +25,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.17",
-  "config_hash": "7bb67484c60b",
+  "detector_version": "detectors-2026.10.22",
+  "config_hash": "df0729ffa10b",
   "sources": [
     {
       "kind": "prometheus",
@@ -2015,6 +2015,570 @@
     },
     {
       "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "seaweedfs_s3_requests",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_s3_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_s3_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "seaweedfs_s3_5xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_s3_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_s3_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "seaweedfs_s3_4xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_s3_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_s3_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "seaweedfs_s3_404",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_s3_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_s3_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "seaweedfs_s3_latency_p95",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_s3_request_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_s3_request_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "seaweedfs_s3_latency_p99",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_s3_request_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_s3_request_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "seaweedfs_filer_requests",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filer_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filer_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "seaweedfs_filer_5xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filer_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filer_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "seaweedfs_filer_4xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filer_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filer_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "seaweedfs_filer_404",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filer_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filer_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "seaweedfs_filer_latency_p95",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filer_request_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filer_request_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "seaweedfs_filer_latency_p99",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filer_request_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filer_request_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "seaweedfs_volume_requests",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "seaweedfs_volume_5xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "seaweedfs_volume_4xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "seaweedfs_volume_404",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "seaweedfs_volume_latency_p95",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_request_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_request_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "seaweedfs_volume_latency_p99",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_request_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_request_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "seaweedfs_filer_store_requests",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filerStore_request_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filerStore_request_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "seaweedfs_filer_store_latency_p95",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filerStore_request_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filerStore_request_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "seaweedfs_filer_store_latency_p99",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filerStore_request_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "api"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filerStore_request_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "storage",
+      "signal": "seaweedfs_disk_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_resource"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "name"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_resource"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "storage",
+      "signal": "seaweedfs_volume_slots_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_volumes",
+        "SeaweedFS_volumeServer_max_volumes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_volumes",
+        "SeaweedFS_volumeServer_max_volumes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "storage",
+      "signal": "seaweedfs_read_only_volumes",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_read_only_volumes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_read_only_volumes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "storage",
+      "signal": "seaweedfs_disk_space_low_volumes",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_volumeServer_read_only_volumes"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_volumeServer_read_only_volumes"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "storage",
+      "signal": "seaweedfs_master_no_leader",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_master_is_leader",
+        "SeaweedFS_master_received_heartbeats"
+      ],
+      "required_labels": [
+        "project",
+        "job"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_master_is_leader",
+        "SeaweedFS_master_received_heartbeats"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "storage",
+      "signal": "seaweedfs_assign_errors",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_master_pick_for_write_error",
+        "SeaweedFS_master_received_heartbeats"
+      ],
+      "required_labels": [
+        "project",
+        "job"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_master_pick_for_write_error",
+        "SeaweedFS_master_received_heartbeats"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "storage",
+      "signal": "seaweedfs_filer_failures",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "SeaweedFS_filer_handler_total"
+      ],
+      "required_labels": [
+        "project",
+        "job"
+      ],
+      "observed_metrics": [
+        "SeaweedFS_filer_handler_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
       "family": "custom",
       "signal": "custom_checkout_failures",
       "status": "supported",
@@ -2179,8 +2743,8 @@
       "family": "request_traffic",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 3,
-      "total_series": 3,
+      "evaluated_series": 7,
+      "total_series": 7,
       "baseline_days": 14,
       "reasons": [
         {
@@ -2205,8 +2769,8 @@
       "family": "request_failures",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 2,
-      "total_series": 3,
+      "evaluated_series": 5,
+      "total_series": 6,
       "baseline_days": 14,
       "reasons": [
         {
@@ -2227,8 +2791,8 @@
       "family": "client_errors",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 6,
-      "total_series": 6,
+      "evaluated_series": 12,
+      "total_series": 12,
       "baseline_days": 14,
       "reasons": [
         {
@@ -2253,8 +2817,8 @@
       "family": "latency",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 2,
-      "total_series": 3,
+      "evaluated_series": 6,
+      "total_series": 7,
       "baseline_days": 14,
       "reasons": [
         {
@@ -2350,6 +2914,15 @@
       "reasons": []
     },
     {
+      "family": "storage",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 15,
+      "total_series": 15,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
       "family": "custom",
       "status": "anomalous",
       "capability": "supported",
@@ -2361,9 +2934,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_0c3003231f92e0cd",
+      "finding_id": "fnd_e4ae4bb37000cb8c",
       "detector": "level:custom_email_queue",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "absolute",
       "family": "custom",
       "signal": "custom_email_queue",
@@ -2401,10 +2974,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_7a59c8bf912dd38a"
+        "evd_2227150124dd59b6"
       ],
       "related_finding_ids": [
-        "fnd_00662eeba92a03de"
+        "fnd_d9e72f97ab0b215f"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -2414,9 +2987,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_00662eeba92a03de",
+      "finding_id": "fnd_d9e72f97ab0b215f",
       "detector": "level:custom_checkout_failures",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "relative",
       "family": "custom",
       "signal": "custom_checkout_failures",
@@ -2454,10 +3027,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_e1da19365fbef48f"
+        "evd_4bca805341b9a685"
       ],
       "related_finding_ids": [
-        "fnd_0c3003231f92e0cd"
+        "fnd_e4ae4bb37000cb8c"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -2481,14 +3054,14 @@
       "affected_entities": [
         "custom|job=checkout-api"
       ],
-      "observed_entity_minutes": 28800,
-      "anomalous_share": 0.002083,
+      "observed_entity_minutes": 46080,
+      "anomalous_share": 0.001302,
       "baseline_days_used": 14,
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_0c3003231f92e0cd",
-          "finding_id": "fnd_0c3003231f92e0cd",
+          "episode_id": "eps_e4ae4bb37000cb8c",
+          "finding_id": "fnd_e4ae4bb37000cb8c",
           "entity": {
             "kind": "custom",
             "key": "custom|job=checkout-api",
@@ -2507,8 +3080,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_00662eeba92a03de",
-          "finding_id": "fnd_00662eeba92a03de",
+          "episode_id": "eps_d9e72f97ab0b215f",
+          "finding_id": "fnd_d9e72f97ab0b215f",
           "entity": {
             "kind": "custom",
             "key": "custom|job=checkout-api",
@@ -2539,7 +3112,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2556,7 +3129,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2573,7 +3146,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2590,7 +3163,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2607,7 +3180,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2624,7 +3197,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2641,7 +3214,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2658,7 +3231,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2675,7 +3248,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2692,7 +3265,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2709,7 +3282,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2726,7 +3299,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2743,7 +3316,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 28800,
+      "observed_entity_minutes": 46080,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -2753,16 +3326,16 @@
   "trend_summary": {
     "direction": "stable",
     "confidence": "high",
-    "recent_share": 0.000298,
+    "recent_share": 0.000186,
     "previous_share": 0.0,
     "recent_episodes": 2,
     "previous_episodes": 0,
-    "reason": "Anomalous share 0.03% over the last 7 days vs 0.00% over the previous 7 (similar); 2 vs 0 episodes."
+    "reason": "Anomalous share 0.02% over the last 7 days vs 0.00% over the previous 7 (similar); 2 vs 0 episodes."
   },
   "evidence": [
     {
-      "evidence_id": "evd_e1da19365fbef48f",
-      "finding_id": "fnd_00662eeba92a03de",
+      "evidence_id": "evd_4bca805341b9a685",
+      "finding_id": "fnd_d9e72f97ab0b215f",
       "series": {
         "series_id": "ser_f310787fa4200236",
         "family": "custom",
@@ -3279,8 +3852,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_7a59c8bf912dd38a",
-      "finding_id": "fnd_0c3003231f92e0cd",
+      "evidence_id": "evd_2227150124dd59b6",
+      "finding_id": "fnd_e4ae4bb37000cb8c",
       "series": {
         "series_id": "ser_f5978005d3905001",
         "family": "custom",
@@ -3806,14 +4379,14 @@
         {
           "text": "E-mail queue depth at or above 2000 (threshold) on checkout-api may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_0c3003231f92e0cd"
+            "fnd_e4ae4bb37000cb8c"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Checkout failures above expected range on checkout-api may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_00662eeba92a03de"
+            "fnd_d9e72f97ab0b215f"
           ],
           "likelihood": "possible"
         }
@@ -3822,13 +4395,13 @@
         {
           "text": "Open the evidence chart for E-mail queue depth at or above 2000 (threshold) and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_0c3003231f92e0cd"
+            "fnd_e4ae4bb37000cb8c"
           ]
         },
         {
           "text": "Open the evidence chart for Checkout failures above expected range and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_00662eeba92a03de"
+            "fnd_d9e72f97ab0b215f"
           ]
         }
       ],
@@ -3880,7 +4453,7 @@
   "diagnostics": [
     {
       "kind": "prometheus",
-      "summary": "6 databases, 2 nodes, 2 filesystems, 2 routes, 2 containers, 2 proxies, 2 processes, 1 upstream, 1 custom, 85 series",
+      "summary": "12 storages, 6 databases, 2 nodes, 2 filesystems, 2 routes, 2 containers, 2 proxies, 2 processes, 1 upstream, 1 custom, 121 series",
       "selection": [
         {
           "display_name": "redis · redis://redis-replica:6379",
@@ -3945,6 +4518,54 @@
           "unit": "series",
           "families": [
             "golang"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-filer · filer",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-filer",
+            "api": "filer"
+          },
+          "count": 6,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "request_failures",
+            "client_errors",
+            "latency"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-filer · s3",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-filer",
+            "api": "s3"
+          },
+          "count": 6,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "request_failures",
+            "client_errors",
+            "latency"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-volume · volume",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-volume",
+            "api": "volume"
+          },
+          "count": 6,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "request_failures",
+            "client_errors",
+            "latency"
           ]
         },
         {
@@ -4037,6 +4658,59 @@
           ]
         },
         {
+          "display_name": "seaweedfs-filer · filer_store",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-filer",
+            "api": "filer_store"
+          },
+          "count": 3,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "latency"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-volume · 10.0.2.11:9327",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-volume",
+            "instance": "10.0.2.11:9327"
+          },
+          "count": 3,
+          "unit": "series",
+          "families": [
+            "storage"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-volume · 10.0.2.12:9327",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-volume",
+            "instance": "10.0.2.12:9327"
+          },
+          "count": 3,
+          "unit": "series",
+          "families": [
+            "storage"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-volume · 10.0.2.13:9327",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-volume",
+            "instance": "10.0.2.13:9327"
+          },
+          "count": 3,
+          "unit": "series",
+          "families": [
+            "storage"
+          ]
+        },
+        {
           "display_name": "checkout-api",
           "labels": {
             "kind": "custom",
@@ -4074,6 +4748,72 @@
           "families": [
             "cpu",
             "memory"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-master",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-master"
+          },
+          "count": 2,
+          "unit": "series",
+          "families": [
+            "storage"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-filer",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-filer"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "storage"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-volume · 10.0.2.11:9327 · /data",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-volume",
+            "instance": "10.0.2.11:9327",
+            "name": "/data"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "storage"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-volume · 10.0.2.12:9327 · /data",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-volume",
+            "instance": "10.0.2.12:9327",
+            "name": "/data"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "storage"
+          ]
+        },
+        {
+          "display_name": "seaweedfs-volume · 10.0.2.13:9327 · /data",
+          "labels": {
+            "kind": "storage",
+            "job": "seaweedfs-volume",
+            "instance": "10.0.2.13:9327",
+            "name": "/data"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "storage"
           ]
         },
         {
@@ -4160,7 +4900,7 @@
           ]
         }
       ],
-      "selection_total": 20,
+      "selection_total": 32,
       "samples": [
         {
           "project": "shop",
@@ -4196,8 +4936,8 @@
         {
           "part": "project=\"shop\"",
           "field": "matcher",
-          "matched": 85,
-          "matched_without": 85,
+          "matched": 121,
+          "matched_without": 121,
           "unit": "series",
           "available": [
             "shop"
@@ -4266,6 +5006,34 @@
         "sum by (job, instance) (rate(go_gc_duration_seconds_sum{project=\"shop\"}[5m]))",
         "sum by (job, instance) (rate(process_cpu_seconds_total{project=\"shop\"}[5m])) and on (job, instance) count by (job, instance) (go_info{project=\"shop\"})",
         "sum by (job, instance) (process_open_fds{project=\"shop\"}) / sum by (job, instance) (process_max_fds{project=\"shop\"} > 0) and on (job, instance) count by (job, instance) (go_info{project=\"shop\"})",
+        "1 - max by (job, instance, name) (SeaweedFS_volumeServer_resource{project=\"shop\", type=\"free\"}) / (max by (job, instance, name) (SeaweedFS_volumeServer_resource{project=\"shop\", type=\"all\"}) > 0)",
+        "sum by (job, instance) (SeaweedFS_volumeServer_volumes{project=\"shop\", type=\"volume\"}) / (max by (job, instance) (SeaweedFS_volumeServer_max_volumes{project=\"shop\"}) > 0)",
+        "sum by (job, instance) (SeaweedFS_volumeServer_read_only_volumes{project=\"shop\", type=\"IsReadOnly\"})",
+        "sum by (job, instance) (SeaweedFS_volumeServer_read_only_volumes{project=\"shop\", type=\"isDiskSpaceLow\"})",
+        "1 - max by (job) (SeaweedFS_master_is_leader{project=\"shop\"} and on (job, instance) SeaweedFS_master_received_heartbeats{project=\"shop\", type=\"total\"})",
+        "sum by (job) (rate(SeaweedFS_master_pick_for_write_error{project=\"shop\"}[5m]) and on (job, instance) SeaweedFS_master_received_heartbeats{project=\"shop\", type=\"total\"})",
+        "sum by (job) (rate(SeaweedFS_filer_handler_total{project=\"shop\", type=~\".*([Ff]ailed|Error).*\"}[5m])) or 0 * sum by (job) (rate(SeaweedFS_filer_handler_total{project=\"shop\"}[5m]))",
+        "label_replace(sum by (job) (rate(SeaweedFS_s3_request_total{project=\"shop\"}[5m])), \"api\", \"s3\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_s3_request_total{project=\"shop\", code=~\"5..\"}[5m])), \"api\", \"s3\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_s3_request_total{project=\"shop\", code=\"404\"}[5m])), \"api\", \"s3\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_s3_request_total{project=\"shop\", code=~\"4..\"}[5m])), \"api\", \"s3\", \"\", \"\")",
+        "histogram_quantile(0.95, label_replace(sum by (job, le) (rate(SeaweedFS_s3_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"s3\", \"\", \"\"))",
+        "histogram_quantile(0.99, label_replace(sum by (job, le) (rate(SeaweedFS_s3_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"s3\", \"\", \"\"))",
+        "label_replace(sum by (job) (rate(SeaweedFS_filer_request_total{project=\"shop\"}[5m])), \"api\", \"filer\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_filer_request_total{project=\"shop\", code=~\"5..\"}[5m])), \"api\", \"filer\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_filer_request_total{project=\"shop\", code=\"404\"}[5m])), \"api\", \"filer\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_filer_request_total{project=\"shop\", code=~\"4..\"}[5m])), \"api\", \"filer\", \"\", \"\")",
+        "histogram_quantile(0.95, label_replace(sum by (job, le) (rate(SeaweedFS_filer_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"filer\", \"\", \"\"))",
+        "histogram_quantile(0.99, label_replace(sum by (job, le) (rate(SeaweedFS_filer_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"filer\", \"\", \"\"))",
+        "label_replace(sum by (job) (rate(SeaweedFS_volumeServer_request_total{project=\"shop\"}[5m])), \"api\", \"volume\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_volumeServer_request_total{project=\"shop\", code=~\"5..\"}[5m])), \"api\", \"volume\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_volumeServer_request_total{project=\"shop\", code=\"404\"}[5m])), \"api\", \"volume\", \"\", \"\")",
+        "label_replace(sum by (job) (rate(SeaweedFS_volumeServer_request_total{project=\"shop\", code=~\"4..\"}[5m])), \"api\", \"volume\", \"\", \"\")",
+        "histogram_quantile(0.95, label_replace(sum by (job, le) (rate(SeaweedFS_volumeServer_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"volume\", \"\", \"\"))",
+        "histogram_quantile(0.99, label_replace(sum by (job, le) (rate(SeaweedFS_volumeServer_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"volume\", \"\", \"\"))",
+        "label_replace(sum by (job) (rate(SeaweedFS_filerStore_request_total{project=\"shop\"}[5m])), \"api\", \"filer_store\", \"\", \"\")",
+        "histogram_quantile(0.95, label_replace(sum by (job, le) (rate(SeaweedFS_filerStore_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"filer_store\", \"\", \"\"))",
+        "histogram_quantile(0.99, label_replace(sum by (job, le) (rate(SeaweedFS_filerStore_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"filer_store\", \"\", \"\"))",
         "sum by (job) (rate(shop_orders_failed_total{project=\"shop\"}[5m]))",
         "max by (job) (shop_email_queue_messages{project=\"shop\"})"
       ],

@@ -604,6 +604,69 @@ async def test_go_goroutine_leak_findings_relate_within_the_process() -> None:
     )
 
 
+async def test_seaweedfs_disk_full_findings_relate_across_the_cluster() -> None:
+    result = await detect(Scenario(seaweedfs_disk_full=True))
+    storage = {f.signal: f for f in result.findings if f.entity.kind is EntityKind.STORAGE}
+
+    assert set(storage) == {
+        "storage_disk_used_ratio",
+        "storage_read_only_volumes",
+        "storage_disk_space_low",
+        "storage_assign_errors",
+        "storage_filer_failures",
+        "server_error_ratio",
+    }
+    assert storage["server_error_ratio"].entity.display_name == "seaweedfs-filer · s3"
+    assert storage["storage_disk_used_ratio"].entity.display_name == (
+        "seaweedfs-volume · 10.0.2.11:9327 · /data"
+    )
+    assert storage["storage_disk_used_ratio"].severity is Severity.CRITICAL
+    assert storage["storage_disk_space_low"].title == (
+        "Volumes read-only because the disk is almost full"
+    )
+
+    disk = storage["storage_disk_space_low"]
+    others = {f.finding_id for s, f in storage.items() if s != disk.signal}
+    assert others <= set(disk.related_finding_ids)
+
+
+def test_seaweedfs_signals_map_to_storage_and_http_rules() -> None:
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    s3 = {"job": "seaweedfs-filer", "api": "s3"}
+    store = {"job": "seaweedfs-filer", "api": "filer_store"}
+    master = {"job": "seaweedfs-master"}
+    for signal in ("seaweedfs_s3_requests", "seaweedfs_s3_5xx", "seaweedfs_s3_latency_p95"):
+        builder.add(signal, s3, np.full(N, 1.0))
+    builder.add("seaweedfs_filer_store_requests", store, np.full(N, 1.0))
+    builder.add("seaweedfs_master_no_leader", master, np.zeros(N))
+    builder.add("seaweedfs_assign_errors", master, np.zeros(N))
+
+    rules = sorted((s.rule.name, s.entity.key) for s in derive(builder.series, STEP_SECONDS, 30))
+
+    assert rules == [
+        ("client_error_rate", "storage|job=seaweedfs-filer|api=s3"),
+        ("latency_p95", "storage|job=seaweedfs-filer|api=s3"),
+        ("not_found_rate", "storage|job=seaweedfs-filer|api=s3"),
+        ("request_rate", "storage|job=seaweedfs-filer|api=filer_store"),
+        ("request_rate", "storage|job=seaweedfs-filer|api=s3"),
+        ("server_error_ratio", "storage|job=seaweedfs-filer|api=s3"),
+        ("storage_assign_errors", "storage|job=seaweedfs-master"),
+        ("storage_master_no_leader", "storage|job=seaweedfs-master"),
+    ]
+
+
+async def test_seaweedfs_latency_beyond_ten_seconds_is_no_lower_bound() -> None:
+    caps, col = await collect("healthy")
+    slow = np.full(N, 0.04)
+    slow[N - 30 : N - 18] = 30.0
+    col = replace_values(col, "seaweedfs_s3_latency_p95", "api=s3", slow)
+
+    result = RobustDetector().detect(REQUEST, WINDOWS, caps, col, CONFIG)
+    [finding] = [f for f in by_signal(result, "latency_p95") if f.entity.labels["api"] == "s3"]
+
+    assert "latency_bound" not in finding.attributes
+
+
 def test_every_catalog_signal_is_consumed_by_derivation() -> None:
     consumed: set[str | None] = {*DIRECT, SWARM_FAILED_TASKS}
     for spec in _TRAFFIC_SPECS:

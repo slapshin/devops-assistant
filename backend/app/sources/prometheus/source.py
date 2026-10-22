@@ -103,7 +103,7 @@ def entity_for(defn: SignalDef, labels: dict[str, str], scope: Scope | None = No
             name = f"{ident['container']} @ {ident['instance']}"
         case EntityKind.SERVICE:
             name = ident["service_name"]
-        case EntityKind.PROXY | EntityKind.DATABASE | EntityKind.PROCESS:
+        case EntityKind.PROXY | EntityKind.DATABASE | EntityKind.PROCESS | EntityKind.STORAGE:
             # Traefik routers and services are often named alike; show each value once.
             name = " · ".join(dict.fromkeys(v for v in ident.values() if v))
         case EntityKind.CUSTOM:

@@ -248,7 +248,7 @@ def test_series_outside_a_regex_scope_are_dropped() -> None:
     assert [e.message for e in exclusions] == ["cpu_utilization: dropped 2 foreign series"]
 
 
-COUNTER = re.compile(r"\b([a-z_:]+_(?:total|count|sum|bucket))\{")
+COUNTER = re.compile(r"\b([A-Za-z_:][A-Za-z0-9_:]*_(?:total|count|sum|bucket))\{")
 GAUGES_NAMED_LIKE_COUNTERS = {"docker_swarm_task_info", "nodejs_active_handles_total"}
 
 
@@ -266,7 +266,7 @@ def test_counters_are_rated_before_aggregation(defn: Any) -> None:
         assert query[: m.start()].rstrip().endswith(("rate(", "increase(")), query
 
 
-# Proxy, PostgreSQL and MySQL counters exported without a conventional suffix.
+# Proxy, PostgreSQL, MySQL and SeaweedFS counters exported without a conventional suffix.
 UNSUFFIXED_COUNTERS = (
     "angie_http_server_zones_responses",
     "angie_connections_dropped",
@@ -280,6 +280,7 @@ UNSUFFIXED_COUNTERS = (
     "mysql_global_status_slow_queries",
     "mysql_global_status_innodb_row_lock_waits",
     "mysql_global_status_created_tmp_disk_tables",
+    "SeaweedFS_master_pick_for_write_error",
 )
 
 
@@ -390,6 +391,47 @@ def test_go_entity_names() -> None:
 
     assert process.display_name == "inventory · 10.0.1.7:2112"
     assert process.kind is EntityKind.PROCESS
+
+
+def test_seaweedfs_apis_are_named_after_aggregation() -> None:
+    s3 = BY_SIGNAL["seaweedfs_s3_5xx"].query.render(SCOPE)
+    p95 = BY_SIGNAL["seaweedfs_filer_store_latency_p95"].query.render(SCOPE)
+
+    assert s3.startswith("label_replace(sum by (job) (rate(SeaweedFS_s3_request_total{")
+    assert s3.endswith('"api", "s3", "", "")')
+    assert 'code=~"5.."' in s3
+    assert "sum by (job, le) (rate(SeaweedFS_filerStore_request_seconds_bucket{" in p95
+    assert "seaweedfs_filer_store_5xx" not in BY_SIGNAL  # the filer store has no status codes
+
+
+def test_seaweedfs_master_signals_only_count_masters() -> None:
+    for signal in ("seaweedfs_master_no_leader", "seaweedfs_assign_errors"):
+        query = BY_SIGNAL[signal].query.render(SCOPE)
+
+        assert "and on (job, instance) SeaweedFS_master_received_heartbeats{" in query
+        assert 'type="total"' in query
+
+
+def test_seaweedfs_filer_failures_are_zero_while_the_filer_works() -> None:
+    query = BY_SIGNAL["seaweedfs_filer_failures"].query.render(SCOPE)
+
+    failures, fallback = query.split(" or 0 * ")
+    assert 'type=~".*([Ff]ailed|Error).*"' in failures
+    assert fallback.startswith("sum by (job) (rate(SeaweedFS_filer_handler_total{")
+
+
+def test_seaweedfs_entity_names() -> None:
+    api = entity_for(BY_SIGNAL["seaweedfs_s3_requests"], {"job": "seaweedfs-filer", "api": "s3"})
+    disk = entity_for(
+        BY_SIGNAL["seaweedfs_disk_used_ratio"],
+        {"job": "seaweedfs-volume", "instance": "10.0.1.18:9327", "name": "/data"},
+    )
+    cluster = entity_for(BY_SIGNAL["seaweedfs_master_no_leader"], {"job": "seaweedfs-master"})
+
+    assert api.display_name == "seaweedfs-filer · s3"
+    assert disk.display_name == "seaweedfs-volume · 10.0.1.18:9327 · /data"
+    assert cluster.display_name == "seaweedfs-master"
+    assert api.kind is disk.kind is cluster.kind is EntityKind.STORAGE
 
 
 def test_proxy_entity_names() -> None:

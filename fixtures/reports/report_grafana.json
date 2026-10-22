@@ -19,8 +19,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.17",
-  "config_hash": "7bb67484c60b",
+  "detector_version": "detectors-2026.10.22",
+  "config_hash": "df0729ffa10b",
   "sources": [
     {
       "kind": "grafana",
@@ -115,9 +115,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_c7f8143e05cdcba4",
+      "finding_id": "fnd_539dda2632010df7",
       "detector": "event:alert_firing_critical",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_critical",
@@ -150,7 +150,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_3200fe2257a6c7e8"
+        "evd_e058665f1e50f422"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -201,9 +201,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_4784d3f728c7fdbb",
+      "finding_id": "fnd_afac48935050cea8",
       "detector": "event:alert_firing_critical",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_critical",
@@ -236,7 +236,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_eaf902d36634a6a7"
+        "evd_556b1be6ea0887cc"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -269,9 +269,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_6505c9ca1e1c66a3",
+      "finding_id": "fnd_772832f4044882e1",
       "detector": "event:alert_firing",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing",
@@ -304,7 +304,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_a6c032ec33442083"
+        "evd_b692f2bbc34cc9d2"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -338,9 +338,9 @@
       "prior_episode_days": 13
     },
     {
-      "finding_id": "fnd_f1b4f97949b8a565",
+      "finding_id": "fnd_8e4d14f2d271d42d",
       "detector": "event:alert_firing_info",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_info",
@@ -373,7 +373,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_1f54490bcd9a88b1"
+        "evd_eaf668ce7eff2028"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -404,9 +404,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_5cbd12091cfac246",
+      "finding_id": "fnd_915215fe76d01921",
       "detector": "event:alert_nodata",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_nodata",
@@ -439,7 +439,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_191c4e7c7dde7a75"
+        "evd_1fec3998a711415e"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -493,8 +493,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_c7f8143e05cdcba4",
-          "finding_id": "fnd_c7f8143e05cdcba4",
+          "episode_id": "eps_539dda2632010df7",
+          "finding_id": "fnd_539dda2632010df7",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-5xx",
@@ -513,8 +513,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_4784d3f728c7fdbb",
-          "finding_id": "fnd_4784d3f728c7fdbb",
+          "episode_id": "eps_afac48935050cea8",
+          "finding_id": "fnd_afac48935050cea8",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-5xx",
@@ -533,8 +533,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_6505c9ca1e1c66a3",
-          "finding_id": "fnd_6505c9ca1e1c66a3",
+          "episode_id": "eps_772832f4044882e1",
+          "finding_id": "fnd_772832f4044882e1",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-disk",
@@ -553,8 +553,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_f1b4f97949b8a565",
-          "finding_id": "fnd_f1b4f97949b8a565",
+          "episode_id": "eps_8e4d14f2d271d42d",
+          "finding_id": "fnd_8e4d14f2d271d42d",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-worker",
@@ -573,8 +573,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_5cbd12091cfac246",
-          "finding_id": "fnd_5cbd12091cfac246",
+          "episode_id": "eps_915215fe76d01921",
+          "finding_id": "fnd_915215fe76d01921",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-queue",
@@ -613,7 +613,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_e18542cb5185a90a",
+          "episode_id": "eps_845c9eea55835531",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -653,7 +653,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_3b5b5b534caa2d52",
+          "episode_id": "eps_8ddaa705e5469ab0",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -693,7 +693,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_e5a3fcee3b3cd449",
+          "episode_id": "eps_fc950616c4e5d177",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -733,7 +733,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_33270680233b4001",
+          "episode_id": "eps_8b10669789f9c206",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -773,7 +773,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_d4898920ff965561",
+          "episode_id": "eps_0600cbe9ac8fc96c",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -813,7 +813,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_864a89c5e7aba391",
+          "episode_id": "eps_0f3835481a660498",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -853,7 +853,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_74199b9927edec55",
+          "episode_id": "eps_2aaa652d9cc88a94",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -893,7 +893,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_e70a7262f49ec682",
+          "episode_id": "eps_3e50addb7bdcc3e9",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -933,7 +933,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_87047f37b097a242",
+          "episode_id": "eps_b8bedaf882cea46b",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -973,7 +973,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_ea89de502aed34c2",
+          "episode_id": "eps_1e5305ef9bde5606",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1013,7 +1013,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_580546f113bb30fa",
+          "episode_id": "eps_2e882e14f7d923de",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1053,7 +1053,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_04534c1dfcd61f66",
+          "episode_id": "eps_0fe485efc1054548",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1093,7 +1093,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_c752f066c7e1a3d4",
+          "episode_id": "eps_d765f3a230078fd9",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1126,8 +1126,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_a6c032ec33442083",
-      "finding_id": "fnd_6505c9ca1e1c66a3",
+      "evidence_id": "evd_b692f2bbc34cc9d2",
+      "finding_id": "fnd_772832f4044882e1",
       "series": {
         "series_id": "ser_dd17d96bed1588f7",
         "family": "alerting",
@@ -1614,8 +1614,8 @@
       "threshold_label": "Grafana alert firing: diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_3200fe2257a6c7e8",
-      "finding_id": "fnd_c7f8143e05cdcba4",
+      "evidence_id": "evd_e058665f1e50f422",
+      "finding_id": "fnd_539dda2632010df7",
       "series": {
         "series_id": "ser_2aba015a13b8d343",
         "family": "alerting",
@@ -2110,8 +2110,8 @@
       "threshold_label": "Grafana alert firing (severity critical): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_eaf902d36634a6a7",
-      "finding_id": "fnd_4784d3f728c7fdbb",
+      "evidence_id": "evd_556b1be6ea0887cc",
+      "finding_id": "fnd_afac48935050cea8",
       "series": {
         "series_id": "ser_2aba015a13b8d343",
         "family": "alerting",
@@ -2462,8 +2462,8 @@
       "threshold_label": "Grafana alert firing (severity critical): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_1f54490bcd9a88b1",
-      "finding_id": "fnd_f1b4f97949b8a565",
+      "evidence_id": "evd_eaf668ce7eff2028",
+      "finding_id": "fnd_8e4d14f2d271d42d",
       "series": {
         "series_id": "ser_d7d124f4399fca6e",
         "family": "alerting",
@@ -3094,8 +3094,8 @@
       "threshold_label": "Grafana alert firing (severity info): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_191c4e7c7dde7a75",
-      "finding_id": "fnd_5cbd12091cfac246",
+      "evidence_id": "evd_1fec3998a711415e",
+      "finding_id": "fnd_915215fe76d01921",
       "series": {
         "series_id": "ser_4ec1b7e3c79addf3",
         "family": "alerting",
@@ -3707,21 +3707,21 @@
         {
           "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_c7f8143e05cdcba4"
+            "fnd_539dda2632010df7"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_4784d3f728c7fdbb"
+            "fnd_afac48935050cea8"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Grafana alert firing on Disk almost full may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_6505c9ca1e1c66a3"
+            "fnd_772832f4044882e1"
           ],
           "likelihood": "possible"
         }
@@ -3730,19 +3730,19 @@
         {
           "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_c7f8143e05cdcba4"
+            "fnd_539dda2632010df7"
           ]
         },
         {
           "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_4784d3f728c7fdbb"
+            "fnd_afac48935050cea8"
           ]
         },
         {
           "text": "Open the evidence chart for Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_6505c9ca1e1c66a3"
+            "fnd_772832f4044882e1"
           ]
         }
       ],

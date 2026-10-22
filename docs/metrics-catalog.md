@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.18` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
+The catalog is `catalog-2026.10.22` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
 
 ## Scope enforcement
 
@@ -14,7 +14,7 @@ String literals are masked before the check, so label values cannot fake a selec
 
 ## Semantics
 
-- **Rates before aggregation:** every counter (`*_total`, `*_count`, `*_sum`, `*_bucket`, plus the unsuffixed proxy counters `angie_http_server_zones_responses`, `angie_connections_dropped`, `nginx_connections_accepted`/`_handled`) is wrapped directly in `rate()`/`increase()` before `sum`/`avg`/`max`. Counter resets are therefore handled per series by the source (a test enforces this).
+- **Rates before aggregation:** every counter (`*_total`, `*_count`, `*_sum`, `*_bucket`, plus the unsuffixed proxy counters `angie_http_server_zones_responses`, `angie_connections_dropped`, `nginx_connections_accepted`/`_handled`, `SeaweedFS_master_pick_for_write_error`) is wrapped directly in `rate()`/`increase()` before `sum`/`avg`/`max`. Counter resets are therefore handled per series by the source (a test enforces this).
 - **Colliding targets:** when two targets write one series (e.g. replicas scraped under a fixed `instance`), their counters interleave, every switch reads as a reset, and `rate()` turns the whole counter into growth: the result is about counter ÷ scrape interval and climbs with uptime. Before a signal is used, one instant probe per rated counter selector computes, per entity, `max(resets / count_over_time)` over the latest 24 h, counting only series with at least 10 resets (`_bucket` selectors probe the histogram's `_count`). Entities at or above a ratio of 0.1 are dropped from that signal; a restarting process resets a few times a day, colliding targets in up to every other sample. One `counter_collision` exclusion per entity lists its dropped signals, and the report is `partial`. Probes are cached per collection; a failed probe flags nothing. Not probed: custom rules, `__name__` selectors (`resets` drops the name, so their series would clash), and container signals in practice (their `container` identity comes from `label_replace`, so probe groups never match).
 - **Physical bounds:** a signal may declare a maximum value (`go_gc_pause_ratio`: 1, a process cannot be paused longer than wall-clock time). Samples above it become gaps with an `invalid_values` exclusion, so coverage, not a finding, reflects them. Node.js GC time has no bound because a cluster master sums its workers.
 - **Window and grid:** the rate window is 5 m (scrape interval 10 s, per T003). Collection covers 28 days on a 300 s grid. `values[i]` is the value evaluated at `start + (i+1)·300 s`, meaning the interval `[start + i·300 s, start + (i+1)·300 s)`. Trend buckets therefore contain whole intervals. `null` is a gap.
@@ -190,6 +190,31 @@ Notes and limitations:
 - `go_gc_duration_seconds` covers stop-the-world pauses only, not the concurrent mark phase, so it understates GC CPU cost; a rising pause share still flags allocation pressure.
 - File descriptor metrics exist on Linux only.
 - Not covered: `GOMEMLIMIT` (`go_gc_gomemlimit_bytes` is `math.MaxInt64` when unset, so the heap is analysed against its own baseline only), the opt-in `runtime/metrics` collectors (scheduler latency, per-class allocations), restarts (`process_start_time_seconds`, as for Node.js) and metrics registered under a custom namespace.
+
+### SeaweedFS
+
+Source: the built-in metrics of [SeaweedFS](https://github.com/seaweedfs/seaweedfs/wiki/System-Metrics) (`weed … -metricsPort`), scraped with one job per component (master, volume servers, filers; the S3 gateway usually runs inside the filer and shares its job). All series are kind `storage`. Request signals are per API with identity `job, api`: the API (`s3`, `filer`, `volume`, `filer_store`) is not a label of the metrics, so `label_replace` adds it after the per-job aggregation, which keeps the S3 gateway and the filer apart when they share a job. Server health is per `job, instance`, disk usage per `job, instance, name` (the data directory), cluster signals per `job`.
+
+| Signal | Source metric(s) |
+| --- | --- |
+| `seaweedfs_<api>_requests` | `rate(SeaweedFS_s3_request_total)`, `SeaweedFS_filer_request_total`, `SeaweedFS_volumeServer_request_total`, `SeaweedFS_filerStore_request_total` |
+| `seaweedfs_<api>_5xx`, `_4xx`, `_404` (5xx operand) | the same counters with `code=~"5.."`, `code=~"4.."`, `code="404"`; not for `filer_store`, which has no status codes |
+| `seaweedfs_<api>_latency_p95`, `_p99` | `histogram_quantile` over `*_request_seconds_bucket`, gated on bucket presence |
+| `seaweedfs_disk_used_ratio` | `1 − SeaweedFS_volumeServer_resource{type="free"} / {type="all"}` |
+| `seaweedfs_volume_slots_used_ratio` | `Σ SeaweedFS_volumeServer_volumes{type="volume"} / SeaweedFS_volumeServer_max_volumes` (servers with a maximum > 0) |
+| `seaweedfs_read_only_volumes` | `Σ SeaweedFS_volumeServer_read_only_volumes{type="IsReadOnly"}` |
+| `seaweedfs_disk_space_low_volumes` | `Σ SeaweedFS_volumeServer_read_only_volumes{type="isDiskSpaceLow"}` |
+| `seaweedfs_master_no_leader` | `1 − max(SeaweedFS_master_is_leader)` over the masters of a job |
+| `seaweedfs_assign_errors` | `rate(SeaweedFS_master_pick_for_write_error)` on the masters |
+| `seaweedfs_filer_failures` | `rate(SeaweedFS_filer_handler_total{type=~".*([Ff]ailed\|Error).*"})` (chunk assign, upload, download and read stream failures), 0 where the filer handles anything |
+
+Notes and limitations:
+
+- Every SeaweedFS server exports the master's plain metrics (`is_leader`, `pick_for_write_error`, `max_volumes`), as 0 off the masters or volume servers. Masters are therefore the servers that export `SeaweedFS_master_received_heartbeats{type="total"}`, joined `on (job, instance)`; volume slots skip servers whose maximum is 0. A master that never received a heartbeat (a fresh follower) is not seen, and a cluster whose masters are all down has no series: that is missing data, never a healthy leader.
+- Request metrics carry the HTTP method as `type`; it is not part of the identity, so each API is one entity. S3 `404`s include routine existence checks (`HEAD`), so they are analysed as client errors with severity ≤ medium, never as failures.
+- SeaweedFS histograms reach far beyond 10 s, so a p95 above 10 s is a measured value, not a lower bound.
+- The Go runtime metrics of every server (`go_*`, `process_*`) are analysed by the Go rules.
+- Not covered: per-bucket S3 traffic and object counts, in-flight requests, vacuum and EC shard state, writable/crowded volume layouts (an idle collection with only full volumes has none writable by design), and filer metadata subscriptions.
 
 ### Cloudflare (T015)
 

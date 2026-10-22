@@ -18,6 +18,7 @@ from app.analysis.rules.nodejs import NODEJS_RULES
 from app.analysis.rules.proxy import PROXY_RULES
 from app.analysis.rules.requests import REQUEST_RULES
 from app.analysis.rules.security import SECURITY_RULES
+from app.analysis.rules.storage import STORAGE_RULES
 
 __all__ = ["RULES", "SEVERITY_ORDER", "Dir", "Rule", "RuleKind", "format_value"]
 
@@ -40,6 +41,7 @@ RULES = _index(
         *DATABASE_RULES,
         *NODEJS_RULES,
         *GO_RULES,
+        *STORAGE_RULES,
         *EDGE_RULES,
         *SECURITY_RULES,
         *APPLICATION_RULES,

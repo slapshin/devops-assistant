@@ -23,6 +23,7 @@ from app.sources.prometheus.catalog.postgres import POSTGRES_CATALOG
 from app.sources.prometheus.catalog.proxy import PROXY_CATALOG
 from app.sources.prometheus.catalog.redis import REDIS_CATALOG
 from app.sources.prometheus.catalog.requests import REQUEST_CATALOG
+from app.sources.prometheus.catalog.seaweedfs import SEAWEEDFS_CATALOG
 
 __all__ = [
     "ALL_REQUIRED_METRICS",
@@ -36,7 +37,7 @@ __all__ = [
     "SignalDef",
 ]
 
-CATALOG_VERSION = "catalog-2026.10.18"
+CATALOG_VERSION = "catalog-2026.10.22"
 
 CATALOG: tuple[SignalDef, ...] = (
     *HOST_CATALOG,
@@ -48,6 +49,7 @@ CATALOG: tuple[SignalDef, ...] = (
     *REDIS_CATALOG,
     *NODEJS_CATALOG,
     *GO_CATALOG,
+    *SEAWEEDFS_CATALOG,
 )
 TRAFFIC_SIGNALS = frozenset(d.traffic for d in CATALOG if d.traffic is not None)
 

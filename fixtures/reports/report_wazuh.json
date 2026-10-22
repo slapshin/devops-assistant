@@ -19,8 +19,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.17",
-  "config_hash": "7bb67484c60b",
+  "detector_version": "detectors-2026.10.22",
+  "config_hash": "df0729ffa10b",
   "sources": [
     {
       "kind": "wazuh",
@@ -124,9 +124,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_bdbb72be117a78df",
+      "finding_id": "fnd_89ae8da526e105d6",
       "detector": "level:hids_alert_rate",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "relative",
       "family": "host_security",
       "signal": "hids_alert_rate",
@@ -164,10 +164,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_1c0bb4d2c6d2d9e6"
+        "evd_b1bd1e52d56df2ae"
       ],
       "related_finding_ids": [
-        "fnd_64bc2ab2604dd291"
+        "fnd_5f9e81b2d4743bf7"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -177,63 +177,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_8aa4cda0d97dc96a",
-      "detector": "level:hids_high_alert_rate",
-      "detector_version": "detectors-2026.10.17",
-      "method": "relative",
-      "family": "host_security",
-      "signal": "hids_high_alert_rate",
-      "title": "More high-level security alerts (rule level 12+)",
-      "summary": "More high-level alerts (rule level 12+), which Wazuh treats as significant.",
-      "help": "Review these alerts in the Wazuh dashboard first, and confirm or rule out a compromise of the agent.",
-      "entity": {
-        "kind": "agent",
-        "key": "agent|name=shop-db-1",
-        "display_name": "shop-db-1",
-        "labels": {
-          "agent": "shop-db-1"
-        }
-      },
-      "start": "2026-09-30T05:05:00Z",
-      "end": "2026-09-30T07:05:00Z",
-      "peak_at": "2026-09-30T05:25:00Z",
-      "duration_seconds": 7200,
-      "severity": "high",
-      "severity_points": 5,
-      "confidence": "high",
-      "confidence_reasons": [],
-      "observed": {
-        "value": 0.026667,
-        "unit": "per_second"
-      },
-      "expected": {
-        "median": 0.0,
-        "lower": 0.0,
-        "upper": 0.004,
-        "unit": "per_second"
-      },
-      "peak_score": 26.67,
-      "threshold": null,
-      "baseline_days": 14,
-      "baseline_mode": "time_of_day",
-      "evidence_ids": [
-        "evd_77fcd0f5293e6046"
-      ],
-      "related_finding_ids": [
-        "fnd_ecd6184a01e5b9be",
-        "fnd_f39aad28a22b9cb2"
-      ],
-      "attributes": {},
-      "alert_instances": [],
-      "error_kinds": [],
-      "state": "resolved",
-      "recurrence": "new",
-      "prior_episode_days": 0
-    },
-    {
-      "finding_id": "fnd_ecd6184a01e5b9be",
+      "finding_id": "fnd_1d51646fee33b700",
       "detector": "level:hids_auth_failure_rate",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "relative",
       "family": "host_security",
       "signal": "hids_auth_failure_rate",
@@ -271,11 +217,11 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_69ce7b9b377bd6a4"
+        "evd_b0946fc6b68fb1ee"
       ],
       "related_finding_ids": [
-        "fnd_8aa4cda0d97dc96a",
-        "fnd_f39aad28a22b9cb2"
+        "fnd_b96d04ab4f28e0eb",
+        "fnd_c5c000e746025154"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -285,9 +231,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_f39aad28a22b9cb2",
+      "finding_id": "fnd_b96d04ab4f28e0eb",
       "detector": "level:hids_alert_rate",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "relative",
       "family": "host_security",
       "signal": "hids_alert_rate",
@@ -325,11 +271,11 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_eb56e030c8515089"
+        "evd_dc363e0b9abd6669"
       ],
       "related_finding_ids": [
-        "fnd_8aa4cda0d97dc96a",
-        "fnd_ecd6184a01e5b9be"
+        "fnd_1d51646fee33b700",
+        "fnd_c5c000e746025154"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -339,9 +285,63 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_64bc2ab2604dd291",
+      "finding_id": "fnd_c5c000e746025154",
+      "detector": "level:hids_high_alert_rate",
+      "detector_version": "detectors-2026.10.22",
+      "method": "relative",
+      "family": "host_security",
+      "signal": "hids_high_alert_rate",
+      "title": "More high-level security alerts (rule level 12+)",
+      "summary": "More high-level alerts (rule level 12+), which Wazuh treats as significant.",
+      "help": "Review these alerts in the Wazuh dashboard first, and confirm or rule out a compromise of the agent.",
+      "entity": {
+        "kind": "agent",
+        "key": "agent|name=shop-db-1",
+        "display_name": "shop-db-1",
+        "labels": {
+          "agent": "shop-db-1"
+        }
+      },
+      "start": "2026-09-30T05:05:00Z",
+      "end": "2026-09-30T07:05:00Z",
+      "peak_at": "2026-09-30T05:25:00Z",
+      "duration_seconds": 7200,
+      "severity": "high",
+      "severity_points": 5,
+      "confidence": "high",
+      "confidence_reasons": [],
+      "observed": {
+        "value": 0.026667,
+        "unit": "per_second"
+      },
+      "expected": {
+        "median": 0.0,
+        "lower": 0.0,
+        "upper": 0.004,
+        "unit": "per_second"
+      },
+      "peak_score": 26.67,
+      "threshold": null,
+      "baseline_days": 14,
+      "baseline_mode": "time_of_day",
+      "evidence_ids": [
+        "evd_8cbc8c76ad9684fc"
+      ],
+      "related_finding_ids": [
+        "fnd_1d51646fee33b700",
+        "fnd_b96d04ab4f28e0eb"
+      ],
+      "attributes": {},
+      "alert_instances": [],
+      "error_kinds": [],
+      "state": "resolved",
+      "recurrence": "new",
+      "prior_episode_days": 0
+    },
+    {
+      "finding_id": "fnd_5f9e81b2d4743bf7",
       "detector": "level:fim_change_rate",
-      "detector_version": "detectors-2026.10.17",
+      "detector_version": "detectors-2026.10.22",
       "method": "relative",
       "family": "file_integrity",
       "signal": "fim_change_rate",
@@ -379,10 +379,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_898218543977736d"
+        "evd_23512829a50d83f5"
       ],
       "related_finding_ids": [
-        "fnd_bdbb72be117a78df"
+        "fnd_89ae8da526e105d6"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -413,8 +413,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_bdbb72be117a78df",
-          "finding_id": "fnd_bdbb72be117a78df",
+          "episode_id": "eps_89ae8da526e105d6",
+          "finding_id": "fnd_89ae8da526e105d6",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-web-2",
@@ -433,28 +433,8 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_8aa4cda0d97dc96a",
-          "finding_id": "fnd_8aa4cda0d97dc96a",
-          "entity": {
-            "kind": "agent",
-            "key": "agent|name=shop-db-1",
-            "display_name": "shop-db-1",
-            "labels": {
-              "agent": "shop-db-1"
-            }
-          },
-          "family": "host_security",
-          "signal": "hids_high_alert_rate",
-          "start": "2026-09-30T05:05:00Z",
-          "end": "2026-09-30T07:05:00Z",
-          "severity": "high",
-          "peak_observed": 0.026667,
-          "expected_median": 0.0,
-          "unit": "per_second"
-        },
-        {
-          "episode_id": "eps_ecd6184a01e5b9be",
-          "finding_id": "fnd_ecd6184a01e5b9be",
+          "episode_id": "eps_1d51646fee33b700",
+          "finding_id": "fnd_1d51646fee33b700",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-db-1",
@@ -473,8 +453,8 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_f39aad28a22b9cb2",
-          "finding_id": "fnd_f39aad28a22b9cb2",
+          "episode_id": "eps_b96d04ab4f28e0eb",
+          "finding_id": "fnd_b96d04ab4f28e0eb",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-db-1",
@@ -493,8 +473,28 @@
           "unit": "per_second"
         },
         {
-          "episode_id": "eps_64bc2ab2604dd291",
-          "finding_id": "fnd_64bc2ab2604dd291",
+          "episode_id": "eps_c5c000e746025154",
+          "finding_id": "fnd_c5c000e746025154",
+          "entity": {
+            "kind": "agent",
+            "key": "agent|name=shop-db-1",
+            "display_name": "shop-db-1",
+            "labels": {
+              "agent": "shop-db-1"
+            }
+          },
+          "family": "host_security",
+          "signal": "hids_high_alert_rate",
+          "start": "2026-09-30T05:05:00Z",
+          "end": "2026-09-30T07:05:00Z",
+          "severity": "high",
+          "peak_observed": 0.026667,
+          "expected_median": 0.0,
+          "unit": "per_second"
+        },
+        {
+          "episode_id": "eps_5f9e81b2d4743bf7",
+          "finding_id": "fnd_5f9e81b2d4743bf7",
           "entity": {
             "kind": "agent",
             "key": "agent|name=shop-web-2",
@@ -747,8 +747,8 @@
   },
   "evidence": [
     {
-      "evidence_id": "evd_eb56e030c8515089",
-      "finding_id": "fnd_f39aad28a22b9cb2",
+      "evidence_id": "evd_dc363e0b9abd6669",
+      "finding_id": "fnd_b96d04ab4f28e0eb",
       "series": {
         "series_id": "ser_af5f614188a61413",
         "family": "host_security",
@@ -1312,8 +1312,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_1c0bb4d2c6d2d9e6",
-      "finding_id": "fnd_bdbb72be117a78df",
+      "evidence_id": "evd_b1bd1e52d56df2ae",
+      "finding_id": "fnd_89ae8da526e105d6",
       "series": {
         "series_id": "ser_555430e8194e290e",
         "family": "host_security",
@@ -1973,8 +1973,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_69ce7b9b377bd6a4",
-      "finding_id": "fnd_ecd6184a01e5b9be",
+      "evidence_id": "evd_b0946fc6b68fb1ee",
+      "finding_id": "fnd_1d51646fee33b700",
       "series": {
         "series_id": "ser_60a0bc566a5641f8",
         "family": "host_security",
@@ -2538,8 +2538,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_898218543977736d",
-      "finding_id": "fnd_64bc2ab2604dd291",
+      "evidence_id": "evd_23512829a50d83f5",
+      "finding_id": "fnd_5f9e81b2d4743bf7",
       "series": {
         "series_id": "ser_993d310e9dbf19e0",
         "family": "file_integrity",
@@ -3199,8 +3199,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_77fcd0f5293e6046",
-      "finding_id": "fnd_8aa4cda0d97dc96a",
+      "evidence_id": "evd_8cbc8c76ad9684fc",
+      "finding_id": "fnd_c5c000e746025154",
       "series": {
         "series_id": "ser_a5a7c51e7d0c38aa",
         "family": "host_security",
@@ -3773,21 +3773,21 @@
         {
           "text": "Surge of security alerts on shop-web-2 may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_bdbb72be117a78df"
-          ],
-          "likelihood": "possible"
-        },
-        {
-          "text": "More high-level security alerts (rule level 12+) on shop-db-1 may reflect a workload or configuration change around its start time.",
-          "finding_ids": [
-            "fnd_8aa4cda0d97dc96a"
+            "fnd_89ae8da526e105d6"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Surge of authentication failures (possible brute force) on shop-db-1 may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_ecd6184a01e5b9be"
+            "fnd_1d51646fee33b700"
+          ],
+          "likelihood": "possible"
+        },
+        {
+          "text": "Surge of security alerts on shop-db-1 may reflect a workload or configuration change around its start time.",
+          "finding_ids": [
+            "fnd_b96d04ab4f28e0eb"
           ],
           "likelihood": "possible"
         }
@@ -3796,19 +3796,19 @@
         {
           "text": "Open the evidence chart for Surge of security alerts and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_bdbb72be117a78df"
-          ]
-        },
-        {
-          "text": "Open the evidence chart for More high-level security alerts (rule level 12+) and compare with deploy and log history.",
-          "finding_ids": [
-            "fnd_8aa4cda0d97dc96a"
+            "fnd_89ae8da526e105d6"
           ]
         },
         {
           "text": "Open the evidence chart for Surge of authentication failures (possible brute force) and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_ecd6184a01e5b9be"
+            "fnd_1d51646fee33b700"
+          ]
+        },
+        {
+          "text": "Open the evidence chart for Surge of security alerts and compare with deploy and log history.",
+          "finding_ids": [
+            "fnd_b96d04ab4f28e0eb"
           ]
         }
       ],

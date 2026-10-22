@@ -76,6 +76,13 @@ DIRECT: dict[str, str] = {
     "go_gc_pause_ratio": "go_gc_pause_ratio",
     "go_cpu": "go_cpu",
     "go_fds_used_ratio": "go_fds_ratio",
+    "seaweedfs_disk_used_ratio": "storage_disk_used_ratio",
+    "seaweedfs_volume_slots_used_ratio": "storage_volume_slots_ratio",
+    "seaweedfs_read_only_volumes": "storage_read_only_volumes",
+    "seaweedfs_disk_space_low_volumes": "storage_disk_space_low",
+    "seaweedfs_master_no_leader": "storage_master_no_leader",
+    "seaweedfs_assign_errors": "storage_assign_errors",
+    "seaweedfs_filer_failures": "storage_filer_failures",
     "cf_blocked": "security_blocked_rate",
     "cf_challenged": "security_challenge_rate",
     "sentry_errors": "app_error_rate",
@@ -160,6 +167,24 @@ _TRAFFIC_SPECS = (
             client_errors=(f"{proxy}_404", f"{proxy}_4xx"),
         )
         for proxy in ("caddy", "traefik")
+    ),
+    # SeaweedFS APIs reuse the HTTP rules too; the filer store has no status codes.
+    *(
+        _TrafficSpec(
+            traffic_signal=f"seaweedfs_{api}_requests",
+            rate_rule="request_rate",
+            error_ratios=((f"seaweedfs_{api}_5xx", "server_error_ratio"),),
+            quantile_signal=f"seaweedfs_{api}_latency_p95",
+            tail_signal=f"seaweedfs_{api}_latency_p99",
+            client_errors=(f"seaweedfs_{api}_404", f"seaweedfs_{api}_4xx"),
+        )
+        for api in ("s3", "filer", "volume")
+    ),
+    _TrafficSpec(
+        traffic_signal="seaweedfs_filer_store_requests",
+        rate_rule="request_rate",
+        quantile_signal="seaweedfs_filer_store_latency_p95",
+        tail_signal="seaweedfs_filer_store_latency_p99",
     ),
     # Rolled-back share of all transactions, volume-guarded like the 5xx ratio.
     _TrafficSpec(

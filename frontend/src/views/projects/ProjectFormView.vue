@@ -267,7 +267,7 @@ async function confirmDelete() {
 
       <fieldset>
         <legend>Prometheus-compatible metrics</legend>
-        <p class="muted hint">Host, container, HTTP/RPC, proxy, database and Node.js/Go runtime metrics from VictoriaMetrics or Prometheus.</p>
+        <p class="muted hint">Host, container, HTTP/RPC, proxy, database, Node.js/Go runtime and SeaweedFS metrics from VictoriaMetrics or Prometheus.</p>
         <h2 class="source-title">Labels</h2>
         <p class="muted hint">
           Every query is restricted to series matching all of these labels; regular expressions are fully anchored (RE2 syntax). Required with a URL,
