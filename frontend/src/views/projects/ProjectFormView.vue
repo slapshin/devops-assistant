@@ -3,7 +3,7 @@
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ApiError, type ConnectionTest, type SourceKind } from "../../api/client";
-import { useCreateProject, useDeleteProject, useProject, useTestConnection, useUpdateProject } from "../../api/queries";
+import { useConfig, useCreateProject, useDeleteProject, useProject, useTestConnection, useTestEmail, useUpdateProject } from "../../api/queries";
 import ConnectionTestResult from "../../components/projects/ConnectionTestResult.vue";
 import CredentialPicker from "../../components/projects/CredentialPicker.vue";
 import CustomRulesEditor from "../../components/projects/CustomRulesEditor.vue";
@@ -20,7 +20,9 @@ import {
   MAX_SENTRY_TAGS,
   MAX_WAZUH_AGENTS,
   MAX_WAZUH_GROUPS,
+  MAX_RECIPIENTS,
   MAX_WAZUH_LABELS,
+  NOTIFY_SEVERITIES,
   SENTRY_URL,
   WAZUH_INDEX_PATTERN,
   WAZUH_MONITORING_INDEX_PATTERN,
@@ -32,7 +34,9 @@ import {
   emptyMatcher,
   grafanaInput,
   matchersInput,
+  parseRecipients,
   prometheusInput,
+  recipientsError,
   sentryInput,
   serverFieldErrors,
   sourceInput,
@@ -73,6 +77,10 @@ const create = useCreateProject();
 const update = useUpdateProject();
 const remove = useDeleteProject();
 const tester = useTestConnection();
+const config = useConfig();
+const emailConfigured = computed(() => config.data.value?.email_configured ?? true);
+const emailTester = useTestEmail();
+const emailTestResult = ref<{ ok: boolean; message: string } | null>(null);
 
 const draft = ref(emptyDraft());
 const loaded = ref(!sourceId.value);
@@ -209,6 +217,23 @@ async function runTest(kind: SourceKind) {
     applyServerError(error, kind);
   } finally {
     testing.value = null;
+  }
+}
+
+async function sendTestEmail() {
+  emailTestResult.value = null;
+  const problem = recipientsError(draft.value.emailRecipients);
+  if (problem) {
+    serverErrors.value = { ...serverErrors.value, "schedule.notify.recipients": problem };
+    return;
+  }
+
+  serverErrors.value = Object.fromEntries(Object.entries(serverErrors.value).filter(([field]) => field !== "schedule.notify.recipients"));
+  try {
+    const result = await emailTester.mutateAsync({ recipients: parseRecipients(draft.value.emailRecipients) });
+    emailTestResult.value = { ok: true, message: `Test email sent to ${result.recipients.join(", ")}.` };
+  } catch (error) {
+    emailTestResult.value = { ok: false, message: problemMessage(error) };
   }
 }
 
@@ -880,6 +905,52 @@ async function confirmDelete() {
             <p v-if="errors['schedule.weekdays']" :id="errorId('schedule.weekdays')" class="field-error">{{ errors["schedule.weekdays"] }}</p>
           </div>
           <p v-if="!sourceKinds(draft).length" class="muted hint">Scheduled runs are skipped until a data source is configured.</p>
+
+          <label class="check"><input v-model="draft.emailReports" type="checkbox"> Email the report</label>
+          <p v-if="!emailConfigured" class="banner">
+            Email delivery is not configured on the server (set <code>SMTP_HOST</code> and <code>SMTP_FROM</code>). The setting is
+            saved, but nothing is sent until then.
+          </p>
+          <template v-if="draft.emailReports">
+            <div class="field">
+              <label for="email-recipients">Recipients</label>
+              <textarea
+                id="email-recipients"
+                v-model="draft.emailRecipients"
+                rows="2"
+                autocomplete="email"
+                placeholder="oncall@example.com, team@example.com"
+                :aria-invalid="!!errors['schedule.notify.recipients']"
+                :aria-describedby="describedBy('schedule.notify.recipients') ?? 'email-recipients-hint'"
+              />
+              <p id="email-recipients-hint" class="muted hint">Up to {{ MAX_RECIPIENTS }} addresses, separated by commas or new lines.</p>
+              <p v-if="errors['schedule.notify.recipients']" :id="errorId('schedule.notify.recipients')" class="field-error">
+                {{ errors["schedule.notify.recipients"] }}
+              </p>
+            </div>
+            <div class="schedule">
+              <div class="field">
+                <label for="email-when">Send</label>
+                <select id="email-when" v-model="draft.emailWhen">
+                  <option value="problems">On problems</option>
+                  <option value="always">After every run</option>
+                </select>
+              </div>
+              <div v-if="draft.emailWhen === 'problems'" class="field">
+                <label for="email-severity">Findings that send</label>
+                <select id="email-severity" v-model="draft.emailMinSeverity" aria-describedby="email-severity-hint">
+                  <option v-for="s in NOTIFY_SEVERITIES" :key="s.severity" :value="s.severity">{{ s.label }}</option>
+                </select>
+                <p id="email-severity-hint" class="muted hint">Failed and partial analyses are always emailed.</p>
+              </div>
+            </div>
+            <div class="row">
+              <button type="button" :disabled="emailTester.isPending.value || !emailConfigured" @click="sendTestEmail">
+                {{ emailTester.isPending.value ? "Sending…" : "Send test email" }}
+              </button>
+              <span v-if="emailTestResult" role="status" :class="emailTestResult.ok ? 'muted' : 'field-error'">{{ emailTestResult.message }}</span>
+            </div>
+          </template>
         </template>
       </fieldset>
 

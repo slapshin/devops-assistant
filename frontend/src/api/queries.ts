@@ -15,6 +15,8 @@ import {
   type ConnectionTestRequest,
   type CustomRulePreview,
   type CustomRulePreviewRequest,
+  type EmailTestRequest,
+  type EmailTestResult,
   type FindingDetail,
   type ProjectInput,
   type ProjectList,
@@ -130,6 +132,12 @@ export const useDeleteCredential = () => useCredentialMutation((id: string) => a
 export function useTestConnection() {
   return useMutation({
     mutationFn: (body: ConnectionTestRequest) => apiPost<ConnectionTest>("/api/projects/test-connection", body),
+  });
+}
+
+export function useTestEmail() {
+  return useMutation({
+    mutationFn: (body: EmailTestRequest) => apiPost<EmailTestResult>("/api/notifications/test-email", body),
   });
 }
 

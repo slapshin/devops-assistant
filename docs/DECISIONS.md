@@ -79,6 +79,11 @@ All settings come from environment (optionally the repository-root `config.env`,
 | `DETECTOR_CONFIG_FILE` | unset | Optional path to a **JSON** override of §5 defaults (T009: JSON only, to avoid a YAML dependency). A changed config yields a new `config_hash` in reports. |
 | `UI_STATIC_DIR` | `../frontend/dist` if built | Built UI served at `/` with an SPA fallback (T009). |
 | `LOG_LEVEL` | `INFO` | Structured JSON logs; query strings logged, credentials never. |
+| `EMAIL_PROVIDER` | `smtp` | `smtp`, `fake` (writes each message as `.eml` to `DATA_DIR/outbox`; tests and demos), or `none`. With `smtp`, email is off until `SMTP_HOST` and `SMTP_FROM` are set (T025). |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_TLS_VERIFY` | unset, `587`, `starttls`, `true` | SMTP relay for scheduled-report emails. `SMTP_SECURITY` is `starttls`, `tls` (implicit, usually port 465) or `none` (trusted relay only). Stdlib `smtplib`, 20 s socket timeout, no retries. |
+| `SMTP_USERNAME` + `SMTP_PASSWORD` | unset | Optional SMTP login; set both or neither. The password is masked in configuration errors. |
+| `SMTP_FROM` | unset | Sender address (a plain address, no display name). |
+| `APP_PUBLIC_URL` | unset | Base URL users open the app at (http/https); emails link to `<APP_PUBLIC_URL>/reports/<analysis_id>`. Without it emails carry no link. |
 
 ## 3. API conventions
 
@@ -115,6 +120,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 - `failed`: no usable report (e.g. source unreachable at collection start, internal error, restart interruption).
 - `cancelled`: user cancellation; no report is saved (`error` is null). T007 cancels a running job by cancelling its task, which aborts in-flight source/provider requests immediately; the token is also checked between stages.
 - Explanation state is **separate**: `disabled | not_configured | pending | succeeded | failed | skipped_no_findings`. AI failure never changes a numerical `completed` to `failed` or `partial`.
+- Email notification (T025) is **separate** too: after a *scheduled* job finishes (`completed`, `partial` or `failed`), its outcome is stored on the job as `notification: {status: sent | skipped | failed | not_configured, recipients, reason, at}` (null when the project requests no email, for manual runs, cancelled jobs, and jobs interrupted by a restart). Delivery never changes the job state; the worker waits for it (at most 60 s) before starting the next job.
 
 **Stages and progress** (stored on the job, exposed by `GET /api/analyses/{id}`): `discovery → collection → detection → trends → explanation → saving`, each `{stage, status, started_at, finished_at, done, total, message}`.
 

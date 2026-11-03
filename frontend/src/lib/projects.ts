@@ -1,4 +1,19 @@
-import type { ConnectionTest, LabelMatcher, Problem, ProjectInput, ProjectSummary, ReportSchedule, ReportSummary, SourceInfo, SourceKind, Weekday } from "../api/client";
+import type {
+  ConnectionTest,
+  EmailNotification,
+  LabelMatcher,
+  NotificationStatus,
+  NotifyWhen,
+  Problem,
+  ProjectInput,
+  ProjectSummary,
+  ReportSchedule,
+  ReportSummary,
+  Severity,
+  SourceInfo,
+  SourceKind,
+  Weekday,
+} from "../api/client";
 import { credentialIdOf, sourceAuthInput, validateSourceCredential } from "./auth";
 import { type CustomRuleDraft, ruleDraftFrom, ruleInput, validateCustomRules } from "./customRules";
 
@@ -52,6 +67,23 @@ export const WEEKDAYS: { day: Weekday; label: string }[] = [
 const ALL_DAYS = WEEKDAYS.map((w) => w.day);
 const WORK_DAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
 const DEFAULT_SCHEDULE_TIME = "08:00";
+/** Mirrors backend/app/domain/notifications.py. */
+export const MAX_RECIPIENTS = 20;
+const MAX_EMAIL_CHARS = 254;
+const EMAIL = /^[^@\s,;:<>()[\]"\\]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/;
+export const NOTIFY_SEVERITIES: { severity: Severity; label: string }[] = [
+  { severity: "critical", label: "Critical" },
+  { severity: "high", label: "High or worse" },
+  { severity: "medium", label: "Medium or worse" },
+  { severity: "low", label: "Any finding" },
+];
+const DEFAULT_NOTIFY_SEVERITY: Severity = "high";
+export const NOTIFICATION_LABELS: Record<NotificationStatus, string> = {
+  sent: "emailed",
+  skipped: "not emailed",
+  failed: "email failed",
+  not_configured: "email not configured",
+};
 /** Mirrors MAX_KEEP_REPORTS in backend/app/domain/projects.py. */
 export const MAX_KEEP_REPORTS = 1000;
 const DEFAULT_KEEP_REPORTS = 10;
@@ -150,6 +182,12 @@ export interface ProjectDraft {
   scheduleTime: string;
   scheduleTimezone: string;
   scheduleWeekdays: Weekday[];
+  /** Email each scheduled report (T025). */
+  emailReports: boolean;
+  /** Comma-, semicolon- or whitespace-separated addresses. */
+  emailRecipients: string;
+  emailWhen: NotifyWhen;
+  emailMinSeverity: Severity;
   limitReports: boolean;
   keepReports: number;
 }
@@ -200,6 +238,10 @@ export function emptyDraft(): ProjectDraft {
     scheduleTime: DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: browserTimezone(),
     scheduleWeekdays: [...ALL_DAYS],
+    emailReports: false,
+    emailRecipients: "",
+    emailWhen: "problems",
+    emailMinSeverity: DEFAULT_NOTIFY_SEVERITY,
     limitReports: false,
     keepReports: DEFAULT_KEEP_REPORTS,
   };
@@ -293,6 +335,10 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
     scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: project.schedule?.timezone ?? browserTimezone(),
     scheduleWeekdays: [...(project.schedule?.weekdays ?? ALL_DAYS)],
+    emailReports: !!project.schedule?.notify,
+    emailRecipients: project.schedule?.notify?.recipients.join(", ") ?? "",
+    emailWhen: project.schedule?.notify?.when ?? "problems",
+    emailMinSeverity: project.schedule?.notify?.min_severity ?? DEFAULT_NOTIFY_SEVERITY,
     limitReports: project.keep_reports != null,
     keepReports: project.keep_reports ?? DEFAULT_KEEP_REPORTS,
   };
@@ -320,6 +366,29 @@ export function parseNames(raw: string): string[] {
 /** Unique, sorted items of a comma- or newline-separated list, case and inner spaces kept (Grafana folders). */
 export function parseFolders(raw: string): string[] {
   return [...new Set(raw.split(/[,\n]+/).map((f) => f.trim()).filter(Boolean))].sort();
+}
+
+/** Unique (case-insensitively) addresses of a comma-, semicolon- or whitespace-separated list, in order. */
+export function parseRecipients(raw: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const address of raw.split(/[\s,;]+/).filter(Boolean)) {
+    const key = address.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(address);
+  }
+  return result;
+}
+
+/** Field error for a recipient list, or null when it is valid. */
+export function recipientsError(raw: string): string | null {
+  const recipients = parseRecipients(raw);
+  if (!recipients.length) return "Add at least one email address";
+  const bad = recipients.filter((a) => a.length > MAX_EMAIL_CHARS || !EMAIL.test(a));
+  if (bad.length) return `Invalid email addresses: ${bad.join(", ")}`;
+  if (recipients.length > MAX_RECIPIENTS) return `At most ${MAX_RECIPIENTS} addresses`;
+  return null;
 }
 
 export const parseHostnames = (raw: string) => parseList(raw.replace(/\.(?=[\s,]|$)/g, ""));
@@ -514,6 +583,10 @@ export function validateSchedule(draft: ProjectDraft): FieldErrors {
   if (!LOCAL_TIME.test(draft.scheduleTime)) errors["schedule.time"] = "Expected a time such as 08:00";
   if (!draft.scheduleTimezone.trim()) errors["schedule.timezone"] = "Required";
   if (draft.scheduleWeekdays.length === 0) errors["schedule.weekdays"] = "Choose at least one day";
+  if (draft.emailReports) {
+    const recipients = recipientsError(draft.emailRecipients);
+    if (recipients) errors["schedule.notify.recipients"] = recipients;
+  }
   return errors;
 }
 
@@ -642,6 +715,9 @@ export function toInput(draft: ProjectDraft): ProjectInput {
           time: draft.scheduleTime,
           timezone: draft.scheduleTimezone.trim(),
           weekdays: ALL_DAYS.filter((d) => draft.scheduleWeekdays.includes(d)),
+          notify: draft.emailReports
+            ? { recipients: parseRecipients(draft.emailRecipients), when: draft.emailWhen, min_severity: draft.emailMinSeverity }
+            : null,
         }
       : null,
     keep_reports: draft.limitReports ? draft.keepReports : null,
@@ -660,6 +736,16 @@ export function scheduleSummary(schedule: ReportSchedule): string {
             .map((w) => w.label)
             .join(", ");
   return `${when} at ${schedule.time} (${schedule.timezone})`;
+}
+
+/** "Emailed to a@example.com on failures and high or worse findings". */
+export function notifySummary(notify: EmailNotification): string {
+  const to = notify.recipients.length === 1 ? notify.recipients[0] : `${notify.recipients.length} recipients`;
+  if (notify.when === "always") return `Emailed to ${to} after every run`;
+  const severity = notify.min_severity ?? DEFAULT_NOTIFY_SEVERITY;
+  const label = NOTIFY_SEVERITIES.find((s) => s.severity === severity)?.label.toLowerCase() ?? severity;
+  const findings = severity === "low" ? "any finding" : severity === "critical" ? "critical findings" : `${label} findings`;
+  return `Emailed to ${to} on failures, partial runs and ${findings}`;
 }
 
 /**

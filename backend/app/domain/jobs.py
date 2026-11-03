@@ -6,6 +6,7 @@ from pydantic import Field
 
 from app.domain.common import Contract, Scope, Severity, UtcDatetime
 from app.domain.explanation import ExplanationStatus
+from app.domain.notifications import NotificationOutcome
 
 
 class JobState(StrEnum):
@@ -74,6 +75,8 @@ class ErrorCode(StrEnum):
     END_TIME_INVALID = "end_time_invalid"
     INTERRUPTED_BY_RESTART = "interrupted_by_restart"
     JOB_TIMEOUT = "job_timeout"
+    EMAIL_NOT_CONFIGURED = "email_not_configured"
+    EMAIL_FAILED = "email_failed"
     INTERNAL_ERROR = "internal_error"
     NOT_IMPLEMENTED = "not_implemented"
     """Foundation-only: route exists but its task (T007) is not done."""
@@ -108,6 +111,10 @@ class AnalysisJob(Contract):
         default=None,
         description="Anomaly episodes per trend day, oldest first; null for days without "
         "enough data. Present once a report is saved.",
+    )
+    notification: NotificationOutcome | None = Field(
+        default=None,
+        description="Email delivery of a scheduled report (T025); null when none was requested.",
     )
 
 
@@ -165,6 +172,9 @@ class RuntimeConfig(Contract):
     )
     detector_version: str
     config_hash: str
+    email_configured: bool = Field(
+        default=False, description="Scheduled reports can be emailed (SMTP or fake delivery)."
+    )
     limits: Limits
     report_count: int | None = None
     database_bytes: int | None = None

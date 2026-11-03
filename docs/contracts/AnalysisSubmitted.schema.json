@@ -91,6 +91,18 @@
           "default": null,
           "title": "Finished At"
         },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationOutcome"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Email delivery of a scheduled report (T025); null when none was requested."
+        },
         "report_available": {
           "title": "Report Available",
           "type": "boolean"
@@ -163,6 +175,8 @@
         "end_time_invalid",
         "interrupted_by_restart",
         "job_timeout",
+        "email_not_configured",
+        "email_failed",
         "internal_error",
         "not_implemented"
       ],
@@ -256,6 +270,55 @@
         "!~"
       ],
       "title": "MatchOp",
+      "type": "string"
+    },
+    "NotificationOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why skipped, failed, or not configured.",
+          "title": "Reason"
+        },
+        "recipients": {
+          "description": "Number of recipients addressed.",
+          "minimum": 0,
+          "title": "Recipients",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/NotificationStatus"
+        }
+      },
+      "required": [
+        "status",
+        "recipients",
+        "at"
+      ],
+      "title": "NotificationOutcome",
+      "type": "object"
+    },
+    "NotificationStatus": {
+      "enum": [
+        "sent",
+        "skipped",
+        "failed",
+        "not_configured"
+      ],
+      "title": "NotificationStatus",
       "type": "string"
     },
     "Scope": {

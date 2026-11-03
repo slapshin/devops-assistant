@@ -346,6 +346,7 @@ describe("project form", () => {
       time: "07:30",
       timezone: "Mars/Olympus",
       weekdays: ["mon", "fri"],
+      notify: null,
     });
 
     await fireEvent.update(screen.getByLabelText("Time zone"), "Europe/Berlin");
@@ -353,6 +354,49 @@ describe("project form", () => {
 
     await waitFor(() => expect(router.currentRoute.value.path).toBe(`/projects/${PID}`));
     expect(JSON.parse(calls.filter((c) => c.method === "PUT")[1]?.body ?? "{}").schedule.timezone).toBe("Europe/Berlin");
+  });
+
+  it("emails scheduled reports and sends a test email", async () => {
+    routes["GET /api/config"] = () => json({ ...config, email_configured: true });
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, schedule: { time: "08:00", timezone: "UTC", weekdays: ["mon"] }, next_scheduled_run: null });
+    routes[`PUT /api/projects/${PID}`] = () => json(base);
+    routes["POST /api/notifications/test-email"] = () => json({ recipients: ["ops@example.com"], sent_at: "2026-11-02T08:00:00Z" });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    const router = await renderAt(`/projects/${PID}/edit`);
+
+    await fireEvent.click(await screen.findByLabelText("Email the report"));
+    await fireEvent.update(screen.getByLabelText("Recipients"), "ops@example.com, not-an-address");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.getByText("Invalid email addresses: not-an-address")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+
+    await fireEvent.update(screen.getByLabelText("Recipients"), "ops@example.com\nOPS@example.com");
+    await fireEvent.click(screen.getByRole("button", { name: "Send test email" }));
+
+    expect(await screen.findByText("Test email sent to ops@example.com.")).toBeInTheDocument();
+    expect(JSON.parse(calls.find((c) => c.url === "/api/notifications/test-email")?.body ?? "{}")).toEqual({ recipients: ["ops@example.com"] });
+
+    await fireEvent.update(screen.getByLabelText("Findings that send"), "critical");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(router.currentRoute.value.path).toBe(`/projects/${PID}`));
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").schedule.notify).toEqual({
+      recipients: ["ops@example.com"],
+      when: "problems",
+      min_severity: "critical",
+    });
+  });
+
+  it("explains that email is not configured on the server", async () => {
+    routes[`GET /api/projects/${PID}`] = () => json({ ...base, schedule: { time: "08:00", timezone: "UTC", weekdays: ["mon"] }, next_scheduled_run: null });
+    routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
+    await renderAt(`/projects/${PID}/edit`);
+
+    await fireEvent.click(await screen.findByLabelText("Email the report"));
+
+    expect(await screen.findByText(/Email delivery is not configured on the server/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send test email" })).toBeDisabled();
   });
 
   it("keeps the source's credential and shows server errors", async () => {
@@ -408,7 +452,7 @@ describe("project form", () => {
     const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/projects")?.body ?? "{}");
     expect(sent.matchers).toEqual(base.matchers);
     expect(sent.sources[0].auth).toEqual(sourceCredential(VM));
-    expect(sent.schedule).toEqual(original.schedule);
+    expect(sent.schedule).toEqual({ ...original.schedule, notify: null });
     expect(sent.keep_reports).toBe(5);
   });
 

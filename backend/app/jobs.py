@@ -15,6 +15,7 @@ from app.domain.interfaces import (
     AnalysisService,
     CancellationToken,
     Cancelled,
+    JobNotifier,
     ReportRepository,
     SourceError,
 )
@@ -28,11 +29,15 @@ from app.domain.jobs import (
     StageProgress,
     StageStatus,
 )
+from app.domain.notifications import NotificationOutcome, NotificationStatus
 from app.domain.report import AnalysisReport, AnalysisRequest, ReportState
 from app.sources.factory import SourceNotConfigured
 from app.storage.secrets import SecretsUnreadable
 
 log = logging.getLogger("app.jobs")
+
+NOTIFY_TIMEOUT_SECONDS = 60.0
+"""Upper bound for emailing one report; the worker waits for it before the next job."""
 
 
 class QueueFull(Exception):
@@ -67,8 +72,10 @@ class JobRunner:
         config: DetectorConfig,
         explanation_status: ExplanationStatus,
         limits: RunnerLimits | None = None,
+        notifier: JobNotifier | None = None,
     ) -> None:
         self.repo = repo
+        self.notifier = notifier
         self.service = service
         self.config = config
         self.explanation_status = explanation_status
@@ -96,6 +103,10 @@ class JobRunner:
             task.cancel()
         await asyncio.gather(*self._tasks.values(), *self._workers, return_exceptions=True)
         self._workers = []
+
+    async def idle(self) -> None:
+        """Wait until every submitted job has finished, including its notification."""
+        await self._queue.join()
 
     def request_for(self, scope: Scope, end_time: datetime) -> AnalysisRequest:
         return AnalysisRequest(
@@ -179,13 +190,14 @@ class JobRunner:
         if await self.repo.mark_running(analysis_id, datetime.now(UTC)) is None:
             return
 
+        finished: AnalysisJob | None = None
         try:
             report = await asyncio.wait_for(
                 self.service.run(analysis_id, request, _Progress(self.repo, analysis_id), token),
                 self.limits.job_timeout_seconds,
             )
             await self._save(analysis_id, report)
-            await self._finish_with_report(analysis_id, report)
+            finished = await self._finish_with_report(analysis_id, report)
             await self._prune(request.scope.project_id)
         except Cancelled, asyncio.CancelledError:
             if analysis_id in self._user_cancelled:
@@ -193,7 +205,7 @@ class JobRunner:
             else:  # shutdown: next start marks it interrupted
                 raise
         except TimeoutError:
-            await self.repo.finish_job(
+            finished = await self.repo.finish_job(
                 analysis_id,
                 JobState.FAILED,
                 JobError(
@@ -203,9 +215,36 @@ class JobRunner:
             )
         except Exception as exc:
             log.exception("analysis %s failed", analysis_id)
-            await self.repo.finish_job(analysis_id, JobState.FAILED, _job_error(exc))
+            finished = await self.repo.finish_job(analysis_id, JobState.FAILED, _job_error(exc))
         finally:
             self._user_cancelled.discard(analysis_id)
+
+        if finished is not None:
+            await self._notify(finished)
+
+    async def _notify(self, job: AnalysisJob) -> None:
+        """Email a scheduled job's report; delivery never affects the job's outcome."""
+        if self.notifier is None or job.trigger is not JobTrigger.SCHEDULED:
+            return
+        try:
+            outcome = await asyncio.wait_for(
+                self.notifier.job_finished(job), NOTIFY_TIMEOUT_SECONDS
+            )
+        except TimeoutError:
+            outcome = NotificationOutcome(
+                status=NotificationStatus.FAILED,
+                recipients=0,
+                reason=f"Email delivery exceeded {NOTIFY_TIMEOUT_SECONDS:.0f} s.",
+                at=datetime.now(UTC),
+            )
+        except Exception:
+            log.exception("notifying analysis %s failed", job.analysis_id)
+            return
+        if outcome is not None:
+            try:
+                await self.repo.set_notification(job.analysis_id, outcome)
+            except Exception:
+                log.exception("recording notification of analysis %s failed", job.analysis_id)
 
     async def _save(self, analysis_id: str, report: AnalysisReport) -> None:
         await self.repo.update_stage(
@@ -234,10 +273,10 @@ class JobRunner:
         except Exception:
             log.exception("pruning reports of project %s failed", project_id)
 
-    async def _finish_with_report(self, analysis_id: str, report: AnalysisReport) -> None:
+    async def _finish_with_report(self, analysis_id: str, report: AnalysisReport) -> AnalysisJob:
         is_partial = report.state is ReportState.PARTIAL
         counts = Counter(f.severity for f in report.findings)
-        await self.repo.finish_job(
+        return await self.repo.finish_job(
             analysis_id,
             JobState.PARTIAL if is_partial else JobState.COMPLETED,
             None,

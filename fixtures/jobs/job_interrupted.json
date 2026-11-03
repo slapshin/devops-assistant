@@ -87,5 +87,6 @@
   "finished_at": "2026-09-30T10:07:00Z",
   "report_available": false,
   "finding_counts": null,
-  "daily_episodes": null
+  "daily_episodes": null,
+  "notification": null
 }

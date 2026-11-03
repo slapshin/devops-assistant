@@ -8,6 +8,7 @@ from pydantic import Field, SecretStr, ValidationError, field_validator, model_v
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.domain.explanation import ExplanationStatus
+from app.domain.notifications import validate_recipients
 from app.domain.projects import PrometheusConnection, validate_source_url
 
 
@@ -16,6 +17,22 @@ class AIProvider(StrEnum):
     NONE = "none"
     FAKE = "fake"
     """Deterministic template provider for tests and offline demos (no network)."""
+
+
+class EmailProvider(StrEnum):
+    SMTP = "smtp"
+    """Deliver through SMTP_HOST; email is off until SMTP_HOST and SMTP_FROM are set."""
+    FAKE = "fake"
+    """Write each message as an .eml file to DATA_DIR/outbox (tests and offline demos)."""
+    NONE = "none"
+
+
+class SmtpSecurity(StrEnum):
+    STARTTLS = "starttls"
+    TLS = "tls"
+    """Implicit TLS (SMTPS, usually port 465)."""
+    NONE = "none"
+    """Plain SMTP; only for a relay on a trusted network."""
 
 
 class ConfigError(Exception):
@@ -52,6 +69,18 @@ class Settings(BaseSettings):
     secret_key: SecretStr | None = None
     """Fernet key for stored project secrets. Defaults to DATA_DIR/secret.key (generated)."""
 
+    email_provider: EmailProvider = EmailProvider.SMTP
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_security: SmtpSecurity = SmtpSecurity.STARTTLS
+    smtp_tls_verify: bool = True
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from: str | None = None
+    """Sender address, e.g. devops-assistant@example.com."""
+    app_public_url: str | None = None
+    """Base URL users open the app at; emailed reports link to it. No link when unset."""
+
     demo_projects: bool = False
     """Seed one synthetic demo project per scenario when no project exists."""
 
@@ -59,6 +88,25 @@ class Settings(BaseSettings):
     @classmethod
     def _valid_metrics_url(cls, value: str | None) -> str | None:
         return validate_source_url(value) if value else None
+
+    @field_validator("smtp_host", "smtp_username", "smtp_from", "app_public_url", mode="before")
+    @classmethod
+    def _blank_is_unset(cls, value: str | None) -> str | None:
+        return (value or "").strip() or None
+
+    @field_validator("smtp_from")
+    @classmethod
+    def _valid_sender(cls, value: str | None) -> str | None:
+        return validate_recipients([value])[0] if value else None
+
+    @field_validator("app_public_url")
+    @classmethod
+    def _valid_public_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.startswith(("http://", "https://")) or any(c.isspace() for c in value):
+            raise ValueError("expected an http(s) URL such as https://assistant.example.com")
+        return value.rstrip("/")
 
     @field_validator("log_level")
     @classmethod
@@ -84,7 +132,23 @@ class Settings(BaseSettings):
             raise ValueError(
                 "METRICS_BASIC_AUTH_USER and METRICS_BASIC_AUTH_PASSWORD must be set together"
             )
+        if (self.smtp_username is None) != (self.smtp_password is None):
+            raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be set together")
         return self
+
+    @property
+    def email_configured(self) -> bool:
+        if self.email_provider is EmailProvider.FAKE:
+            return True
+        return (
+            self.email_provider is EmailProvider.SMTP
+            and self.smtp_host is not None
+            and self.smtp_from is not None
+        )
+
+    @property
+    def outbox_dir(self) -> Path:
+        return self.data_dir / "outbox"
 
     @property
     def metrics_connection(self) -> PrometheusConnection | None:

@@ -25,6 +25,7 @@ services:
       # those reports came from (the former compose default).
       METRICS_URL: ${METRICS_URL:-http://host.docker.internal:8428}
       AI_PROVIDER: ${AI_PROVIDER:-openai}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # Container paths win over native values from config.env.

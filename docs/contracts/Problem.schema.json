@@ -22,6 +22,8 @@
         "end_time_invalid",
         "interrupted_by_restart",
         "job_timeout",
+        "email_not_configured",
+        "email_failed",
         "internal_error",
         "not_implemented"
       ],

@@ -90,6 +90,12 @@
       "title": "Detector Version",
       "type": "string"
     },
+    "email_configured": {
+      "default": false,
+      "description": "Scheduled reports can be emailed (SMTP or fake delivery).",
+      "title": "Email Configured",
+      "type": "boolean"
+    },
     "explanation_status": {
       "$ref": "#/$defs/ExplanationStatus",
       "description": "disabled, not_configured, or pending (configured, per-report status varies)."

@@ -1,0 +1,114 @@
+{
+  "analysis_id": "01999a2b-0000-7000-8000-000000000002",
+  "scope": {
+    "project_id": "01999a3c-0000-7000-8000-000000000001",
+    "project_name": "shop / production",
+    "matchers": [
+      {
+        "name": "env",
+        "op": "=",
+        "value": "production"
+      },
+      {
+        "name": "project",
+        "op": "=",
+        "value": "shop"
+      }
+    ]
+  },
+  "end_time": "2026-09-30T10:05:00Z",
+  "detector_version": "detectors-2026.10.22.1",
+  "config_hash": "4856d4783d08",
+  "trigger": "scheduled",
+  "state": "completed",
+  "stages": [
+    {
+      "stage": "discovery",
+      "status": "done",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "collection",
+      "status": "done",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "detection",
+      "status": "done",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "trends",
+      "status": "done",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "explanation",
+      "status": "done",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    },
+    {
+      "stage": "saving",
+      "status": "done",
+      "started_at": null,
+      "finished_at": null,
+      "done": null,
+      "total": null,
+      "message": null
+    }
+  ],
+  "explanation_status": "succeeded",
+  "error": null,
+  "created_at": "2026-09-30T10:05:00Z",
+  "started_at": "2026-09-30T10:05:01Z",
+  "finished_at": "2026-09-30T10:07:00Z",
+  "report_available": true,
+  "finding_counts": {
+    "critical": 1,
+    "high": 0,
+    "medium": 1,
+    "low": 0
+  },
+  "daily_episodes": [
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    2
+  ],
+  "notification": {
+    "status": "sent",
+    "recipients": 1,
+    "reason": null,
+    "at": "2026-09-30T10:07:03Z"
+  }
+}

@@ -52,6 +52,17 @@ All settings are environment variables, optionally read from `config.env` in the
 | `UI_STATIC_DIR` | `../frontend/dist` if built (image: `/app/static`) | Built UI served at `/`. |
 | `DETECTOR_CONFIG_FILE` | unset | JSON file overriding detector defaults (see below). |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_TLS_VERIFY` | unset, `587`, `starttls`, `true` | SMTP relay for emailing scheduled reports. Email is off until `SMTP_HOST` and `SMTP_FROM` are set. `SMTP_SECURITY`: `starttls`, `tls` (port 465) or `none`. |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | unset | Optional SMTP login (both or neither). |
+| `SMTP_FROM` | unset | Sender address, e.g. `devops-assistant@example.com`. |
+| `EMAIL_PROVIDER` | `smtp` | `fake` writes messages to `DATA_DIR/outbox/*.eml` instead of sending (`make demo` uses it); `none` turns email off. |
+| `APP_PUBLIC_URL` | unset | URL the app is opened at; emailed reports link to it. |
+
+### Email notifications
+
+A project's schedule can email each report (*Edit project → Schedule → Email the report*): to up to 20 addresses, either after every run or only on problems (a failed or partial run, or a finding at or above the chosen severity; *high* by default). Manual runs are never emailed. The email lists the window, state, finding counts, the 10 most severe findings, the AI summary when there is one, what was not included, and a link to the report when `APP_PUBLIC_URL` is set. *Send test email* checks the SMTP settings; each scheduled run in the analysis history says *emailed*, *not emailed*, *email failed* (reason on hover) or *email not configured*. There are no retries: a failed delivery is recorded and the next scheduled run tries again.
+
+In Docker, an SMTP relay on the host is reached at `host.docker.internal`, not `localhost`.
 
 Without AI, numerical reports are complete. The explanation status is `disabled` (with `AI_PROVIDER=none`) or `not_configured` (when the key or model is missing).
 
@@ -157,6 +168,8 @@ docker compose -f tools/compose/compose.yml cp assistant:/data/backup.sqlite3 ./
 | Report `partial`, a family shows *Source error* | Individual queries timed out or were truncated; each one is listed under *Omitted from this report*. Large scopes may need a quieter time or tighter budgets. |
 | AI `not_configured` | Set `OPENAI_API_KEY` and `OPENAI_MODEL`, or use `AI_PROVIDER=none`. Numerical results are unaffected. |
 | AI `failed (…)` | A provider problem (timeout, rate limit, refusal, invalid output). Findings and evidence are still complete. |
+| Scheduled run shows *email failed* | Hover for the SMTP error. `SMTPAuthenticationError`: check `SMTP_USERNAME`/`SMTP_PASSWORD`. `ConnectionRefusedError`/`TimeoutError`: check `SMTP_HOST`/`SMTP_PORT` (Docker: `host.docker.internal`) and `SMTP_SECURITY` (465 needs `tls`). `SSLCertVerificationError`: install the relay's CA, or for an internal relay set `SMTP_TLS_VERIFY=false`. Use *Send test email* to retry. |
+| Scheduled run shows *email not configured* | Set `SMTP_HOST` and `SMTP_FROM` and restart. |
 | `429 queue_full` | Wait for the running and queued analyses (up to 5 in total). |
 | Container stays `unhealthy` | Check `make logs`: usually an invalid configuration (exit code 2) or an unwritable `/data`. |
 

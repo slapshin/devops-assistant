@@ -153,6 +153,17 @@
             ],
             "title": "Finished At"
           },
+          "notification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Email delivery of a scheduled report (T025); null when none was requested."
+          },
           "report_available": {
             "title": "Report Available",
             "type": "boolean"
@@ -1533,6 +1544,84 @@
         "title": "DetectionMethod",
         "type": "string"
       },
+      "EmailNotification": {
+        "additionalProperties": false,
+        "description": "Email each scheduled report to ``recipients`` when ``when`` matches.",
+        "properties": {
+          "min_severity": {
+            "$ref": "#/components/schemas/Severity",
+            "default": "high",
+            "description": "Lowest finding severity that sends (problems only)."
+          },
+          "recipients": {
+            "description": "Plain email addresses (no display names); duplicates are removed.",
+            "examples": [
+              [
+                "oncall@example.com"
+              ]
+            ],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Recipients",
+            "type": "array"
+          },
+          "when": {
+            "$ref": "#/components/schemas/NotifyWhen",
+            "default": "problems",
+            "description": "always, or problems: failed or partial analyses and findings at or above min_severity."
+          }
+        },
+        "required": [
+          "recipients"
+        ],
+        "title": "EmailNotification",
+        "type": "object"
+      },
+      "EmailTestRequest": {
+        "additionalProperties": false,
+        "description": "Body of POST /api/notifications/test-email.",
+        "properties": {
+          "recipients": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Recipients",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recipients"
+        ],
+        "title": "EmailTestRequest",
+        "type": "object"
+      },
+      "EmailTestResult": {
+        "additionalProperties": false,
+        "properties": {
+          "recipients": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recipients",
+            "type": "array"
+          },
+          "sent_at": {
+            "title": "Sent At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipients",
+          "sent_at"
+        ],
+        "title": "EmailTestResult",
+        "type": "object"
+      },
       "Entity": {
         "additionalProperties": false,
         "description": "Resource identity built from actual labels only; never inferred across namespaces.",
@@ -1689,6 +1778,8 @@
           "end_time_invalid",
           "interrupted_by_restart",
           "job_timeout",
+          "email_not_configured",
+          "email_failed",
           "internal_error",
           "not_implemented"
         ],
@@ -3097,6 +3188,62 @@
         "title": "NoAuth",
         "type": "object"
       },
+      "NotificationOutcome": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why skipped, failed, or not configured.",
+            "title": "Reason"
+          },
+          "recipients": {
+            "description": "Number of recipients addressed.",
+            "minimum": 0.0,
+            "title": "Recipients",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NotificationStatus"
+          }
+        },
+        "required": [
+          "status",
+          "recipients",
+          "at"
+        ],
+        "title": "NotificationOutcome",
+        "type": "object"
+      },
+      "NotificationStatus": {
+        "enum": [
+          "sent",
+          "skipped",
+          "failed",
+          "not_configured"
+        ],
+        "title": "NotificationStatus",
+        "type": "string"
+      },
+      "NotifyWhen": {
+        "enum": [
+          "always",
+          "problems"
+        ],
+        "title": "NotifyWhen",
+        "type": "string"
+      },
       "ObservedValue": {
         "additionalProperties": false,
         "properties": {
@@ -4224,6 +4371,17 @@
         "additionalProperties": false,
         "description": "Run an analysis automatically at ``time`` (local to ``timezone``) on ``weekdays``.\n\nEach run analyses the 24 h ending at the scheduled instant.",
         "properties": {
+          "notify": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailNotification"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Email each scheduled report (T025); null sends nothing."
+          },
           "time": {
             "description": "Local time of day, HH:MM (24 h).",
             "examples": [
@@ -4473,6 +4631,12 @@
           "detector_version": {
             "title": "Detector Version",
             "type": "string"
+          },
+          "email_configured": {
+            "default": false,
+            "description": "Scheduled reports can be emailed (SMTP or fake delivery).",
+            "title": "Email Configured",
+            "type": "boolean"
           },
           "explanation_status": {
             "$ref": "#/components/schemas/ExplanationStatus",
@@ -6285,6 +6449,67 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/notifications/test-email": {
+      "post": {
+        "operationId": "send_test_email_api_notifications_test_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Send Test Email"
       }
     },
     "/api/projects": {

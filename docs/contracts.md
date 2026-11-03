@@ -65,6 +65,7 @@ The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is
 - **Job** (`JobState`): `queued | running | completed | partial | failed | cancelled`. **Stages**: `discovery, collection, detection, trends, explanation, saving`, each `pending | running | done | failed | skipped`.
 - **Explanation**: `disabled | not_configured | pending | succeeded | failed | skipped_no_findings`, separate from the job state.
 - **Report**: `completed | partial`. Failed and cancelled jobs have no report.
+- **Notification** (`NotificationStatus`, T025): `sent | skipped | failed | not_configured`, on `AnalysisJob.notification` for scheduled jobs whose project asks for email; null otherwise. Separate from the job state.
 
 ## Exclusion codes
 
@@ -73,6 +74,8 @@ The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is
 ## Errors and routes
 
 Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-api-conventions), and are visible in `docs/contracts/openapi.json`. Errors are `application/problem+json` with `{type, title, status, detail?, code, errors?}`. Validation errors list `errors[{field, message}]`, where `field` is a dotted location such as `body.matchers.0.name`.
+
+`POST /api/notifications/test-email` (T025) returns `409 email_not_configured` without email delivery and `502 email_failed` when sending fails (the SMTP error in `detail`).
 
 `not_implemented` (501) was a foundation-only code; since T007 no route returns it. Cancelled jobs have `error: null`. An unreadable saved schema returns 404 with `code=schema_unsupported`. `METRICS_URL=synthetic://<healthy|incident|short-history|degraded>` selects the deterministic demo source; its reports carry `source.backend="synthetic"`.
 

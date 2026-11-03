@@ -16,6 +16,7 @@ import {
   cloudflareSource,
   grafanaSource,
   prometheusSource,
+  notifySummary,
   scheduleSummary,
   sentryFilters,
   sentrySource,
@@ -142,6 +143,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
           <template v-if="project.data.value.next_scheduled_run">
             · next <span :title="utcTooltip(project.data.value.next_scheduled_run)">{{ formatTime(project.data.value.next_scheduled_run) }}</span>
           </template>
+          <div v-if="project.data.value.schedule.notify" class="muted">{{ notifySummary(project.data.value.schedule.notify) }}</div>
         </dd>
         <dd v-else class="muted">On demand only</dd>
         <dt>Saved reports</dt>

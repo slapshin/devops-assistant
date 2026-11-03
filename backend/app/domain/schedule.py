@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, field_validator
 
 from app.domain.common import Contract
+from app.domain.notifications import EmailNotification
 
 LOCAL_TIME_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
 DAYS_PER_WEEK = 7
@@ -50,6 +51,9 @@ class ReportSchedule(Contract):
         min_length=1,
         max_length=DAYS_PER_WEEK,
         description="Days to run on; all days by default.",
+    )
+    notify: EmailNotification | None = Field(
+        default=None, description="Email each scheduled report (T025); null sends nothing."
     )
 
     @field_validator("timezone")

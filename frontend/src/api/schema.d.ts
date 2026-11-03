@@ -177,6 +177,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notifications/test-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Test Email */
+        post: operations["send_test_email_api_notifications_test_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -344,6 +361,8 @@ export interface components {
             } | null;
             /** Finished At */
             finished_at?: string | null;
+            /** @description Email delivery of a scheduled report (T025); null when none was requested. */
+            notification?: components["schemas"]["NotificationOutcome"] | null;
             /** Report Available */
             report_available: boolean;
             scope: components["schemas"]["Scope"];
@@ -911,6 +930,45 @@ export interface components {
          */
         DetectionMethod: "relative" | "absolute";
         /**
+         * EmailNotification
+         * @description Email each scheduled report to ``recipients`` when ``when`` matches.
+         */
+        EmailNotification: {
+            /**
+             * @description Lowest finding severity that sends (problems only).
+             * @default high
+             */
+            min_severity: components["schemas"]["Severity"];
+            /**
+             * Recipients
+             * @description Plain email addresses (no display names); duplicates are removed.
+             * @example [
+             *       "oncall@example.com"
+             *     ]
+             */
+            recipients: string[];
+            /**
+             * @description always, or problems: failed or partial analyses and findings at or above min_severity.
+             * @default problems
+             */
+            when: components["schemas"]["NotifyWhen"];
+        };
+        /**
+         * EmailTestRequest
+         * @description Body of POST /api/notifications/test-email.
+         */
+        EmailTestRequest: {
+            /** Recipients */
+            recipients: string[];
+        };
+        /** EmailTestResult */
+        EmailTestResult: {
+            /** Recipients */
+            recipients: string[];
+            /** Sent At */
+            sent_at: string;
+        };
+        /**
          * Entity
          * @description Resource identity built from actual labels only; never inferred across namespaces.
          */
@@ -964,7 +1022,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "credential_not_found" | "credential_name_taken" | "credential_in_use" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "finding_not_found" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "internal_error" | "not_implemented";
+        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "credential_not_found" | "credential_name_taken" | "credential_in_use" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "finding_not_found" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "email_not_configured" | "email_failed" | "internal_error" | "not_implemented";
         /**
          * ErrorKindActivity
          * @description One error kind (Sentry issue) and its error events during a finding on its project.
@@ -1549,6 +1607,32 @@ export interface components {
              */
             type: "none";
         };
+        /** NotificationOutcome */
+        NotificationOutcome: {
+            /** At */
+            at: string;
+            /**
+             * Reason
+             * @description Why skipped, failed, or not configured.
+             */
+            reason?: string | null;
+            /**
+             * Recipients
+             * @description Number of recipients addressed.
+             */
+            recipients: number;
+            status: components["schemas"]["NotificationStatus"];
+        };
+        /**
+         * NotificationStatus
+         * @enum {string}
+         */
+        NotificationStatus: "sent" | "skipped" | "failed" | "not_configured";
+        /**
+         * NotifyWhen
+         * @enum {string}
+         */
+        NotifyWhen: "always" | "problems";
         /** ObservedValue */
         ObservedValue: {
             unit: components["schemas"]["Unit"];
@@ -1959,6 +2043,8 @@ export interface components {
          *     Each run analyses the 24 h ending at the scheduled instant.
          */
         ReportSchedule: {
+            /** @description Email each scheduled report (T025); null sends nothing. */
+            notify?: components["schemas"]["EmailNotification"] | null;
             /**
              * Time
              * @description Local time of day, HH:MM (24 h).
@@ -2064,6 +2150,12 @@ export interface components {
             database_bytes?: number | null;
             /** Detector Version */
             detector_version: string;
+            /**
+             * Email Configured
+             * @description Scheduled reports can be emailed (SMTP or fake delivery).
+             * @default false
+             */
+            email_configured: boolean;
             /** @description disabled, not_configured, or pending (configured, per-report status varies). */
             explanation_status: components["schemas"]["ExplanationStatus"];
             limits: components["schemas"]["Limits"];
@@ -3128,6 +3220,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    send_test_email_api_notifications_test_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTestResult"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
                 };
             };
         };

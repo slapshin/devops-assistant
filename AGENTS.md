@@ -46,6 +46,7 @@ Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source 
 - `app/domain/` — contracts and Protocol interfaces (`MetricsSource`, `SourceProvider`, `Detector`, `ExplanationProvider`, `ReportRepository`, `AnalysisService`, progress/cancellation). Other layers depend on these, not on each other.
 - `app/service.py` — `AnalysisPipeline`, the framework-independent entry point (intended for future CLI/scheduled use too). Freezes one UTC end time `T` per run; stages: discovery → collection (per source, merged; a failing source makes the report `partial`, all failing fails the job) → detection → explanation.
 - `app/scheduler.py` — `ReportScheduler`: background loop that submits each project's due scheduled analyses (`ReportSchedule` in `app/domain/schedule.py`) to the runner.
+- Email notifications (T025): `app/domain/notifications.py` (`EmailNotification` on `ReportSchedule.notify`, `NotificationOutcome` on `AnalysisJob.notification`), `app/notifications/` (`notifier.py` policy + delivery called by `JobRunner` after a scheduled job finishes, `render.py` email content from `ReportSummary`, `transport.py` SMTP via stdlib `smtplib` or the `EMAIL_PROVIDER=fake` outbox), `app/api/notifications.py` (`POST /api/notifications/test-email`). Configured by `SMTP_*`, `EMAIL_PROVIDER`, `APP_PUBLIC_URL`.
 - `app/jobs.py` — bounded in-process runner (1 running, ≤4 queued, timeout, cancellation by task cancel). On startup, interrupted jobs are marked failed.
 - `app/sources/` — one package per source kind plus what they share: `factory.py` (`ProjectSources`: opens a project's sources by kind), `probe.py` (bounded connection test wrapper, family summary), `base.py` (`ClientLimits`, `HISTORY_DAYS`).
 - `app/sources/prometheus/` — `client.py` (HTTP Prometheus API, auth, preserves URL path prefix), `catalog/` (scoped query catalog: `base.py` signal model + template builders; one module per exporter: `host`, `container`, `requests`, `proxy`, `postgres`, `mysql`, `redis`, `nodejs`, `golang`, `seaweedfs`), `promql.py` (every selector carries all project matchers), `source.py` (capability discovery + bounded collection), `synthetic.py` (demo source), `probe.py` (connection test).
@@ -67,7 +68,7 @@ Flow: browser → API → `JobRunner` → `AnalysisPipeline` → metrics source 
 ## Invariants to preserve
 
 - Only `app/ai/openai_adapter.py` may import `openai` (enforced by ruff `TID251`).
-- Numerical findings never depend on AI. AI failure must not change a `completed` job to `failed`/`partial`; explanation status is tracked separately.
+- Numerical findings never depend on AI. AI failure must not change a `completed` job to `failed`/`partial`; explanation status is tracked separately. The same holds for email delivery (`AnalysisJob.notification`).
 - Missing or partial data is never reported as healthy: insufficient coverage/baseline is surfaced as such, and source errors/truncation make a job `partial` with listed exclusions.
 - Baselines use only data preceding the analysed bucket. Severity reflects magnitude/duration; confidence reflects data quality — keep them separate.
 - HTTP 5xx and 4xx are analysed separately; `error_type` alone never makes a request a server failure. Latency requires histogram buckets; count-only data never yields latency.

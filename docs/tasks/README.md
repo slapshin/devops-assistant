@@ -8,6 +8,8 @@ Related metrics for incident investigation (T023) are DONE; their numerical defa
 
 Fast report loading (T024: report summary and per-finding chart data, rounded chart values) is DONE.
 
+Email notifications for scheduled reports (T025: per-schedule recipients and policy, SMTP from the environment) are DONE; the SMTP path is verified against a fake `smtplib.SMTP` only.
+
 ## Ordered backlog
 
 | ID | Task | Dependencies | Status |
@@ -36,6 +38,7 @@ Fast report loading (T024: report summary and per-finding chart data, rounded ch
 | T022 | [Scope diagnostics: what each source's filter selected](T022-scope-diagnostics.md) | T021 | DONE |
 | T023 | [Related metrics for incident investigation](T023-related-metrics.md) | T022 | DONE |
 | T024 | [Fast report loading](T024-report-loading.md) | T023 | DONE |
+| T025 | [Email notifications for scheduled reports](T025-email-notifications.md) | T024 | DONE |
 
 ## How the next agent should work
 
@@ -74,7 +77,7 @@ Shared fixtures allow UI design/prototyping while backend work proceeds, but T00
 - Verify real persistence and restart behavior where essential; mocked storage alone is insufficient.
 - UI work covers loading, empty, error, partial, keyboard, and narrow-screen states.
 - Record what actually ran; never report unavailable live sources or unrun checks as passing.
-- Keep run instructions/configuration current. Public hosting, infrastructure remediation, CLI, and scheduled delivery are outside this release.
+- Keep run instructions/configuration current. Public hosting, infrastructure remediation, and CLI are outside this release; scheduled delivery by email was added in T025.
 - T003 may document an inaccessible source using explicit unverified capabilities. T010 must disclose remaining live-verification gaps even when all fixture-based acceptance passes.
 
 ## Suggested assignment for the next agent

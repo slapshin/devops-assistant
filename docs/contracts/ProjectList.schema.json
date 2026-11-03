@@ -91,6 +91,18 @@
           "default": null,
           "title": "Finished At"
         },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationOutcome"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Email delivery of a scheduled report (T025); null when none was requested."
+        },
         "report_available": {
           "title": "Report Available",
           "type": "boolean"
@@ -376,6 +388,42 @@
       "title": "CustomRuleMode",
       "type": "string"
     },
+    "EmailNotification": {
+      "additionalProperties": false,
+      "description": "Email each scheduled report to ``recipients`` when ``when`` matches.",
+      "properties": {
+        "min_severity": {
+          "$ref": "#/$defs/Severity",
+          "default": "high",
+          "description": "Lowest finding severity that sends (problems only)."
+        },
+        "recipients": {
+          "description": "Plain email addresses (no display names); duplicates are removed.",
+          "examples": [
+            [
+              "oncall@example.com"
+            ]
+          ],
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Recipients",
+          "type": "array"
+        },
+        "when": {
+          "$ref": "#/$defs/NotifyWhen",
+          "default": "problems",
+          "description": "always, or problems: failed or partial analyses and findings at or above min_severity."
+        }
+      },
+      "required": [
+        "recipients"
+      ],
+      "title": "EmailNotification",
+      "type": "object"
+    },
     "ErrorCode": {
       "enum": [
         "validation_error",
@@ -398,6 +446,8 @@
         "end_time_invalid",
         "interrupted_by_restart",
         "job_timeout",
+        "email_not_configured",
+        "email_failed",
         "internal_error",
         "not_implemented"
       ],
@@ -582,6 +632,63 @@
       },
       "title": "NoAuth",
       "type": "object"
+    },
+    "NotificationOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why skipped, failed, or not configured.",
+          "title": "Reason"
+        },
+        "recipients": {
+          "description": "Number of recipients addressed.",
+          "minimum": 0,
+          "title": "Recipients",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/NotificationStatus"
+        }
+      },
+      "required": [
+        "status",
+        "recipients",
+        "at"
+      ],
+      "title": "NotificationOutcome",
+      "type": "object"
+    },
+    "NotificationStatus": {
+      "enum": [
+        "sent",
+        "skipped",
+        "failed",
+        "not_configured"
+      ],
+      "title": "NotificationStatus",
+      "type": "string"
+    },
+    "NotifyWhen": {
+      "enum": [
+        "always",
+        "problems"
+      ],
+      "title": "NotifyWhen",
+      "type": "string"
     },
     "ProjectSummary": {
       "additionalProperties": false,
@@ -796,6 +903,18 @@
       "additionalProperties": false,
       "description": "Run an analysis automatically at ``time`` (local to ``timezone``) on ``weekdays``.\n\nEach run analyses the 24 h ending at the scheduled instant.",
       "properties": {
+        "notify": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EmailNotification"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Email each scheduled report (T025); null sends nothing."
+        },
         "time": {
           "description": "Local time of day, HH:MM (24 h).",
           "examples": [

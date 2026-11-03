@@ -112,6 +112,7 @@ def test_schedule_round_trip_and_validation(tmp_path: Path) -> None:
             "time": "08:00",
             "timezone": "Europe/Berlin",
             "weekdays": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            "notify": None,
         }
         assert project["next_scheduled_run"].endswith(":00:00Z")
 

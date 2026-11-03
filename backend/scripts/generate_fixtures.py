@@ -72,6 +72,7 @@ from app.domain.jobs import (
     ErrorCode,
     JobError,
     JobState,
+    JobTrigger,
     Limits,
     Problem,
     RuntimeConfig,
@@ -80,6 +81,11 @@ from app.domain.jobs import (
     StageStatus,
 )
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
+from app.domain.notifications import (
+    EmailNotification,
+    NotificationOutcome,
+    NotificationStatus,
+)
 from app.domain.projects import (
     ConnectionTest,
     FamilyCapability,
@@ -126,7 +132,10 @@ SCOPE = Scope(
 SCOPE_LABELS = {m.name: m.value for m in SCOPE.matchers}
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
 SCHEDULE = ReportSchedule(
-    time="08:00", timezone="Europe/Berlin", weekdays=[Weekday.MON, Weekday.WED, Weekday.FRI]
+    time="08:00",
+    timezone="Europe/Berlin",
+    weekdays=[Weekday.MON, Weekday.WED, Weekday.FRI],
+    notify=EmailNotification(recipients=["oncall@example.com"], min_severity=Severity.HIGH),
 )
 STEP = timedelta(seconds=STEP_SECONDS)
 CONFIG = DetectorConfig()
@@ -1071,6 +1080,16 @@ def build() -> dict[str, BaseModel]:
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
         "jobs/job_completed.json": completed,
+        "jobs/job_scheduled_emailed.json": completed.model_copy(
+            update={
+                "trigger": JobTrigger.SCHEDULED,
+                "notification": NotificationOutcome(
+                    status=NotificationStatus.SENT,
+                    recipients=1,
+                    at=T + timedelta(minutes=2, seconds=3),
+                ),
+            }
+        ),
         "jobs/job_interrupted.json": job(
             ids["interrupted"],
             JobState.FAILED,

@@ -85,7 +85,8 @@
     "finished_at": null,
     "report_available": false,
     "finding_counts": null,
-    "daily_episodes": null
+    "daily_episodes": null,
+    "notification": null
   },
   "duplicate_of_active": true
 }
