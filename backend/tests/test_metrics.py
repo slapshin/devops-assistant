@@ -270,7 +270,7 @@ def test_counters_are_rated_before_aggregation(defn: Any) -> None:
         assert query[: m.start()].rstrip().endswith(("rate(", "increase(")), query
 
 
-# Proxy, PostgreSQL, MySQL, SeaweedFS and Meilisearch counters exported without a conventional suffix.
+# Proxy, PostgreSQL, MySQL, SeaweedFS and Meilisearch counters without a conventional suffix.
 UNSUFFIXED_COUNTERS = (
     "angie_http_server_zones_responses",
     "angie_connections_dropped",

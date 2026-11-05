@@ -211,7 +211,10 @@ async def test_sub_threshold_change_without_its_own_finding_is_inspectable() -> 
         c for c in result.related_metrics.charts if c.chart_id == latency.candidate.chart_id
     )
 
-    assert not any(f.signal == "latency_p95" for f in result.findings)
+    assert not any(
+        f.signal == "latency_p95" and f.entity.key == latency.candidate.entity.key
+        for f in result.findings
+    )
     assert latency.candidate.finding_id is None
     assert latency.association is ResourceAssociation.SAME_ENTITY
     assert latency.onset_lead_seconds == 600

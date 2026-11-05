@@ -19,8 +19,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.22.1",
-  "config_hash": "4856d4783d08",
+  "detector_version": "detectors-2026.11.05",
+  "config_hash": "f68a407fd3c0",
   "sources": [
     {
       "kind": "grafana",
@@ -115,9 +115,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_820d77f74d3e430e",
+      "finding_id": "fnd_e7668418c5dc18cb",
       "detector": "event:alert_firing_critical",
-      "detector_version": "detectors-2026.10.22.1",
+      "detector_version": "detectors-2026.11.05",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_critical",
@@ -150,7 +150,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_3d7b09cc4e42225c"
+        "evd_515cc34f2a487a36"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -201,9 +201,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_b62616f329ef4870",
+      "finding_id": "fnd_74a8c63269bdf9ef",
       "detector": "event:alert_firing_critical",
-      "detector_version": "detectors-2026.10.22.1",
+      "detector_version": "detectors-2026.11.05",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_critical",
@@ -236,7 +236,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_2475427d60fa9bbe"
+        "evd_8f04128ad7a7903b"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -269,9 +269,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_f1b591c185080d43",
+      "finding_id": "fnd_bcbbf2ed72298ac7",
       "detector": "event:alert_firing",
-      "detector_version": "detectors-2026.10.22.1",
+      "detector_version": "detectors-2026.11.05",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing",
@@ -304,7 +304,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_d74f3df58c6dfd4a"
+        "evd_b60972682a2c78e0"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -338,9 +338,9 @@
       "prior_episode_days": 13
     },
     {
-      "finding_id": "fnd_e39554e175e3bd77",
+      "finding_id": "fnd_21ecc8e98ae60f20",
       "detector": "event:alert_firing_info",
-      "detector_version": "detectors-2026.10.22.1",
+      "detector_version": "detectors-2026.11.05",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_firing_info",
@@ -373,7 +373,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_ec084c02b27174b5"
+        "evd_57b6e13ee1206daf"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -404,9 +404,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_949a2b61412148e5",
+      "finding_id": "fnd_db4a2a69a7aa944d",
       "detector": "event:alert_nodata",
-      "detector_version": "detectors-2026.10.22.1",
+      "detector_version": "detectors-2026.11.05",
       "method": "absolute",
       "family": "alerting",
       "signal": "alert_nodata",
@@ -439,7 +439,7 @@
       "baseline_days": null,
       "baseline_mode": null,
       "evidence_ids": [
-        "evd_106fe5c8ef2bf38b"
+        "evd_6ef383a6d64f4938"
       ],
       "related_finding_ids": [],
       "attributes": {
@@ -493,8 +493,8 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_820d77f74d3e430e",
-          "finding_id": "fnd_820d77f74d3e430e",
+          "episode_id": "eps_e7668418c5dc18cb",
+          "finding_id": "fnd_e7668418c5dc18cb",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-5xx",
@@ -513,8 +513,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_b62616f329ef4870",
-          "finding_id": "fnd_b62616f329ef4870",
+          "episode_id": "eps_74a8c63269bdf9ef",
+          "finding_id": "fnd_74a8c63269bdf9ef",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-5xx",
@@ -533,8 +533,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_f1b591c185080d43",
-          "finding_id": "fnd_f1b591c185080d43",
+          "episode_id": "eps_bcbbf2ed72298ac7",
+          "finding_id": "fnd_bcbbf2ed72298ac7",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-disk",
@@ -553,8 +553,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_e39554e175e3bd77",
-          "finding_id": "fnd_e39554e175e3bd77",
+          "episode_id": "eps_21ecc8e98ae60f20",
+          "finding_id": "fnd_21ecc8e98ae60f20",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-worker",
@@ -573,8 +573,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_949a2b61412148e5",
-          "finding_id": "fnd_949a2b61412148e5",
+          "episode_id": "eps_db4a2a69a7aa944d",
+          "finding_id": "fnd_db4a2a69a7aa944d",
           "entity": {
             "kind": "alert_rule",
             "key": "alert_rule|uid=shop-queue",
@@ -613,7 +613,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_388f04914f5e5bb1",
+          "episode_id": "eps_be18a57c11e11b63",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -653,7 +653,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_adc74bc74df753e6",
+          "episode_id": "eps_8252943be2dc29da",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -693,7 +693,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_ec4e091c79690caa",
+          "episode_id": "eps_44245fc3803e5979",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -733,7 +733,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_5361b43541d680d0",
+          "episode_id": "eps_6f76275af09da1a6",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -773,7 +773,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_56fbea626bdc75c9",
+          "episode_id": "eps_be3bd4abfbcb8d7a",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -813,7 +813,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_739b6f73ecc16888",
+          "episode_id": "eps_8c723d1a96b19b71",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -853,7 +853,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_25f841780540abb0",
+          "episode_id": "eps_4edfa43c550a6e76",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -893,7 +893,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_3c78ec560cd306e2",
+          "episode_id": "eps_d689768794d8b57b",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -933,7 +933,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_addfd7ed8d3ca878",
+          "episode_id": "eps_555693c48b3b97e8",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -973,7 +973,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_71c8e1bd475d5f34",
+          "episode_id": "eps_139c75d473e7f238",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1013,7 +1013,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_95039c8c6c7051b0",
+          "episode_id": "eps_8dfda8e24c07f1fd",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1053,7 +1053,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_c27c75751d064207",
+          "episode_id": "eps_620be44f3c5641e3",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1093,7 +1093,7 @@
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_b0df9c3f40051189",
+          "episode_id": "eps_98f5ed1d3002d039",
           "finding_id": null,
           "entity": {
             "kind": "alert_rule",
@@ -1133,21 +1133,21 @@
         {
           "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_820d77f74d3e430e"
+            "fnd_e7668418c5dc18cb"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Critical Grafana alert firing on Checkout 5xx errors may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_b62616f329ef4870"
+            "fnd_74a8c63269bdf9ef"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Grafana alert firing on Disk almost full may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_f1b591c185080d43"
+            "fnd_bcbbf2ed72298ac7"
           ],
           "likelihood": "possible"
         }
@@ -1156,19 +1156,19 @@
         {
           "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_820d77f74d3e430e"
+            "fnd_e7668418c5dc18cb"
           ]
         },
         {
           "text": "Open the evidence chart for Critical Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_b62616f329ef4870"
+            "fnd_74a8c63269bdf9ef"
           ]
         },
         {
           "text": "Open the evidence chart for Grafana alert firing and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_f1b591c185080d43"
+            "fnd_bcbbf2ed72298ac7"
           ]
         }
       ],
@@ -1406,8 +1406,8 @@
   ],
   "evidence": [
     {
-      "evidence_id": "evd_d74f3df58c6dfd4a",
-      "finding_id": "fnd_f1b591c185080d43",
+      "evidence_id": "evd_b60972682a2c78e0",
+      "finding_id": "fnd_bcbbf2ed72298ac7",
       "series": {
         "series_id": "ser_dd17d96bed1588f7",
         "family": "alerting",
@@ -1894,8 +1894,8 @@
       "threshold_label": "Grafana alert firing: diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_3d7b09cc4e42225c",
-      "finding_id": "fnd_820d77f74d3e430e",
+      "evidence_id": "evd_515cc34f2a487a36",
+      "finding_id": "fnd_e7668418c5dc18cb",
       "series": {
         "series_id": "ser_2aba015a13b8d343",
         "family": "alerting",
@@ -2390,8 +2390,8 @@
       "threshold_label": "Grafana alert firing (severity critical): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_2475427d60fa9bbe",
-      "finding_id": "fnd_b62616f329ef4870",
+      "evidence_id": "evd_8f04128ad7a7903b",
+      "finding_id": "fnd_74a8c63269bdf9ef",
       "series": {
         "series_id": "ser_2aba015a13b8d343",
         "family": "alerting",
@@ -2742,8 +2742,8 @@
       "threshold_label": "Grafana alert firing (severity critical): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_ec084c02b27174b5",
-      "finding_id": "fnd_e39554e175e3bd77",
+      "evidence_id": "evd_57b6e13ee1206daf",
+      "finding_id": "fnd_21ecc8e98ae60f20",
       "series": {
         "series_id": "ser_d7d124f4399fca6e",
         "family": "alerting",
@@ -3374,8 +3374,8 @@
       "threshold_label": "Grafana alert firing (severity info): diagnostic heuristic (not an SLO)"
     },
     {
-      "evidence_id": "evd_106fe5c8ef2bf38b",
-      "finding_id": "fnd_949a2b61412148e5",
+      "evidence_id": "evd_6ef383a6d64f4938",
+      "finding_id": "fnd_db4a2a69a7aa944d",
       "series": {
         "series_id": "ser_4ec1b7e3c79addf3",
         "family": "alerting",
@@ -3990,7 +3990,7 @@
     },
     "evaluations": [
       {
-        "finding_id": "fnd_820d77f74d3e430e",
+        "finding_id": "fnd_e7668418c5dc18cb",
         "state": "evaluated",
         "window": {
           "start": "2026-09-30T04:35:00Z",
@@ -4006,7 +4006,7 @@
         "reasons": []
       },
       {
-        "finding_id": "fnd_b62616f329ef4870",
+        "finding_id": "fnd_74a8c63269bdf9ef",
         "state": "evaluated",
         "window": {
           "start": "2026-09-30T07:35:00Z",
@@ -4027,7 +4027,7 @@
         ]
       },
       {
-        "finding_id": "fnd_f1b591c185080d43",
+        "finding_id": "fnd_bcbbf2ed72298ac7",
         "state": "evaluated",
         "window": {
           "start": "2026-09-30T04:45:00Z",
@@ -4043,7 +4043,7 @@
         "reasons": []
       },
       {
-        "finding_id": "fnd_e39554e175e3bd77",
+        "finding_id": "fnd_21ecc8e98ae60f20",
         "state": "evaluated",
         "window": {
           "start": "2026-09-29T23:45:00Z",
@@ -4059,7 +4059,7 @@
         "reasons": []
       },
       {
-        "finding_id": "fnd_949a2b61412148e5",
+        "finding_id": "fnd_db4a2a69a7aa944d",
         "state": "evaluated",
         "window": {
           "start": "2026-09-30T02:20:00Z",
@@ -4077,8 +4077,8 @@
     ],
     "comparisons": [
       {
-        "comparison_id": "cmp_90814025f9295a43",
-        "finding_id": "fnd_820d77f74d3e430e",
+        "comparison_id": "cmp_6ab39893861f691c",
+        "finding_id": "fnd_e7668418c5dc18cb",
         "rank": 1,
         "anchor": {
           "source": "grafana",
@@ -4094,8 +4094,8 @@
             }
           },
           "unit": "count",
-          "finding_id": "fnd_820d77f74d3e430e",
-          "chart_id": "rch_2fac541bccc446f3"
+          "finding_id": "fnd_e7668418c5dc18cb",
+          "chart_id": "rch_f78ec939ee355d33"
         },
         "candidate": {
           "source": "grafana",
@@ -4111,8 +4111,8 @@
             }
           },
           "unit": "count",
-          "finding_id": "fnd_f1b591c185080d43",
-          "chart_id": "rch_fbd9e8b783f86c4d"
+          "finding_id": "fnd_bcbbf2ed72298ac7",
+          "chart_id": "rch_11226df1d48d6f1d"
         },
         "selection": "Resource association unknown; unusual for 4 steps around the finding.",
         "association": "unknown",
@@ -4142,8 +4142,8 @@
         ]
       },
       {
-        "comparison_id": "cmp_4d5531f5d8992cf5",
-        "finding_id": "fnd_f1b591c185080d43",
+        "comparison_id": "cmp_4a79f24af624240b",
+        "finding_id": "fnd_bcbbf2ed72298ac7",
         "rank": 1,
         "anchor": {
           "source": "grafana",
@@ -4159,8 +4159,8 @@
             }
           },
           "unit": "count",
-          "finding_id": "fnd_f1b591c185080d43",
-          "chart_id": "rch_ffd195687da812bd"
+          "finding_id": "fnd_bcbbf2ed72298ac7",
+          "chart_id": "rch_6f6c836437fe93e3"
         },
         "candidate": {
           "source": "grafana",
@@ -4176,8 +4176,8 @@
             }
           },
           "unit": "count",
-          "finding_id": "fnd_820d77f74d3e430e",
-          "chart_id": "rch_1a0adc660272cf3c"
+          "finding_id": "fnd_e7668418c5dc18cb",
+          "chart_id": "rch_5a25bda886df34c8"
         },
         "selection": "Resource association unknown; unusual for 12 steps around the finding.",
         "association": "unknown",
@@ -4209,7 +4209,108 @@
     ],
     "charts": [
       {
-        "chart_id": "rch_1a0adc660272cf3c",
+        "chart_id": "rch_11226df1d48d6f1d",
+        "series": {
+          "series_id": "ser_dd17d96bed1588f7",
+          "family": "alerting",
+          "signal": "alert_firing",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-disk",
+            "display_name": "Disk almost full",
+            "labels": {
+              "rule_uid": "shop-disk"
+            }
+          },
+          "labels": {
+            "rule_uid": "shop-disk",
+            "alert_folder": "Shop",
+            "alert_group": "Node",
+            "alert_summary": "Less than 10% of the data disk is free"
+          },
+          "unit": "count",
+          "query": "# Grafana alert rule shop-disk: firing instances, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-disk\nGET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end&limit=5000",
+          "step_seconds": 300,
+          "start": "2026-09-30T04:35:00Z",
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "coverage": 1.0,
+          "sample_interval": null,
+          "alert_instances": []
+        },
+        "expected": null,
+        "lower": null,
+        "upper": null,
+        "deviation": null
+      },
+      {
+        "chart_id": "rch_5a25bda886df34c8",
         "series": {
           "series_id": "ser_2aba015a13b8d343",
           "family": "alerting",
@@ -4296,7 +4397,94 @@
         "deviation": null
       },
       {
-        "chart_id": "rch_2fac541bccc446f3",
+        "chart_id": "rch_6f6c836437fe93e3",
+        "series": {
+          "series_id": "ser_dd17d96bed1588f7",
+          "family": "alerting",
+          "signal": "alert_firing",
+          "entity": {
+            "kind": "alert_rule",
+            "key": "alert_rule|uid=shop-disk",
+            "display_name": "Disk almost full",
+            "labels": {
+              "rule_uid": "shop-disk"
+            }
+          },
+          "labels": {
+            "rule_uid": "shop-disk",
+            "alert_folder": "Shop",
+            "alert_group": "Node",
+            "alert_summary": "Less than 10% of the data disk is free"
+          },
+          "unit": "count",
+          "query": "# Grafana alert rule shop-disk: firing instances, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-disk\nGET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end&limit=5000",
+          "step_seconds": 300,
+          "start": "2026-09-30T04:45:00Z",
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "coverage": 1.0,
+          "sample_interval": null,
+          "alert_instances": []
+        },
+        "expected": null,
+        "lower": null,
+        "upper": null,
+        "deviation": null
+      },
+      {
+        "chart_id": "rch_f78ec939ee355d33",
         "series": {
           "series_id": "ser_2aba015a13b8d343",
           "family": "alerting",
@@ -4386,194 +4574,6 @@
             1.0,
             1.0,
             1.0
-          ],
-          "coverage": 1.0,
-          "sample_interval": null,
-          "alert_instances": []
-        },
-        "expected": null,
-        "lower": null,
-        "upper": null,
-        "deviation": null
-      },
-      {
-        "chart_id": "rch_fbd9e8b783f86c4d",
-        "series": {
-          "series_id": "ser_dd17d96bed1588f7",
-          "family": "alerting",
-          "signal": "alert_firing",
-          "entity": {
-            "kind": "alert_rule",
-            "key": "alert_rule|uid=shop-disk",
-            "display_name": "Disk almost full",
-            "labels": {
-              "rule_uid": "shop-disk"
-            }
-          },
-          "labels": {
-            "rule_uid": "shop-disk",
-            "alert_folder": "Shop",
-            "alert_group": "Node",
-            "alert_summary": "Less than 10% of the data disk is free"
-          },
-          "unit": "count",
-          "query": "# Grafana alert rule shop-disk: firing instances, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-disk\nGET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end&limit=5000",
-          "step_seconds": 300,
-          "start": "2026-09-30T04:35:00Z",
-          "values": [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "coverage": 1.0,
-          "sample_interval": null,
-          "alert_instances": []
-        },
-        "expected": null,
-        "lower": null,
-        "upper": null,
-        "deviation": null
-      },
-      {
-        "chart_id": "rch_ffd195687da812bd",
-        "series": {
-          "series_id": "ser_dd17d96bed1588f7",
-          "family": "alerting",
-          "signal": "alert_firing",
-          "entity": {
-            "kind": "alert_rule",
-            "key": "alert_rule|uid=shop-disk",
-            "display_name": "Disk almost full",
-            "labels": {
-              "rule_uid": "shop-disk"
-            }
-          },
-          "labels": {
-            "rule_uid": "shop-disk",
-            "alert_folder": "Shop",
-            "alert_group": "Node",
-            "alert_summary": "Less than 10% of the data disk is free"
-          },
-          "unit": "count",
-          "query": "# Grafana alert rule shop-disk: firing instances, instances: project=\"shop\"\nGET /api/prometheus/grafana/api/v1/rules?rule_uid=shop-disk\nGET /api/annotations?type=alert&alertUID=shop-disk&from=$start&to=$end&limit=5000",
-          "step_seconds": 300,
-          "start": "2026-09-30T04:45:00Z",
-          "values": [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0
           ],
           "coverage": 1.0,
           "sample_interval": null,

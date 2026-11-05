@@ -400,10 +400,13 @@ async def test_rule_description_is_given_to_the_explanation() -> None:
     described = rule(description="Orders rejected by the payment provider.")
     report = await run("incident", [described])
 
+    # Custom findings first, so the input's size cap cannot leave them out.
+    findings = sorted(report.findings, key=lambda f: f.family is not SignalFamily.CUSTOM)
+
     payload, _ = build_input(
         SCOPE,
         WINDOWS.latest_day,
-        report.findings,
+        findings,
         report.coverage,
         custom_rules=report.custom_rules,
     )

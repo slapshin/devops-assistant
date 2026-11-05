@@ -25,8 +25,8 @@
     "step_seconds": 300
   },
   "generated_at": "2026-09-30T10:05:00Z",
-  "detector_version": "detectors-2026.10.22.1",
-  "config_hash": "4856d4783d08",
+  "detector_version": "detectors-2026.11.05",
+  "config_hash": "f68a407fd3c0",
   "sources": [
     {
       "kind": "prometheus",
@@ -2579,6 +2579,404 @@
     },
     {
       "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "meilisearch_search_requests",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "meilisearch_search_5xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "meilisearch_search_4xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "meilisearch_search_404",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "meilisearch_search_latency_p95",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_response_time_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_response_time_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "meilisearch_search_latency_p99",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_response_time_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_response_time_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_traffic",
+      "signal": "meilisearch_documents_requests",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "request_failures",
+      "signal": "meilisearch_documents_5xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "meilisearch_documents_4xx",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "client_errors",
+      "signal": "meilisearch_documents_404",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_requests_total"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "meilisearch_documents_latency_p95",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_response_time_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_response_time_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "latency",
+      "signal": "meilisearch_documents_latency_p99",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_http_response_time_seconds_bucket"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_http_response_time_seconds_bucket"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "search",
+      "signal": "meilisearch_degraded_searches",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_degraded_search_requests"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "api"
+      ],
+      "observed_metrics": [
+        "meilisearch_degraded_search_requests"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "search",
+      "signal": "meilisearch_task_queue_latency",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_task_queue_latency_seconds"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "meilisearch_task_queue_latency_seconds"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "search",
+      "signal": "meilisearch_enqueued_tasks",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_nb_tasks"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "meilisearch_nb_tasks"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "search",
+      "signal": "meilisearch_failed_tasks",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_nb_tasks"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "meilisearch_nb_tasks"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "search",
+      "signal": "meilisearch_task_db_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_task_queue_used_size",
+        "meilisearch_task_queue_size_until_stop_registering"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "meilisearch_task_queue_used_size",
+        "meilisearch_task_queue_size_until_stop_registering"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "search",
+      "signal": "meilisearch_search_queue_used_ratio",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_searches_waiting_to_be_processed",
+        "meilisearch_search_queue_size"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance"
+      ],
+      "observed_metrics": [
+        "meilisearch_searches_waiting_to_be_processed",
+        "meilisearch_search_queue_size"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
+      "family": "search",
+      "signal": "meilisearch_index_documents",
+      "status": "supported",
+      "verified": true,
+      "required_metrics": [
+        "meilisearch_index_docs_count"
+      ],
+      "required_labels": [
+        "project",
+        "job",
+        "instance",
+        "index"
+      ],
+      "observed_metrics": [
+        "meilisearch_index_docs_count"
+      ],
+      "reason": null,
+      "history_days": 28.0
+    },
+    {
+      "source": "prometheus",
       "family": "custom",
       "signal": "custom_checkout_failures",
       "status": "supported",
@@ -2743,8 +3141,8 @@
       "family": "request_traffic",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 7,
-      "total_series": 7,
+      "evaluated_series": 9,
+      "total_series": 9,
       "baseline_days": 14,
       "reasons": [
         {
@@ -2769,8 +3167,8 @@
       "family": "request_failures",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 5,
-      "total_series": 6,
+      "evaluated_series": 6,
+      "total_series": 8,
       "baseline_days": 14,
       "reasons": [
         {
@@ -2791,8 +3189,8 @@
       "family": "client_errors",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 12,
-      "total_series": 12,
+      "evaluated_series": 16,
+      "total_series": 16,
       "baseline_days": 14,
       "reasons": [
         {
@@ -2817,8 +3215,8 @@
       "family": "latency",
       "status": "no_anomaly",
       "capability": "supported",
-      "evaluated_series": 6,
-      "total_series": 7,
+      "evaluated_series": 7,
+      "total_series": 9,
       "baseline_days": 14,
       "reasons": [
         {
@@ -2923,6 +3321,15 @@
       "reasons": []
     },
     {
+      "family": "search",
+      "status": "no_anomaly",
+      "capability": "supported",
+      "evaluated_series": 7,
+      "total_series": 7,
+      "baseline_days": 14,
+      "reasons": []
+    },
+    {
       "family": "custom",
       "status": "anomalous",
       "capability": "supported",
@@ -2934,9 +3341,9 @@
   ],
   "findings": [
     {
-      "finding_id": "fnd_9f4a16dc0f74dfe7",
+      "finding_id": "fnd_f07fc3689d4a6e28",
       "detector": "level:custom_email_queue",
-      "detector_version": "detectors-2026.10.22.1",
+      "detector_version": "detectors-2026.11.05",
       "method": "absolute",
       "family": "custom",
       "signal": "custom_email_queue",
@@ -2974,10 +3381,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_210d1e36a4360dc3"
+        "evd_d3bd50de72835edc"
       ],
       "related_finding_ids": [
-        "fnd_b6d9abcbd0f32184"
+        "fnd_40c69a4b8e55f6e0"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -2987,9 +3394,9 @@
       "prior_episode_days": 0
     },
     {
-      "finding_id": "fnd_b6d9abcbd0f32184",
+      "finding_id": "fnd_40c69a4b8e55f6e0",
       "detector": "level:custom_checkout_failures",
-      "detector_version": "detectors-2026.10.22.1",
+      "detector_version": "detectors-2026.11.05",
       "method": "relative",
       "family": "custom",
       "signal": "custom_checkout_failures",
@@ -3027,10 +3434,10 @@
       "baseline_days": 14,
       "baseline_mode": "time_of_day",
       "evidence_ids": [
-        "evd_1a1e1b65ff42f505"
+        "evd_ca65787a709cf105"
       ],
       "related_finding_ids": [
-        "fnd_9f4a16dc0f74dfe7"
+        "fnd_f07fc3689d4a6e28"
       ],
       "attributes": {},
       "alert_instances": [],
@@ -3054,14 +3461,14 @@
       "affected_entities": [
         "custom|job=checkout-api"
       ],
-      "observed_entity_minutes": 46080,
-      "anomalous_share": 0.001302,
+      "observed_entity_minutes": 51840,
+      "anomalous_share": 0.001157,
       "baseline_days_used": 14,
       "coverage": 1.0,
       "episodes": [
         {
-          "episode_id": "eps_9f4a16dc0f74dfe7",
-          "finding_id": "fnd_9f4a16dc0f74dfe7",
+          "episode_id": "eps_f07fc3689d4a6e28",
+          "finding_id": "fnd_f07fc3689d4a6e28",
           "entity": {
             "kind": "custom",
             "key": "custom|job=checkout-api",
@@ -3080,8 +3487,8 @@
           "unit": "count"
         },
         {
-          "episode_id": "eps_b6d9abcbd0f32184",
-          "finding_id": "fnd_b6d9abcbd0f32184",
+          "episode_id": "eps_40c69a4b8e55f6e0",
+          "finding_id": "fnd_40c69a4b8e55f6e0",
           "entity": {
             "kind": "custom",
             "key": "custom|job=checkout-api",
@@ -3112,7 +3519,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3129,7 +3536,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3146,7 +3553,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3163,7 +3570,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3180,7 +3587,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3197,7 +3604,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3214,7 +3621,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3231,7 +3638,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3248,7 +3655,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3265,7 +3672,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3282,7 +3689,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3299,7 +3706,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3316,7 +3723,7 @@
       "anomalous_minutes": 0,
       "peak_severity": null,
       "affected_entities": [],
-      "observed_entity_minutes": 46080,
+      "observed_entity_minutes": 51840,
       "anomalous_share": 0.0,
       "baseline_days_used": 14,
       "coverage": 1.0,
@@ -3326,7 +3733,7 @@
   "trend_summary": {
     "direction": "stable",
     "confidence": "high",
-    "recent_share": 0.000186,
+    "recent_share": 0.000165,
     "previous_share": 0.0,
     "recent_episodes": 2,
     "previous_episodes": 0,
@@ -3341,14 +3748,14 @@
         {
           "text": "E-mail queue depth at or above 2000 (threshold) on checkout-api may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_9f4a16dc0f74dfe7"
+            "fnd_f07fc3689d4a6e28"
           ],
           "likelihood": "possible"
         },
         {
           "text": "Checkout failures above expected range on checkout-api may reflect a workload or configuration change around its start time.",
           "finding_ids": [
-            "fnd_b6d9abcbd0f32184"
+            "fnd_40c69a4b8e55f6e0"
           ],
           "likelihood": "possible"
         }
@@ -3357,13 +3764,13 @@
         {
           "text": "Open the evidence chart for E-mail queue depth at or above 2000 (threshold) and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_9f4a16dc0f74dfe7"
+            "fnd_f07fc3689d4a6e28"
           ]
         },
         {
           "text": "Open the evidence chart for Checkout failures above expected range and compare with deploy and log history.",
           "finding_ids": [
-            "fnd_b6d9abcbd0f32184"
+            "fnd_40c69a4b8e55f6e0"
           ]
         }
       ],
@@ -3415,7 +3822,7 @@
   "diagnostics": [
     {
       "kind": "prometheus",
-      "summary": "12 storages, 6 databases, 2 nodes, 2 filesystems, 2 routes, 2 containers, 2 proxies, 2 processes, 1 upstream, 1 custom, 121 series",
+      "summary": "12 storages, 10 databases, 2 nodes, 2 filesystems, 2 routes, 2 containers, 2 proxies, 2 processes, 1 upstream, 1 custom, 140 series",
       "selection": [
         {
           "display_name": "redis · redis://redis-replica:6379",
@@ -3457,6 +3864,24 @@
           ]
         },
         {
+          "display_name": "meilisearch · 10.0.1.16:7700 · search",
+          "labels": {
+            "kind": "database",
+            "job": "meilisearch",
+            "instance": "10.0.1.16:7700",
+            "api": "search"
+          },
+          "count": 7,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "request_failures",
+            "client_errors",
+            "latency",
+            "search"
+          ]
+        },
+        {
           "display_name": "mysql · mysql-primary:9104",
           "labels": {
             "kind": "database",
@@ -3480,6 +3905,23 @@
           "unit": "series",
           "families": [
             "golang"
+          ]
+        },
+        {
+          "display_name": "meilisearch · 10.0.1.16:7700 · documents",
+          "labels": {
+            "kind": "database",
+            "job": "meilisearch",
+            "instance": "10.0.1.16:7700",
+            "api": "documents"
+          },
+          "count": 6,
+          "unit": "series",
+          "families": [
+            "request_traffic",
+            "request_failures",
+            "client_errors",
+            "latency"
           ]
         },
         {
@@ -3590,6 +4032,19 @@
             "request_traffic",
             "client_errors",
             "latency"
+          ]
+        },
+        {
+          "display_name": "meilisearch · 10.0.1.16:7700",
+          "labels": {
+            "kind": "database",
+            "job": "meilisearch",
+            "instance": "10.0.1.16:7700"
+          },
+          "count": 5,
+          "unit": "series",
+          "families": [
+            "search"
           ]
         },
         {
@@ -3722,6 +4177,20 @@
           "unit": "series",
           "families": [
             "storage"
+          ]
+        },
+        {
+          "display_name": "meilisearch · 10.0.1.16:7700 · products",
+          "labels": {
+            "kind": "database",
+            "job": "meilisearch",
+            "instance": "10.0.1.16:7700",
+            "index": "products"
+          },
+          "count": 1,
+          "unit": "series",
+          "families": [
+            "search"
           ]
         },
         {
@@ -3862,7 +4331,7 @@
           ]
         }
       ],
-      "selection_total": 32,
+      "selection_total": 36,
       "samples": [
         {
           "project": "shop",
@@ -3898,8 +4367,8 @@
         {
           "part": "project=\"shop\"",
           "field": "matcher",
-          "matched": 121,
-          "matched_without": 121,
+          "matched": 140,
+          "matched_without": 140,
           "unit": "series",
           "available": [
             "shop"
@@ -3996,6 +4465,25 @@
         "label_replace(sum by (job) (rate(SeaweedFS_filerStore_request_total{project=\"shop\"}[5m])), \"api\", \"filer_store\", \"\", \"\")",
         "histogram_quantile(0.95, label_replace(sum by (job, le) (rate(SeaweedFS_filerStore_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"filer_store\", \"\", \"\"))",
         "histogram_quantile(0.99, label_replace(sum by (job, le) (rate(SeaweedFS_filerStore_request_seconds_bucket{project=\"shop\"}[5m])), \"api\", \"filer_store\", \"\", \"\"))",
+        "max by (job, instance) (max_over_time(meilisearch_task_queue_latency_seconds{project=\"shop\"}[5m]))",
+        "max by (job, instance) (meilisearch_nb_tasks{project=\"shop\", kind=\"statuses\", value=\"enqueued\"})",
+        "max by (job, instance) (meilisearch_nb_tasks{project=\"shop\", kind=\"statuses\", value=\"failed\"})",
+        "max by (job, instance) (meilisearch_task_queue_used_size{project=\"shop\"}) / ((max by (job, instance) (meilisearch_task_queue_used_size{project=\"shop\"}) + max by (job, instance) (meilisearch_task_queue_size_until_stop_registering{project=\"shop\"})) > 0)",
+        "max by (job, instance) (max_over_time(meilisearch_searches_waiting_to_be_processed{project=\"shop\"}[5m])) / (max by (job, instance) (meilisearch_search_queue_size{project=\"shop\"}) > 0)",
+        "max by (job, instance, index) (meilisearch_index_docs_count{project=\"shop\"})",
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{project=\"shop\", path=~\"/multi-search|/indexes/[^/]+/(search|facet-search|similar)\"}[5m])), \"api\", \"search\", \"\", \"\")",
+        "label_replace(sum by (job, instance) (rate(meilisearch_degraded_search_requests{project=\"shop\"}[5m])), \"api\", \"search\", \"\", \"\")",
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{project=\"shop\", path=~\"/multi-search|/indexes/[^/]+/(search|facet-search|similar)\", status=~\"5..\"}[5m])), \"api\", \"search\", \"\", \"\")",
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{project=\"shop\", path=~\"/multi-search|/indexes/[^/]+/(search|facet-search|similar)\", status=\"404\"}[5m])), \"api\", \"search\", \"\", \"\")",
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{project=\"shop\", path=~\"/multi-search|/indexes/[^/]+/(search|facet-search|similar)\", status=~\"4..\"}[5m])), \"api\", \"search\", \"\", \"\")",
+        "histogram_quantile(0.95, label_replace(sum by (job, instance, le) (rate(meilisearch_http_response_time_seconds_bucket{project=\"shop\", path=~\"/multi-search|/indexes/[^/]+/(search|facet-search|similar)\"}[5m])), \"api\", \"search\", \"\", \"\"))",
+        "histogram_quantile(0.99, label_replace(sum by (job, instance, le) (rate(meilisearch_http_response_time_seconds_bucket{project=\"shop\", path=~\"/multi-search|/indexes/[^/]+/(search|facet-search|similar)\"}[5m])), \"api\", \"search\", \"\", \"\"))",
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{project=\"shop\", path=~\"/indexes/[^/]+/documents(/.*)?\"}[5m])), \"api\", \"documents\", \"\", \"\")",
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{project=\"shop\", path=~\"/indexes/[^/]+/documents(/.*)?\", status=~\"5..\"}[5m])), \"api\", \"documents\", \"\", \"\")",
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{project=\"shop\", path=~\"/indexes/[^/]+/documents(/.*)?\", status=\"404\"}[5m])), \"api\", \"documents\", \"\", \"\")",
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{project=\"shop\", path=~\"/indexes/[^/]+/documents(/.*)?\", status=~\"4..\"}[5m])), \"api\", \"documents\", \"\", \"\")",
+        "histogram_quantile(0.95, label_replace(sum by (job, instance, le) (rate(meilisearch_http_response_time_seconds_bucket{project=\"shop\", path=~\"/indexes/[^/]+/documents(/.*)?\"}[5m])), \"api\", \"documents\", \"\", \"\"))",
+        "histogram_quantile(0.99, label_replace(sum by (job, instance, le) (rate(meilisearch_http_response_time_seconds_bucket{project=\"shop\", path=~\"/indexes/[^/]+/documents(/.*)?\"}[5m])), \"api\", \"documents\", \"\", \"\"))",
         "sum by (job) (rate(shop_orders_failed_total{project=\"shop\"}[5m]))",
         "max by (job) (shop_email_queue_messages{project=\"shop\"})"
       ],
@@ -4004,8 +4492,8 @@
   ],
   "evidence": [
     {
-      "evidence_id": "evd_1a1e1b65ff42f505",
-      "finding_id": "fnd_b6d9abcbd0f32184",
+      "evidence_id": "evd_ca65787a709cf105",
+      "finding_id": "fnd_40c69a4b8e55f6e0",
       "series": {
         "series_id": "ser_f310787fa4200236",
         "family": "custom",
@@ -4522,8 +5010,8 @@
       "threshold_label": null
     },
     {
-      "evidence_id": "evd_210d1e36a4360dc3",
-      "finding_id": "fnd_9f4a16dc0f74dfe7",
+      "evidence_id": "evd_d3bd50de72835edc",
+      "finding_id": "fnd_f07fc3689d4a6e28",
       "series": {
         "series_id": "ser_f5978005d3905001",
         "family": "custom",
@@ -5052,7 +5540,7 @@
     },
     "evaluations": [
       {
-        "finding_id": "fnd_9f4a16dc0f74dfe7",
+        "finding_id": "fnd_f07fc3689d4a6e28",
         "state": "evaluated",
         "window": {
           "start": "2026-09-30T04:05:00Z",
@@ -5068,7 +5556,7 @@
         "reasons": []
       },
       {
-        "finding_id": "fnd_b6d9abcbd0f32184",
+        "finding_id": "fnd_40c69a4b8e55f6e0",
         "state": "evaluated",
         "window": {
           "start": "2026-09-30T04:05:00Z",
@@ -5086,8 +5574,8 @@
     ],
     "comparisons": [
       {
-        "comparison_id": "cmp_b85374d4b9ee483a",
-        "finding_id": "fnd_9f4a16dc0f74dfe7",
+        "comparison_id": "cmp_62d4420bcec7b97c",
+        "finding_id": "fnd_f07fc3689d4a6e28",
         "rank": 1,
         "anchor": {
           "source": "prometheus",
@@ -5103,8 +5591,8 @@
             }
           },
           "unit": "count",
-          "finding_id": "fnd_9f4a16dc0f74dfe7",
-          "chart_id": "rch_f1c8c931144a1eea"
+          "finding_id": "fnd_f07fc3689d4a6e28",
+          "chart_id": "rch_b36cd2c6b00aeea4"
         },
         "candidate": {
           "source": "prometheus",
@@ -5120,8 +5608,8 @@
             }
           },
           "unit": "per_second",
-          "finding_id": "fnd_b6d9abcbd0f32184",
-          "chart_id": "rch_32c923fd45b8fe68"
+          "finding_id": "fnd_40c69a4b8e55f6e0",
+          "chart_id": "rch_6fea8d01ee46dbff"
         },
         "selection": "Same resource; deviations move together (r = +1.00).",
         "association": "same_entity",
@@ -5151,8 +5639,8 @@
         ]
       },
       {
-        "comparison_id": "cmp_2d7b9c39d4fd1163",
-        "finding_id": "fnd_b6d9abcbd0f32184",
+        "comparison_id": "cmp_be3522576fed246b",
+        "finding_id": "fnd_40c69a4b8e55f6e0",
         "rank": 1,
         "anchor": {
           "source": "prometheus",
@@ -5168,8 +5656,8 @@
             }
           },
           "unit": "per_second",
-          "finding_id": "fnd_b6d9abcbd0f32184",
-          "chart_id": "rch_32c923fd45b8fe68"
+          "finding_id": "fnd_40c69a4b8e55f6e0",
+          "chart_id": "rch_6fea8d01ee46dbff"
         },
         "candidate": {
           "source": "prometheus",
@@ -5185,8 +5673,8 @@
             }
           },
           "unit": "count",
-          "finding_id": "fnd_9f4a16dc0f74dfe7",
-          "chart_id": "rch_f1c8c931144a1eea"
+          "finding_id": "fnd_f07fc3689d4a6e28",
+          "chart_id": "rch_b36cd2c6b00aeea4"
         },
         "selection": "Same resource; deviations move together (r = +1.00).",
         "association": "same_entity",
@@ -5218,7 +5706,7 @@
     ],
     "charts": [
       {
-        "chart_id": "rch_32c923fd45b8fe68",
+        "chart_id": "rch_6fea8d01ee46dbff",
         "series": {
           "series_id": "ser_f310787fa4200236",
           "family": "custom",
@@ -5555,7 +6043,7 @@
         ]
       },
       {
-        "chart_id": "rch_f1c8c931144a1eea",
+        "chart_id": "rch_b36cd2c6b00aeea4",
         "series": {
           "series_id": "ser_f5978005d3905001",
           "family": "custom",

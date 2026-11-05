@@ -5380,6 +5380,7 @@
           "nodejs",
           "golang",
           "storage",
+          "search",
           "edge",
           "security",
           "app_errors",

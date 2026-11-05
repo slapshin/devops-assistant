@@ -2561,7 +2561,7 @@ export interface components {
          * SignalFamily
          * @enum {string}
          */
-        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "nodejs" | "golang" | "storage" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity" | "alerting" | "custom";
+        SignalFamily: "cpu" | "memory" | "filesystem" | "disk_io" | "network" | "container" | "request_traffic" | "request_failures" | "client_errors" | "latency" | "proxy" | "database" | "nodejs" | "golang" | "storage" | "search" | "edge" | "security" | "app_errors" | "app_performance" | "host_security" | "file_integrity" | "alerting" | "custom";
         /**
          * SignalStatus
          * @enum {string}
