@@ -26,7 +26,7 @@ Every report URL can be shared and reloaded and works after a process restart, b
 
 Visual design: the "DevOps Assistant UI" canvas in Claude Design (Overview, Findings + evidence, Trends boards). It is a dense, Grafana-like dashboard: IBM Plex Sans/Mono (self-hosted via `@fontsource`, no external font requests), panels on a 24-column grid, 4 px radii, solid severity fills for stat panels and chips.
 
-Every page has a left **icon rail** (home, Projects, and Overview / Findings / Timeline / Trends / Scope while a report is open; a top row below 700 px; above 700 px it stays in view while scrolling and its bottom button hides it, leaving a small *Show navigation* button in the bottom-left corner, remembered per browser in `localStorage`) and a **top bar** with breadcrumbs (`Projects › <project> › <page>`), page badges such as *Synthetic data*, and the theme switch.
+Every page has a left **navigation** (home, Projects, Credentials, Notification channels, and a *Report* group with Overview / Findings / Timeline / Trends / Scope while a report is open). Above 700 px it stays in view while scrolling and is either expanded (icon and title per item) or collapsed to an icon rail with tooltips; the button at its bottom switches between them and the choice is remembered per browser in `localStorage`. Below 700 px it is a top row of icons. Every page also has a **top bar** with breadcrumbs (`Projects › <project> › <page>`), page badges such as *Synthetic data*, and the theme switch.
 
 Report routes add a toolbar and tabs under the top bar:
 

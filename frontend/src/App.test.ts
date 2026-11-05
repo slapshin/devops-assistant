@@ -1783,18 +1783,22 @@ describe("theme", () => {
 });
 
 describe("navigation rail", () => {
-  it("hides and shows the left rail and remembers the choice", async () => {
+  it("collapses to icons and expands to titled items, remembering the choice", async () => {
     await renderAt("/");
-    await screen.findByRole("navigation", { name: "App" });
+    const nav = await screen.findByRole("navigation", { name: "App" });
 
-    await fireEvent.click(screen.getByRole("button", { name: "Hide navigation" }));
+    expect(within(nav).getByText("Credentials")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Credentials" })).not.toHaveAttribute("title");
 
-    expect(screen.queryByRole("navigation", { name: "App" })).not.toBeInTheDocument();
-    expect(localStorage.getItem("assistant.rail")).toBe("hidden");
+    await fireEvent.click(within(nav).getByRole("button", { name: "Collapse navigation" }));
 
-    await fireEvent.click(screen.getByRole("button", { name: "Show navigation" }));
+    expect(nav).toHaveClass("collapsed");
+    expect(within(nav).getByRole("link", { name: "Credentials" })).toHaveAttribute("title", "Credentials");
+    expect(localStorage.getItem("assistant.rail")).toBe("collapsed");
 
-    expect(screen.getByRole("navigation", { name: "App" })).toBeInTheDocument();
+    await fireEvent.click(within(nav).getByRole("button", { name: "Expand navigation" }));
+
+    expect(nav).not.toHaveClass("collapsed");
     expect(localStorage.getItem("assistant.rail")).toBeNull();
   });
 });

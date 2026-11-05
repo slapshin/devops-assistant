@@ -2,24 +2,24 @@ import { ref, watch } from "vue";
 
 const RAIL_STORAGE_KEY = "assistant.rail";
 
-function readHidden(): boolean {
+function readCollapsed(): boolean {
   try {
-    return localStorage.getItem(RAIL_STORAGE_KEY) === "hidden";
+    return localStorage.getItem(RAIL_STORAGE_KEY) === "collapsed";
   } catch {
     return false;
   }
 }
 
-function persistHidden(hidden: boolean) {
+function persistCollapsed(collapsed: boolean) {
   try {
-    if (hidden) localStorage.setItem(RAIL_STORAGE_KEY, "hidden");
+    if (collapsed) localStorage.setItem(RAIL_STORAGE_KEY, "collapsed");
     else localStorage.removeItem(RAIL_STORAGE_KEY);
   } catch {
     /* storage unavailable: keep in memory */
   }
 }
 
-/** Whether the left navigation rail is hidden; a per-viewer convenience kept in localStorage. */
-export const railHidden = ref<boolean>(readHidden());
+/** Whether the left navigation shows icons only; a per-viewer convenience kept in localStorage. */
+export const railCollapsed = ref<boolean>(readCollapsed());
 
-watch(railHidden, persistHidden);
+watch(railCollapsed, persistCollapsed);
