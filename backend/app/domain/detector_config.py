@@ -10,7 +10,7 @@ from pydantic import Field
 
 from app.domain.common import STEP_SECONDS, Contract
 
-DETECTOR_VERSION = "detectors-2026.10.22.1"
+DETECTOR_VERSION = "detectors-2026.11.05"
 CONFIG_HASH_HEX_CHARS = 12
 
 
@@ -116,6 +116,28 @@ _DEFAULT_SIGNALS: dict[str, SignalThresholds] = {
         absolute_min_minutes=5,
     ),
     "storage_read_only_volumes": _T(min_abs_effect=1.0, abs_floor=0.5),
+    "search_degraded_ratio": _T(
+        min_abs_effect=0.01, abs_floor=0.001, absolute_high=0.05, absolute_min_minutes=10
+    ),
+    "search_queue_ratio": _T(
+        min_abs_effect=0.10,
+        abs_floor=0.01,
+        absolute_high=0.50,
+        absolute_critical=0.90,
+        absolute_min_minutes=5,
+    ),
+    "search_task_queue_latency": _T(
+        min_rel_factor=2.0, min_abs_effect=120.0, abs_floor=5.0, absolute_high=1800.0
+    ),
+    "search_task_backlog": _T(min_rel_factor=2.0, min_abs_effect=100.0, abs_floor=1.0),
+    "search_task_db_ratio": _T(
+        min_abs_effect=0.05,
+        abs_floor=0.005,
+        absolute_high=0.80,
+        absolute_critical=0.95,
+        absolute_min_minutes=5,
+    ),
+    "search_index_documents": _T(min_rel_factor=1.1, min_abs_effect=100.0, abs_floor=1.0),
     "storage_assign_errors": _T(min_rel_factor=2.0, min_abs_effect=0.05, abs_floor=0.01),
     "storage_filer_failures": _T(min_rel_factor=2.0, min_abs_effect=0.05, abs_floor=0.01),
     "edge_origin_error_ratio": _T(

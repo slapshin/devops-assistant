@@ -78,6 +78,7 @@ SEAWEEDFS_MASTER = {"job": "seaweedfs-master"}
 SEAWEEDFS_VOLUMES = [
     {"job": "seaweedfs-volume", "instance": f"10.0.2.{i}:9327"} for i in (11, 12, 13)
 ]
+MEILISEARCH = {"job": "meilisearch", "instance": "10.0.1.16:7700"}
 QUIET_ROUTE = {
     "job": SERVICE_JOB,
     "http_route": "/internal/order-sla",
@@ -140,6 +141,11 @@ class Scenario:
     seaweedfs_disk_full: bool = False
     """One volume server's disk fills for 1 h, ending 11 h before T: its volumes turn read-only,
     the master fails volume assignments and S3 uploads fail with 5xx."""
+    meilisearch: bool = True
+    """A Meilisearch server with one `products` index, searched and continuously updated."""
+    meilisearch_indexing_stall: bool = False
+    """Meilisearch indexing stalls for 1 h, ending 5 h before T: tasks pile up and wait 25 min,
+    some fail, and searches slow down and hit the search cutoff more often."""
     recurring_404_days: tuple[int, ...] = ()
     """Trend buckets (1..13) with an extra 404 burst, for recurrence."""
     custom_incident: bool = False
@@ -162,6 +168,7 @@ SCENARIOS: dict[str, Scenario] = {
         nodejs_event_loop_block=True,
         go_goroutine_leak=True,
         seaweedfs_disk_full=True,
+        meilisearch_indexing_stall=True,
         custom_incident=True,
     ),
     "short-history": Scenario(history_days=5, cpu_load=True, histogram=False),
@@ -268,6 +275,8 @@ def build_series(
         _add_go_series(builder, gen)
     if scenario.seaweedfs:
         _add_seaweedfs_series(builder, gen)
+    if scenario.meilisearch:
+        _add_meilisearch_series(builder, gen)
     for rule in custom_rules:
         _add_custom_series(builder, scenario, rule)
 
@@ -559,6 +568,56 @@ def _add_seaweedfs_series(builder: _SeriesBuilder, gen: _Gen) -> None:
     builder.add("seaweedfs_filer_store_latency_p99", store, gen.available(store_p95 * 3))
 
 
+def _add_meilisearch_series(builder: _SeriesBuilder, gen: _Gen) -> None:
+    stall = slice(N - 72, N - 60)
+    stalled = gen.scenario.meilisearch_indexing_stall
+    queue_latency = np.clip(gen.base(90.0, 10.0, 5.0), 0, None)
+    enqueued = np.round(np.clip(gen.base(2.0, 1.0, 1.0), 0, None))
+    failed = np.full(N, 4.0)
+    task_db = np.clip(gen.base(0.40, 0.0, 0.002), 0, 1)
+    search_queue = np.clip(gen.base(0.001, 0.0005, 0.0005), 0, 1)
+    docs = np.round(3_800_000 + np.arange(N) * 15.0)
+    searches = np.clip(gen.base(60.0, 15.0, 2.0), 0, None)
+    degraded = np.clip(searches * 0.00001 + gen.rng.normal(0, 0.0002, N), 0, None)
+    search_p95 = np.clip(gen.base(0.17, 0.02, 0.005), 0.001, None)
+    if stalled:
+        ramp = np.linspace(0.0, 1.0, stall.stop - stall.start)
+        queue_latency[stall] = 90.0 + ramp * 1500.0
+        enqueued[stall] = np.round(ramp * 3000.0)
+        failed[stall.start :] += np.minimum(np.arange(N - stall.start), 12)
+        degraded[stall] = searches[stall] * 0.06
+        search_p95[stall] *= 2.5
+        search_queue[stall] = 0.3
+
+    builder.add("meilisearch_task_queue_latency", MEILISEARCH, gen.available(queue_latency))
+    builder.add("meilisearch_enqueued_tasks", MEILISEARCH, gen.available(enqueued))
+    builder.add("meilisearch_failed_tasks", MEILISEARCH, gen.available(failed))
+    builder.add("meilisearch_task_db_used_ratio", MEILISEARCH, gen.available(task_db))
+    builder.add("meilisearch_search_queue_used_ratio", MEILISEARCH, gen.available(search_queue))
+    builder.add(
+        "meilisearch_index_documents", {**MEILISEARCH, "index": "products"}, gen.available(docs)
+    )
+
+    search = {**MEILISEARCH, "api": "search"}
+    builder.add("meilisearch_search_requests", search, gen.available(searches))
+    builder.add("meilisearch_degraded_searches", search, gen.available(degraded))
+    builder.add("meilisearch_search_5xx", search, gen.available(np.zeros(N)))
+    builder.add("meilisearch_search_404", search, gen.available(np.zeros(N)))
+    builder.add("meilisearch_search_4xx", search, gen.available(searches * 0.001))
+    builder.add("meilisearch_search_latency_p95", search, gen.available(search_p95))
+    builder.add("meilisearch_search_latency_p99", search, gen.available(search_p95 * 1.5))
+
+    documents = {**MEILISEARCH, "api": "documents"}
+    writes = np.clip(gen.base(0.03, 0.01, 0.003), 0, None)
+    write_p95 = np.clip(gen.base(0.008, 0.001, 0.0005), 0.001, None)
+    builder.add("meilisearch_documents_requests", documents, gen.available(writes))
+    builder.add("meilisearch_documents_5xx", documents, gen.available(np.zeros(N)))
+    builder.add("meilisearch_documents_404", documents, gen.available(np.zeros(N)))
+    builder.add("meilisearch_documents_4xx", documents, gen.available(np.zeros(N)))
+    builder.add("meilisearch_documents_latency_p95", documents, gen.available(write_p95))
+    builder.add("meilisearch_documents_latency_p99", documents, gen.available(write_p95 * 2))
+
+
 DEMO_CUSTOM_RULES = [
     CustomRule(
         slug="checkout_failures",
@@ -715,6 +774,11 @@ class SyntheticMetricsSource:
             *(
                 (d.signal for d in CATALOG if d.signal.startswith("seaweedfs_"))
                 if scenario.seaweedfs
+                else ()
+            ),
+            *(
+                (d.signal for d in CATALOG if d.signal.startswith("meilisearch_"))
+                if scenario.meilisearch
                 else ()
             ),
         }

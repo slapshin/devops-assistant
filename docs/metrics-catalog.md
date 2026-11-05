@@ -1,6 +1,6 @@
 # Metrics catalog (T004)
 
-The catalog is `catalog-2026.10.22` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
+The catalog is `catalog-2026.11.05` in `backend/app/sources/prometheus/catalog/` (one module per source; `__init__.py` assembles `CATALOG`). It holds one scoped query template per signal and is collected by `PrometheusMetricsSource` (`backend/app/sources/prometheus/source.py`) through the bounded client (`backend/app/sources/prometheus/client.py`).
 
 ## Scope enforcement
 
@@ -14,7 +14,7 @@ String literals are masked before the check, so label values cannot fake a selec
 
 ## Semantics
 
-- **Rates before aggregation:** every counter (`*_total`, `*_count`, `*_sum`, `*_bucket`, plus the unsuffixed proxy counters `angie_http_server_zones_responses`, `angie_connections_dropped`, `nginx_connections_accepted`/`_handled`, `SeaweedFS_master_pick_for_write_error`) is wrapped directly in `rate()`/`increase()` before `sum`/`avg`/`max`. Counter resets are therefore handled per series by the source (a test enforces this).
+- **Rates before aggregation:** every counter (`*_total`, `*_count`, `*_sum`, `*_bucket`, plus the unsuffixed proxy counters `angie_http_server_zones_responses`, `angie_connections_dropped`, `nginx_connections_accepted`/`_handled`, `SeaweedFS_master_pick_for_write_error`, `meilisearch_degraded_search_requests`) is wrapped directly in `rate()`/`increase()` before `sum`/`avg`/`max`. Counter resets are therefore handled per series by the source (a test enforces this).
 - **Colliding targets:** when two targets write one series (e.g. replicas scraped under a fixed `instance`), their counters interleave, every switch reads as a reset, and `rate()` turns the whole counter into growth: the result is about counter ÷ scrape interval and climbs with uptime. Before a signal is used, one instant probe per rated counter selector computes, per entity, `max(resets / count_over_time)` over the latest 24 h, counting only series with at least 10 resets (`_bucket` selectors probe the histogram's `_count`). Entities at or above a ratio of 0.1 are dropped from that signal; a restarting process resets a few times a day, colliding targets in up to every other sample. One `counter_collision` exclusion per entity lists its dropped signals, and the report is `partial`. Probes are cached per collection; a failed probe flags nothing. Not probed: custom rules, `__name__` selectors (`resets` drops the name, so their series would clash), and container signals in practice (their `container` identity comes from `label_replace`, so probe groups never match).
 - **Physical bounds:** a signal may declare a maximum value (`go_gc_pause_ratio`: 1, a process cannot be paused longer than wall-clock time). Samples above it become gaps with an `invalid_values` exclusion, so coverage, not a finding, reflects them. Node.js GC time has no bound because a cluster master sums its workers.
 - **Window and grid:** the rate window is 5 m (scrape interval 10 s, per T003). Collection covers 28 days on a 300 s grid. `values[i]` is the value evaluated at `start + (i+1)·300 s`, meaning the interval `[start + i·300 s, start + (i+1)·300 s)`. Trend buckets therefore contain whole intervals. `null` is a gap.
@@ -215,6 +215,32 @@ Notes and limitations:
 - SeaweedFS histograms reach far beyond 10 s, so a p95 above 10 s is a measured value, not a lower bound.
 - The Go runtime metrics of every server (`go_*`, `process_*`) are analysed by the Go rules.
 - Not covered: per-bucket S3 traffic and object counts, in-flight requests, vacuum and EC shard state, writable/crowded volume layouts (an idle collection with only full volumes has none writable by design), and filer metadata subscriptions.
+
+### Meilisearch
+
+Source: the built-in metrics of [Meilisearch](https://www.meilisearch.com/docs/learn/experimental/metrics) (`--experimental-enable-metrics`, `GET /metrics`), one scrape target per server. All series are kind `database`. Request signals are per API with identity `job, instance, api`: requests are labelled by route template (`path`, e.g. `/indexes/{index_uid}/search`), so the API (`search`, `documents`) is selected by route and added by `label_replace` after the per-server aggregation. Server signals are per `job, instance`, document counts per `job, instance, index`.
+
+| Signal | Source metric(s) |
+| --- | --- |
+| `meilisearch_search_requests` | `rate(meilisearch_http_requests_total{path=~"/multi-search\|/indexes/[^/]+/(search\|facet-search\|similar)"})` |
+| `meilisearch_documents_requests` | the same counter with `path=~"/indexes/[^/]+/documents(/.*)?"` (additions, updates, deletions, fetches) |
+| `meilisearch_<api>_5xx`, `_4xx`, `_404` (5xx operand) | the same counters with `status=~"5.."`, `status=~"4.."`, `status="404"` |
+| `meilisearch_<api>_latency_p95`, `_p99` | `histogram_quantile` over `meilisearch_http_response_time_seconds_bucket` of the API's routes, gated on bucket presence |
+| `meilisearch_degraded_searches` (operand of the search API) | `rate(meilisearch_degraded_search_requests)` |
+| `meilisearch_task_queue_latency` | `max_over_time(meilisearch_task_queue_latency_seconds)` |
+| `meilisearch_enqueued_tasks` | `meilisearch_nb_tasks{kind="statuses", value="enqueued"}` |
+| `meilisearch_failed_tasks` | `meilisearch_nb_tasks{kind="statuses", value="failed"}` (cumulative; the analysis uses its per-step increase) |
+| `meilisearch_task_db_used_ratio` | `meilisearch_task_queue_used_size / (used_size + meilisearch_task_queue_size_until_stop_registering)` |
+| `meilisearch_search_queue_used_ratio` | `max_over_time(meilisearch_searches_waiting_to_be_processed) / meilisearch_search_queue_size` |
+| `meilisearch_index_documents` | `meilisearch_index_docs_count` per `index` |
+
+Notes and limitations:
+
+- Monitoring routes (`/health`, `/metrics`) and the remaining API (tasks, settings, keys, stats) are not analysed as traffic; settings changes show up as task queue latency.
+- `meilisearch_nb_tasks` counts the tasks kept in the task history, so it drops when old tasks are deleted (manually, or automatically at 1M tasks); those decreases are ignored, never read as recovered failures.
+- Meilisearch stops registering new tasks (writes fail) when the task database reaches `used + size_until_stop_registering`, a fraction of `--max-task-db-size`; the ratio is measured against that limit, not against the maximum.
+- The histogram's top finite bucket is 10 s, so a p95 at or above it is a lower bound, as for HTTP routes.
+- Not covered: `meilisearch_searches_running` (no limit to compare it with), `meilisearch_is_indexing` and `meilisearch_last_update`, database sizes on disk (`db_size_bytes`, `used_db_size_bytes`; the host filesystem rules cover disk space) and per-index request breakdowns (the route template hides the index).
 
 ### Cloudflare (T015)
 

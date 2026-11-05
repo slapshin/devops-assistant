@@ -249,7 +249,11 @@ def test_series_outside_a_regex_scope_are_dropped() -> None:
 
 
 COUNTER = re.compile(r"\b([A-Za-z_:][A-Za-z0-9_:]*_(?:total|count|sum|bucket))\{")
-GAUGES_NAMED_LIKE_COUNTERS = {"docker_swarm_task_info", "nodejs_active_handles_total"}
+GAUGES_NAMED_LIKE_COUNTERS = {
+    "docker_swarm_task_info",
+    "nodejs_active_handles_total",
+    "meilisearch_index_docs_count",
+}
 
 
 @pytest.mark.parametrize("defn", CATALOG, ids=lambda d: d.signal)
@@ -266,7 +270,7 @@ def test_counters_are_rated_before_aggregation(defn: Any) -> None:
         assert query[: m.start()].rstrip().endswith(("rate(", "increase(")), query
 
 
-# Proxy, PostgreSQL, MySQL and SeaweedFS counters exported without a conventional suffix.
+# Proxy, PostgreSQL, MySQL, SeaweedFS and Meilisearch counters exported without a conventional suffix.
 UNSUFFIXED_COUNTERS = (
     "angie_http_server_zones_responses",
     "angie_connections_dropped",
@@ -281,6 +285,7 @@ UNSUFFIXED_COUNTERS = (
     "mysql_global_status_innodb_row_lock_waits",
     "mysql_global_status_created_tmp_disk_tables",
     "SeaweedFS_master_pick_for_write_error",
+    "meilisearch_degraded_search_requests",
 )
 
 
@@ -432,6 +437,43 @@ def test_seaweedfs_entity_names() -> None:
     assert disk.display_name == "seaweedfs-volume · 10.0.1.18:9327 · /data"
     assert cluster.display_name == "seaweedfs-master"
     assert api.kind is disk.kind is cluster.kind is EntityKind.STORAGE
+
+
+def test_meilisearch_apis_are_named_after_aggregation() -> None:
+    search = BY_SIGNAL["meilisearch_search_5xx"].query.render(SCOPE)
+    p95 = BY_SIGNAL["meilisearch_documents_latency_p95"].query.render(SCOPE)
+    degraded = BY_SIGNAL["meilisearch_degraded_searches"].query.render(SCOPE)
+
+    assert search.startswith(
+        "label_replace(sum by (job, instance) (rate(meilisearch_http_requests_total{"
+    )
+    assert 'path=~"/multi-search|/indexes/[^/]+/(search|facet-search|similar)"' in search
+    assert 'status=~"5.."' in search
+    assert search.endswith('"api", "search", "", "")')
+    assert "sum by (job, instance, le) (rate(meilisearch_http_response_time_seconds_bucket{" in p95
+    assert 'path=~"/indexes/[^/]+/documents(/.*)?"' in p95
+    assert degraded.endswith('"api", "search", "", "")')
+
+
+def test_meilisearch_task_db_ratio_is_against_the_registration_limit() -> None:
+    query = BY_SIGNAL["meilisearch_task_db_used_ratio"].query.render(SCOPE)
+
+    used, limit = query.split(" / ", 1)
+    assert used.startswith("max by (job, instance) (meilisearch_task_queue_used_size{")
+    assert "meilisearch_task_queue_size_until_stop_registering{" in limit
+    assert limit.endswith("> 0)")
+
+
+def test_meilisearch_entity_names() -> None:
+    server = {"job": "meilisearch", "instance": "10.0.1.16:7700"}
+    api = entity_for(BY_SIGNAL["meilisearch_search_requests"], {**server, "api": "search"})
+    index = entity_for(BY_SIGNAL["meilisearch_index_documents"], {**server, "index": "posts"})
+    queue = entity_for(BY_SIGNAL["meilisearch_task_queue_latency"], server)
+
+    assert api.display_name == "meilisearch · 10.0.1.16:7700 · search"
+    assert index.display_name == "meilisearch · 10.0.1.16:7700 · posts"
+    assert queue.display_name == "meilisearch · 10.0.1.16:7700"
+    assert api.kind is index.kind is queue.kind is EntityKind.DATABASE
 
 
 def test_proxy_entity_names() -> None:

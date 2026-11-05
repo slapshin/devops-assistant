@@ -83,6 +83,11 @@ DIRECT: dict[str, str] = {
     "seaweedfs_master_no_leader": "storage_master_no_leader",
     "seaweedfs_assign_errors": "storage_assign_errors",
     "seaweedfs_filer_failures": "storage_filer_failures",
+    "meilisearch_task_queue_latency": "search_task_queue_latency",
+    "meilisearch_enqueued_tasks": "search_task_backlog",
+    "meilisearch_task_db_used_ratio": "search_task_db_ratio",
+    "meilisearch_search_queue_used_ratio": "search_queue_ratio",
+    "meilisearch_index_documents": "search_index_documents",
     "cf_blocked": "security_blocked_rate",
     "cf_challenged": "security_challenge_rate",
     "sentry_errors": "app_error_rate",
@@ -104,7 +109,11 @@ ERROR_KIND_TOTALS = ("sentry_errors", "sentry_unhandled", "sentry_error_users")
 """A project's error signals whose findings list the project's error kinds (the issue series
 of ``ERROR_KINDS_SIGNAL``) with their events during the finding."""
 
-SWARM_FAILED_TASKS = "swarm_failed_tasks"
+CUMULATIVE_FAILURES: dict[str, str] = {
+    "swarm_failed_tasks": "swarm_task_failures",
+    "meilisearch_failed_tasks": "search_task_failures",
+}
+"""Cumulative failed-task gauges -> event rule analysing their per-step increase."""
 MEAN_LATENCY_RULE = "latency_mean"
 STATUS_CODE_ATTRIBUTE = "http_response_status_code"
 
@@ -185,6 +194,25 @@ _TRAFFIC_SPECS = (
         rate_rule="request_rate",
         quantile_signal="seaweedfs_filer_store_latency_p95",
         tail_signal="seaweedfs_filer_store_latency_p99",
+    ),
+    # Meilisearch APIs reuse the HTTP rules; degraded searches are a share of all searches.
+    *(
+        _TrafficSpec(
+            traffic_signal=f"meilisearch_{api}_requests",
+            rate_rule="request_rate",
+            error_ratios=(
+                (f"meilisearch_{api}_5xx", "server_error_ratio"),
+                *(
+                    (("meilisearch_degraded_searches", "search_degraded_ratio"),)
+                    if api == "search"
+                    else ()
+                ),
+            ),
+            quantile_signal=f"meilisearch_{api}_latency_p95",
+            tail_signal=f"meilisearch_{api}_latency_p99",
+            client_errors=(f"meilisearch_{api}_404", f"meilisearch_{api}_4xx"),
+        )
+        for api in ("search", "documents")
     ),
     # Rolled-back share of all transactions, volume-guarded like the 5xx ratio.
     _TrafficSpec(
@@ -337,22 +365,23 @@ def _error_kinds(
 
 def _task_failure_series(by_signal: dict[str, dict[str, MetricSeries]]) -> list[AnalysisSeries]:
     """Failed-task counts are cumulative gauges; analyse the per-step increase instead."""
-    failed_tasks = by_signal.get(SWARM_FAILED_TASKS, {})
     out: list[AnalysisSeries] = []
-    for key in sorted(failed_tasks):
-        s = failed_tasks[key]
-        delta = np.diff(to_array(s), prepend=np.nan)
-        delta[delta < 0] = 0.0  # pruned task history: decreases carry no information
-        out.append(
-            AnalysisSeries(
-                RULES["swarm_task_failures"],
-                s.entity,
-                Unit.COUNT,
-                delta,
-                f"delta of: {s.query}",
-                s,
+    for signal, rule in CUMULATIVE_FAILURES.items():
+        failed_tasks = by_signal.get(signal, {})
+        for key in sorted(failed_tasks):
+            s = failed_tasks[key]
+            delta = np.diff(to_array(s), prepend=np.nan)
+            delta[delta < 0] = 0.0  # pruned task history: decreases carry no information
+            out.append(
+                AnalysisSeries(
+                    RULES[rule],
+                    s.entity,
+                    Unit.COUNT,
+                    delta,
+                    f"delta of: {s.query}",
+                    s,
+                )
             )
-        )
     return out
 
 

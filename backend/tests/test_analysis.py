@@ -5,7 +5,13 @@ import pytest
 
 from app.analysis.baseline import STEPS_PER_DAY, bucket_baseline
 from app.analysis.charts import chart_value
-from app.analysis.derive import _TRAFFIC_SPECS, DIRECT, SWARM_FAILED_TASKS, AnalysisSeries, derive
+from app.analysis.derive import (
+    _TRAFFIC_SPECS,
+    CUMULATIVE_FAILURES,
+    DIRECT,
+    AnalysisSeries,
+    derive,
+)
 from app.analysis.detect import TREND_STEPS, evaluate
 from app.analysis.engine import RobustDetector, severity_from_points, trend_summary
 from app.analysis.rules import RULES
@@ -668,15 +674,81 @@ async def test_seaweedfs_latency_beyond_ten_seconds_is_no_lower_bound() -> None:
     assert "latency_bound" not in finding.attributes
 
 
+async def test_meilisearch_indexing_stall_findings_relate_within_the_server() -> None:
+    result = await detect(Scenario(meilisearch_indexing_stall=True))
+    search = {f.signal: f for f in result.findings if f.entity.labels.get("job") == "meilisearch"}
+
+    assert set(search) == {
+        "search_task_queue_latency",
+        "search_task_backlog",
+        "search_task_failures",
+        "search_degraded_ratio",
+        "search_queue_ratio",
+        "latency_p95",
+    }
+    assert search["search_degraded_ratio"].entity.display_name == (
+        "meilisearch · 10.0.1.16:7700 · search"
+    )
+    assert search["search_task_failures"].severity is Severity.MEDIUM
+
+    latency = search["search_task_queue_latency"]
+    others = {f.finding_id for s, f in search.items() if s != latency.signal}
+    assert others <= set(latency.related_finding_ids)
+
+
+async def test_meilisearch_is_quiet_when_healthy() -> None:
+    result = await detect(Scenario())
+
+    assert not [f for f in result.findings if f.entity.labels.get("job") == "meilisearch"]
+
+
+def test_meilisearch_signals_map_to_search_and_http_rules() -> None:
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    server = {"job": "meilisearch", "instance": "10.0.1.16:7700"}
+    search = {**server, "api": "search"}
+    for signal in ("meilisearch_search_requests", "meilisearch_degraded_searches"):
+        builder.add(signal, search, np.full(N, 1.0))
+    builder.add("meilisearch_failed_tasks", server, np.full(N, 4.0))
+    builder.add("meilisearch_task_db_used_ratio", server, np.full(N, 0.5))
+    builder.add("meilisearch_index_documents", {**server, "index": "posts"}, np.full(N, 9.0))
+
+    rules = sorted((s.rule.name, s.entity.key) for s in derive(builder.series, STEP_SECONDS, 30))
+
+    api = "database|job=meilisearch|instance=10.0.1.16:7700|api=search"
+    assert rules == [
+        ("client_error_rate", api),
+        ("not_found_rate", api),
+        ("request_rate", api),
+        ("search_degraded_ratio", api),
+        ("search_index_documents", "database|job=meilisearch|instance=10.0.1.16:7700|index=posts"),
+        ("search_task_db_ratio", "database|job=meilisearch|instance=10.0.1.16:7700"),
+        ("search_task_failures", "database|job=meilisearch|instance=10.0.1.16:7700"),
+        ("server_error_ratio", api),
+    ]
+
+
+def test_meilisearch_failed_tasks_count_only_new_failures() -> None:
+    builder = _SeriesBuilder(SCOPE, WINDOWS)
+    failed = np.full(N, 4.0)
+    failed[N - 10 :] = 7.0
+    failed[N - 5 :] = 1.0  # old tasks deleted from the history
+    builder.add("meilisearch_failed_tasks", {"job": "meilisearch", "instance": "m:7700"}, failed)
+
+    [series] = derive(builder.series, STEP_SECONDS, 30)
+
+    assert series.rule.name == "search_task_failures"
+    assert np.nansum(series.values) == 3.0
+
+
 def test_every_catalog_signal_is_consumed_by_derivation() -> None:
-    consumed: set[str | None] = {*DIRECT, SWARM_FAILED_TASKS}
+    consumed: set[str | None] = {*DIRECT, *CUMULATIVE_FAILURES}
     for spec in _TRAFFIC_SPECS:
         consumed |= {spec.traffic_signal, spec.quantile_signal, spec.mean_signal, spec.tail_signal}
         consumed |= {numerator for numerator, _ in spec.error_ratios}
         consumed |= set(spec.client_errors or ())
 
     assert {d.signal for d in CATALOG} <= consumed
-    assert set(DIRECT.values()) <= set(RULES)
+    assert set(DIRECT.values()) | set(CUMULATIVE_FAILURES.values()) <= set(RULES)
 
 
 def test_nginx_signals_map_to_generic_proxy_rules() -> None:

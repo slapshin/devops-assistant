@@ -17,6 +17,7 @@ from app.sources.prometheus.catalog.base import Direction, Gate, Role, SignalDef
 from app.sources.prometheus.catalog.container import CONTAINER_CATALOG
 from app.sources.prometheus.catalog.golang import GO_CATALOG
 from app.sources.prometheus.catalog.host import HOST_CATALOG
+from app.sources.prometheus.catalog.meilisearch import MEILISEARCH_CATALOG
 from app.sources.prometheus.catalog.mysql import MYSQL_CATALOG
 from app.sources.prometheus.catalog.nodejs import NODEJS_CATALOG
 from app.sources.prometheus.catalog.postgres import POSTGRES_CATALOG
@@ -37,7 +38,7 @@ __all__ = [
     "SignalDef",
 ]
 
-CATALOG_VERSION = "catalog-2026.10.22"
+CATALOG_VERSION = "catalog-2026.11.05"
 
 CATALOG: tuple[SignalDef, ...] = (
     *HOST_CATALOG,
@@ -50,6 +51,7 @@ CATALOG: tuple[SignalDef, ...] = (
     *NODEJS_CATALOG,
     *GO_CATALOG,
     *SEAWEEDFS_CATALOG,
+    *MEILISEARCH_CATALOG,
 )
 TRAFFIC_SIGNALS = frozenset(d.traffic for d in CATALOG if d.traffic is not None)
 

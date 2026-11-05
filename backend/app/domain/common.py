@@ -198,6 +198,9 @@ class SignalFamily(StrEnum):
     STORAGE = "storage"
     """Distributed storage health (SeaweedFS): disk and volume capacity, read-only volumes,
     master leadership, failed volume assignments and chunk transfers."""
+    SEARCH = "search"
+    """Search engine health (Meilisearch): degraded searches, search queue, task queue latency,
+    backlog and failures, task database capacity, documents per index."""
     EDGE = "edge"
     """CDN edge HTTP traffic: requests, 5xx/4xx, origin errors, cache hits, TTFB (Cloudflare)."""
     SECURITY = "security"
@@ -278,7 +281,8 @@ class EntityKind(StrEnum):
     UPSTREAM = "upstream"
     """A backend server behind a reverse proxy."""
     DATABASE = "database"
-    """A database server (exporter target) or one database on it (PostgreSQL only)."""
+    """A database server (exporter target) or one database on it (PostgreSQL only); also a
+    Meilisearch server, one of its indexes (``index``) or APIs (``api``)."""
     PROCESS = "process"
     """An instrumented application process (``job``, ``instance``), e.g. a Node.js or Go service."""
     STORAGE = "storage"

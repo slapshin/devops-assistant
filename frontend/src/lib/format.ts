@@ -123,6 +123,7 @@ export const FAMILY_LABELS: Record<string, string> = {
   nodejs: "Node.js",
   golang: "Go",
   storage: "Storage (SeaweedFS)",
+  search: "Search (Meilisearch)",
   edge: "CDN edge (Cloudflare)",
   security: "Security (WAF)",
   app_errors: "Application errors (Sentry)",

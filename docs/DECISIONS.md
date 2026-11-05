@@ -140,7 +140,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 
 **Report schema version:** `schema_version: "1.0"`. Minor bumps add optional fields; major bumps require a reader migration. Readers must open every saved major version they claim to support, or return `report_unavailable` with `code=schema_unsupported` — never a crash.
 
-## 5. Numerical policy (detector config `detectors-2026.10.22.1`)
+## 5. Numerical policy (detector config `detectors-2026.11.05`)
 
 All thresholds are **provisional diagnostic heuristics**, configurable through `DETECTOR_CONFIG_FILE`, and labelled in the UI as heuristics — never SLOs or SLO violations. Every report records `detector_version` and `config_hash`.
 
@@ -222,6 +222,14 @@ All thresholds are **provisional diagnostic heuristics**, configurable through `
 | SeaweedFS volume server | volumes read-only on low disk space (`isDiskSpaceLow`) | up | — | value ≥ 1 for ≥ 15 min (shortfall rule, 3 points) |
 | SeaweedFS cluster | no master is the Raft leader | up | — | value ≥ 1 for ≥ 15 min (shortfall rule, 3 points) |
 | SeaweedFS cluster | failed volume assignments on the master (`pick_for_write_error`); failed filer chunk assignments, uploads and downloads | up | ×2 and ≥ +0.05/s | — |
+| Meilisearch API | search (`/indexes/:index/search`, `facet-search`, `similar`, `/multi-search`) and document APIs (per server and API): request rate, 5xx ratio, 404 and other-4xx rates, p95/p99. These reuse the HTTP rules above. | as HTTP | as HTTP | as HTTP |
+| Meilisearch search | degraded searches (hit `searchCutoffMs`) as a share of searches, volume-guarded at ≥ 30 searches per step | up | +1 pp | ≥ 5 % for ≥ 10 min |
+| Meilisearch server | searches waiting vs `search_queue_size` (peak per step) | up | +10 pp | ≥ 50 % high, ≥ 90 % critical, for ≥ 5 min |
+| Meilisearch server | task queue latency (age of the oldest unfinished task, peak per step) | up | ×2 and ≥ +120 s | ≥ 30 min for ≥ 15 min |
+| Meilisearch server | enqueued tasks | up | ×2 and ≥ +100 tasks | — |
+| Meilisearch server | new failed tasks (per-step increase of the cumulative count; severity ≤ medium) | up | — | any increase (event rule, 2 points) |
+| Meilisearch server | task database used vs the size where new tasks are refused (`used / (used + size_until_stop_registering)`) | up | +5 pp | ≥ 80 % high, ≥ 95 % critical, for ≥ 5 min |
+| Meilisearch index | documents in the index | down | ÷1.1 and ≥ −100 documents | — |
 | Cloudflare edge (zone) | request rate | both | ×2 or ÷2 and ≥ 0.2 req/s change | — |
 | Cloudflare edge (zone) | 5xx share (edge status 500–599, volume-guarded at ≥ 30 requests per step) | up | +2 pp | ≥ 5 % for ≥ 5 min |
 | Cloudflare edge (zone) | origin error share (520–530: origin down, timed out, TLS failure; volume-guarded) | up | +1 pp | ≥ 2 % for ≥ 5 min |
