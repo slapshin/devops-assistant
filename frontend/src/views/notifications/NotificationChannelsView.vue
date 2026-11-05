@@ -3,6 +3,7 @@
 import { type Component, computed, ref, watch } from "vue";
 import { ApiError, type ChannelKind, type NotificationChannel } from "../../api/client";
 import { useChannelKinds, useCreateChannel, useDeleteChannel, useNotificationChannels, useTestChannel, useUpdateChannel } from "../../api/queries";
+import ChannelIcon from "../../components/notifications/ChannelIcon.vue";
 import EmailDestination from "../../components/notifications/EmailDestination.vue";
 import TelegramDestination from "../../components/notifications/TelegramDestination.vue";
 import AppTopbar from "../../components/shell/AppTopbar.vue";
@@ -218,7 +219,7 @@ async function confirmDelete(channel: NotificationChannel) {
               <p v-if="!c.readable" class="field-error">Unreadable: the secret key changed. Enter the bot token again.</p>
             </th>
             <td>
-              {{ describeDestination(c.destination) }}
+              <span class="destination"><ChannelIcon :kind="c.destination.kind" />{{ describeDestination(c.destination) }}</span>
               <p v-if="unavailable[c.destination.kind]" class="hint v-critical">{{ unavailable[c.destination.kind] }}</p>
             </td>
             <td>
@@ -255,6 +256,7 @@ async function confirmDelete(channel: NotificationChannel) {
 .field label { font-weight: 500; }
 .hint { font-size: 0.85rem; margin: 0; }
 .used { list-style: none; margin: 0; padding: 0; }
+.destination { display: inline-flex; align-items: center; gap: 6px; }
 .actions { white-space: nowrap; }
 .actions .field-error { white-space: normal; max-width: 320px; }
 </style>

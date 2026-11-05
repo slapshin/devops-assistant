@@ -147,7 +147,9 @@ describe("projects list", () => {
     expect(within(card("no-source")).getByRole("img", { name: "Prometheus: not configured" })).toBeInTheDocument();
     expect(within(card("ok")).getByText("Keeps latest 10 reports")).toBeInTheDocument();
     expect(within(card("down")).getByText("Keeps all reports")).toBeInTheDocument();
-    const notifies = await within(card("ok")).findByText("Notifies: On-call email, Ops chat");
+    const notifies = within(card("ok")).getByText("Notifies:").parentElement!;
+    expect(await within(notifies).findByText("On-call email")).toBeInTheDocument();
+    expect(within(notifies).getByText("Ops chat")).toBeInTheDocument();
     expect(notifies).toHaveAttribute("title", expect.stringContaining("Ops chat (Telegram · chat -1001000000001, topic 12): on failures"));
     // labels and per-source health stay on the project page
     expect(within(card("ok")).queryByText(/project=/)).not.toBeInTheDocument();

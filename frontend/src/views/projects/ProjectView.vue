@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { ApiError } from "../../api/client";
 import { useAnalyses, useNotificationChannels, useProject } from "../../api/queries";
 import AnalysesTable from "../../components/AnalysesTable.vue";
+import ChannelIcon from "../../components/notifications/ChannelIcon.vue";
 import MatcherChips from "../../components/projects/MatcherChips.vue";
 import { ruleSummary } from "../../lib/customRules";
 import RunAnalysis from "../../components/projects/RunAnalysis.vue";
@@ -151,7 +152,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
         <dd v-if="targets.length">
           <ul class="targets">
             <li v-for="t in targets" :key="t.channelId" :class="{ muted: !t.enabled }">
-              <strong>{{ t.name }}</strong><template v-if="t.destination"> ({{ t.destination }})</template>
+              <ChannelIcon v-if="t.kind" :kind="t.kind" class="target-icon" /><strong>{{ t.name }}</strong><template v-if="t.destination"> ({{ t.destination }})</template>
               {{ t.policy }}<span v-if="!t.enabled"> (disabled)</span>
             </li>
           </ul>
@@ -182,6 +183,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
 <style scoped>
 .section-title { margin: 8px 0 0; }
 .targets { list-style: none; margin: 0; padding: 0; }
+.target-icon { margin-right: 4px; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px calc(var(--space) * 2); margin: 0; }
 .facts dt { font-weight: 600; color: var(--muted); }
 .facts dd { margin: 0; }

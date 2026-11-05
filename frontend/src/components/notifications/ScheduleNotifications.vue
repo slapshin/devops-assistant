@@ -3,6 +3,7 @@
 import { computed } from "vue";
 import { useChannelKinds, useNotificationChannels } from "../../api/queries";
 import type { FieldErrors } from "../../lib/auth";
+import ChannelIcon from "./ChannelIcon.vue";
 import {
   MAX_SCHEDULE_NOTIFICATIONS,
   NOTIFY_SEVERITIES,
@@ -61,7 +62,7 @@ function remove(index: number) {
           <option value="" disabled>Choose a channel…</option>
           <option v-for="c in items" :key="c.channel_id" :value="c.channel_id">{{ c.name }}</option>
         </select>
-        <p v-if="byId.get(n.channelId)" class="muted hint">{{ describeDestination(byId.get(n.channelId)!.destination) }}</p>
+        <p v-if="byId.get(n.channelId)" class="muted hint destination"><ChannelIcon :kind="byId.get(n.channelId)!.destination.kind" />{{ describeDestination(byId.get(n.channelId)!.destination) }}</p>
         <p v-if="errors[field(i)]" :id="`err-${n.key}-channel`" class="field-error">{{ errors[field(i)] }}</p>
         <p v-if="reasonOf(n.channelId)" class="hint v-critical">{{ reasonOf(n.channelId) }} Nothing is sent until then.</p>
       </div>
@@ -96,6 +97,7 @@ function remove(index: number) {
 </template>
 
 <style scoped>
+.destination { display: inline-flex; align-items: center; gap: 6px; }
 .title { margin: calc(var(--space) * 2) 0 0; font-size: 0.95rem; }
 .hint { font-size: 0.85rem; margin: 0; }
 .field { display: flex; flex-direction: column; gap: 2px; }

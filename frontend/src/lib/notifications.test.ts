@@ -12,7 +12,6 @@ import {
   policySummary,
   scheduleTargets,
   targetsDetails,
-  targetsSummary,
   validateChannel,
   validateNotifications,
 } from "./notifications";
@@ -93,12 +92,11 @@ describe("schedule notifications", () => {
     const targets = scheduleTargets(notifications, [TELEGRAM]);
 
     expect(targets).toEqual([
-      { channelId: "c1", name: "Ops chat", destination: "Telegram · chat -100123, topic 4", policy: "after every run", enabled: true },
-      { channelId: "gone", name: "Unknown channel", destination: null, policy: "on failures, partial runs and high or worse findings", enabled: false },
+      { channelId: "c1", name: "Ops chat", kind: "telegram", destination: "Telegram · chat -100123, topic 4", policy: "after every run", enabled: true },
+      { channelId: "gone", name: "Unknown channel", kind: null, destination: null, policy: "on failures, partial runs and high or worse findings", enabled: false },
     ]);
-    expect(targetsSummary(targets)).toBe("Ops chat, Unknown channel (disabled)");
     expect(targetsDetails(targets)).toBe("Ops chat (Telegram · chat -100123, topic 4): after every run\nUnknown channel: disabled");
-    expect(targetsSummary(scheduleTargets(undefined, [TELEGRAM]))).toBe("No notifications");
+    expect(scheduleTargets(undefined, [TELEGRAM])).toEqual([]);
   });
 
   it("summarizes deliveries", () => {

@@ -3,7 +3,8 @@ import { computed } from "vue";
 import type { ProjectSummary, SourceKind } from "../../api/client";
 import { useNotificationChannels } from "../../api/queries";
 import { JOB_STATES, formatAge, utcTooltip } from "../../lib/format";
-import { scheduleTargets, targetsDetails, targetsSummary } from "../../lib/notifications";
+import { scheduleTargets, targetsDetails } from "../../lib/notifications";
+import ChannelIcon from "../notifications/ChannelIcon.vue";
 import { SOURCE_KIND_LABELS, scheduleSummary } from "../../lib/projects";
 import SeverityCounts from "../SeverityCounts.vue";
 import RunAnalysis from "./RunAnalysis.vue";
@@ -53,8 +54,12 @@ const latestLink = computed(() => {
         </li>
       </ul>
       <p v-if="project.schedule" class="muted meta">Scheduled: {{ scheduleSummary(project.schedule) }}</p>
-      <p v-if="project.schedule" class="muted meta" :title="targetsDetails(targets) || undefined">
-        Notifies: {{ targetsSummary(targets) }}
+      <p v-if="project.schedule" class="muted meta notifies" :title="targetsDetails(targets) || undefined">
+        <span>Notifies:</span>
+        <span v-for="t in targets" :key="t.channelId" class="target">
+          <ChannelIcon v-if="t.kind" :kind="t.kind" />{{ t.name }}{{ t.enabled ? "" : " (disabled)" }}
+        </span>
+        <span v-if="!targets.length">No notifications</span>
       </p>
       <p class="muted meta">{{ retention }}</p>
     </div>
@@ -93,6 +98,9 @@ h2 { margin: 0 0 6px; font-size: 15px; }
 .meta { margin: 0; font-size: 12px; }
 .sources { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
 .sources li { display: inline-flex; cursor: help; }
+.notifies { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.target { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.target:not(:last-child)::after { content: ","; }
 .sources .off { color: var(--muted); opacity: 0.35; filter: grayscale(1); }
 .latest, .trend { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 960px) {
