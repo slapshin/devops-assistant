@@ -10,6 +10,9 @@ import {
   notificationDraftFrom,
   notificationInput,
   policySummary,
+  scheduleTargets,
+  targetsDetails,
+  targetsSummary,
   validateChannel,
   validateNotifications,
 } from "./notifications";
@@ -79,6 +82,23 @@ describe("schedule notifications", () => {
       "schedule.notifications.2.channel_id": "Choose a channel",
     });
     expect(policySummary({ when: "problems", min_severity: "critical" })).toBe("on failures, partial runs and critical findings");
+  });
+
+  it("resolves a schedule's channels for display", () => {
+    const notifications = [
+      { channel_id: "c1", enabled: true, policy: { when: "always" as const, min_severity: "high" as const } },
+      { channel_id: "gone", enabled: false },
+    ];
+
+    const targets = scheduleTargets(notifications, [TELEGRAM]);
+
+    expect(targets).toEqual([
+      { channelId: "c1", name: "Ops chat", destination: "Telegram · chat -100123, topic 4", policy: "after every run", enabled: true },
+      { channelId: "gone", name: "Unknown channel", destination: null, policy: "on failures, partial runs and high or worse findings", enabled: false },
+    ]);
+    expect(targetsSummary(targets)).toBe("Ops chat, Unknown channel (disabled)");
+    expect(targetsDetails(targets)).toBe("Ops chat (Telegram · chat -100123, topic 4): after every run\nUnknown channel: disabled");
+    expect(targetsSummary(scheduleTargets(undefined, [TELEGRAM]))).toBe("No notifications");
   });
 
   it("summarizes deliveries", () => {

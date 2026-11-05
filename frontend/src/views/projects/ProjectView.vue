@@ -23,7 +23,7 @@ import {
   wazuhSource,
 } from "../../lib/projects";
 import { authSummary } from "../../lib/auth";
-import { describeDestination, policySummary } from "../../lib/notifications";
+import { scheduleTargets } from "../../lib/notifications";
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -32,7 +32,7 @@ const props = defineProps<{ projectId: string }>();
 const project = useProject(() => props.projectId);
 const history = useAnalyses(() => props.projectId, HISTORY_PAGE_SIZE);
 const channels = useNotificationChannels();
-const channelsById = computed(() => new Map((channels.data.value?.items ?? []).map((c) => [c.channel_id, c])));
+const targets = computed(() => scheduleTargets(project.data.value?.schedule?.notifications, channels.data.value?.items ?? []));
 
 const notFound = computed(() => project.error.value instanceof ApiError && project.error.value.problem.status === 404);
 const prometheus = computed(() => prometheusSource(project.data.value));
@@ -145,17 +145,19 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
           <template v-if="project.data.value.next_scheduled_run">
             · next <span :title="utcTooltip(project.data.value.next_scheduled_run)">{{ formatTime(project.data.value.next_scheduled_run) }}</span>
           </template>
-          <ul v-if="project.data.value.schedule.notifications?.length" class="targets muted">
-            <li v-for="n in project.data.value.schedule.notifications" :key="n.channel_id">
-              <template v-if="channelsById.get(n.channel_id)">
-                <strong>{{ channelsById.get(n.channel_id)!.name }}</strong> ({{ describeDestination(channelsById.get(n.channel_id)!.destination) }})
-              </template>
-              <template v-else>Notification channel</template>
-              {{ policySummary(n.policy) }}<span v-if="n.enabled === false"> (disabled)</span>
+        </dd>
+        <dd v-else class="muted">On demand only</dd>
+        <dt>Notifications</dt>
+        <dd v-if="targets.length">
+          <ul class="targets">
+            <li v-for="t in targets" :key="t.channelId" :class="{ muted: !t.enabled }">
+              <strong>{{ t.name }}</strong><template v-if="t.destination"> ({{ t.destination }})</template>
+              {{ t.policy }}<span v-if="!t.enabled"> (disabled)</span>
             </li>
           </ul>
         </dd>
-        <dd v-else class="muted">On demand only</dd>
+        <dd v-else-if="project.data.value.schedule" class="muted">None · scheduled reports are only saved</dd>
+        <dd v-else class="muted">None · notifications are sent for scheduled reports only</dd>
         <dt>Saved reports</dt>
         <dd>
           {{ project.data.value.report_count }}
@@ -179,7 +181,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
 
 <style scoped>
 .section-title { margin: 8px 0 0; }
-.targets { list-style: none; margin: 4px 0 0; padding: 0; }
+.targets { list-style: none; margin: 0; padding: 0; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px calc(var(--space) * 2); margin: 0; }
 .facts dt { font-weight: 600; color: var(--muted); }
 .facts dd { margin: 0; }

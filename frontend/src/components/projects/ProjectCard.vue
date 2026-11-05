@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { ProjectSummary, SourceKind } from "../../api/client";
+import { useNotificationChannels } from "../../api/queries";
 import { JOB_STATES, formatAge, utcTooltip } from "../../lib/format";
+import { scheduleTargets, targetsDetails, targetsSummary } from "../../lib/notifications";
 import { SOURCE_KIND_LABELS, scheduleSummary } from "../../lib/projects";
 import SeverityCounts from "../SeverityCounts.vue";
 import RunAnalysis from "./RunAnalysis.vue";
@@ -17,6 +19,8 @@ const sources = computed(() =>
     return { kind, label: `${SOURCE_KIND_LABELS[kind]}: ${configured ? "configured" : "not configured"}`, configured };
   }),
 );
+const channels = useNotificationChannels();
+const targets = computed(() => scheduleTargets(props.project.schedule?.notifications, channels.data.value?.items ?? []));
 const retention = computed(() =>
   props.project.keep_reports != null ? `Keeps latest ${props.project.keep_reports} reports` : "Keeps all reports",
 );
@@ -49,6 +53,9 @@ const latestLink = computed(() => {
         </li>
       </ul>
       <p v-if="project.schedule" class="muted meta">Scheduled: {{ scheduleSummary(project.schedule) }}</p>
+      <p v-if="project.schedule" class="muted meta" :title="targetsDetails(targets) || undefined">
+        Notifies: {{ targetsSummary(targets) }}
+      </p>
       <p class="muted meta">{{ retention }}</p>
     </div>
 

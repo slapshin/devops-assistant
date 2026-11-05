@@ -247,6 +247,43 @@ export function policySummary(policy: ScheduleNotification["policy"]): string {
   return `on failures, partial runs and ${findings}`;
 }
 
+/** A schedule's notification resolved against the app's channels, for display. */
+export interface ScheduleTarget {
+  channelId: string;
+  /** The channel's name; "Unknown channel" while channels load or after it is gone. */
+  name: string;
+  /** "Telegram · chat -100…"; null when the channel is unknown. */
+  destination: string | null;
+  policy: string;
+  enabled: boolean;
+}
+
+export function scheduleTargets(notifications: ScheduleNotification[] | undefined, channels: NotificationChannel[]): ScheduleTarget[] {
+  const byId = new Map(channels.map((c) => [c.channel_id, c]));
+  return (notifications ?? []).map((n) => {
+    const channel = byId.get(n.channel_id);
+    return {
+      channelId: n.channel_id,
+      name: channel?.name ?? "Unknown channel",
+      destination: channel ? describeDestination(channel.destination) : null,
+      policy: policySummary(n.policy),
+      enabled: n.enabled ?? true,
+    };
+  });
+}
+
+/** "Ops chat, On-call email (disabled)" / "No notifications". */
+export function targetsSummary(targets: ScheduleTarget[]): string {
+  if (!targets.length) return "No notifications";
+  return targets.map((t) => (t.enabled ? t.name : `${t.name} (disabled)`)).join(", ");
+}
+
+/** One line per target, for a tooltip: "Ops chat (Telegram · chat -100…): on failures, …". */
+export const targetsDetails = (targets: ScheduleTarget[]) =>
+  targets
+    .map((t) => `${t.name}${t.destination ? ` (${t.destination})` : ""}: ${t.enabled ? t.policy : "disabled"}`)
+    .join("\n");
+
 // --- delivery outcomes ---------------------------------------------------------------------------
 
 /** "Ops chat sent" / "2 of 3 notifications sent", plus whether any needs attention. */
