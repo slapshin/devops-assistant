@@ -2,6 +2,7 @@
 /** Left icon rail: home, projects, credentials and notification channels, plus the report views while a report is open. */
 import { computed } from "vue";
 import { useRoute } from "vue-router";
+import { railHidden } from "../../lib/rail";
 
 const REPORT_VIEWS: Record<string, string> = { evidence: "findings" };
 
@@ -46,20 +47,25 @@ const onChannels = computed(() => route.path.startsWith("/notification-channels"
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h13l-5 6v5l-3 1.5V9.5z" /></svg>
       </RouterLink>
     </template>
+    <button type="button" class="hide" aria-label="Hide navigation" title="Hide navigation" @click="railHidden = true">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M6 2.5v11M10.5 6.5L9 8l1.5 1.5" /></svg>
+    </button>
   </nav>
 </template>
 
 <style scoped>
-.rail { flex: 0 0 56px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; }
-.rail a { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); color: var(--muted); }
-.rail a:hover { background: var(--hover); color: var(--strong); }
+.rail { flex: 0 0 56px; position: sticky; top: 0; height: 100vh; box-sizing: border-box; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; }
+.rail a, .rail .hide { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); color: var(--muted); }
+.rail a:hover, .rail .hide:hover { background: var(--hover); color: var(--strong); }
 .rail .logo { color: var(--primary); margin-bottom: 8px; }
 .rail .on { color: var(--strong); background: var(--hover); box-shadow: inset 3px 0 0 var(--primary); }
+.rail .hide { margin-top: auto; padding: 0; border: none; background: none; cursor: pointer; }
 .sep { width: 24px; height: 1px; background: var(--border); margin: 4px 0; }
 @media (max-width: 700px) {
-  .rail { flex: 1 1 100%; flex-direction: row; justify-content: center; border-right: none; border-bottom: 1px solid var(--border); padding: 4px 0; }
+  .rail { flex: 1 1 100%; position: static; height: auto; flex-direction: row; justify-content: center; border-right: none; border-bottom: 1px solid var(--border); padding: 4px 0; }
   .rail .logo { margin: 0 8px 0 0; }
   .rail .on { box-shadow: inset 0 -3px 0 var(--primary); }
+  .rail .hide { display: none; }
   .sep { width: 1px; height: 24px; margin: 0 4px; }
 }
 </style>

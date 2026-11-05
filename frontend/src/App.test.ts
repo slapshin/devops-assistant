@@ -1781,3 +1781,20 @@ describe("theme", () => {
     expect(localStorage.getItem("assistant.theme")).toBeNull();
   });
 });
+
+describe("navigation rail", () => {
+  it("hides and shows the left rail and remembers the choice", async () => {
+    await renderAt("/");
+    await screen.findByRole("navigation", { name: "App" });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Hide navigation" }));
+
+    expect(screen.queryByRole("navigation", { name: "App" })).not.toBeInTheDocument();
+    expect(localStorage.getItem("assistant.rail")).toBe("hidden");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Show navigation" }));
+
+    expect(screen.getByRole("navigation", { name: "App" })).toBeInTheDocument();
+    expect(localStorage.getItem("assistant.rail")).toBeNull();
+  });
+});
