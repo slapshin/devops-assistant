@@ -88,7 +88,6 @@ async def runtime_config(settings: SettingsDep, services: ServicesDep) -> Runtim
         explanation_status=settings.explanation_status,
         detector_version=detector.version,
         config_hash=detector.config_hash,
-        email_configured=services.notifier.transport is not None,
         limits=Limits(
             max_running_jobs=limits.max_running,
             max_queued_jobs=limits.max_queued,

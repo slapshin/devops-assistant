@@ -28,6 +28,10 @@ def new_credential_id() -> str:
     return str(uuid.uuid7())
 
 
+def new_channel_id() -> str:
+    return str(uuid.uuid7())
+
+
 def series_id(query: str, label_key: str) -> str:
     return f"ser_{_digest(query, label_key)}"
 

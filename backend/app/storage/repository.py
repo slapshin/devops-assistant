@@ -13,7 +13,7 @@ from app.domain.common import REPORT_SCHEMA_VERSION, Severity, format_utc
 from app.domain.explanation import ExplanationStatus
 from app.domain.interfaces import ProjectActivity
 from app.domain.jobs import AnalysisJob, ErrorCode, JobError, JobState, StageProgress, StageStatus
-from app.domain.notifications import NotificationOutcome
+from app.domain.notifications import DeliveryOutcome
 from app.domain.report import AnalysisReport, AnalysisRequest
 from app.storage.db import analysis_jobs, make_engine, migrate, projects, reports
 
@@ -241,10 +241,10 @@ class SqliteReportRepository:
 
         return await self._run(q)
 
-    async def set_notification(self, analysis_id: str, outcome: NotificationOutcome) -> None:
+    async def set_notifications(self, analysis_id: str, outcomes: list[DeliveryOutcome]) -> None:
         def q(conn: sa.Connection) -> None:
             if (job := self._get(conn, analysis_id)) is not None:
-                self._put(conn, job.model_copy(update={"notification": outcome}))
+                self._put(conn, job.model_copy(update={"notifications": outcomes}))
 
         await self._run(q)
 

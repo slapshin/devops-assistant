@@ -153,16 +153,13 @@
             ],
             "title": "Finished At"
           },
-          "notification": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NotificationOutcome"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Email delivery of a scheduled report (T025); null when none was requested."
+          "notifications": {
+            "description": "Delivery of a scheduled report, one outcome per enabled notification target (T026); empty for manual analyses and schedules without targets.",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryOutcome"
+            },
+            "title": "Notifications",
+            "type": "array"
           },
           "report_available": {
             "title": "Report Available",
@@ -625,6 +622,146 @@
         ],
         "title": "ChangeDirection",
         "type": "string"
+      },
+      "ChannelKind": {
+        "enum": [
+          "email",
+          "telegram"
+        ],
+        "title": "ChannelKind",
+        "type": "string"
+      },
+      "ChannelKindInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ChannelKind"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the server cannot deliver.",
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "kind",
+          "available"
+        ],
+        "title": "ChannelKindInfo",
+        "type": "object"
+      },
+      "ChannelKindList": {
+        "additionalProperties": false,
+        "description": "GET /api/notification-channels/kinds.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelKindInfo"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ChannelKindList",
+        "type": "object"
+      },
+      "ChannelTestRequest": {
+        "additionalProperties": false,
+        "description": "Body of POST /api/notification-channels/test: a destination, saved or not.\n\n``channel_id`` supplies a stored secret the destination omits (an edited channel).",
+        "properties": {
+          "channel_id": {
+            "anyOf": [
+              {
+                "maxLength": 36,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "destination": {
+            "discriminator": {
+              "mapping": {
+                "email": "#/components/schemas/EmailDestination",
+                "telegram": "#/components/schemas/TelegramDestinationInput"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EmailDestination"
+              },
+              {
+                "$ref": "#/components/schemas/TelegramDestinationInput"
+              }
+            ],
+            "title": "Destination"
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "title": "ChannelTestRequest",
+        "type": "object"
+      },
+      "ChannelTestResult": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "description": "What was sent, e.g. \"sent to Ops chat (supergroup)\".",
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ChannelKind"
+          },
+          "sent_at": {
+            "title": "Sent At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "detail",
+          "sent_at"
+        ],
+        "title": "ChannelTestResult",
+        "type": "object"
+      },
+      "ChannelUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "title": "ChannelUsage",
+        "type": "object"
       },
       "CloudflareSource": {
         "additionalProperties": false,
@@ -1536,6 +1673,67 @@
         "title": "DailyTrend",
         "type": "object"
       },
+      "DeliveryOutcome": {
+        "additionalProperties": false,
+        "description": "What happened to one notification when a scheduled analysis finished.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for outcomes recorded before channels existed (T025).",
+            "title": "Channel Id"
+          },
+          "destinations": {
+            "description": "Recipients or chats addressed.",
+            "minimum": 0.0,
+            "title": "Destinations",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ChannelKind"
+          },
+          "name": {
+            "description": "The channel's name at delivery time.",
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why skipped, failed, or not configured.",
+            "title": "Reason"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NotificationStatus"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "status",
+          "destinations",
+          "at"
+        ],
+        "title": "DeliveryOutcome",
+        "type": "object"
+      },
       "DetectionMethod": {
         "enum": [
           "relative",
@@ -1544,14 +1742,15 @@
         "title": "DetectionMethod",
         "type": "string"
       },
-      "EmailNotification": {
+      "EmailDestination": {
         "additionalProperties": false,
-        "description": "Email each scheduled report to ``recipients`` when ``when`` matches.",
+        "description": "Email the report to ``recipients`` through the server's SMTP configuration.",
         "properties": {
-          "min_severity": {
-            "$ref": "#/components/schemas/Severity",
-            "default": "high",
-            "description": "Lowest finding severity that sends (problems only)."
+          "kind": {
+            "const": "email",
+            "default": "email",
+            "title": "Kind",
+            "type": "string"
           },
           "recipients": {
             "description": "Plain email addresses (no display names); duplicates are removed.",
@@ -1567,59 +1766,12 @@
             "minItems": 1,
             "title": "Recipients",
             "type": "array"
-          },
-          "when": {
-            "$ref": "#/components/schemas/NotifyWhen",
-            "default": "problems",
-            "description": "always, or problems: failed or partial analyses and findings at or above min_severity."
           }
         },
         "required": [
           "recipients"
         ],
-        "title": "EmailNotification",
-        "type": "object"
-      },
-      "EmailTestRequest": {
-        "additionalProperties": false,
-        "description": "Body of POST /api/notifications/test-email.",
-        "properties": {
-          "recipients": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 20,
-            "minItems": 1,
-            "title": "Recipients",
-            "type": "array"
-          }
-        },
-        "required": [
-          "recipients"
-        ],
-        "title": "EmailTestRequest",
-        "type": "object"
-      },
-      "EmailTestResult": {
-        "additionalProperties": false,
-        "properties": {
-          "recipients": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Recipients",
-            "type": "array"
-          },
-          "sent_at": {
-            "title": "Sent At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "recipients",
-          "sent_at"
-        ],
-        "title": "EmailTestResult",
+        "title": "EmailDestination",
         "type": "object"
       },
       "Entity": {
@@ -1778,8 +1930,12 @@
           "end_time_invalid",
           "interrupted_by_restart",
           "job_timeout",
-          "email_not_configured",
-          "email_failed",
+          "channel_not_found",
+          "channel_name_taken",
+          "channel_in_use",
+          "channel_not_configured",
+          "delivery_failed",
+          "telegram_webhook_set",
           "internal_error",
           "not_implemented"
         ],
@@ -3188,42 +3344,162 @@
         "title": "NoAuth",
         "type": "object"
       },
-      "NotificationOutcome": {
+      "NotificationChannel": {
         "additionalProperties": false,
         "properties": {
-          "at": {
-            "title": "At",
+          "channel_id": {
+            "title": "Channel Id",
             "type": "string"
           },
-          "reason": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
             "anyOf": [
               {
-                "maxLength": 300,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Why skipped, failed, or not configured.",
-            "title": "Reason"
+            "title": "Description"
           },
-          "recipients": {
-            "description": "Number of recipients addressed.",
-            "minimum": 0.0,
-            "title": "Recipients",
-            "type": "integer"
+          "destination": {
+            "discriminator": {
+              "mapping": {
+                "email": "#/components/schemas/EmailDestination",
+                "telegram": "#/components/schemas/TelegramDestination"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EmailDestination"
+              },
+              {
+                "$ref": "#/components/schemas/TelegramDestination"
+              }
+            ],
+            "title": "Destination"
           },
-          "status": {
-            "$ref": "#/components/schemas/NotificationStatus"
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "readable": {
+            "default": true,
+            "description": "False when the stored secret cannot be decrypted (lost or changed key).",
+            "title": "Readable",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "used_by": {
+            "description": "Projects whose schedule sends to the channel.",
+            "items": {
+              "$ref": "#/components/schemas/ChannelUsage"
+            },
+            "title": "Used By",
+            "type": "array"
           }
         },
         "required": [
-          "status",
-          "recipients",
-          "at"
+          "channel_id",
+          "name",
+          "destination",
+          "created_at",
+          "updated_at"
         ],
-        "title": "NotificationOutcome",
+        "title": "NotificationChannel",
+        "type": "object"
+      },
+      "NotificationChannelInput": {
+        "additionalProperties": false,
+        "description": "Body of POST /api/notification-channels and PUT /api/notification-channels/{id}.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "destination": {
+            "discriminator": {
+              "mapping": {
+                "email": "#/components/schemas/EmailDestination",
+                "telegram": "#/components/schemas/TelegramDestinationInput"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EmailDestination"
+              },
+              {
+                "$ref": "#/components/schemas/TelegramDestinationInput"
+              }
+            ],
+            "title": "Destination"
+          },
+          "name": {
+            "examples": [
+              "Ops chat"
+            ],
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "destination"
+        ],
+        "title": "NotificationChannelInput",
+        "type": "object"
+      },
+      "NotificationChannelList": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationChannel"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "NotificationChannelList",
+        "type": "object"
+      },
+      "NotificationPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "min_severity": {
+            "$ref": "#/components/schemas/Severity",
+            "default": "high",
+            "description": "Lowest finding severity that counts as a problem. With always, reports below it are delivered silently where the channel supports that (Telegram)."
+          },
+          "when": {
+            "$ref": "#/components/schemas/NotifyWhen",
+            "default": "problems",
+            "description": "always, or problems: failed or partial analyses and findings at or above min_severity."
+          }
+        },
+        "title": "NotificationPolicy",
         "type": "object"
       },
       "NotificationStatus": {
@@ -4371,16 +4647,14 @@
         "additionalProperties": false,
         "description": "Run an analysis automatically at ``time`` (local to ``timezone``) on ``weekdays``.\n\nEach run analyses the 24 h ending at the scheduled instant.",
         "properties": {
-          "notify": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/EmailNotification"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Email each scheduled report (T025); null sends nothing."
+          "notifications": {
+            "description": "Notification channels each scheduled report is sent to, each with its own policy (T026); manual analyses never are.",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleNotification"
+            },
+            "maxItems": 10,
+            "title": "Notifications",
+            "type": "array"
           },
           "time": {
             "description": "Local time of day, HH:MM (24 h).",
@@ -4632,12 +4906,6 @@
             "title": "Detector Version",
             "type": "string"
           },
-          "email_configured": {
-            "default": false,
-            "description": "Scheduled reports can be emailed (SMTP or fake delivery).",
-            "title": "Email Configured",
-            "type": "boolean"
-          },
           "explanation_status": {
             "$ref": "#/components/schemas/ExplanationStatus",
             "description": "disabled, not_configured, or pending (configured, per-report status varies)."
@@ -4671,6 +4939,31 @@
           "limits"
         ],
         "title": "RuntimeConfig",
+        "type": "object"
+      },
+      "ScheduleNotification": {
+        "additionalProperties": false,
+        "description": "Send a project's scheduled reports to a channel when ``policy`` matches.",
+        "properties": {
+          "channel_id": {
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/NotificationPolicy"
+          }
+        },
+        "required": [
+          "channel_id"
+        ],
+        "title": "ScheduleNotification",
         "type": "object"
       },
       "Scope": {
@@ -5261,6 +5554,207 @@
         ],
         "title": "StageStatus",
         "type": "string"
+      },
+      "TelegramChat": {
+        "additionalProperties": false,
+        "properties": {
+          "chat_id": {
+            "title": "Chat Id",
+            "type": "string"
+          },
+          "is_forum": {
+            "default": false,
+            "title": "Is Forum",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "description": "private, group, supergroup or channel.",
+            "title": "Type",
+            "type": "string"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "chat_id",
+          "title",
+          "type"
+        ],
+        "title": "TelegramChat",
+        "type": "object"
+      },
+      "TelegramChatList": {
+        "additionalProperties": false,
+        "description": "Chats that recently messaged the bot or added it (Telegram keeps updates ≤ 24 h).",
+        "properties": {
+          "bot_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bot, e.g. ops_alerts_bot.",
+            "title": "Bot Username"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TelegramChat"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "bot_username",
+          "items"
+        ],
+        "title": "TelegramChatList",
+        "type": "object"
+      },
+      "TelegramChatsRequest": {
+        "additionalProperties": false,
+        "description": "Body of POST /api/notification-channels/telegram/chats: a bot token, or the channel\nwhose stored token to use.",
+        "properties": {
+          "bot_token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Token"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "maxLength": 36,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          }
+        },
+        "title": "TelegramChatsRequest",
+        "type": "object"
+      },
+      "TelegramDestination": {
+        "additionalProperties": false,
+        "properties": {
+          "bot_token_set": {
+            "title": "Bot Token Set",
+            "type": "boolean"
+          },
+          "chat_id": {
+            "description": "Numeric chat ID (groups and channels are negative) or @channel_username.",
+            "examples": [
+              "-1001234567890"
+            ],
+            "pattern": "^(-?\\d{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31})$",
+            "title": "Chat Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "telegram",
+            "default": "telegram",
+            "title": "Kind",
+            "type": "string"
+          },
+          "message_thread_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Forum topic of a supergroup; null for the main chat.",
+            "title": "Message Thread Id"
+          }
+        },
+        "required": [
+          "chat_id",
+          "bot_token_set"
+        ],
+        "title": "TelegramDestination",
+        "type": "object"
+      },
+      "TelegramDestinationInput": {
+        "additionalProperties": false,
+        "description": "Post the report into a Telegram chat with a bot.",
+        "properties": {
+          "bot_token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Bot token from @BotFather. Omit to keep the stored token (update only).",
+            "title": "Bot Token"
+          },
+          "chat_id": {
+            "description": "Numeric chat ID (groups and channels are negative) or @channel_username.",
+            "examples": [
+              "-1001234567890"
+            ],
+            "pattern": "^(-?\\d{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31})$",
+            "title": "Chat Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "telegram",
+            "default": "telegram",
+            "title": "Kind",
+            "type": "string"
+          },
+          "message_thread_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Forum topic of a supergroup; null for the main chat.",
+            "title": "Message Thread Id"
+          }
+        },
+        "required": [
+          "chat_id"
+        ],
+        "title": "TelegramDestinationInput",
+        "type": "object"
       },
       "ThresholdOp": {
         "enum": [
@@ -6451,14 +6945,109 @@
         "summary": "Health"
       }
     },
-    "/api/notifications/test-email": {
+    "/api/notification-channels": {
+      "get": {
+        "operationId": "list_channels_api_notification_channels_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChannelList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Channels",
+        "tags": [
+          "notification channels"
+        ]
+      },
       "post": {
-        "operationId": "send_test_email_api_notifications_test_email_post",
+        "operationId": "create_channel_api_notification_channels_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EmailTestRequest"
+                "$ref": "#/components/schemas/NotificationChannelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChannel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Create Channel",
+        "tags": [
+          "notification channels"
+        ]
+      }
+    },
+    "/api/notification-channels/kinds": {
+      "get": {
+        "description": "Every channel kind and whether this server can deliver to it.",
+        "operationId": "list_kinds_api_notification_channels_kinds_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelKindList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Kinds",
+        "tags": [
+          "notification channels"
+        ]
+      }
+    },
+    "/api/notification-channels/telegram/chats": {
+      "post": {
+        "description": "A bot (its token, or the one stored for ``channel_id``) and the chats that recently\nmessaged it or added it.",
+        "operationId": "telegram_chats_api_notification_channels_telegram_chats_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramChatsRequest"
               }
             }
           },
@@ -6469,7 +7058,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EmailTestResult"
+                  "$ref": "#/components/schemas/TelegramChatList"
                 }
               }
             },
@@ -6509,7 +7098,258 @@
             "description": "Problem"
           }
         },
-        "summary": "Send Test Email"
+        "summary": "Telegram Chats",
+        "tags": [
+          "notification channels"
+        ]
+      }
+    },
+    "/api/notification-channels/test": {
+      "post": {
+        "description": "Send a short test message to a destination, saved or not; an omitted secret comes from\n``channel_id``.",
+        "operationId": "send_test_api_notification_channels_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Send Test",
+        "tags": [
+          "notification channels"
+        ]
+      }
+    },
+    "/api/notification-channels/{channel_id}": {
+      "delete": {
+        "description": "Only a channel no schedule sends to can be deleted.",
+        "operationId": "delete_channel_api_notification_channels__channel_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "title": "Channel Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Channel",
+        "tags": [
+          "notification channels"
+        ]
+      },
+      "get": {
+        "operationId": "get_channel_api_notification_channels__channel_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "title": "Channel Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChannel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Channel",
+        "tags": [
+          "notification channels"
+        ]
+      },
+      "put": {
+        "description": "Every project sending to the channel uses the new destination from its next run on.",
+        "operationId": "update_channel_api_notification_channels__channel_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "title": "Channel Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationChannelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChannel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Update Channel",
+        "tags": [
+          "notification channels"
+        ]
       }
     },
     "/api/projects": {

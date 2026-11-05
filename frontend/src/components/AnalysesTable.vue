@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AnalysisJob } from "../api/client";
 import { JOB_STATES, formatTime, utcTooltip } from "../lib/format";
-import { NOTIFICATION_LABELS } from "../lib/projects";
+import { deliveryDetails, deliverySummary } from "../lib/notifications";
 import SeverityCounts from "./SeverityCounts.vue";
 
 defineProps<{ jobs: AnalysisJob[] }>();
@@ -21,10 +21,10 @@ const link = (job: AnalysisJob) => (job.report_available ? `/reports/${job.analy
             <RouterLink :to="link(job)" :title="utcTooltip(job.end_time)">{{ formatTime(job.end_time) }}</RouterLink>
             <span v-if="job.trigger === 'scheduled'" class="muted"> · scheduled</span>
             <span
-              v-if="job.notification"
-              :class="job.notification.status === 'sent' || job.notification.status === 'skipped' ? 'muted' : 'v-critical'"
-              :title="job.notification.reason ?? undefined"
-            > · {{ NOTIFICATION_LABELS[job.notification.status] }}</span>
+              v-if="deliverySummary(job.notifications ?? [])"
+              :class="deliverySummary(job.notifications ?? [])!.problem ? 'v-critical' : 'muted'"
+              :title="deliveryDetails(job.notifications ?? [])"
+            > · {{ deliverySummary(job.notifications ?? [])!.text }}</span>
           </td>
           <td>{{ JOB_STATES[job.state] ?? job.state }}<span v-if="job.error" class="muted"> · {{ job.error.code }}</span></td>
           <td><SeverityCounts :counts="job.finding_counts" /></td>

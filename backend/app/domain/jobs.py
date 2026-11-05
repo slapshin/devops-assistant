@@ -6,7 +6,7 @@ from pydantic import Field
 
 from app.domain.common import Contract, Scope, Severity, UtcDatetime
 from app.domain.explanation import ExplanationStatus
-from app.domain.notifications import NotificationOutcome
+from app.domain.notifications import DeliveryOutcome
 
 
 class JobState(StrEnum):
@@ -75,8 +75,12 @@ class ErrorCode(StrEnum):
     END_TIME_INVALID = "end_time_invalid"
     INTERRUPTED_BY_RESTART = "interrupted_by_restart"
     JOB_TIMEOUT = "job_timeout"
-    EMAIL_NOT_CONFIGURED = "email_not_configured"
-    EMAIL_FAILED = "email_failed"
+    CHANNEL_NOT_FOUND = "channel_not_found"
+    CHANNEL_NAME_TAKEN = "channel_name_taken"
+    CHANNEL_IN_USE = "channel_in_use"
+    CHANNEL_NOT_CONFIGURED = "channel_not_configured"
+    DELIVERY_FAILED = "delivery_failed"
+    TELEGRAM_WEBHOOK_SET = "telegram_webhook_set"
     INTERNAL_ERROR = "internal_error"
     NOT_IMPLEMENTED = "not_implemented"
     """Foundation-only: route exists but its task (T007) is not done."""
@@ -112,9 +116,10 @@ class AnalysisJob(Contract):
         description="Anomaly episodes per trend day, oldest first; null for days without "
         "enough data. Present once a report is saved.",
     )
-    notification: NotificationOutcome | None = Field(
-        default=None,
-        description="Email delivery of a scheduled report (T025); null when none was requested.",
+    notifications: list[DeliveryOutcome] = Field(
+        default_factory=list,
+        description="Delivery of a scheduled report, one outcome per enabled notification "
+        "target (T026); empty for manual analyses and schedules without targets.",
     )
 
 
@@ -172,9 +177,6 @@ class RuntimeConfig(Contract):
     )
     detector_version: str
     config_hash: str
-    email_configured: bool = Field(
-        default=False, description="Scheduled reports can be emailed (SMTP or fake delivery)."
-    )
     limits: Limits
     report_count: int | None = None
     database_bytes: int | None = None

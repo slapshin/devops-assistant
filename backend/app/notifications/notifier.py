@@ -1,48 +1,39 @@
-"""Emails a finished scheduled analysis to its project's recipients (T025).
+"""Delivers a finished scheduled analysis to its schedule's notification channels (T025, T026).
 
-Reads the project's current schedule at delivery time, so recipients removed while a run was
-queued receive nothing. Every failure becomes a ``NotificationOutcome``; nothing raises into the
-job runner.
+Reads the project's current schedule and the channels' current destinations at delivery time,
+so a channel edited or removed while a run was queued is honoured. The message is built once;
+every enabled notification is then delivered concurrently, each bounded by
+``DELIVERY_TIMEOUT_SECONDS``, so one slow or broken channel never affects another. Every failure
+becomes a ``DeliveryOutcome``; nothing raises into the runner.
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
-from app.domain.jobs import AnalysisJob, JobState
+from app.domain.jobs import AnalysisJob
 from app.domain.notifications import (
-    MAX_OUTCOME_REASON_CHARS,
-    SEVERITY_ORDER,
-    EmailNotification,
-    NotificationOutcome,
+    DeliveryOutcome,
+    NotificationChannel,
     NotificationStatus,
-    NotifyWhen,
+    ScheduleNotification,
+    destination_count,
 )
 from app.domain.report import ReportSummary
-from app.notifications.render import render_email, report_link
-from app.notifications.transport import EmailTransport, build_message
+from app.notifications.drivers import Drivers
+from app.notifications.drivers.base import (
+    DELIVERY_TIMEOUT_SECONDS,
+    ChannelNotConfigured,
+    DeliveryError,
+)
+from app.notifications.message import ReportMessage, build_message, report_link
+from app.notifications.policy import has_problem, skip_reason
+from app.storage.channels import ChannelNotFound, SqliteChannelRepository
 from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository
+from app.storage.secrets import SecretsUnreadable
 
 log = logging.getLogger("app.notifications")
-
-
-def skip_reason(
-    notify: EmailNotification, job: AnalysisJob, summary: ReportSummary | None
-) -> str | None:
-    """Why the policy does not send this job's report; None when it does."""
-    if notify.when is NotifyWhen.ALWAYS:
-        return None
-    if job.state in (JobState.FAILED, JobState.PARTIAL) or summary is None:
-        return None
-    floor = SEVERITY_ORDER.index(notify.min_severity)
-    if any(SEVERITY_ORDER.index(f.severity) >= floor for f in summary.findings):
-        return None
-    return f"no finding at or above {notify.min_severity.value} severity"
-
-
-def _error_reason(exc: Exception) -> str:
-    message = f"{type(exc).__name__}: {exc}".strip().rstrip(":")
-    return message[:MAX_OUTCOME_REASON_CHARS]
 
 
 class ReportNotifier:
@@ -50,53 +41,135 @@ class ReportNotifier:
         self,
         projects: SqliteProjectRepository,
         reports: SqliteReportRepository,
-        transport: EmailTransport | None,
-        sender: str,
+        channels: SqliteChannelRepository,
+        drivers: Drivers,
         public_url: str | None,
     ) -> None:
         self.projects = projects
         self.reports = reports
-        self.transport = transport
-        self.sender = sender
+        self.channels = channels
+        self.drivers = drivers
         self.public_url = public_url
 
-    async def job_finished(self, job: AnalysisJob) -> NotificationOutcome | None:
-        """The delivery outcome of a finished scheduled job; None when none is requested."""
+    async def job_finished(self, job: AnalysisJob) -> list[DeliveryOutcome]:
+        """One outcome per enabled notification of the project's schedule; empty without any."""
         project = await self.projects.get(job.scope.project_id)
         schedule = project.schedule if project else None
-        if project is None or schedule is None or schedule.notify is None:
-            return None
-        notify = schedule.notify
+        if project is None or schedule is None:
+            return []
+        wanted = [n for n in schedule.notifications if n.enabled]
+        if not wanted:
+            return []
 
-        def outcome(status: NotificationStatus, reason: str | None = None) -> NotificationOutcome:
-            recipients = len(notify.recipients) if status is not NotificationStatus.SKIPPED else 0
-            return NotificationOutcome(
-                status=status, recipients=recipients, reason=reason, at=datetime.now(UTC)
-            )
-
-        if self.transport is None:
-            return outcome(
-                NotificationStatus.NOT_CONFIGURED, "Email delivery is not configured (SMTP_HOST)."
-            )
-
+        message: ReportMessage | None = None
+        build_error = ""
         try:
-            summary = None
+            summary: ReportSummary | None = None
             if job.report_available and (report := await self.reports.get_report(job.analysis_id)):
                 summary = report.summary()
-            if (reason := skip_reason(notify, job, summary)) is not None:
-                return outcome(NotificationStatus.SKIPPED, reason)
-
-            email = render_email(
+            message = build_message(
                 project.name,
                 job,
                 summary,
                 timezone=schedule.timezone,
                 link=report_link(self.public_url, job.analysis_id),
             )
-            await self.transport.send(build_message(self.sender, notify.recipients, email))
         except Exception as exc:
-            log.warning("emailing analysis %s failed: %s", job.analysis_id, _error_reason(exc))
-            return outcome(NotificationStatus.FAILED, _error_reason(exc))
+            log.exception("building the notification of analysis %s failed", job.analysis_id)
+            build_error = f"Could not read the report: {type(exc).__name__}"
 
-        log.info("emailed analysis %s to %d recipient(s)", job.analysis_id, len(notify.recipients))
-        return outcome(NotificationStatus.SENT)
+        outcomes = await asyncio.gather(
+            *(
+                self._deliver(n, message, job.analysis_id)
+                if message is not None
+                else self._failed(n, build_error)
+                for n in wanted
+            )
+        )
+        return [o for o in outcomes if o is not None]
+
+    async def _failed(
+        self, notification: ScheduleNotification, reason: str
+    ) -> DeliveryOutcome | None:
+        try:
+            channel, _ = await self.channels.resolve(notification.channel_id)
+        except ChannelNotFound, SecretsUnreadable:
+            return None
+        return _outcome(
+            channel, NotificationStatus.FAILED, destination_count(channel.destination), reason
+        )
+
+    async def _deliver(
+        self, notification: ScheduleNotification, message: ReportMessage, analysis_id: str
+    ) -> DeliveryOutcome | None:
+        try:
+            channel, secrets = await self.channels.resolve(notification.channel_id)
+        except ChannelNotFound:  # removed meanwhile; the schedule no longer names it
+            return None
+        except SecretsUnreadable:
+            unreadable = await self.channels.get(notification.channel_id)
+            if unreadable is None:
+                return None
+            return _outcome(
+                unreadable,
+                NotificationStatus.FAILED,
+                destination_count(unreadable.destination),
+                "The channel's secret cannot be decrypted (secret key changed); re-enter it.",
+            )
+
+        destination = channel.destination
+        addressed = destination_count(destination)
+        if (skipped := skip_reason(notification.policy, message)) is not None:
+            return _outcome(channel, NotificationStatus.SKIPPED, 0, skipped)
+        driver = self.drivers.get(destination.kind)
+        if driver is None:
+            missing = f"No {destination.kind} driver on this server."
+            return _outcome(channel, NotificationStatus.NOT_CONFIGURED, addressed, missing)
+        if (unavailable := driver.unavailable()) is not None:
+            return _outcome(channel, NotificationStatus.NOT_CONFIGURED, addressed, unavailable)
+
+        silent = not has_problem(notification.policy, message)
+        try:
+            reached = await asyncio.wait_for(
+                driver.deliver(destination, secrets, message, silent=silent),
+                DELIVERY_TIMEOUT_SECONDS,
+            )
+        except ChannelNotConfigured as exc:
+            return _outcome(channel, NotificationStatus.NOT_CONFIGURED, addressed, exc.reason)
+        except DeliveryError as exc:
+            log.warning("delivering analysis %s to %r failed: %s", analysis_id, channel.name, exc)
+            return _outcome(channel, NotificationStatus.FAILED, addressed, exc.reason)
+        except TimeoutError:
+            reason = f"Delivery exceeded {DELIVERY_TIMEOUT_SECONDS:.0f} s."
+            log.warning("delivering analysis %s to %r timed out", analysis_id, channel.name)
+            return _outcome(channel, NotificationStatus.FAILED, addressed, reason)
+        except Exception as exc:
+            # Library messages may embed secrets (URLs with tokens): record the type only.
+            log.warning(
+                "delivering analysis %s to %r failed: %s",
+                analysis_id,
+                channel.name,
+                type(exc).__name__,
+            )
+            reason = f"Unexpected error: {type(exc).__name__}"
+            return _outcome(channel, NotificationStatus.FAILED, addressed, reason)
+
+        log.info("delivered analysis %s to %r (%d)", analysis_id, channel.name, reached)
+        return _outcome(channel, NotificationStatus.SENT, reached)
+
+
+def _outcome(
+    channel: NotificationChannel,
+    status: NotificationStatus,
+    destinations: int,
+    reason: str | None = None,
+) -> DeliveryOutcome:
+    return DeliveryOutcome(
+        channel_id=channel.channel_id,
+        name=channel.name,
+        kind=channel.destination.kind,
+        status=status,
+        destinations=destinations,
+        reason=reason,
+        at=datetime.now(UTC),
+    )

@@ -5,8 +5,16 @@ import logging
 from pydantic import SecretStr
 
 from app.domain.auth import CredentialRef, TokenAuthInput
-from app.domain.common import LabelMatcher, SourceKind
+from app.domain.common import LabelMatcher, Severity, SourceKind
 from app.domain.credentials import CredentialInput
+from app.domain.notifications import (
+    EmailDestination,
+    NotificationChannelInput,
+    NotificationPolicy,
+    NotifyWhen,
+    ScheduleNotification,
+    TelegramDestinationInput,
+)
 from app.domain.projects import (
     CloudflareSourceInput,
     GrafanaSourceInput,
@@ -15,10 +23,12 @@ from app.domain.projects import (
     SentrySourceInput,
     WazuhSourceInput,
 )
+from app.domain.schedule import ReportSchedule
 from app.settings import Settings
 from app.sources.cloudflare.synthetic import SYNTHETIC_ZONE_ID
 from app.sources.prometheus.synthetic import DEMO_CUSTOM_RULES, SCENARIOS
 from app.sources.sentry.synthetic import SYNTHETIC_ORGANIZATION
+from app.storage.channels import SqliteChannelRepository
 from app.storage.credentials import SqliteCredentialRepository
 from app.storage.projects import SqliteProjectRepository
 
@@ -36,9 +46,41 @@ DEMO_CREDENTIAL = CredentialInput(
     kind=SourceKind.GRAFANA,
     auth=TokenAuthInput(token=SecretStr("glsa_demo")),
 )
+DEMO_CHANNELS = [
+    NotificationChannelInput(
+        name="Demo: on-call email",
+        description="Synthetic; with EMAIL_PROVIDER=fake messages land in DATA_DIR/outbox.",
+        destination=EmailDestination(recipients=["oncall@example.com"]),
+    ),
+    NotificationChannelInput(
+        name="Demo: Ops chat",
+        description="Synthetic; with TELEGRAM_PROVIDER=fake nothing reaches Telegram.",
+        destination=TelegramDestinationInput(
+            bot_token=SecretStr("1000001:demo-token-for-the-fake-telegram-api"),
+            chat_id="-1001000000001",
+        ),
+    ),
+]
+DEMO_SCHEDULED_SCENARIO = "incident"
 
 
-def demo_projects(grafana_credential_id: str) -> list[ProjectInput]:
+def demo_schedule(email_channel_id: str, telegram_channel_id: str) -> ReportSchedule:
+    """A daily schedule that emails every report and posts problems to Telegram."""
+    return ReportSchedule(
+        time="08:00",
+        notifications=[
+            ScheduleNotification(
+                channel_id=email_channel_id, policy=NotificationPolicy(when=NotifyWhen.ALWAYS)
+            ),
+            ScheduleNotification(
+                channel_id=telegram_channel_id,
+                policy=NotificationPolicy(min_severity=Severity.HIGH),
+            ),
+        ],
+    )
+
+
+def demo_projects(grafana_credential_id: str, schedule: ReportSchedule) -> list[ProjectInput]:
     return [
         ProjectInput(
             name=f"Demo: {scenario}",
@@ -68,6 +110,7 @@ def demo_projects(grafana_credential_id: str) -> list[ProjectInput]:
                     auth=CredentialRef(credential_id=grafana_credential_id),
                 ),
             ],
+            schedule=schedule if scenario == DEMO_SCHEDULED_SCENARIO else None,
         )
         for scenario in SCENARIOS
     ]
@@ -77,6 +120,7 @@ async def bootstrap_projects(
     settings: Settings,
     projects: SqliteProjectRepository,
     credentials: SqliteCredentialRepository,
+    channels: SqliteChannelRepository,
 ) -> None:
     imported = await projects.import_legacy_source(settings.metrics_connection)
     if imported is not None:
@@ -99,9 +143,12 @@ async def bootstrap_projects(
         log.warning("moved source secrets into %d credential(s); see Credentials", moved)
 
     if settings.demo_projects and await projects.count() == 0:
-        credential = next(
+        grafana = next(
             (c for c in await credentials.list() if c.name == DEMO_CREDENTIAL.name), None
         ) or await credentials.create(DEMO_CREDENTIAL)
-        for data in demo_projects(credential.credential_id):
+        existing = {c.name: c for c in await channels.list()}
+        email, telegram = [existing.get(c.name) or await channels.create(c) for c in DEMO_CHANNELS]
+        schedule = demo_schedule(email.channel_id, telegram.channel_id)
+        for data in demo_projects(grafana.credential_id, schedule):
             await projects.create(data)
         log.info("seeded %d demo projects", len(SCENARIOS))

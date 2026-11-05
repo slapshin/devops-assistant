@@ -29,7 +29,6 @@ from app.domain.jobs import (
     StageProgress,
     StageStatus,
 )
-from app.domain.notifications import NotificationOutcome, NotificationStatus
 from app.domain.report import AnalysisReport, AnalysisRequest, ReportState
 from app.sources.factory import SourceNotConfigured
 from app.storage.secrets import SecretsUnreadable
@@ -223,28 +222,30 @@ class JobRunner:
             await self._notify(finished)
 
     async def _notify(self, job: AnalysisJob) -> None:
-        """Email a scheduled job's report; delivery never affects the job's outcome."""
+        """Deliver a scheduled job's report; delivery never affects the job's outcome.
+
+        The notifier bounds each target itself, well within NOTIFY_TIMEOUT_SECONDS; this outer
+        bound only protects the worker.
+        """
         if self.notifier is None or job.trigger is not JobTrigger.SCHEDULED:
             return
         try:
-            outcome = await asyncio.wait_for(
+            outcomes = await asyncio.wait_for(
                 self.notifier.job_finished(job), NOTIFY_TIMEOUT_SECONDS
             )
         except TimeoutError:
-            outcome = NotificationOutcome(
-                status=NotificationStatus.FAILED,
-                recipients=0,
-                reason=f"Email delivery exceeded {NOTIFY_TIMEOUT_SECONDS:.0f} s.",
-                at=datetime.now(UTC),
+            log.error(
+                "notifying analysis %s exceeded %.0f s", job.analysis_id, NOTIFY_TIMEOUT_SECONDS
             )
+            return
         except Exception:
             log.exception("notifying analysis %s failed", job.analysis_id)
             return
-        if outcome is not None:
+        if outcomes:
             try:
-                await self.repo.set_notification(job.analysis_id, outcome)
+                await self.repo.set_notifications(job.analysis_id, outcomes)
             except Exception:
-                log.exception("recording notification of analysis %s failed", job.analysis_id)
+                log.exception("recording notifications of analysis %s failed", job.analysis_id)
 
     async def _save(self, analysis_id: str, report: AnalysisReport) -> None:
         await self.repo.update_stage(

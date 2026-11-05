@@ -20,7 +20,7 @@ from app.domain.explanation import Explanation, ExplanationInput, ExplanationSta
 from app.domain.findings import DailyTrend, Evidence, Finding, SignalCoverage, TrendSummary
 from app.domain.jobs import AnalysisJob, JobError, JobState, StageProgress
 from app.domain.metrics import MetricCapability, MetricSeries
-from app.domain.notifications import NotificationOutcome
+from app.domain.notifications import DeliveryOutcome
 from app.domain.report import (
     AnalysisReport,
     AnalysisRequest,
@@ -239,8 +239,8 @@ class ReportRepository(Protocol):
         report_available: bool = False,
     ) -> AnalysisJob: ...
 
-    async def set_notification(self, analysis_id: str, outcome: NotificationOutcome) -> None:
-        """Record how a finished job's report was emailed (T025)."""
+    async def set_notifications(self, analysis_id: str, outcomes: list[DeliveryOutcome]) -> None:
+        """Record how a finished job's report was delivered to each target (T026)."""
         ...
 
     async def save_report(self, report: AnalysisReport) -> None: ...
@@ -261,8 +261,8 @@ class ReportRepository(Protocol):
 
 
 class JobNotifier(Protocol):
-    """Delivers a finished scheduled job's report (T025); never raises."""
+    """Delivers a finished scheduled job's report to its targets (T026); never raises."""
 
-    async def job_finished(self, job: AnalysisJob) -> NotificationOutcome | None:
-        """The delivery outcome; None when the project requests no notification."""
+    async def job_finished(self, job: AnalysisJob) -> list[DeliveryOutcome]:
+        """One outcome per enabled target; empty when the schedule has none."""
         ...

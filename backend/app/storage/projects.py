@@ -3,6 +3,9 @@
 A source row stores its config as JSON (``config["auth"]`` is ``none`` or ``credential``) and
 references the credential holding its secret with ``credential_id`` (T021). Rows saved before
 then kept an encrypted secret in ``secrets``; the startup import moves those into credentials.
+
+A schedule is stored as JSON without its notifications; those are rows of
+``schedule_notifications`` (T026), so the notification channel each uses is a real foreign key.
 """
 
 import asyncio
@@ -23,6 +26,7 @@ from app.domain.auth import (
 )
 from app.domain.common import LabelMatcher, SourceKind, format_utc
 from app.domain.ids import new_project_id
+from app.domain.notifications import ScheduleNotification
 from app.domain.projects import (
     SECRET_REQUIRED_KINDS,
     AnySource,
@@ -42,10 +46,22 @@ from app.domain.projects import (
 from app.domain.schedule import ReportSchedule
 from app.storage.auth import CredentialInvalid, connection_auth
 from app.storage.credentials import insert_credential
-from app.storage.db import app_meta, credentials, project_sources, projects
+from app.storage.db import (
+    app_meta,
+    credentials,
+    notification_channels,
+    project_sources,
+    projects,
+    schedule_notifications,
+)
 from app.storage.secrets import SecretBox, SecretsUnreadable
 
-__all__ = ["CredentialInvalid", "ProjectNameTaken", "SqliteProjectRepository"]
+__all__ = [
+    "CredentialInvalid",
+    "ProjectNameTaken",
+    "SqliteProjectRepository",
+    "UnknownChannel",
+]
 
 LEGACY_IMPORT_KEY = "legacy_source_import"
 """Set to 'pending' by migration 0003 when it created projects from existing reports."""
@@ -80,6 +96,15 @@ class ProjectNameTaken(Exception):
         self.name = name
 
 
+class UnknownChannel(Exception):
+    """A schedule notification references a channel that does not exist."""
+
+    def __init__(self, index: int) -> None:
+        super().__init__("no such notification channel")
+        self.field = f"schedule.notifications.{index}.channel_id"
+        self.message = "no such notification channel"
+
+
 class SqliteProjectRepository:
     def __init__(self, engine: sa.Engine, box: SecretBox) -> None:
         self.engine = engine
@@ -106,12 +131,22 @@ class SqliteProjectRepository:
         sources: dict[str, list[Any]] = {}
         for row in conn.execute(src_stmt.order_by(project_sources.c.kind)):
             sources.setdefault(row.project_id, []).append(row)
+        notifications = _notifications(conn, project_id)
         now = datetime.now(UTC)
         return [
-            self._project(row, sources.get(row.project_id, []), now) for row in conn.execute(stmt)
+            self._project(
+                row, sources.get(row.project_id, []), notifications.get(row.project_id), now
+            )
+            for row in conn.execute(stmt)
         ]
 
-    def _project(self, row: Any, source_rows: list[Any], now: datetime) -> Project:
+    def _project(
+        self,
+        row: Any,
+        source_rows: list[Any],
+        notifications: builtins.list[ScheduleNotification] | None,
+        now: datetime,
+    ) -> Project:
         readable = True
         for src in source_rows:
             _, blob = _effective_auth(src)
@@ -121,6 +156,8 @@ class SqliteProjectRepository:
                 except SecretsUnreadable:
                     readable = False
         schedule = _schedule(row.schedule)
+        if schedule is not None and notifications:
+            schedule = schedule.model_copy(update={"notifications": notifications})
         return Project(
             project_id=row.project_id,
             name=row.name,
@@ -275,12 +312,43 @@ class SqliteProjectRepository:
             conn.execute(project_sources.insert(), rows)
 
     @staticmethod
+    def _write_notifications(conn: sa.Connection, project_id: str, data: ProjectInput) -> None:
+        """Replace the schedule's notifications; none without a schedule. Raises UnknownChannel."""
+        wanted = data.schedule.notifications if data.schedule else []
+        known = {
+            channel_id
+            for (channel_id,) in conn.execute(
+                sa.select(notification_channels.c.channel_id).where(
+                    notification_channels.c.channel_id.in_([n.channel_id for n in wanted])
+                )
+            )
+        }
+        rows = []
+        for i, notification in enumerate(wanted):
+            if notification.channel_id not in known:
+                raise UnknownChannel(i)
+            rows.append(
+                {
+                    "project_id": project_id,
+                    "channel_id": notification.channel_id,
+                    "position": i,
+                    "enabled": notification.enabled,
+                    "policy": notification.policy.model_dump_json(),
+                }
+            )
+        conn.execute(
+            schedule_notifications.delete().where(schedule_notifications.c.project_id == project_id)
+        )
+        if rows:
+            conn.execute(schedule_notifications.insert(), rows)
+
+    @staticmethod
     def _values(data: ProjectInput) -> dict[str, Any]:
         return {
             "name": data.name,
             "description": data.description,
             "matchers": json.dumps([m.model_dump() for m in data.matchers]),
-            "schedule": data.schedule.model_dump_json() if data.schedule else None,
+            "schedule": data.schedule.timing().model_dump_json() if data.schedule else None,
             "keep_reports": data.keep_reports,
         }
 
@@ -308,6 +376,7 @@ class SqliteProjectRepository:
                 )
             )
             self._write_sources(conn, project_id, data, now)
+            self._write_notifications(conn, project_id, data)
             return self._load(conn, project_id)[0]
 
         return await self._run(q)
@@ -324,8 +393,10 @@ class SqliteProjectRepository:
             if self._name_taken(conn, data.name, project_id):
                 raise ProjectNameTaken(data.name)
             values = self._values(data)
-            if _schedule(stored.schedule) != data.schedule:
-                # A changed schedule starts now: it never fires for earlier times.
+            timing = data.schedule.timing() if data.schedule else None
+            if _schedule(stored.schedule) != timing:
+                # A changed schedule starts now: it never fires for earlier times. Editing only
+                # its notifications is not a change of when it runs.
                 values["schedule_anchor"] = now if data.schedule else None
             conn.execute(
                 projects.update()
@@ -333,6 +404,7 @@ class SqliteProjectRepository:
                 .values(updated_at=now, **values)
             )
             self._write_sources(conn, project_id, data, now)
+            self._write_notifications(conn, project_id, data)
             return self._load(conn, project_id)[0]
 
         return await self._run(q)
@@ -432,6 +504,22 @@ def _legacy_auth(conn: PrometheusConnection) -> tuple[dict[str, Any] | None, dic
 
 def _schedule(raw: str | None) -> ReportSchedule | None:
     return ReportSchedule.model_validate_json(raw) if raw else None
+
+
+def _notifications(
+    conn: sa.Connection, project_id: str | None
+) -> dict[str, builtins.list[ScheduleNotification]]:
+    table = schedule_notifications
+    stmt = sa.select(table).order_by(table.c.project_id, table.c.position)
+    if project_id is not None:
+        stmt = stmt.where(table.c.project_id == project_id)
+    found: dict[str, builtins.list[ScheduleNotification]] = {}
+    for row in conn.execute(stmt):
+        notification = ScheduleNotification.model_validate(
+            {"channel_id": row.channel_id, "enabled": row.enabled, "policy": json.loads(row.policy)}
+        )
+        found.setdefault(row.project_id, []).append(notification)
+    return found
 
 
 def _effective_auth(row: Any) -> tuple[dict[str, Any], bytes | None]:

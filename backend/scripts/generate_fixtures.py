@@ -82,9 +82,17 @@ from app.domain.jobs import (
 )
 from app.domain.metrics import CapabilityStatus, MetricCapability, MetricSeries
 from app.domain.notifications import (
-    EmailNotification,
-    NotificationOutcome,
+    ChannelKind,
+    ChannelUsage,
+    DeliveryOutcome,
+    EmailDestination,
+    NotificationChannel,
+    NotificationChannelList,
+    NotificationPolicy,
     NotificationStatus,
+    NotifyWhen,
+    ScheduleNotification,
+    TelegramDestination,
 )
 from app.domain.projects import (
     ConnectionTest,
@@ -131,11 +139,21 @@ SCOPE = Scope(
 )
 SCOPE_LABELS = {m.name: m.value for m in SCOPE.matchers}
 T = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
+EMAIL_CHANNEL_ID = "0199a0c0-0000-7000-8000-00000000e001"
+TELEGRAM_CHANNEL_ID = "0199a0c0-0000-7000-8000-00000000e002"
 SCHEDULE = ReportSchedule(
     time="08:00",
     timezone="Europe/Berlin",
     weekdays=[Weekday.MON, Weekday.WED, Weekday.FRI],
-    notify=EmailNotification(recipients=["oncall@example.com"], min_severity=Severity.HIGH),
+    notifications=[
+        ScheduleNotification(
+            channel_id=EMAIL_CHANNEL_ID, policy=NotificationPolicy(when=NotifyWhen.ALWAYS)
+        ),
+        ScheduleNotification(
+            channel_id=TELEGRAM_CHANNEL_ID,
+            policy=NotificationPolicy(min_severity=Severity.CRITICAL),
+        ),
+    ],
 )
 STEP = timedelta(seconds=STEP_SECONDS)
 CONFIG = DetectorConfig()
@@ -1080,14 +1098,29 @@ def build() -> dict[str, BaseModel]:
             ids["running"], JobState.RUNNING, stage_at=StageName.COLLECTION
         ),
         "jobs/job_completed.json": completed,
-        "jobs/job_scheduled_emailed.json": completed.model_copy(
+        "jobs/job_scheduled_notified.json": completed.model_copy(
             update={
                 "trigger": JobTrigger.SCHEDULED,
-                "notification": NotificationOutcome(
-                    status=NotificationStatus.SENT,
-                    recipients=1,
-                    at=T + timedelta(minutes=2, seconds=3),
-                ),
+                "notifications": [
+                    DeliveryOutcome(
+                        channel_id=EMAIL_CHANNEL_ID,
+                        name="On-call email",
+                        kind=ChannelKind.EMAIL,
+                        status=NotificationStatus.SENT,
+                        destinations=1,
+                        at=T + timedelta(minutes=2, seconds=3),
+                    ),
+                    DeliveryOutcome(
+                        channel_id=TELEGRAM_CHANNEL_ID,
+                        name="Ops chat",
+                        kind=ChannelKind.TELEGRAM,
+                        status=NotificationStatus.FAILED,
+                        destinations=1,
+                        reason="Chat not found: check the chat ID and that the bot was added "
+                        "to the chat.",
+                        at=T + timedelta(minutes=2, seconds=3),
+                    ),
+                ],
             }
         ),
         "jobs/job_interrupted.json": job(
@@ -1144,6 +1177,29 @@ def build() -> dict[str, BaseModel]:
                     latest_analysis=completed,
                     report_count=1,
                 )
+            ]
+        ),
+        "api/notification_channels.json": NotificationChannelList(
+            items=[
+                NotificationChannel(
+                    channel_id=TELEGRAM_CHANNEL_ID,
+                    name="Ops chat",
+                    description="Shop on-call group, topic Alerts.",
+                    destination=TelegramDestination(
+                        chat_id="-1001000000001", message_thread_id=12, bot_token_set=True
+                    ),
+                    used_by=[ChannelUsage(project_id=PROJECT_ID, name=SCOPE.project_name)],
+                    created_at=T,
+                    updated_at=T,
+                ),
+                NotificationChannel(
+                    channel_id=EMAIL_CHANNEL_ID,
+                    name="On-call email",
+                    destination=EmailDestination(recipients=["oncall@example.com"]),
+                    used_by=[ChannelUsage(project_id=PROJECT_ID, name=SCOPE.project_name)],
+                    created_at=T,
+                    updated_at=T,
+                ),
             ]
         ),
         "api/credentials.json": CredentialList(

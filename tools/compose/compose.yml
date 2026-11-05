@@ -26,6 +26,7 @@ services:
       METRICS_URL: ${METRICS_URL:-http://host.docker.internal:8428}
       AI_PROVIDER: ${AI_PROVIDER:-openai}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      TELEGRAM_PROVIDER: ${TELEGRAM_PROVIDER:-bot_api}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # Container paths win over native values from config.env.

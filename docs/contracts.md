@@ -65,7 +65,7 @@ The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is
 - **Job** (`JobState`): `queued | running | completed | partial | failed | cancelled`. **Stages**: `discovery, collection, detection, trends, explanation, saving`, each `pending | running | done | failed | skipped`.
 - **Explanation**: `disabled | not_configured | pending | succeeded | failed | skipped_no_findings`, separate from the job state.
 - **Report**: `completed | partial`. Failed and cancelled jobs have no report.
-- **Notification** (`NotificationStatus`, T025): `sent | skipped | failed | not_configured`, on `AnalysisJob.notification` for scheduled jobs whose project asks for email; null otherwise. Separate from the job state.
+- **Notification** (`NotificationStatus`, T025/T026): `sent | skipped | failed | not_configured`, one `DeliveryOutcome` per enabled notification of the schedule in `AnalysisJob.notifications` (`channel_id`, `name`, `kind`, `status`, `destinations`, `reason`, `at`); empty for manual jobs and schedules without notifications. Separate from the job state.
 
 ## Exclusion codes
 
@@ -75,7 +75,7 @@ The analysis key is `<matchers>|T|config_hash` (T005; since T012 `<matchers>` is
 
 Routes and `ErrorCode` values are as listed in [DECISIONS §3](DECISIONS.md#3-api-conventions), and are visible in `docs/contracts/openapi.json`. Errors are `application/problem+json` with `{type, title, status, detail?, code, errors?}`. Validation errors list `errors[{field, message}]`, where `field` is a dotted location such as `body.matchers.0.name`.
 
-`POST /api/notifications/test-email` (T025) returns `409 email_not_configured` without email delivery and `502 email_failed` when sending fails (the SMTP error in `detail`).
+`/api/notification-channels` (T026) manages app-level channels: `GET` (list, with `used_by`), `POST`, `GET/PUT/DELETE /{channel_id}`; secrets are write-only (`bot_token` in input, `bot_token_set` in output; omitted on update keeps the stored token); `409 channel_name_taken`, `409 channel_in_use` (a schedule sends to it), `404 channel_not_found`. `GET /kinds` lists each kind (`email`, `telegram`) with `available` and the server's `reason`. `POST /test` with `{channel_id?, destination}` sends a test message (an omitted token comes from `channel_id`): `409 channel_not_configured` when the server cannot deliver to the kind, `502 delivery_failed` with a safe reason in `detail` (never a token). `POST /telegram/chats` with `{bot_token}` or `{channel_id}` (T027) returns the bot's username and recently seen chats; `409 telegram_webhook_set` when the bot uses a webhook. A schedule notification naming an unknown channel is a `422` at `schedule.notifications.<i>.channel_id`.
 
 `not_implemented` (501) was a foundation-only code; since T007 no route returns it. Cancelled jobs have `error: null`. An unreadable saved schema returns 404 with `code=schema_unsupported`. `METRICS_URL=synthetic://<healthy|incident|short-history|degraded>` selects the deterministic demo source; its reports carry `source.backend="synthetic"`.
 

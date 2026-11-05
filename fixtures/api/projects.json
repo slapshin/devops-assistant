@@ -38,13 +38,24 @@
           "wed",
           "fri"
         ],
-        "notify": {
-          "recipients": [
-            "oncall@example.com"
-          ],
-          "when": "problems",
-          "min_severity": "high"
-        }
+        "notifications": [
+          {
+            "channel_id": "0199a0c0-0000-7000-8000-00000000e001",
+            "enabled": true,
+            "policy": {
+              "when": "always",
+              "min_severity": "high"
+            }
+          },
+          {
+            "channel_id": "0199a0c0-0000-7000-8000-00000000e002",
+            "enabled": true,
+            "policy": {
+              "when": "problems",
+              "min_severity": "critical"
+            }
+          }
+        ]
       },
       "keep_reports": null,
       "next_scheduled_run": "2026-10-02T06:00:00Z",
@@ -157,7 +168,7 @@
           0,
           2
         ],
-        "notification": null
+        "notifications": []
       },
       "active_analysis": null,
       "report_count": 1

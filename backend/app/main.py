@@ -13,7 +13,7 @@ from app import __version__
 from app.ai.providers import provider_from_settings
 from app.analysis.engine import RobustDetector
 from app.api.credentials import router as credentials_router
-from app.api.notifications import router as notifications_router
+from app.api.notification_channels import router as notification_channels_router
 from app.api.problems import install_problem_handlers
 from app.api.projects import router as projects_router
 from app.api.routes import router
@@ -22,13 +22,14 @@ from app.container import Services
 from app.domain.detector_config import DetectorConfig
 from app.domain.interfaces import ExplanationProvider, MetricsSource
 from app.jobs import JobRunner, RunnerLimits
+from app.notifications.drivers import Drivers, build_drivers
 from app.notifications.notifier import ReportNotifier
-from app.notifications.transport import sender_address, transport_from_settings
 from app.scheduler import ReportScheduler
 from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
 from app.sources.factory import ProjectSources
 from app.static import mount_ui
+from app.storage.channels import SqliteChannelRepository
 from app.storage.credentials import SqliteCredentialRepository
 from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository
@@ -67,8 +68,10 @@ def build_services(
     source: MetricsSource | None = None,
     provider: ExplanationProvider | None = None,
     limits: RunnerLimits | None = None,
+    drivers: Drivers | None = None,
 ) -> Services:
-    """``source``, when given, replaces every project's metrics source (tests, fixtures)."""
+    """``source``, when given, replaces every project's metrics source (tests, fixtures);
+    ``drivers`` replaces the notification channel drivers built from the settings."""
     config = load_detector_config(settings)
 
     unavailable, reason = settings.explanation_status, None
@@ -81,17 +84,23 @@ def build_services(
     credentials = SqliteCredentialRepository(repo.engine, box)
     sources = ProjectSources(projects, override=source)
     pipeline = AnalysisPipeline(sources, RobustDetector(), config, provider, unavailable, reason)
-    notifier = ReportNotifier(
-        projects,
-        repo,
-        transport_from_settings(settings),
-        sender_address(settings),
-        settings.app_public_url,
-    )
+    channels = SqliteChannelRepository(repo.engine, box)
+    if drivers is None:
+        drivers = build_drivers(settings)
+    notifier = ReportNotifier(projects, repo, channels, drivers, settings.app_public_url)
     runner = JobRunner(repo, pipeline, config, settings.explanation_status, limits, notifier)
     scheduler = ReportScheduler(projects, runner)
     return Services(
-        settings, config, sources, repo, runner, projects, scheduler, credentials, notifier
+        settings,
+        config,
+        sources,
+        repo,
+        runner,
+        projects,
+        scheduler,
+        credentials,
+        channels,
+        notifier,
     )
 
 
@@ -100,6 +109,7 @@ def create_app(
     source: MetricsSource | None = None,
     provider: ExplanationProvider | None = None,
     limits: RunnerLimits | None = None,
+    drivers: Drivers | None = None,
 ) -> FastAPI:
     if settings is None:
         try:
@@ -110,21 +120,24 @@ def create_app(
 
     logging.basicConfig(level=settings.log_level)
     try:
-        services = build_services(settings, source, provider, limits)
+        services = build_services(settings, source, provider, limits, drivers)
     except ConfigError as exc:
         print(exc, file=sys.stderr)
         raise SystemExit(CONFIG_ERROR_EXIT_CODE) from None
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
-        await bootstrap_projects(settings, services.projects, services.credentials)
+        await bootstrap_projects(
+            settings, services.projects, services.credentials, services.channels
+        )
         recovered = await services.runner.start()
         services.scheduler.start()
         log.info(
-            "started version=%s ai=%s email=%s db=%s interrupted_jobs_failed=%d",
+            "started version=%s ai=%s email=%s telegram=%s db=%s interrupted_jobs_failed=%d",
             __version__,
             settings.explanation_status.value,
             "on" if settings.email_configured else "off",
+            settings.telegram_provider.value,
             settings.database_path,
             recovered,
         )
@@ -155,7 +168,7 @@ def create_app(
     app.include_router(router)
     app.include_router(projects_router)
     app.include_router(credentials_router)
-    app.include_router(notifications_router)
+    app.include_router(notification_channels_router)
     if settings.ui_dir is not None:
         mount_ui(app, settings.ui_dir)
     return app

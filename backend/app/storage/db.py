@@ -68,6 +68,41 @@ project_sources = sa.Table(
     ),
 )
 
+notification_channels = sa.Table(
+    "notification_channels",
+    metadata,
+    sa.Column("channel_id", sa.String(36), primary_key=True),
+    sa.Column("name", sa.String(100, collation="NOCASE"), nullable=False, unique=True),
+    sa.Column("description", sa.Text, nullable=True),
+    sa.Column("kind", sa.String(32), nullable=False),
+    sa.Column("destination", sa.Text, nullable=False, comment="JSON destination without secrets"),
+    sa.Column("secrets", sa.LargeBinary, nullable=True, comment="Fernet-encrypted JSON"),
+    sa.Column("created_at", sa.String(20), nullable=False),
+    sa.Column("updated_at", sa.String(20), nullable=False),
+)
+"""Application-level notification channels (T026)."""
+
+schedule_notifications = sa.Table(
+    "schedule_notifications",
+    metadata,
+    sa.Column(
+        "project_id",
+        sa.String(36),
+        sa.ForeignKey("projects.project_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    sa.Column(
+        "channel_id",
+        sa.String(36),
+        sa.ForeignKey("notification_channels.channel_id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
+    sa.Column("position", sa.Integer, nullable=False),
+    sa.Column("enabled", sa.Boolean, nullable=False),
+    sa.Column("policy", sa.Text, nullable=False, comment="JSON NotificationPolicy"),
+)
+"""The channels a project's schedule sends to, each with its policy (T026)."""
+
 analysis_jobs = sa.Table(
     "analysis_jobs",
     metadata,

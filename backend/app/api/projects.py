@@ -44,7 +44,7 @@ from app.sources.sentry.connect import connect_sentry, probe_sentry
 from app.sources.sentry.synthetic import SCENARIOS as SENTRY_SCENARIOS
 from app.sources.wazuh.connect import connect_wazuh, probe_wazuh
 from app.sources.wazuh.synthetic import SCENARIOS as WAZUH_SCENARIOS
-from app.storage.projects import CredentialInvalid, ProjectNameTaken
+from app.storage.projects import CredentialInvalid, ProjectNameTaken, UnknownChannel
 from app.storage.secrets import SecretsUnreadable
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -109,6 +109,8 @@ def _write_error(exc: Exception, field_prefix: str) -> ProblemError:
                 "Project name taken",
                 f"A project named {name!r} already exists.",
             )
+        case UnknownChannel(field=field, message=message):
+            return _invalid(f"body.{field}", message)
         case CredentialInvalid(field=field, message=message):
             return _invalid(f"{field_prefix}.{field}", message)
         case SecretsUnreadable():
@@ -142,7 +144,7 @@ async def create_project(data: ProjectInput, services: ServicesDep) -> Project:
     _validate(data)
     try:
         return await services.projects.create(data)
-    except (ProjectNameTaken, CredentialInvalid) as exc:
+    except (ProjectNameTaken, CredentialInvalid, UnknownChannel) as exc:
         raise _write_error(exc, "body.sources") from None
 
 
@@ -159,7 +161,7 @@ async def update_project(project_id: str, data: ProjectInput, services: Services
     _validate(data)
     try:
         project = await services.projects.update(project_id, data)
-    except (ProjectNameTaken, CredentialInvalid) as exc:
+    except (ProjectNameTaken, CredentialInvalid, UnknownChannel) as exc:
         raise _write_error(exc, "body.sources") from None
     if project is None:
         raise _not_found(project_id)

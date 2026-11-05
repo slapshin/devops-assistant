@@ -56,11 +56,17 @@ All settings are environment variables, optionally read from `config.env` in the
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | unset | Optional SMTP login (both or neither). |
 | `SMTP_FROM` | unset | Sender address, e.g. `devops-assistant@example.com`. |
 | `EMAIL_PROVIDER` | `smtp` | `fake` writes messages to `DATA_DIR/outbox/*.eml` instead of sending (`make demo` uses it); `none` turns email off. |
-| `APP_PUBLIC_URL` | unset | URL the app is opened at; emailed reports link to it. |
+| `APP_PUBLIC_URL` | unset | URL the app is opened at; notifications link to the report. |
+| `TELEGRAM_PROVIDER` | `bot_api` | `fake` writes messages to `DATA_DIR/outbox/telegram/*.json` instead of sending (`make demo` uses it); `none` turns Telegram off. |
+| `TELEGRAM_API_URL` | `https://api.telegram.org` | Bot API base URL, e.g. a self-hosted Bot API server. Set `HTTPS_PROXY` where Telegram is only reachable through a proxy. |
 
-### Email notifications
+### Notifications
 
-A project's schedule can email each report (*Edit project → Schedule → Email the report*): to up to 20 addresses, either after every run or only on problems (a failed or partial run, or a finding at or above the chosen severity; *high* by default). Manual runs are never emailed. The email lists the window, state, finding counts, the 10 most severe findings, the AI summary when there is one, what was not included, and a link to the report when `APP_PUBLIC_URL` is set. *Send test email* checks the SMTP settings; each scheduled run in the analysis history says *emailed*, *not emailed*, *email failed* (reason on hover) or *email not configured*. There are no retries: a failed delivery is recorded and the next scheduled run tries again.
+Notifications have two parts. A **notification channel** says *where*: an email list or a Telegram chat, set up once under *Notification channels* (rail icon) and shared by every project. A project's schedule then says *when*: *Edit project → Schedule → Notifications → Add notification* picks a channel and its rule, after every run or only on problems (a failed or partial run, or a finding at or above the chosen severity; *high* by default), up to 10 channels per schedule. The same channel can get every report from one project and only critical ones from another. Manual runs are never delivered. Editing a channel applies to every project at its next run; a channel in use cannot be deleted. Every message lists the window, state, finding counts, the most severe findings, the AI summary when there is one (marked unverified), what was not evaluated or included, and a link to the report when `APP_PUBLIC_URL` is set. *Send test message* on the channel form checks a channel (also before it is saved); each scheduled run in the analysis history says how many notifications were sent (details and failure reasons on hover). Channels are delivered independently: a broken Telegram chat never stops the email. There are no retries: a failed delivery is recorded and the next scheduled run tries again.
+
+**Email** needs `SMTP_HOST` and `SMTP_FROM`; recipients are up to 20 plain addresses per channel.
+
+**Telegram** needs a bot: create one with [@BotFather](https://t.me/BotFather), then create a *Telegram* channel with its token (stored encrypted, never shown again). Add the bot to the group (or as an administrator to a channel), send any message there, and use *Find chats* to pick the chat; it lists chats the bot saw in the last 24 hours (not available while the bot has a webhook; then paste the chat ID). For a group with topics, set the topic ID (the number at the end of a topic message link). With *After every run*, reports without problems are posted silently. Messages are limited to 4096 characters: when a report does not fit, the least severe findings are left out ("and N more"). To use one bot in several chats, enter its token in each chat's channel.
 
 In Docker, an SMTP relay on the host is reached at `host.docker.internal`, not `localhost`.
 
@@ -170,6 +176,10 @@ docker compose -f tools/compose/compose.yml cp assistant:/data/backup.sqlite3 ./
 | AI `failed (…)` | A provider problem (timeout, rate limit, refusal, invalid output). Findings and evidence are still complete. |
 | Scheduled run shows *email failed* | Hover for the SMTP error. `SMTPAuthenticationError`: check `SMTP_USERNAME`/`SMTP_PASSWORD`. `ConnectionRefusedError`/`TimeoutError`: check `SMTP_HOST`/`SMTP_PORT` (Docker: `host.docker.internal`) and `SMTP_SECURITY` (465 needs `tls`). `SSLCertVerificationError`: install the relay's CA, or for an internal relay set `SMTP_TLS_VERIFY=false`. Use *Send test email* to retry. |
 | Scheduled run shows *email not configured* | Set `SMTP_HOST` and `SMTP_FROM` and restart. |
+| Telegram: *Bot token rejected* | The channel's bot token is wrong or was revoked in @BotFather; enter a new one in the channel. |
+| Telegram: *Chat not found* / *bot cannot post in this chat* | Add the bot to the chat (channels: as an administrator) and check the chat ID; for a user chat, the user must start the bot first. |
+| Telegram: *group was upgraded to a supergroup* | Telegram changed the chat ID; set the new ID shown in the reason. |
+| Telegram: *Telegram API unreachable* | The app cannot reach `api.telegram.org`: check outbound HTTPS, set `HTTPS_PROXY`, or point `TELEGRAM_API_URL` at a reachable Bot API server. |
 | `429 queue_full` | Wait for the running and queued analyses (up to 5 in total). |
 | Container stays `unhealthy` | Check `make logs`: usually an invalid configuration (exit code 2) or an unwritable `/data`. |
 

@@ -27,6 +27,14 @@ class EmailProvider(StrEnum):
     NONE = "none"
 
 
+class TelegramProvider(StrEnum):
+    BOT_API = "bot_api"
+    """Deliver through the Telegram Bot API at TELEGRAM_API_URL."""
+    FAKE = "fake"
+    """Write each message as JSON to DATA_DIR/outbox/telegram (tests and offline demos)."""
+    NONE = "none"
+
+
 class SmtpSecurity(StrEnum):
     STARTTLS = "starttls"
     TLS = "tls"
@@ -79,7 +87,11 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     """Sender address, e.g. devops-assistant@example.com."""
     app_public_url: str | None = None
-    """Base URL users open the app at; emailed reports link to it. No link when unset."""
+    """Base URL users open the app at; notifications link to it. No link when unset."""
+
+    telegram_provider: TelegramProvider = TelegramProvider.BOT_API
+    telegram_api_url: str = "https://api.telegram.org"
+    """Bot API base URL; change it for a self-hosted Bot API server."""
 
     demo_projects: bool = False
     """Seed one synthetic demo project per scenario when no project exists."""
@@ -106,6 +118,14 @@ class Settings(BaseSettings):
             return None
         if not value.startswith(("http://", "https://")) or any(c.isspace() for c in value):
             raise ValueError("expected an http(s) URL such as https://assistant.example.com")
+        return value.rstrip("/")
+
+    @field_validator("telegram_api_url")
+    @classmethod
+    def _valid_telegram_url(cls, value: str) -> str:
+        value = value.strip()
+        if not value.startswith(("http://", "https://")) or any(c.isspace() for c in value):
+            raise ValueError("expected an http(s) URL such as https://api.telegram.org")
         return value.rstrip("/")
 
     @field_validator("log_level")
@@ -149,6 +169,10 @@ class Settings(BaseSettings):
     @property
     def outbox_dir(self) -> Path:
         return self.data_dir / "outbox"
+
+    @property
+    def telegram_outbox_dir(self) -> Path:
+        return self.outbox_dir / "telegram"
 
     @property
     def metrics_connection(self) -> PrometheusConnection | None:

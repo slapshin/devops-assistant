@@ -105,10 +105,24 @@
     0,
     2
   ],
-  "notification": {
-    "status": "sent",
-    "recipients": 1,
-    "reason": null,
-    "at": "2026-09-30T10:07:03Z"
-  }
+  "notifications": [
+    {
+      "channel_id": "0199a0c0-0000-7000-8000-00000000e001",
+      "name": "On-call email",
+      "kind": "email",
+      "status": "sent",
+      "destinations": 1,
+      "reason": null,
+      "at": "2026-09-30T10:07:03Z"
+    },
+    {
+      "channel_id": "0199a0c0-0000-7000-8000-00000000e002",
+      "name": "Ops chat",
+      "kind": "telegram",
+      "status": "failed",
+      "destinations": 1,
+      "reason": "Chat not found: check the chat ID and that the bot was added to the chat.",
+      "at": "2026-09-30T10:07:03Z"
+    }
+  ]
 }

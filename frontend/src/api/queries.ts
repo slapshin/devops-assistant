@@ -15,8 +15,14 @@ import {
   type ConnectionTestRequest,
   type CustomRulePreview,
   type CustomRulePreviewRequest,
-  type EmailTestRequest,
-  type EmailTestResult,
+  type ChannelKindList,
+  type ChannelTestRequest,
+  type ChannelTestResult,
+  type NotificationChannel,
+  type NotificationChannelInput,
+  type NotificationChannelList,
+  type TelegramChatList,
+  type TelegramChatsRequest,
   type FindingDetail,
   type ProjectInput,
   type ProjectList,
@@ -86,6 +92,7 @@ function useProjectMutation<A, T>(fn: (args: A) => Promise<T>, removes?: (args: 
       void client.invalidateQueries({ queryKey: ["project"] });
       void client.invalidateQueries({ queryKey: ["project-health"] });
       void client.invalidateQueries({ queryKey: ["credentials"] });
+      void client.invalidateQueries({ queryKey: ["notification-channels"] });
     },
   });
 }
@@ -135,9 +142,46 @@ export function useTestConnection() {
   });
 }
 
-export function useTestEmail() {
+export function useNotificationChannels() {
+  return useQuery({ queryKey: ["notification-channels"], queryFn: () => apiGet<NotificationChannelList>("/api/notification-channels") });
+}
+
+/** Channel kinds and whether the server can deliver to each. */
+export function useChannelKinds() {
+  return useQuery({ queryKey: ["notification-channel-kinds"], queryFn: () => apiGet<ChannelKindList>("/api/notification-channels/kinds") });
+}
+
+const channelPath = (id: string) => `/api/notification-channels/${encodeURIComponent(id)}` as const;
+
+/** Channels change what project pages show (their names). */
+function useChannelMutation<A, T>(fn: (args: A) => Promise<T>) {
+  const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: EmailTestRequest) => apiPost<EmailTestResult>("/api/notifications/test-email", body),
+    mutationFn: fn,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["notification-channels"] });
+    },
+  });
+}
+
+export const useCreateChannel = () =>
+  useChannelMutation((body: NotificationChannelInput) => apiPost<NotificationChannel>("/api/notification-channels", body));
+
+export const useUpdateChannel = () =>
+  useChannelMutation(({ id, body }: { id: string; body: NotificationChannelInput }) => apiPut<NotificationChannel>(channelPath(id), body));
+
+export const useDeleteChannel = () => useChannelMutation((id: string) => apiDelete<void>(channelPath(id)));
+
+export function useTestChannel() {
+  return useMutation({
+    mutationFn: (body: ChannelTestRequest) => apiPost<ChannelTestResult>("/api/notification-channels/test", body),
+  });
+}
+
+/** A bot (typed token, or the stored one of a channel) and the chats that recently messaged it. */
+export function useTelegramChats() {
+  return useMutation({
+    mutationFn: (body: TelegramChatsRequest) => apiPost<TelegramChatList>("/api/notification-channels/telegram/chats", body),
   });
 }
 

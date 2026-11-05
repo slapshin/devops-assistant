@@ -177,7 +177,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/notifications/test-email": {
+    "/api/notification-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Channels */
+        get: operations["list_channels_api_notification_channels_get"];
+        put?: never;
+        /** Create Channel */
+        post: operations["create_channel_api_notification_channels_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notification-channels/kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Kinds
+         * @description Every channel kind and whether this server can deliver to it.
+         */
+        get: operations["list_kinds_api_notification_channels_kinds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notification-channels/telegram/chats": {
         parameters: {
             query?: never;
             header?: never;
@@ -186,9 +224,59 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send Test Email */
-        post: operations["send_test_email_api_notifications_test_email_post"];
+        /**
+         * Telegram Chats
+         * @description A bot (its token, or the one stored for ``channel_id``) and the chats that recently
+         *     messaged it or added it.
+         */
+        post: operations["telegram_chats_api_notification_channels_telegram_chats_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notification-channels/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Test
+         * @description Send a short test message to a destination, saved or not; an omitted secret comes from
+         *     ``channel_id``.
+         */
+        post: operations["send_test_api_notification_channels_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notification-channels/{channel_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Channel */
+        get: operations["get_channel_api_notification_channels__channel_id__get"];
+        /**
+         * Update Channel
+         * @description Every project sending to the channel uses the new destination from its next run on.
+         */
+        put: operations["update_channel_api_notification_channels__channel_id__put"];
+        post?: never;
+        /**
+         * Delete Channel
+         * @description Only a channel no schedule sends to can be deleted.
+         */
+        delete: operations["delete_channel_api_notification_channels__channel_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -361,8 +449,11 @@ export interface components {
             } | null;
             /** Finished At */
             finished_at?: string | null;
-            /** @description Email delivery of a scheduled report (T025); null when none was requested. */
-            notification?: components["schemas"]["NotificationOutcome"] | null;
+            /**
+             * Notifications
+             * @description Delivery of a scheduled report, one outcome per enabled notification target (T026); empty for manual analyses and schedules without targets.
+             */
+            notifications?: components["schemas"]["DeliveryOutcome"][];
             /** Report Available */
             report_available: boolean;
             scope: components["schemas"]["Scope"];
@@ -541,6 +632,60 @@ export interface components {
          * @enum {string}
          */
         ChangeDirection: "up" | "down" | "both";
+        /**
+         * ChannelKind
+         * @enum {string}
+         */
+        ChannelKind: "email" | "telegram";
+        /** ChannelKindInfo */
+        ChannelKindInfo: {
+            /** Available */
+            available: boolean;
+            kind: components["schemas"]["ChannelKind"];
+            /**
+             * Reason
+             * @description Why the server cannot deliver.
+             */
+            reason?: string | null;
+        };
+        /**
+         * ChannelKindList
+         * @description GET /api/notification-channels/kinds.
+         */
+        ChannelKindList: {
+            /** Items */
+            items: components["schemas"]["ChannelKindInfo"][];
+        };
+        /**
+         * ChannelTestRequest
+         * @description Body of POST /api/notification-channels/test: a destination, saved or not.
+         *
+         *     ``channel_id`` supplies a stored secret the destination omits (an edited channel).
+         */
+        ChannelTestRequest: {
+            /** Channel Id */
+            channel_id?: string | null;
+            /** Destination */
+            destination: components["schemas"]["EmailDestination"] | components["schemas"]["TelegramDestinationInput"];
+        };
+        /** ChannelTestResult */
+        ChannelTestResult: {
+            /**
+             * Detail
+             * @description What was sent, e.g. "sent to Ops chat (supergroup)".
+             */
+            detail: string;
+            kind: components["schemas"]["ChannelKind"];
+            /** Sent At */
+            sent_at: string;
+        };
+        /** ChannelUsage */
+        ChannelUsage: {
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: string;
+        };
         /** CloudflareSource */
         CloudflareSource: {
             /** Api Url */
@@ -925,20 +1070,50 @@ export interface components {
             window: components["schemas"]["TimeRange"];
         };
         /**
+         * DeliveryOutcome
+         * @description What happened to one notification when a scheduled analysis finished.
+         */
+        DeliveryOutcome: {
+            /** At */
+            at: string;
+            /**
+             * Channel Id
+             * @description Null for outcomes recorded before channels existed (T025).
+             */
+            channel_id?: string | null;
+            /**
+             * Destinations
+             * @description Recipients or chats addressed.
+             */
+            destinations: number;
+            kind: components["schemas"]["ChannelKind"];
+            /**
+             * Name
+             * @description The channel's name at delivery time.
+             */
+            name: string;
+            /**
+             * Reason
+             * @description Why skipped, failed, or not configured.
+             */
+            reason?: string | null;
+            status: components["schemas"]["NotificationStatus"];
+        };
+        /**
          * DetectionMethod
          * @enum {string}
          */
         DetectionMethod: "relative" | "absolute";
         /**
-         * EmailNotification
-         * @description Email each scheduled report to ``recipients`` when ``when`` matches.
+         * EmailDestination
+         * @description Email the report to ``recipients`` through the server's SMTP configuration.
          */
-        EmailNotification: {
+        EmailDestination: {
             /**
-             * @description Lowest finding severity that sends (problems only).
-             * @default high
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
-            min_severity: components["schemas"]["Severity"];
+            kind: "email";
             /**
              * Recipients
              * @description Plain email addresses (no display names); duplicates are removed.
@@ -947,26 +1122,6 @@ export interface components {
              *     ]
              */
             recipients: string[];
-            /**
-             * @description always, or problems: failed or partial analyses and findings at or above min_severity.
-             * @default problems
-             */
-            when: components["schemas"]["NotifyWhen"];
-        };
-        /**
-         * EmailTestRequest
-         * @description Body of POST /api/notifications/test-email.
-         */
-        EmailTestRequest: {
-            /** Recipients */
-            recipients: string[];
-        };
-        /** EmailTestResult */
-        EmailTestResult: {
-            /** Recipients */
-            recipients: string[];
-            /** Sent At */
-            sent_at: string;
         };
         /**
          * Entity
@@ -1022,7 +1177,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "credential_not_found" | "credential_name_taken" | "credential_in_use" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "finding_not_found" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "email_not_configured" | "email_failed" | "internal_error" | "not_implemented";
+        ErrorCode: "validation_error" | "project_not_found" | "project_name_taken" | "project_busy" | "source_not_configured" | "credentials_unreadable" | "credential_not_found" | "credential_name_taken" | "credential_in_use" | "analysis_not_found" | "report_not_ready" | "report_unavailable" | "finding_not_found" | "schema_unsupported" | "analysis_not_active" | "queue_full" | "metrics_source_unavailable" | "end_time_invalid" | "interrupted_by_restart" | "job_timeout" | "channel_not_found" | "channel_name_taken" | "channel_in_use" | "channel_not_configured" | "delivery_failed" | "telegram_webhook_set" | "internal_error" | "not_implemented";
         /**
          * ErrorKindActivity
          * @description One error kind (Sentry issue) and its error events during a finding on its project.
@@ -1607,21 +1762,64 @@ export interface components {
              */
             type: "none";
         };
-        /** NotificationOutcome */
-        NotificationOutcome: {
-            /** At */
-            at: string;
+        /** NotificationChannel */
+        NotificationChannel: {
+            /** Channel Id */
+            channel_id: string;
+            /** Created At */
+            created_at: string;
+            /** Description */
+            description?: string | null;
+            /** Destination */
+            destination: components["schemas"]["EmailDestination"] | components["schemas"]["TelegramDestination"];
+            /** Name */
+            name: string;
             /**
-             * Reason
-             * @description Why skipped, failed, or not configured.
+             * Readable
+             * @description False when the stored secret cannot be decrypted (lost or changed key).
+             * @default true
              */
-            reason?: string | null;
+            readable: boolean;
+            /** Updated At */
+            updated_at: string;
             /**
-             * Recipients
-             * @description Number of recipients addressed.
+             * Used By
+             * @description Projects whose schedule sends to the channel.
              */
-            recipients: number;
-            status: components["schemas"]["NotificationStatus"];
+            used_by?: components["schemas"]["ChannelUsage"][];
+        };
+        /**
+         * NotificationChannelInput
+         * @description Body of POST /api/notification-channels and PUT /api/notification-channels/{id}.
+         */
+        NotificationChannelInput: {
+            /** Description */
+            description?: string | null;
+            /** Destination */
+            destination: components["schemas"]["EmailDestination"] | components["schemas"]["TelegramDestinationInput"];
+            /**
+             * Name
+             * @example Ops chat
+             */
+            name: string;
+        };
+        /** NotificationChannelList */
+        NotificationChannelList: {
+            /** Items */
+            items: components["schemas"]["NotificationChannel"][];
+        };
+        /** NotificationPolicy */
+        NotificationPolicy: {
+            /**
+             * @description Lowest finding severity that counts as a problem. With always, reports below it are delivered silently where the channel supports that (Telegram).
+             * @default high
+             */
+            min_severity: components["schemas"]["Severity"];
+            /**
+             * @description always, or problems: failed or partial analyses and findings at or above min_severity.
+             * @default problems
+             */
+            when: components["schemas"]["NotifyWhen"];
         };
         /**
          * NotificationStatus
@@ -2043,8 +2241,11 @@ export interface components {
          *     Each run analyses the 24 h ending at the scheduled instant.
          */
         ReportSchedule: {
-            /** @description Email each scheduled report (T025); null sends nothing. */
-            notify?: components["schemas"]["EmailNotification"] | null;
+            /**
+             * Notifications
+             * @description Notification channels each scheduled report is sent to, each with its own policy (T026); manual analyses never are.
+             */
+            notifications?: components["schemas"]["ScheduleNotification"][];
             /**
              * Time
              * @description Local time of day, HH:MM (24 h).
@@ -2150,12 +2351,6 @@ export interface components {
             database_bytes?: number | null;
             /** Detector Version */
             detector_version: string;
-            /**
-             * Email Configured
-             * @description Scheduled reports can be emailed (SMTP or fake delivery).
-             * @default false
-             */
-            email_configured: boolean;
             /** @description disabled, not_configured, or pending (configured, per-report status varies). */
             explanation_status: components["schemas"]["ExplanationStatus"];
             limits: components["schemas"]["Limits"];
@@ -2163,6 +2358,20 @@ export interface components {
             report_count?: number | null;
             /** Version */
             version: string;
+        };
+        /**
+         * ScheduleNotification
+         * @description Send a project's scheduled reports to a channel when ``policy`` matches.
+         */
+        ScheduleNotification: {
+            /** Channel Id */
+            channel_id: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            policy?: components["schemas"]["NotificationPolicy"];
         };
         /**
          * Scope
@@ -2408,6 +2617,97 @@ export interface components {
          * @enum {string}
          */
         StageStatus: "pending" | "running" | "done" | "failed" | "skipped";
+        /** TelegramChat */
+        TelegramChat: {
+            /** Chat Id */
+            chat_id: string;
+            /**
+             * Is Forum
+             * @default false
+             */
+            is_forum: boolean;
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @description private, group, supergroup or channel.
+             */
+            type: string;
+            /** Username */
+            username?: string | null;
+        };
+        /**
+         * TelegramChatList
+         * @description Chats that recently messaged the bot or added it (Telegram keeps updates ≤ 24 h).
+         */
+        TelegramChatList: {
+            /**
+             * Bot Username
+             * @description The bot, e.g. ops_alerts_bot.
+             */
+            bot_username: string | null;
+            /** Items */
+            items: components["schemas"]["TelegramChat"][];
+        };
+        /**
+         * TelegramChatsRequest
+         * @description Body of POST /api/notification-channels/telegram/chats: a bot token, or the channel
+         *     whose stored token to use.
+         */
+        TelegramChatsRequest: {
+            /** Bot Token */
+            bot_token?: string | null;
+            /** Channel Id */
+            channel_id?: string | null;
+        };
+        /** TelegramDestination */
+        TelegramDestination: {
+            /** Bot Token Set */
+            bot_token_set: boolean;
+            /**
+             * Chat Id
+             * @description Numeric chat ID (groups and channels are negative) or @channel_username.
+             * @example -1001234567890
+             */
+            chat_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "telegram";
+            /**
+             * Message Thread Id
+             * @description Forum topic of a supergroup; null for the main chat.
+             */
+            message_thread_id?: number | null;
+        };
+        /**
+         * TelegramDestinationInput
+         * @description Post the report into a Telegram chat with a bot.
+         */
+        TelegramDestinationInput: {
+            /**
+             * Bot Token
+             * @description Bot token from @BotFather. Omit to keep the stored token (update only).
+             */
+            bot_token?: string | null;
+            /**
+             * Chat Id
+             * @description Numeric chat ID (groups and channels are negative) or @channel_username.
+             * @example -1001234567890
+             */
+            chat_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "telegram";
+            /**
+             * Message Thread Id
+             * @description Forum topic of a supergroup; null for the main chat.
+             */
+            message_thread_id?: number | null;
+        };
         /**
          * ThresholdOp
          * @enum {string}
@@ -3224,7 +3524,27 @@ export interface operations {
             };
         };
     };
-    send_test_email_api_notifications_test_email_post: {
+    list_channels_api_notification_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelList"];
+                };
+            };
+        };
+    };
+    create_channel_api_notification_channels_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3233,7 +3553,71 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EmailTestRequest"];
+                "application/json": components["schemas"]["NotificationChannelInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannel"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    list_kinds_api_notification_channels_kinds_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelKindList"];
+                };
+            };
+        };
+    };
+    telegram_chats_api_notification_channels_telegram_chats_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramChatsRequest"];
             };
         };
         responses: {
@@ -3243,7 +3627,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EmailTestResult"];
+                    "application/json": components["schemas"]["TelegramChatList"];
                 };
             };
             /** @description Problem */
@@ -3274,6 +3658,206 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                     "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    send_test_api_notification_channels_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelTestResult"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    get_channel_api_notification_channels__channel_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannel"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_channel_api_notification_channels__channel_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationChannelInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannel"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+        };
+    };
+    delete_channel_api_notification_channels__channel_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "application/problem+json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { ApiError } from "../../api/client";
-import { useAnalyses, useProject } from "../../api/queries";
+import { useAnalyses, useNotificationChannels, useProject } from "../../api/queries";
 import AnalysesTable from "../../components/AnalysesTable.vue";
 import MatcherChips from "../../components/projects/MatcherChips.vue";
 import { ruleSummary } from "../../lib/customRules";
@@ -16,7 +16,6 @@ import {
   cloudflareSource,
   grafanaSource,
   prometheusSource,
-  notifySummary,
   scheduleSummary,
   sentryFilters,
   sentrySource,
@@ -24,6 +23,7 @@ import {
   wazuhSource,
 } from "../../lib/projects";
 import { authSummary } from "../../lib/auth";
+import { describeDestination, policySummary } from "../../lib/notifications";
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -31,6 +31,8 @@ const props = defineProps<{ projectId: string }>();
 
 const project = useProject(() => props.projectId);
 const history = useAnalyses(() => props.projectId, HISTORY_PAGE_SIZE);
+const channels = useNotificationChannels();
+const channelsById = computed(() => new Map((channels.data.value?.items ?? []).map((c) => [c.channel_id, c])));
 
 const notFound = computed(() => project.error.value instanceof ApiError && project.error.value.problem.status === 404);
 const prometheus = computed(() => prometheusSource(project.data.value));
@@ -143,7 +145,15 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
           <template v-if="project.data.value.next_scheduled_run">
             · next <span :title="utcTooltip(project.data.value.next_scheduled_run)">{{ formatTime(project.data.value.next_scheduled_run) }}</span>
           </template>
-          <div v-if="project.data.value.schedule.notify" class="muted">{{ notifySummary(project.data.value.schedule.notify) }}</div>
+          <ul v-if="project.data.value.schedule.notifications?.length" class="targets muted">
+            <li v-for="n in project.data.value.schedule.notifications" :key="n.channel_id">
+              <template v-if="channelsById.get(n.channel_id)">
+                <strong>{{ channelsById.get(n.channel_id)!.name }}</strong> ({{ describeDestination(channelsById.get(n.channel_id)!.destination) }})
+              </template>
+              <template v-else>Notification channel</template>
+              {{ policySummary(n.policy) }}<span v-if="n.enabled === false"> (disabled)</span>
+            </li>
+          </ul>
         </dd>
         <dd v-else class="muted">On demand only</dd>
         <dt>Saved reports</dt>
@@ -169,6 +179,7 @@ const jobs = computed(() => history.data.value?.pages.flatMap((p) => p.items) ??
 
 <style scoped>
 .section-title { margin: 8px 0 0; }
+.targets { list-style: none; margin: 4px 0 0; padding: 0; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px calc(var(--space) * 2); margin: 0; }
 .facts dt { font-weight: 600; color: var(--muted); }
 .facts dd { margin: 0; }

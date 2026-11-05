@@ -1,5 +1,76 @@
 {
   "$defs": {
+    "ChannelKind": {
+      "enum": [
+        "email",
+        "telegram"
+      ],
+      "title": "ChannelKind",
+      "type": "string"
+    },
+    "DeliveryOutcome": {
+      "additionalProperties": false,
+      "description": "What happened to one notification when a scheduled analysis finished.",
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "channel_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Null for outcomes recorded before channels existed (T025).",
+          "title": "Channel Id"
+        },
+        "destinations": {
+          "description": "Recipients or chats addressed.",
+          "minimum": 0,
+          "title": "Destinations",
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChannelKind"
+        },
+        "name": {
+          "description": "The channel's name at delivery time.",
+          "title": "Name",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why skipped, failed, or not configured.",
+          "title": "Reason"
+        },
+        "status": {
+          "$ref": "#/$defs/NotificationStatus"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "status",
+        "destinations",
+        "at"
+      ],
+      "title": "DeliveryOutcome",
+      "type": "object"
+    },
     "ErrorCode": {
       "enum": [
         "validation_error",
@@ -22,8 +93,12 @@
         "end_time_invalid",
         "interrupted_by_restart",
         "job_timeout",
-        "email_not_configured",
-        "email_failed",
+        "channel_not_found",
+        "channel_name_taken",
+        "channel_in_use",
+        "channel_not_configured",
+        "delivery_failed",
+        "telegram_webhook_set",
         "internal_error",
         "not_implemented"
       ],
@@ -118,45 +193,6 @@
       ],
       "title": "MatchOp",
       "type": "string"
-    },
-    "NotificationOutcome": {
-      "additionalProperties": false,
-      "properties": {
-        "at": {
-          "title": "At",
-          "type": "string"
-        },
-        "reason": {
-          "anyOf": [
-            {
-              "maxLength": 300,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Why skipped, failed, or not configured.",
-          "title": "Reason"
-        },
-        "recipients": {
-          "description": "Number of recipients addressed.",
-          "minimum": 0,
-          "title": "Recipients",
-          "type": "integer"
-        },
-        "status": {
-          "$ref": "#/$defs/NotificationStatus"
-        }
-      },
-      "required": [
-        "status",
-        "recipients",
-        "at"
-      ],
-      "title": "NotificationOutcome",
-      "type": "object"
     },
     "NotificationStatus": {
       "enum": [
@@ -400,17 +436,13 @@
       "default": null,
       "title": "Finished At"
     },
-    "notification": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/NotificationOutcome"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Email delivery of a scheduled report (T025); null when none was requested."
+    "notifications": {
+      "description": "Delivery of a scheduled report, one outcome per enabled notification target (T026); empty for manual analyses and schedules without targets.",
+      "items": {
+        "$ref": "#/$defs/DeliveryOutcome"
+      },
+      "title": "Notifications",
+      "type": "array"
     },
     "report_available": {
       "title": "Report Available",

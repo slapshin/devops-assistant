@@ -75,7 +75,7 @@ up: ## Build and start the container in the background
 	@echo "assistant: ${APP_URL}"
 
 demo: ## Start with synthetic demo projects, the fake AI provider and the email outbox
-	DEMO_PROJECTS=true AI_PROVIDER=fake EMAIL_PROVIDER=fake ${COMPOSE} up -d --build --remove-orphans
+	DEMO_PROJECTS=true AI_PROVIDER=fake EMAIL_PROVIDER=fake TELEGRAM_PROVIDER=fake ${COMPOSE} up -d --build --remove-orphans
 	@echo "assistant (demo): ${APP_URL}"
 
 down: ## Stop and remove the container (keeps the data volume)

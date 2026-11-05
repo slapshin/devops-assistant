@@ -237,42 +237,6 @@
       "title": "CustomRuleMode",
       "type": "string"
     },
-    "EmailNotification": {
-      "additionalProperties": false,
-      "description": "Email each scheduled report to ``recipients`` when ``when`` matches.",
-      "properties": {
-        "min_severity": {
-          "$ref": "#/$defs/Severity",
-          "default": "high",
-          "description": "Lowest finding severity that sends (problems only)."
-        },
-        "recipients": {
-          "description": "Plain email addresses (no display names); duplicates are removed.",
-          "examples": [
-            [
-              "oncall@example.com"
-            ]
-          ],
-          "items": {
-            "type": "string"
-          },
-          "maxItems": 20,
-          "minItems": 1,
-          "title": "Recipients",
-          "type": "array"
-        },
-        "when": {
-          "$ref": "#/$defs/NotifyWhen",
-          "default": "problems",
-          "description": "always, or problems: failed or partial analyses and findings at or above min_severity."
-        }
-      },
-      "required": [
-        "recipients"
-      ],
-      "title": "EmailNotification",
-      "type": "object"
-    },
     "GrafanaSourceInput": {
       "additionalProperties": false,
       "description": "Grafana-managed alert rules selected by folder, UID and/or rule labels.\n\nThe folders' rules and the listed rules together form the selection; rule label matchers\nnarrow it (or alone select every rule with those labels). Instance label matchers then\nnarrow which alert instances of those rules count, e.g. ``project=shop``.",
@@ -416,6 +380,23 @@
       "title": "NoAuth",
       "type": "object"
     },
+    "NotificationPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "min_severity": {
+          "$ref": "#/$defs/Severity",
+          "default": "high",
+          "description": "Lowest finding severity that counts as a problem. With always, reports below it are delivered silently where the channel supports that (Telegram)."
+        },
+        "when": {
+          "$ref": "#/$defs/NotifyWhen",
+          "default": "problems",
+          "description": "always, or problems: failed or partial analyses and findings at or above min_severity."
+        }
+      },
+      "title": "NotificationPolicy",
+      "type": "object"
+    },
     "NotifyWhen": {
       "enum": [
         "always",
@@ -482,17 +463,14 @@
       "additionalProperties": false,
       "description": "Run an analysis automatically at ``time`` (local to ``timezone``) on ``weekdays``.\n\nEach run analyses the 24 h ending at the scheduled instant.",
       "properties": {
-        "notify": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmailNotification"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Email each scheduled report (T025); null sends nothing."
+        "notifications": {
+          "description": "Notification channels each scheduled report is sent to, each with its own policy (T026); manual analyses never are.",
+          "items": {
+            "$ref": "#/$defs/ScheduleNotification"
+          },
+          "maxItems": 10,
+          "title": "Notifications",
+          "type": "array"
         },
         "time": {
           "description": "Local time of day, HH:MM (24 h).",
@@ -525,6 +503,31 @@
         "time"
       ],
       "title": "ReportSchedule",
+      "type": "object"
+    },
+    "ScheduleNotification": {
+      "additionalProperties": false,
+      "description": "Send a project's scheduled reports to a channel when ``policy`` matches.",
+      "properties": {
+        "channel_id": {
+          "maxLength": 36,
+          "minLength": 1,
+          "title": "Channel Id",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "policy": {
+          "$ref": "#/$defs/NotificationPolicy"
+        }
+      },
+      "required": [
+        "channel_id"
+      ],
+      "title": "ScheduleNotification",
       "type": "object"
     },
     "SentrySourceInput": {

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw, type RouterHistory } from "vue-router";
 import NotImplemented from "./components/NotImplemented.vue";
 import CredentialsView from "./views/credentials/CredentialsView.vue";
+import NotificationChannelsView from "./views/notifications/NotificationChannelsView.vue";
 import JobView from "./views/JobView.vue";
 import FindingsView from "./views/report/FindingsView.vue";
 import OverviewView from "./views/report/OverviewView.vue";
@@ -24,6 +25,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/projects/:projectId", name: "project", component: ProjectView, props: true },
   { path: "/projects/:projectId/edit", name: "project-edit", component: ProjectFormView, props: true },
   { path: "/credentials", name: "credentials", component: CredentialsView },
+  { path: "/notification-channels", name: "notification-channels", component: NotificationChannelsView },
   { path: "/analyses/:id", name: "job", component: JobView, props: true },
   {
     path: "/reports/:id",

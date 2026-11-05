@@ -6,6 +6,7 @@ import config from "../../fixtures/api/config.json";
 import jobCompleted from "../../fixtures/jobs/job_completed.json";
 import jobInterrupted from "../../fixtures/jobs/job_interrupted.json";
 import jobRunning from "../../fixtures/jobs/job_running.json";
+import jobNotified from "../../fixtures/jobs/job_scheduled_notified.json";
 import connectionTest from "../../fixtures/api/connection_test.json";
 import cloudflareTest from "../../fixtures/api/connection_test_cloudflare.json";
 import sentryTest from "../../fixtures/api/connection_test_sentry.json";
@@ -13,6 +14,7 @@ import wazuhTest from "../../fixtures/api/connection_test_wazuh.json";
 import grafanaTest from "../../fixtures/api/connection_test_grafana.json";
 import customRulePreview from "../../fixtures/api/custom_rule_preview.json";
 import credentials from "../../fixtures/api/credentials.json";
+import notificationChannels from "../../fixtures/api/notification_channels.json";
 import projects from "../../fixtures/api/projects.json";
 import aiFailed from "../../fixtures/reports/report_ai_failed.json";
 import anomalies from "../../fixtures/reports/report_anomalies.json";
@@ -46,6 +48,9 @@ let credentialItems: Credential[];
 
 const VM = credentials.items.find((c) => c.kind === "prometheus") as Credential;
 const GRAFANA = credentials.items.find((c) => c.kind === "grafana") as Credential;
+const OPS_CHAT = notificationChannels.items.find((c) => c.destination.kind === "telegram")!;
+const ONCALL = notificationChannels.items.find((c) => c.destination.kind === "email")!;
+const KINDS_AVAILABLE = { items: [{ kind: "email", available: true, reason: null }, { kind: "telegram", available: true, reason: null }] };
 
 /** What the server returns for a created credential (POST /api/credentials). */
 function createdCredential(body: { name: string; description?: string | null; kind: Credential["kind"]; auth: { type: string; username?: string } }): Credential {
@@ -60,6 +65,8 @@ beforeEach(() => {
   calls = [];
   routes = {
     "GET /api/config": () => json(config),
+    "GET /api/notification-channels": () => json(notificationChannels),
+    "GET /api/notification-channels/kinds": () => json(KINDS_AVAILABLE),
     "GET /api/projects": () => json(projects),
     "GET /api/credentials": () => json({ items: credentialItems }),
     "POST /api/credentials": (init) => {
@@ -346,7 +353,7 @@ describe("project form", () => {
       time: "07:30",
       timezone: "Mars/Olympus",
       weekdays: ["mon", "fri"],
-      notify: null,
+      notifications: [],
     });
 
     await fireEvent.update(screen.getByLabelText("Time zone"), "Europe/Berlin");
@@ -356,47 +363,59 @@ describe("project form", () => {
     expect(JSON.parse(calls.filter((c) => c.method === "PUT")[1]?.body ?? "{}").schedule.timezone).toBe("Europe/Berlin");
   });
 
-  it("emails scheduled reports and sends a test email", async () => {
-    routes["GET /api/config"] = () => json({ ...config, email_configured: true });
+  it("sends scheduled reports to chosen notification channels", async () => {
     routes[`GET /api/projects/${PID}`] = () => json({ ...base, schedule: { time: "08:00", timezone: "UTC", weekdays: ["mon"] }, next_scheduled_run: null });
     routes[`PUT /api/projects/${PID}`] = () => json(base);
-    routes["POST /api/notifications/test-email"] = () => json({ recipients: ["ops@example.com"], sent_at: "2026-11-02T08:00:00Z" });
     routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
     const router = await renderAt(`/projects/${PID}/edit`);
 
-    await fireEvent.click(await screen.findByLabelText("Email the report"));
-    await fireEvent.update(screen.getByLabelText("Recipients"), "ops@example.com, not-an-address");
+    const add = await screen.findByRole("button", { name: "Add notification" });
+    await waitFor(() => expect(add).toBeEnabled());
+    await fireEvent.click(add);
+    await fireEvent.click(add);
+    const second = screen.getByRole("region", { name: "Notification 2" });
+    await fireEvent.update(within(second).getByLabelText("Channel"), OPS_CHAT.channel_id);
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(screen.getByText("Invalid email addresses: not-an-address")).toBeInTheDocument();
+    expect(within(second).getByText("This channel is already listed")).toBeInTheDocument();
     expect(calls.some((c) => c.method === "PUT")).toBe(false);
 
-    await fireEvent.update(screen.getByLabelText("Recipients"), "ops@example.com\nOPS@example.com");
-    await fireEvent.click(screen.getByRole("button", { name: "Send test email" }));
-
-    expect(await screen.findByText("Test email sent to ops@example.com.")).toBeInTheDocument();
-    expect(JSON.parse(calls.find((c) => c.url === "/api/notifications/test-email")?.body ?? "{}")).toEqual({ recipients: ["ops@example.com"] });
-
-    await fireEvent.update(screen.getByLabelText("Findings that send"), "critical");
+    await fireEvent.update(within(second).getByLabelText("Channel"), ONCALL.channel_id);
+    await fireEvent.update(within(second).getByLabelText("Send"), "always");
+    await fireEvent.update(within(screen.getByRole("region", { name: "Notification 1" })).getByLabelText("Findings that send"), "critical");
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(router.currentRoute.value.path).toBe(`/projects/${PID}`));
-    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").schedule.notify).toEqual({
-      recipients: ["ops@example.com"],
-      when: "problems",
-      min_severity: "critical",
-    });
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").schedule.notifications).toEqual([
+      { channel_id: OPS_CHAT.channel_id, enabled: true, policy: { when: "problems", min_severity: "critical" } },
+      { channel_id: ONCALL.channel_id, enabled: true, policy: { when: "always", min_severity: "high" } },
+    ]);
   });
 
-  it("explains that email is not configured on the server", async () => {
-    routes[`GET /api/projects/${PID}`] = () => json({ ...base, schedule: { time: "08:00", timezone: "UTC", weekdays: ["mon"] }, next_scheduled_run: null });
+  it("keeps stored notifications and shows server errors on them", async () => {
+    let attempt = 0;
+    routes[`GET /api/projects/${PID}`] = () => json(base);
+    routes[`PUT /api/projects/${PID}`] = () =>
+      ++attempt === 1
+        ? json(
+            {
+              type: "about:blank",
+              title: "Request validation failed",
+              status: 422,
+              code: "validation_error",
+              errors: [{ field: "body.schedule.notifications.1.channel_id", message: "no such notification channel" }],
+            },
+            422,
+          )
+        : json(base);
     routes["GET /api/analyses"] = () => json({ items: [], next_cursor: null });
     await renderAt(`/projects/${PID}/edit`);
 
-    await fireEvent.click(await screen.findByLabelText("Email the report"));
+    const second = await screen.findByRole("region", { name: "Notification 2" });
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(await screen.findByText(/Email delivery is not configured on the server/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send test email" })).toBeDisabled();
+    expect(await within(second).findByText("no such notification channel")).toBeInTheDocument();
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").schedule.notifications).toEqual(base.schedule?.notifications);
   });
 
   it("keeps the source's credential and shows server errors", async () => {
@@ -452,7 +471,7 @@ describe("project form", () => {
     const sent = JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/projects")?.body ?? "{}");
     expect(sent.matchers).toEqual(base.matchers);
     expect(sent.sources[0].auth).toEqual(sourceCredential(VM));
-    expect(sent.schedule).toEqual({ ...original.schedule, notify: null });
+    expect(sent.schedule).toEqual({ ...original.schedule, notifications: [] });
     expect(sent.keep_reports).toBe(5);
   });
 
@@ -1049,6 +1068,75 @@ describe("credentials", () => {
   });
 });
 
+describe("notification channels", () => {
+  it("creates a Telegram channel with a chat found by its bot", async () => {
+    routes["POST /api/notification-channels/telegram/chats"] = () =>
+      json({ bot_username: "ops_bot", items: [{ chat_id: "-1001000000009", title: "Ops", type: "supergroup", username: null, is_forum: true }] });
+    routes["POST /api/notification-channels/test"] = () => json({ kind: "telegram", detail: "sent to Ops (supergroup)", sent_at: "2026-11-02T08:00:00Z" });
+    routes["POST /api/notification-channels"] = () => json(OPS_CHAT, 201);
+    await renderAt("/notification-channels");
+
+    const row = await screen.findByRole("row", { name: /Ops chat/ });
+    expect(within(row).getByText("Telegram · chat -1001000000001, topic 12")).toBeInTheDocument();
+    expect(within(row).getByRole("link", { name: base.name })).toHaveAttribute("href", `/projects/${PID}`);
+    expect(screen.getByRole("link", { name: "Notification channels" })).toHaveAttribute("href", "/notification-channels");
+
+    await fireEvent.click(screen.getByRole("button", { name: "New channel" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create channel" }));
+
+    expect(screen.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Bot token")).toHaveAttribute("aria-invalid", "true");
+
+    await fireEvent.update(screen.getByLabelText("Name"), " Shop alerts ");
+    await fireEvent.update(screen.getByLabelText("Bot token"), "123456:AAH-test-token-0123456789abcdefghij");
+    await fireEvent.click(screen.getByRole("button", { name: "Find chats" }));
+    await fireEvent.click(await screen.findByRole("button", { name: /Ops \(supergroup, topics, -1001000000009\)/ }));
+    await fireEvent.update(screen.getByLabelText(/Topic ID/), "12");
+    await fireEvent.click(screen.getByRole("button", { name: "Send test message" }));
+
+    expect(await screen.findByText("Test message sent to Ops (supergroup).")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Create channel" }));
+
+    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/notification-channels")).toBe(true));
+    const destination = { kind: "telegram", bot_token: "123456:AAH-test-token-0123456789abcdefghij", chat_id: "-1001000000009", message_thread_id: 12 };
+    expect(JSON.parse(calls.find((c) => c.url === "/api/notification-channels/telegram/chats")?.body ?? "{}")).toEqual({ bot_token: destination.bot_token });
+    expect(JSON.parse(calls.find((c) => c.url === "/api/notification-channels/test")?.body ?? "{}")).toEqual({ channel_id: null, destination });
+    expect(JSON.parse(calls.find((c) => c.method === "POST" && c.url === "/api/notification-channels")?.body ?? "{}")).toEqual({
+      name: "Shop alerts",
+      description: null,
+      destination,
+    });
+  });
+
+  it("keeps a stored bot token, explains unavailable kinds and channels in use", async () => {
+    routes["GET /api/notification-channels/kinds"] = () =>
+      json({ items: [{ kind: "email", available: false, reason: "Email delivery is not configured (SMTP_HOST and SMTP_FROM)." }, KINDS_AVAILABLE.items[1]] });
+    routes[`PUT /api/notification-channels/${OPS_CHAT.channel_id}`] = () => json(OPS_CHAT);
+    routes[`DELETE /api/notification-channels/${ONCALL.channel_id}`] = () =>
+      problem(409, "channel_in_use", "Notification channel is in use", `Cannot delete it: the schedules of ${base.name} send to it.`);
+    await renderAt("/notification-channels");
+
+    const email = await screen.findByRole("row", { name: /On-call email/ });
+    expect(await within(email).findByText(/Email delivery is not configured/)).toBeInTheDocument();
+
+    await fireEvent.click(within(email).getByRole("button", { name: "Delete On-call email" }));
+    await fireEvent.click(within(email).getByRole("button", { name: "Delete permanently" }));
+
+    expect(await within(email).findByRole("alert")).toHaveTextContent("Cannot delete it");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Edit Ops chat" }));
+
+    expect(screen.getByLabelText("Bot token")).toHaveAttribute("placeholder", "Stored — leave empty to keep");
+
+    await fireEvent.update(screen.getByLabelText("Chat ID"), "@ops_alerts");
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
+    expect(JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}").destination).toEqual({ kind: "telegram", chat_id: "@ops_alerts", message_thread_id: 12 });
+  });
+});
+
 describe("project page", () => {
   it("shows configuration and pages through the analysis history", async () => {
     routes[`GET /api/projects/${PID}`] = () => json(base);
@@ -1065,6 +1153,12 @@ describe("project page", () => {
     expect(screen.getByText("victoriametrics.example:8428")).toBeInTheDocument();
     expect(screen.getByText(new RegExp(`Credential: ${VM.name}`))).toBeInTheDocument();
     expect(screen.getByText(/Mon, Wed, Fri at 08:00 \(Europe\/Berlin\)/)).toBeInTheDocument();
+    const lines = await waitFor(() => {
+      const items = screen.getAllByRole("listitem").map((li) => li.textContent?.replace(/\s+/g, " ").trim());
+      expect(items).toContain("Ops chat (Telegram · chat -1001000000001, topic 12) on failures, partial runs and critical findings");
+      return items;
+    });
+    expect(lines).toContain("On-call email (Email · oncall@example.com) after every run");
     expect(await screen.findAllByRole("row")).toHaveLength(2);
 
     await fireEvent.click(screen.getByRole("button", { name: "Load older analyses" }));
@@ -1072,6 +1166,18 @@ describe("project page", () => {
     await waitFor(() => expect(screen.getAllByRole("row")).toHaveLength(3));
     expect(screen.queryByRole("button", { name: "Load older analyses" })).not.toBeInTheDocument();
     expect(calls.some((c) => c.url.includes(`project_id=${PID}`))).toBe(true);
+  });
+
+  it("shows how each scheduled report was delivered", async () => {
+    routes[`GET /api/projects/${PID}`] = () => json(base);
+    routes[`GET /api/projects/${PID}/health`] = () => json([reachable]);
+    routes["GET /api/analyses"] = () => json({ items: [jobNotified], next_cursor: null });
+
+    await renderAt(`/projects/${PID}`);
+
+    const delivery = await screen.findByText(/1 of 2 notifications sent/);
+    expect(delivery).toHaveClass("v-critical");
+    expect(delivery).toHaveAttribute("title", expect.stringContaining("Ops chat (Telegram): failed — Chat not found"));
   });
 
   it("shows Cloudflare and Sentry filters as matcher chips", async () => {

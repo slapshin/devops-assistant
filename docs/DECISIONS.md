@@ -83,7 +83,9 @@ All settings come from environment (optionally the repository-root `config.env`,
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_TLS_VERIFY` | unset, `587`, `starttls`, `true` | SMTP relay for scheduled-report emails. `SMTP_SECURITY` is `starttls`, `tls` (implicit, usually port 465) or `none` (trusted relay only). Stdlib `smtplib`, 20 s socket timeout, no retries. |
 | `SMTP_USERNAME` + `SMTP_PASSWORD` | unset | Optional SMTP login; set both or neither. The password is masked in configuration errors. |
 | `SMTP_FROM` | unset | Sender address (a plain address, no display name). |
-| `APP_PUBLIC_URL` | unset | Base URL users open the app at (http/https); emails link to `<APP_PUBLIC_URL>/reports/<analysis_id>`. Without it emails carry no link. |
+| `APP_PUBLIC_URL` | unset | Base URL users open the app at (http/https); notifications link to `<APP_PUBLIC_URL>/reports/<analysis_id>`. Without it they carry no link. |
+| `TELEGRAM_PROVIDER` | `bot_api` | `bot_api`, `fake` (writes each message as JSON to `DATA_DIR/outbox/telegram`; tests and demos), or `none` (T027). Bot tokens belong to Telegram notification channels (encrypted), not to settings. |
+| `TELEGRAM_API_URL` | `https://api.telegram.org` | Bot API base URL (a self-hosted Bot API server works too). Requests honour `HTTPS_PROXY`; 10 s connect / 15 s total timeout. |
 
 ## 3. API conventions
 
@@ -120,7 +122,7 @@ Error codes: `validation_error` (422), `project_not_found` (404), `project_name_
 - `failed`: no usable report (e.g. source unreachable at collection start, internal error, restart interruption).
 - `cancelled`: user cancellation; no report is saved (`error` is null). T007 cancels a running job by cancelling its task, which aborts in-flight source/provider requests immediately; the token is also checked between stages.
 - Explanation state is **separate**: `disabled | not_configured | pending | succeeded | failed | skipped_no_findings`. AI failure never changes a numerical `completed` to `failed` or `partial`.
-- Email notification (T025) is **separate** too: after a *scheduled* job finishes (`completed`, `partial` or `failed`), its outcome is stored on the job as `notification: {status: sent | skipped | failed | not_configured, recipients, reason, at}` (null when the project requests no email, for manual runs, cancelled jobs, and jobs interrupted by a restart). Delivery never changes the job state; the worker waits for it (at most 60 s) before starting the next job.
+- Notification delivery (T025, generalised to app-level notification channels in T026) is **separate** too: after a *scheduled* job finishes (`completed`, `partial` or `failed`), every enabled notification of the project's schedule (a channel plus its policy) is delivered concurrently, each bounded by 20 s, and one outcome per channel is stored on the job as `notifications: [{channel_id, name, kind, status: sent | skipped | failed | not_configured, destinations, reason, at}]` (empty for manual runs, schedules without notifications, cancelled jobs, and jobs interrupted by a restart). Delivery never changes the job state, and one channel's failure never affects another; the worker waits for delivery (at most 60 s) before starting the next job. No retries, except one Telegram retry when it asks to wait at most 5 s. Channels hold *where* (and their own secret, like a Grafana contact point); schedules hold *when*, so one channel serves many projects with different rules.
 
 **Stages and progress** (stored on the job, exposed by `GET /api/analyses/{id}`): `discovery → collection → detection → trends → explanation → saving`, each `{stage, status, started_at, finished_at, done, total, message}`.
 

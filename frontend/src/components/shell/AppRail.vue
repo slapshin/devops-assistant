@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** Left icon rail: home, projects and credentials, plus the report views while a report is open. */
+/** Left icon rail: home, projects, credentials and notification channels, plus the report views while a report is open. */
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 
@@ -11,6 +11,7 @@ const reportId = computed(() => (route.path.startsWith("/reports/") ? String(rou
 const reportView = computed(() => REPORT_VIEWS[String(route.name)] ?? String(route.name));
 const onProjects = computed(() => route.path === "/" || route.path.startsWith("/projects"));
 const onCredentials = computed(() => route.path.startsWith("/credentials"));
+const onChannels = computed(() => route.path.startsWith("/notification-channels"));
 </script>
 
 <template>
@@ -23,6 +24,9 @@ const onCredentials = computed(() => route.path.startsWith("/credentials"));
     </RouterLink>
     <RouterLink to="/credentials" :class="{ on: onCredentials }" aria-label="Credentials" title="Credentials">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="11.5" r="3.5" /><path d="M8.5 9l6-6M12.5 5l2 2M10.5 7l1.5 1.5" /></svg>
+    </RouterLink>
+    <RouterLink to="/notification-channels" :class="{ on: onChannels }" aria-label="Notification channels" title="Notification channels">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.5l13-5.5-4 12.5-3-4.5z" /><path d="M8.5 11l7-8" /></svg>
     </RouterLink>
     <template v-if="reportId">
       <span class="sep" aria-hidden="true" />

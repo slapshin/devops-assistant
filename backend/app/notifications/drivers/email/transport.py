@@ -10,7 +10,7 @@ from itertools import count
 from pathlib import Path
 from typing import Protocol
 
-from app.notifications.render import RenderedEmail
+from app.notifications.drivers.email.render import RenderedEmail
 from app.settings import EmailProvider, Settings, SmtpSecurity
 
 SMTP_TIMEOUT_SECONDS = 20.0
