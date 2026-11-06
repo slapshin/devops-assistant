@@ -47,7 +47,7 @@ FilterCheck
   matched: int | None               # with the full filter; null if unknown
   matched_without: int | None       # with this part dropped; null if not applicable / failed
   unit: str
-  available: list[str]              # ≤ 20 values that exist for this field within the rest of the filter
+  available: list[str]              # ≤ 200 values that exist for this field within the rest of the filter
   available_truncated: bool
   matching: list[str]               # the subset of `available` this part accepts
 ```
@@ -123,7 +123,7 @@ Merging: `service._gather` concatenates `diagnostics` like `totals`. A source th
   - a wrong matcher (e.g. `env="prod"` where only `production` exists) yields `matched == 0`, `matched_without > 0`, and `production` in `available`.
 - [x] Cloudflare, Sentry, Wazuh and Grafana each produce selection, checks and notes on their synthetic scenarios. The new Api methods have synthetic counterparts and client tests.
 - [x] A failing or timing-out diagnostic becomes a `diagnostic_failed` note. The job state, the series and the findings are unchanged (test with a failing check).
-- [x] Bounds are enforced: 50 entities, 5 samples, 20 values, 30 requests. No secrets appear in requests (test with credentialed sources).
+- [x] Bounds are enforced: 50 entities, 5 samples, 200 values, 30 requests. No secrets appear in requests (test with credentialed sources).
 - [x] The UI Scope tab covers the panels, flags, empty, old-report and failed-source states, plus vitest coverage.
 - [x] Docs: `docs/contracts.md`, `docs/UI_SPEC.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` (the leave-one-out exception) and `AGENTS.md`. `make check` passes. Do a demo run (`make demo`) with a deliberately wrong filter and check the tab.
 

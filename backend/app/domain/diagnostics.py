@@ -12,7 +12,7 @@ from app.domain.common import Contract, Labels, Reason, SignalFamily, SourceKind
 
 MAX_SELECTED: Final = 50
 MAX_SAMPLES: Final = 5
-MAX_AVAILABLE: Final = 20
+MAX_AVAILABLE: Final = 200
 MAX_REQUESTS: Final = 120
 MAX_CHECKS: Final = 160
 

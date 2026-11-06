@@ -1646,6 +1646,24 @@ describe("report", () => {
     expect(screen.getByRole("tab", { name: "Scope 1" })).toBeInTheDocument();
   });
 
+  it("scope tab expands a long value list on click", async () => {
+    const [diagnostics] = sentryReport.diagnostics;
+    const available = Array.from({ length: 25 }, (_, i) => `env-${String(i).padStart(2, "0")}`);
+    const env = { part: "env-24", field: "environment", matched: 3, matched_without: 432, unit: "events", available, available_truncated: false, matching: ["env-24"] };
+    const long = { ...sentryReport, analysis_id: "long-values", diagnostics: [{ ...diagnostics, checks: [env] }] };
+    await renderAt(`${report(long)}/scope`);
+    const row = await screen.findByRole("row", { name: /Environment env-24/ });
+
+    expect(within(row).getByText("env-19")).toBeInTheDocument();
+    expect(within(row).queryByText("env-20")).not.toBeInTheDocument();
+    expect(within(row).getAllByText("env-24").at(-1)).toHaveClass("on");
+
+    await fireEvent.click(within(row).getByRole("button", { name: "and 4 more" }));
+
+    expect(within(row).getByText("env-20")).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "show less" })).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("a finding lists related metrics with resource, similarity and timing kept apart", async () => {
     const errors = relatedReport.findings.find((f) => f.signal === "server_error_ratio")!;
     const deadlocks = relatedReport.findings.find((f) => f.signal === "database_deadlocks")!;

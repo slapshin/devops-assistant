@@ -9,6 +9,8 @@ import { useReportContext } from "./context";
 
 /** Longer selections start collapsed so the filter checks of every source stay in view. */
 const OPEN_SELECTION_MAX = 10;
+/** Values shown per filter part before "and N more" expands the rest. */
+const SHOWN_VALUES = 20;
 
 const { report } = useReportContext();
 
@@ -18,6 +20,21 @@ const sources = computed(() => {
   return all.some((s) => s.diagnostics || s.failures.length) ? all : [];
 });
 const copied = ref<string | null>(null);
+/** Filter checks whose value list is expanded, keyed by source kind and row. */
+const expanded = ref(new Set<string>());
+
+/** The first values, plus any matching value further down so the highlighted ones stay in view. */
+const shownValues = (check: FilterCheck, key: string) => {
+  const all = check.available ?? [];
+  if (expanded.value.has(key) || all.length <= SHOWN_VALUES) return all;
+  return all.filter((v, i) => i < SHOWN_VALUES || check.matching?.includes(v));
+};
+const hiddenCount = (check: FilterCheck, key: string) => (check.available?.length ?? 0) - shownValues(check, key).length;
+function toggleValues(key: string) {
+  const next = new Set(expanded.value);
+  if (!next.delete(key)) next.add(key);
+  expanded.value = next;
+}
 
 const verdictClass = (check: FilterCheck) => {
   const verdict = checkVerdict(check);
@@ -87,8 +104,19 @@ async function copy(text: string) {
                   <td>
                     <span v-if="!c.available?.length" class="muted">—</span>
                     <span v-else class="chips">
-                      <span v-for="v in c.available" :key="v" class="tag mono" :class="{ on: c.matching?.includes(v) }">{{ v }}</span>
-                      <span v-if="c.available_truncated" class="lbl">and more</span>
+                      <span v-for="v in shownValues(c, `${s.kind}:${i}`)" :key="v" class="tag mono" :class="{ on: c.matching?.includes(v) }">{{ v }}</span>
+                      <button
+                        v-if="hiddenCount(c, `${s.kind}:${i}`) > 0"
+                        type="button"
+                        class="link"
+                        :aria-expanded="false"
+                        @click="toggleValues(`${s.kind}:${i}`)"
+                      >and {{ hiddenCount(c, `${s.kind}:${i}`) }} more</button>
+                      <template v-else-if="expanded.has(`${s.kind}:${i}`)">
+                        <span v-if="c.available_truncated" class="lbl">and more not recorded</span>
+                        <button type="button" class="link" :aria-expanded="true" @click="toggleValues(`${s.kind}:${i}`)">show less</button>
+                      </template>
+                      <span v-else-if="c.available_truncated" class="lbl">and more not recorded</span>
                     </span>
                   </td>
                   <td :class="verdictClass(c)">{{ VERDICT_LABELS[checkVerdict(c)] }}</td>
