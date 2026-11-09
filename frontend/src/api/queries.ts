@@ -29,6 +29,7 @@ import {
   type ProjectSummary,
   type ReportSummary,
   type RuntimeConfig,
+  type VersionInfo,
 } from "./client";
 
 const ACTIVE_JOB_STATES = new Set(["queued", "running"]);
@@ -42,6 +43,18 @@ export const isActive = (state: string) => ACTIVE_JOB_STATES.has(state);
 
 export function useConfig() {
   return useQuery({ queryKey: ["config"], queryFn: () => apiGet<RuntimeConfig>("/api/config") });
+}
+
+/** The server caches the GitHub answer for hours; refreshing hourly is plenty. */
+const VERSION_STALE_MS = 3_600_000;
+
+export function useVersion() {
+  return useQuery({
+    queryKey: ["version"],
+    queryFn: () => apiGet<VersionInfo>("/api/version"),
+    staleTime: VERSION_STALE_MS,
+    refetchInterval: VERSION_STALE_MS,
+  });
 }
 
 const HEALTH_STALE_MS = 60_000;

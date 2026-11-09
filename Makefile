@@ -8,6 +8,10 @@ COMPOSE=docker compose ${COMPOSE_ARGS}
 SERVICE=assistant
 APP_URL=http://127.0.0.1:$${APP_PORT:-8000}
 
+# Baked into Docker images so the UI can tell whether the build is the latest (GET /api/version).
+GIT_COMMIT := $(shell git rev-parse HEAD 2>/dev/null)
+BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
 MONITORING_FORWARD := 8428:localhost:8428
 MONITORING_HOST := art-monitoring
 
@@ -66,7 +70,8 @@ backup: ## Back up the native SQLite database to ./backups
 
 # -- docker --
 docker-build: ## Build the Docker image
-	docker build -f devops/docker/Dockerfile -t devops-ai-assistant:local .
+	docker build -f devops/docker/Dockerfile -t devops-ai-assistant:local \
+		--build-arg APP_COMMIT=${GIT_COMMIT} --build-arg APP_BUILD_DATE=${BUILD_DATE} .
 
 run: up ## Alias for up
 

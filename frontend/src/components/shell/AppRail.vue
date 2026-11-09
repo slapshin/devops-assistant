@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /**
  * Left navigation: home, projects, credentials and notification channels, plus the report views while a report is open.
+ * The running version and its update status sit below the collapse toggle.
  * Expanded it shows each item's icon and title; collapsed it is an icon-only rail (the choice is kept per browser).
  */
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { railCollapsed } from "../../lib/rail";
+import VersionStatus from "./VersionStatus.vue";
 
 const REPORT_VIEWS: Record<string, string> = { evidence: "findings" };
 
@@ -78,6 +80,7 @@ const toggleLabel = computed(() => (railCollapsed.value ? "Expand navigation" : 
       </svg>
       <span class="label">Collapse</span>
     </button>
+    <VersionStatus />
   </nav>
 </template>
 

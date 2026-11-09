@@ -382,6 +382,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version
+         * @description The running build and whether it is the latest commit of the tracked GitHub branch.
+         */
+        get: operations["version_api_version_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2790,6 +2810,34 @@ export interface components {
          * @enum {string}
          */
         Unit: "ratio" | "bytes" | "bytes_per_second" | "requests_per_second" | "per_second" | "seconds" | "count";
+        /**
+         * UpdateState
+         * @enum {string}
+         */
+        UpdateState: "latest" | "outdated" | "ahead" | "unknown" | "disabled";
+        /** UpdateStatus */
+        UpdateStatus: {
+            /** Branch */
+            branch: string;
+            /** Checked At */
+            checked_at?: string | null;
+            /**
+             * Commits Behind
+             * @description Commits on the branch the build does not have.
+             */
+            commits_behind?: number | null;
+            /**
+             * Compare Url
+             * @description Web page listing the commits between the build and the branch.
+             */
+            compare_url?: string | null;
+            /**
+             * Reason
+             * @description Why the state is unknown.
+             */
+            reason?: string | null;
+            state: components["schemas"]["UpdateState"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -2802,6 +2850,24 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * VersionInfo
+         * @description GET /api/version — the running build and its update status.
+         */
+        VersionInfo: {
+            /** Built At */
+            built_at: string | null;
+            /**
+             * Commit
+             * @description Full git commit SHA of the build, when known.
+             */
+            commit: string | null;
+            /** Repository Url */
+            repository_url: string;
+            update: components["schemas"]["UpdateStatus"];
+            /** Version */
+            version: string;
         };
         /**
          * WazuhLabel
@@ -4237,6 +4303,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_api_version_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionInfo"];
                 };
             };
         };

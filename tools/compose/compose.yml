@@ -10,6 +10,10 @@ services:
     build:
       context: ../..
       dockerfile: devops/docker/Dockerfile
+      # Set by the Makefile; the UI compares the commit with GitHub to tell whether it is the latest.
+      args:
+        APP_COMMIT: ${GIT_COMMIT:-}
+        APP_BUILD_DATE: ${BUILD_DATE:-}
     image: devops-ai-assistant:local
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"

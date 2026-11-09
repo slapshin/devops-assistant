@@ -22,6 +22,7 @@ from app.domain.jobs import (
     RuntimeConfig,
 )
 from app.domain.report import AnalysisReport, FindingDetail, ReportSummary
+from app.domain.version import VersionInfo
 from app.jobs import NotActive, QueueFull
 from app.settings import AIProvider, Settings
 from app.sources.base import ClientLimits
@@ -71,6 +72,12 @@ async def health(services: ServicesDep) -> HealthResponse:
         version=__version__,
         database=database,
     )
+
+
+@router.get("/version", response_model=VersionInfo)
+async def version(services: ServicesDep) -> VersionInfo:
+    """The running build and whether it is the latest commit of the tracked GitHub branch."""
+    return await services.update_checker.version()
 
 
 @router.get("/config", response_model=RuntimeConfig)

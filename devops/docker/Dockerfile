@@ -56,6 +56,12 @@ USER app
 VOLUME ["/data"]
 EXPOSE 8000
 
+# Build identity for GET /api/version; last, so a new commit rebuilds only this metadata layer.
+ARG APP_COMMIT=""
+ARG APP_BUILD_DATE=""
+ENV APP_COMMIT=${APP_COMMIT} \
+  APP_BUILD_DATE=${APP_BUILD_DATE}
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS --max-time 4 -o /dev/null "http://127.0.0.1:${APP_PORT}/api/health" || exit 1
 

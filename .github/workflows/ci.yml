@@ -105,11 +105,18 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
+      # One timestamp for both builds, so the push reuses every cached layer.
+      - name: Build date
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Build
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: devops/docker/Dockerfile
+          build-args: |
+            APP_COMMIT=${{ github.sha }}
+            APP_BUILD_DATE=${{ env.BUILD_DATE }}
           tags: devops-ai-assistant:ci
           labels: ${{ steps.meta.outputs.labels }}
           load: true
@@ -147,6 +154,9 @@ jobs:
         with:
           context: .
           file: devops/docker/Dockerfile
+          build-args: |
+            APP_COMMIT=${{ github.sha }}
+            APP_BUILD_DATE=${{ env.BUILD_DATE }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}

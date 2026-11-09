@@ -3,6 +3,8 @@ import type { components } from "./schema";
 export type Schemas = components["schemas"];
 export type Problem = Schemas["Problem"];
 export type RuntimeConfig = Schemas["RuntimeConfig"];
+export type VersionInfo = Schemas["VersionInfo"];
+export type UpdateState = Schemas["UpdateState"];
 export type AnalysisReport = Schemas["AnalysisReport"];
 export type ReportSummary = Schemas["ReportSummary"];
 export type FindingDetail = Schemas["FindingDetail"];

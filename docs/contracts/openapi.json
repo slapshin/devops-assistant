@@ -5950,6 +5950,83 @@
         "title": "Unit",
         "type": "string"
       },
+      "UpdateState": {
+        "enum": [
+          "latest",
+          "outdated",
+          "ahead",
+          "unknown",
+          "disabled"
+        ],
+        "title": "UpdateState",
+        "type": "string"
+      },
+      "UpdateStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "commits_behind": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Commits on the branch the build does not have.",
+            "title": "Commits Behind"
+          },
+          "compare_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Web page listing the commits between the build and the branch.",
+            "title": "Compare Url"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the state is unknown.",
+            "title": "Reason"
+          },
+          "state": {
+            "$ref": "#/components/schemas/UpdateState"
+          }
+        },
+        "required": [
+          "state",
+          "branch"
+        ],
+        "title": "UpdateStatus",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -5988,6 +6065,55 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VersionInfo": {
+        "additionalProperties": false,
+        "description": "GET /api/version — the running build and its update status.",
+        "properties": {
+          "built_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Built At"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Full git commit SHA of the build, when known.",
+            "title": "Commit"
+          },
+          "repository_url": {
+            "title": "Repository Url",
+            "type": "string"
+          },
+          "update": {
+            "$ref": "#/components/schemas/UpdateStatus"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "commit",
+          "built_at",
+          "repository_url",
+          "update"
+        ],
+        "title": "VersionInfo",
         "type": "object"
       },
       "WazuhLabel": {
@@ -7815,6 +7941,25 @@
         "tags": [
           "projects"
         ]
+      }
+    },
+    "/api/version": {
+      "get": {
+        "description": "The running build and whether it is the latest commit of the tracked GitHub branch.",
+        "operationId": "version_api_version_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Version"
       }
     }
   }

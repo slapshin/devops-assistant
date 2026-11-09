@@ -96,7 +96,7 @@ All fixtures are synthetic and sanitised. They use neutral, made-up labels (`pro
 | `reports/report_short_history.json` | 5 days of history: 4 baseline days, medium confidence, trend buckets 2–4 `insufficient_baseline` and 5–13 `insufficient_data`; latency `unsupported` (no histogram); AI `disabled` |
 | `reports/report_partial_source_error.json` | Partial report: network queries timed out (exclusion listed); AI `not_configured` |
 | `jobs/job_running.json`, `job_completed.json`, `job_interrupted.json`, `submitted_duplicate.json` | Lifecycle states, including restart interruption and a duplicate submission |
-| `api/config.json`, `projects.json`, `connection_test.json`, `problem_queue_full.json`, `problem_report_not_ready.json` | API bodies |
+| `api/config.json`, `version.json`, `projects.json`, `connection_test.json`, `problem_queue_full.json`, `problem_report_not_ready.json` | API bodies |
 | `metrics/capabilities_supplied_unverified.json` | Capability manifest from supplied examples only (all `verified=false`); fallback for scopes not yet discovered |
 | `metrics/capabilities_shop_production_observed.json` | shop/production capabilities verified live by T003, including `partial` containers and `unsupported` memory limits/throttling |
 

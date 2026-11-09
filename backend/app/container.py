@@ -13,6 +13,7 @@ from app.storage.channels import SqliteChannelRepository
 from app.storage.credentials import SqliteCredentialRepository
 from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository
+from app.version import UpdateChecker
 
 
 @dataclass
@@ -27,5 +28,6 @@ class Services:
     credentials: SqliteCredentialRepository
     channels: SqliteChannelRepository
     notifier: ReportNotifier
+    update_checker: UpdateChecker
     health_cache: dict[str, tuple[float, str, list[ConnectionTest]]] = field(default_factory=dict)
     """project_id -> (monotonic time, project updated_at, last connection test)."""

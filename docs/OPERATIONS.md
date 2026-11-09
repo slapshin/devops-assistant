@@ -59,6 +59,9 @@ All settings are environment variables, optionally read from `config.env` in the
 | `APP_PUBLIC_URL` | unset | URL the app is opened at; notifications link to the report. |
 | `TELEGRAM_PROVIDER` | `bot_api` | `fake` writes messages to `DATA_DIR/outbox/telegram/*.json` instead of sending (`make demo` uses it); `none` turns Telegram off. |
 | `TELEGRAM_API_URL` | `https://api.telegram.org` | Bot API base URL, e.g. a self-hosted Bot API server. Set `HTTPS_PROXY` where Telegram is only reachable through a proxy. |
+| `UPDATE_CHECK` | `true` | Show in the rail whether this build is the latest commit of `UPDATE_CHECK_BRANCH` in `UPDATE_CHECK_REPOSITORY` (`main` of `slapshin/devops-assistant`, which `ghcr.io/…:latest` follows). One GitHub API request, cached 6 h (15 min after a failure); honours `HTTPS_PROXY`. `false` turns it off; without internet access the status is *unknown*. |
+| `UPDATE_CHECK_REPOSITORY`, `UPDATE_CHECK_BRANCH`, `GITHUB_API_URL` | `slapshin/devops-assistant`, `main`, `https://api.github.com` | Repository and branch the build is compared with (e.g. a fork). |
+| `APP_COMMIT`, `APP_BUILD_DATE` | baked into the image | Build identity. `make up`/`make docker-build` and CI pass them as build arguments; a native run reads `git rev-parse HEAD`. Without a commit the update status is *unknown*. |
 
 ### Notifications
 

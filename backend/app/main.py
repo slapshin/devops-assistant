@@ -34,6 +34,7 @@ from app.storage.credentials import SqliteCredentialRepository
 from app.storage.projects import SqliteProjectRepository
 from app.storage.repository import SqliteReportRepository
 from app.storage.secrets import load_secret_box
+from app.version import update_checker
 
 log = logging.getLogger("app")
 
@@ -101,6 +102,7 @@ def build_services(
         credentials,
         channels,
         notifier,
+        update_checker(settings),
     )
 
 
@@ -133,8 +135,10 @@ def create_app(
         recovered = await services.runner.start()
         services.scheduler.start()
         log.info(
-            "started version=%s ai=%s email=%s telegram=%s db=%s interrupted_jobs_failed=%d",
+            "started version=%s commit=%s ai=%s email=%s telegram=%s db=%s "
+            "interrupted_jobs_failed=%d",
             __version__,
+            services.update_checker.commit or "unknown",
             settings.explanation_status.value,
             "on" if settings.email_configured else "off",
             settings.telegram_provider.value,

@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "commit": "9bfe484000000000000000000000000000000000",
+  "built_at": "2026-09-28T10:05:00Z",
+  "repository_url": "https://github.com/slapshin/devops-assistant",
+  "update": {
+    "state": "outdated",
+    "branch": "main",
+    "commits_behind": 3,
+    "compare_url": "https://github.com/slapshin/devops-assistant/compare/9bfe484000000000000000000000000000000000...main",
+    "checked_at": "2026-09-30T10:05:00Z",
+    "reason": null
+  }
+}

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/vue
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, type Router } from "vue-router";
 import config from "../../fixtures/api/config.json";
+import version from "../../fixtures/api/version.json";
 import jobCompleted from "../../fixtures/jobs/job_completed.json";
 import jobInterrupted from "../../fixtures/jobs/job_interrupted.json";
 import jobRunning from "../../fixtures/jobs/job_running.json";
@@ -65,6 +66,7 @@ beforeEach(() => {
   calls = [];
   routes = {
     "GET /api/config": () => json(config),
+    "GET /api/version": () => json(version),
     "GET /api/notification-channels": () => json(notificationChannels),
     "GET /api/notification-channels/kinds": () => json(KINDS_AVAILABLE),
     "GET /api/projects": () => json(projects),
@@ -1822,5 +1824,29 @@ describe("navigation rail", () => {
 
     expect(nav).not.toHaveClass("collapsed");
     expect(localStorage.getItem("assistant.rail")).toBeNull();
+  });
+
+  it("shows the running version and links an outdated build to the newer commits", async () => {
+    await renderAt("/");
+    const nav = await screen.findByRole("navigation", { name: "App" });
+
+    const link = await within(nav).findByRole("link", { name: /^v0\.1\.0 · 9bfe484\./ });
+
+    expect(link).toHaveTextContent("Update available · 3 commits behind");
+    expect(link).toHaveAttribute("href", version.update.compare_url);
+  });
+
+  it.each([
+    ["latest", "Latest"],
+    ["ahead", "Ahead of main"],
+    ["disabled", "Update check off"],
+    ["unknown", "Update status unknown"],
+  ])("labels a %s build", async (state, text) => {
+    routes["GET /api/version"] = () => json({ ...version, update: { ...version.update, state, commits_behind: null, reason: "GitHub is unreachable." } });
+
+    await renderAt("/");
+    const nav = await screen.findByRole("navigation", { name: "App" });
+
+    expect(await within(nav).findByText(text)).toBeInTheDocument();
   });
 });

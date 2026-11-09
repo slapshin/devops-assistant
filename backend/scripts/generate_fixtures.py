@@ -113,6 +113,7 @@ from app.domain.report import (
     SourceInfo,
 )
 from app.domain.schedule import ReportSchedule, Weekday
+from app.domain.version import UpdateState, UpdateStatus, VersionInfo
 from app.jobs import daily_episodes
 from app.service import AnalysisPipeline
 from app.sources.cloudflare.source import CloudflareMetricsSource
@@ -1151,6 +1152,22 @@ def build() -> dict[str, BaseModel]:
                 max_series_per_query=500,
                 max_series_per_job=5000,
                 report_max_bytes=20 * 1024 * 1024,
+            ),
+        ),
+        "api/version.json": VersionInfo(
+            version="0.1.0",
+            commit="9bfe484" + "0" * 33,
+            built_at=T - timedelta(days=2),
+            repository_url="https://github.com/slapshin/devops-assistant",
+            update=UpdateStatus(
+                state=UpdateState.OUTDATED,
+                branch="main",
+                commits_behind=3,
+                compare_url="https://github.com/slapshin/devops-assistant/compare/"
+                + "9bfe484"
+                + "0" * 33
+                + "...main",
+                checked_at=T,
             ),
         ),
         "api/projects.json": ProjectList(

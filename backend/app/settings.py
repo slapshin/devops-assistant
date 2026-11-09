@@ -1,5 +1,7 @@
 """Environment configuration (docs/DECISIONS.md §2) with actionable validation errors."""
 
+import re
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Self
@@ -46,6 +48,10 @@ class SmtpSecurity(StrEnum):
 class ConfigError(Exception):
     """Startup configuration error listing each invalid variable."""
 
+
+GIT_SHA = re.compile(r"[0-9a-f]{40}")
+GITHUB_REPOSITORY = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+")
+GIT_BRANCH = re.compile(r"[A-Za-z0-9._/-]+")
 
 CONFIG_ENV_FILE = Path(__file__).resolve().parents[2] / "config.env"
 """Repository-root config.env (copied from config.env.template); ignored when absent."""
@@ -96,6 +102,16 @@ class Settings(BaseSettings):
     demo_projects: bool = False
     """Seed one synthetic demo project per scenario when no project exists."""
 
+    app_commit: str | None = None
+    """Git commit of the build; baked into the Docker image, else read from git at startup."""
+    app_build_date: datetime | None = None
+    """Build time; baked into the Docker image."""
+    update_check: bool = True
+    """Compare the build commit with the tracked GitHub branch to tell whether it is the latest."""
+    update_check_repository: str = "slapshin/devops-assistant"
+    update_check_branch: str = "main"
+    github_api_url: str = "https://api.github.com"
+
     @field_validator("metrics_url", mode="before")
     @classmethod
     def _valid_metrics_url(cls, value: str | None) -> str | None:
@@ -105,6 +121,43 @@ class Settings(BaseSettings):
     @classmethod
     def _blank_is_unset(cls, value: str | None) -> str | None:
         return (value or "").strip() or None
+
+    @field_validator("app_commit", "app_build_date", mode="before")
+    @classmethod
+    def _blank_build_info_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("app_commit")
+    @classmethod
+    def _valid_commit(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip().lower()
+        if not GIT_SHA.fullmatch(value):
+            raise ValueError("expected a full 40-character git commit SHA")
+        return value
+
+    @field_validator("update_check_repository")
+    @classmethod
+    def _valid_repository(cls, value: str) -> str:
+        if not GITHUB_REPOSITORY.fullmatch(value):
+            raise ValueError("expected a GitHub repository as owner/name")
+        return value
+
+    @field_validator("update_check_branch")
+    @classmethod
+    def _valid_branch(cls, value: str) -> str:
+        if not GIT_BRANCH.fullmatch(value) or ".." in value:
+            raise ValueError("expected a branch name such as main")
+        return value
+
+    @field_validator("github_api_url")
+    @classmethod
+    def _valid_github_url(cls, value: str) -> str:
+        value = value.strip()
+        if not value.startswith(("http://", "https://")) or any(c.isspace() for c in value):
+            raise ValueError("expected an http(s) URL such as https://api.github.com")
+        return value.rstrip("/")
 
     @field_validator("smtp_from")
     @classmethod

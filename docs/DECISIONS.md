@@ -86,6 +86,8 @@ All settings come from environment (optionally the repository-root `config.env`,
 | `APP_PUBLIC_URL` | unset | Base URL users open the app at (http/https); notifications link to `<APP_PUBLIC_URL>/reports/<analysis_id>`. Without it they carry no link. |
 | `TELEGRAM_PROVIDER` | `bot_api` | `bot_api`, `fake` (writes each message as JSON to `DATA_DIR/outbox/telegram`; tests and demos), or `none` (T027). Bot tokens belong to Telegram notification channels (encrypted), not to settings. |
 | `TELEGRAM_API_URL` | `https://api.telegram.org` | Bot API base URL (a self-hosted Bot API server works too). Requests honour `HTTPS_PROXY`; 10 s connect / 15 s total timeout. |
+| `UPDATE_CHECK` | `true` | Compare the build commit with `UPDATE_CHECK_BRANCH` (`main`) of `UPDATE_CHECK_REPOSITORY` through the GitHub compare API (`GITHUB_API_URL`); 3 s connect / 5 s total timeout, cached 6 h, 15 min after a failure. Failure is the state `unknown`, never an error. |
+| `APP_COMMIT`, `APP_BUILD_DATE` | unset | Build identity, baked into the image as build arguments; natively the commit is read from git. |
 
 ## 3. API conventions
 
@@ -95,6 +97,7 @@ All settings come from environment (optionally the repository-root `config.env`,
 | Route | Result |
 | --- | --- |
 | `GET /api/health` | `{status, version, database}`. Source reachability is per project (`GET /api/projects/{id}/health`). |
+| `GET /api/version` | `{version, commit, built_at, repository_url, update}`; `update.state` is `latest` (build = branch head), `outdated` (with `commits_behind`, `compare_url`), `ahead` (unpublished commits), `unknown` (with `reason`) or `disabled`. |
 | `GET /api/config` | Public runtime facts only: AI provider/status, model name, detector version, config hash, limits. No secrets. |
 | `GET /api/projects` | `{items: [ProjectSummary]}` sorted by name: the project plus `latest_analysis` (newest finished job) and `active_analysis` (queued/running job). Sources hold no secrets: each source's `auth` is `{type: none}` or `{type: credential, credential_id, name}`. |
 | `POST /api/projects` | Body `ProjectInput {name, description?, matchers: [{name, op, value}] (1–10; `op` is `=` (default), `!=`, `=~` or `!~`, regexes fully anchored RE2; at least one `=`/`=~` matcher that does not match an empty value), sources: [{kind: "prometheus", url, tls_verify, auth}]}` → `201 Project`. Name is unique case-insensitively → `409 project_name_taken`. |
