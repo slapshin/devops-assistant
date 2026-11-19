@@ -2,8 +2,8 @@
 /** Create (/projects/new), clone (/projects/new?from=:projectId) or edit (/projects/:projectId/edit) a project, test its sources, delete it. */
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ApiError, type ConnectionTest, type SourceKind } from "../../api/client";
-import { useCreateProject, useDeleteProject, useProject, useTestConnection, useUpdateProject } from "../../api/queries";
+import { ApiError, type SourceKind } from "../../api/client";
+import { useCreateProject, useDeleteProject, useProject, useUpdateProject } from "../../api/queries";
 import ScheduleNotifications from "../../components/notifications/ScheduleNotifications.vue";
 import ConnectionTestResult from "../../components/projects/ConnectionTestResult.vue";
 import CredentialPicker from "../../components/projects/CredentialPicker.vue";
@@ -27,30 +27,15 @@ import {
   WAZUH_MONITORING_INDEX_PATTERN,
   WEEKDAYS,
   cloneDraft,
-  cloudflareInput,
   draftFrom,
   emptyDraft,
   emptyMatcher,
-  grafanaInput,
-  matchersInput,
-  prometheusInput,
-  sentryInput,
+  prepareProjectSubmission,
   serverFieldErrors,
-  sourceInput,
-  sourceKindLabel,
-  sourceKinds,
-  testKey,
   timezoneOptions,
-  toInput,
-  validateCloudflare,
   validateDraft,
-  validateGrafana,
-  validateMatchers,
-  validateSentry,
-  validateSource,
-  validateWazuh,
-  wazuhInput,
 } from "../../lib/projects";
+import { useSourceEditor } from "../../lib/projectSources";
 
 const props = defineProps<{ projectId?: string; cloneOf?: string }>();
 const TIMEZONES = timezoneOptions();
@@ -73,15 +58,14 @@ const crumbs = computed<Crumb[]>(() => {
 const create = useCreateProject();
 const update = useUpdateProject();
 const remove = useDeleteProject();
-const tester = useTestConnection();
 
 const draft = ref(emptyDraft());
 const loaded = ref(!sourceId.value);
 const submitted = ref(false);
 const serverErrors = ref<FieldErrors>({});
 const formError = ref<string | null>(null);
-const lastTests = ref<Partial<Record<SourceKind, { result: ConnectionTest; signature: string }>>>({});
-const testing = ref<SourceKind | null>(null);
+const sources = useSourceEditor(draft, editing);
+const { lastTests, testing, hasSources, isStale, saveWarning, previewBase, pending: testingPending } = sources;
 const confirmingDelete = ref(false);
 const deleteName = ref("");
 
@@ -119,39 +103,6 @@ const errors = computed<FieldErrors>(() => ({ ...(submitted.value ? clientErrors
 // A server error belongs to the value it was about; editing anything clears them.
 watch(draft, () => (serverErrors.value = {}), { deep: true });
 
-/** The connection without its custom rules: editing rules does not make a connection test stale. */
-const prometheusConnection = () => ({ ...prometheusInput(draft.value), custom_rules: [] });
-const signatures = computed<Record<SourceKind, string>>(() => ({
-  prometheus: JSON.stringify([matchersInput(draft.value), draft.value.url.trim() ? prometheusConnection() : null]),
-  cloudflare: JSON.stringify(draft.value.cloudflare ? cloudflareInput(draft.value) : null),
-  sentry: JSON.stringify(draft.value.sentry ? sentryInput(draft.value) : null),
-  wazuh: JSON.stringify(draft.value.wazuh ? wazuhInput(draft.value) : null),
-  grafana: JSON.stringify(draft.value.grafana ? grafanaInput(draft.value) : null),
-}));
-const isStale = (kind: SourceKind) => {
-  const last = lastTests.value[kind];
-  return !!last && last.signature !== signatures.value[kind];
-};
-const saveWarning = computed(() => {
-  const kinds = sourceKinds(draft.value);
-  if (!kinds.length) return "Without a data source this project cannot be analysed yet.";
-  for (const kind of kinds) {
-    const label = sourceKindLabel(kind);
-    const last = lastTests.value[kind];
-    if (!last) {
-      if (!editing.value) return `The ${label} connection has not been tested.`;
-    } else if (isStale(kind)) return `The ${label} connection was not tested with the current values.`;
-    else if (testKey(last.result) !== "ok") return `The last ${label} connection test did not succeed.`;
-  }
-  return null;
-});
-
-const previewBase = computed(() => {
-  const usable = !Object.keys({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, true) }).length;
-  if (!usable) return null;
-  return { matchers: matchersInput(draft.value), source: prometheusConnection() };
-});
-
 const saving = computed(() => create.isPending.value || update.isPending.value);
 const active = computed(() => existing.data.value?.active_analysis ?? null);
 const canDelete = computed(() => !!existing.data.value && deleteName.value === existing.data.value.name && !active.value);
@@ -172,9 +123,9 @@ function problemMessage(error: unknown): string {
   return "Unexpected error";
 }
 
-function applyServerError(error: unknown, tested?: SourceKind) {
+function applyServerError(error: unknown, fieldErrors = serverFieldErrors) {
   if (error instanceof ApiError && error.problem.code === "validation_error") {
-    serverErrors.value = serverFieldErrors(error.problem, sourceKinds(draft.value), tested);
+    serverErrors.value = fieldErrors(error.problem);
     formError.value = "Some fields need attention.";
   } else if (error instanceof ApiError && error.problem.code === "project_name_taken") {
     serverErrors.value = { name: error.problem.detail ?? "Name already in use" };
@@ -185,31 +136,14 @@ function applyServerError(error: unknown, tested?: SourceKind) {
 
 async function runTest(kind: SourceKind) {
   formError.value = null;
-  const validators: Record<SourceKind, () => FieldErrors> = {
-    prometheus: () => ({ ...validateMatchers(draft.value.matchers), ...validateSource(draft.value, true) }),
-    cloudflare: () => validateCloudflare(draft.value),
-    sentry: () => validateSentry(draft.value),
-    wazuh: () => validateWazuh(draft.value),
-    grafana: () => validateGrafana(draft.value),
-  };
-  const problems = validators[kind]();
-  if (Object.keys(problems).length) {
-    serverErrors.value = problems;
-    return;
-  }
-
-  const signature = signatures.value[kind];
-  testing.value = kind;
   try {
-    const result = await tester.mutateAsync({
-      matchers: kind === "prometheus" ? matchersInput(draft.value) : [],
-      source: sourceInput(draft.value, kind),
-    });
-    lastTests.value = { ...lastTests.value, [kind]: { result, signature } };
+    const result = await sources.test(kind);
+    if (result) {
+      serverErrors.value = result.errors;
+      formError.value = result.message;
+    }
   } catch (error) {
-    applyServerError(error, kind);
-  } finally {
-    testing.value = null;
+    applyServerError(error);
   }
 }
 
@@ -221,14 +155,15 @@ async function save() {
     return;
   }
 
+  const request = prepareProjectSubmission(draft.value);
   try {
-    const body = toInput(draft.value);
+    const body = request.body;
     const saved = props.projectId
       ? await update.mutateAsync({ id: props.projectId, body })
       : await create.mutateAsync(body);
     await router.push(`/projects/${saved.project_id}`);
   } catch (error) {
-    applyServerError(error);
+    applyServerError(error, request.fieldErrors);
   }
 }
 
@@ -342,7 +277,7 @@ async function confirmDelete() {
           <template #hint>Bearer token or basic auth; None when the server needs no authentication.</template>
         </CredentialPicker>
         <div class="row">
-          <button type="button" :disabled="tester.isPending.value" @click="runTest('prometheus')">
+          <button type="button" :disabled="testingPending" @click="runTest('prometheus')">
             {{ testing === "prometheus" ? "Testing…" : "Test Prometheus connection" }}
           </button>
         </div>
@@ -416,7 +351,7 @@ async function confirmDelete() {
             </div>
           </details>
           <div class="row">
-            <button type="button" :disabled="tester.isPending.value" @click="runTest('cloudflare')">
+            <button type="button" :disabled="testingPending" @click="runTest('cloudflare')">
               {{ testing === "cloudflare" ? "Testing…" : "Test Cloudflare connection" }}
             </button>
           </div>
@@ -546,7 +481,7 @@ async function confirmDelete() {
             </template>
           </CredentialPicker>
           <div class="row">
-            <button type="button" :disabled="tester.isPending.value" @click="runTest('sentry')">
+            <button type="button" :disabled="testingPending" @click="runTest('sentry')">
               {{ testing === "sentry" ? "Testing…" : "Test Sentry connection" }}
             </button>
           </div>
@@ -687,7 +622,7 @@ async function confirmDelete() {
             </template>
           </CredentialPicker>
           <div class="row">
-            <button type="button" :disabled="tester.isPending.value" @click="runTest('wazuh')">
+            <button type="button" :disabled="testingPending" @click="runTest('wazuh')">
               {{ testing === "wazuh" ? "Testing…" : "Test Wazuh connection" }}
             </button>
           </div>
@@ -826,7 +761,7 @@ async function confirmDelete() {
             </template>
           </CredentialPicker>
           <div class="row">
-            <button type="button" :disabled="tester.isPending.value" @click="runTest('grafana')">
+            <button type="button" :disabled="testingPending" @click="runTest('grafana')">
               {{ testing === "grafana" ? "Testing…" : "Test Grafana connection" }}
             </button>
           </div>
@@ -880,7 +815,7 @@ async function confirmDelete() {
             </div>
             <p v-if="errors['schedule.weekdays']" :id="errorId('schedule.weekdays')" class="field-error">{{ errors["schedule.weekdays"] }}</p>
           </div>
-          <p v-if="!sourceKinds(draft).length" class="muted hint">Scheduled runs are skipped until a data source is configured.</p>
+          <p v-if="!hasSources" class="muted hint">Scheduled runs are skipped until a data source is configured.</p>
 
           <ScheduleNotifications v-model="draft.notifications" :errors="errors" />
         </template>
