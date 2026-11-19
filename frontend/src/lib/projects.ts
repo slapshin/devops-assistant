@@ -1,55 +1,34 @@
-import type {
-  ConnectionTest,
-  LabelMatcher,
-  Problem,
-  ProjectInput,
-  ProjectSummary,
-  ReportSchedule,
-  ReportSummary,
-  SourceInfo,
-  SourceKind,
-  Weekday,
-} from "../api/client";
-import { credentialIdOf, sourceAuthInput, validateSourceCredential } from "./auth";
-import { type CustomRuleDraft, ruleDraftFrom, ruleInput, validateCustomRules } from "./customRules";
-import { type NotificationDraft, normalizeDestinationField, notificationDraftFrom, notificationInput, validateNotifications } from "./notifications";
+import type { LabelMatcher, ProjectInput, ProjectSummary, ReportSchedule, ReportSummary, SourceInfo, Weekday } from "../api/client";
+import type { FieldErrors } from "./auth";
+import { type NotificationDraft, notificationDraftFrom, notificationInput, validateNotifications } from "./notifications";
+import { type SourceDraft, emptySourceDraft, sourceDraftFrom } from "./projectSources/draft";
+import { cloudflareSource, sentrySource } from "./projectSources/draft";
+import { prepareSourceSubmission, validateSources } from "./projectSources";
 
-/** Mirrors backend/app/domain/common.py and projects.py so most mistakes never reach the server. */
-const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-const RESERVED_LABEL_PREFIX = "__";
-export const MAX_MATCHERS = 10;
+export type { FieldErrors } from "./auth";
+export {
+  MATCH_OPS,
+  MAX_MATCHERS,
+  MAX_GRAFANA_FOLDERS,
+  MAX_GRAFANA_RULES,
+  MAX_SENTRY_PROJECTS,
+  MAX_SENTRY_TAGS,
+  MAX_WAZUH_AGENTS,
+  MAX_WAZUH_GROUPS,
+  MAX_WAZUH_LABELS,
+  SENTRY_URL,
+  WAZUH_INDEX_PATTERN,
+  WAZUH_MONITORING_INDEX_PATTERN,
+  emptyMatcher,
+  prometheusSource,
+  cloudflareSource,
+  sentrySource,
+  wazuhSource,
+  grafanaSource,
+} from "./projectSources/draft";
+export type { MatcherDraft, TagDraft, MatchOp } from "./projectSources/draft";
+
 const MAX_NAME_CHARS = 100;
-const MAX_LABEL_VALUE_CHARS = 256;
-/** Mirrors backend/app/domain/projects.py (Cloudflare). */
-export const CLOUDFLARE_GRAPHQL_URL = "https://api.cloudflare.com/client/v4/graphql";
-const ZONE_ID = /^[0-9a-f]{32}$/;
-const HOSTNAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
-export const MAX_HOSTNAMES = 20;
-/** Mirrors backend/app/domain/projects.py (Sentry). */
-export const SENTRY_URL = "https://sentry.io";
-const SENTRY_SLUG = /^[a-z0-9][a-z0-9_-]{0,99}$/;
-const SENTRY_ENVIRONMENT = /^[^\s/]{1,64}$/;
-const SENTRY_TAG_KEY = /^[a-zA-Z0-9_.:-]{1,32}$/;
-export const MAX_SENTRY_PROJECTS = 10;
-export const MAX_SENTRY_TAGS = 10;
-const MAX_SENTRY_TAG_VALUE_CHARS = 200;
-/** Mirrors backend/app/domain/projects.py (Wazuh). */
-export const WAZUH_INDEX_PATTERN = "wazuh-alerts-4.x-*";
-const WAZUH_AGENT = /^[A-Za-z0-9._-]{1,128}$/;
-const WAZUH_LABEL_KEY = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/;
-const WAZUH_INDEX = /^[a-z0-9_*][a-z0-9_.*+-]{0,254}$/;
-export const MAX_WAZUH_AGENTS = 50;
-export const MAX_WAZUH_LABELS = 10;
-export const WAZUH_MONITORING_INDEX_PATTERN = "wazuh-monitoring-*";
-const WAZUH_GROUP = /^[A-Za-z0-9_.-]{1,255}$/;
-export const MAX_WAZUH_GROUPS = 10;
-const MAX_WAZUH_LABEL_VALUE_CHARS = 200;
-/** Mirrors backend/app/domain/projects.py (Grafana). */
-const GRAFANA_UID = /^[A-Za-z0-9_-]{1,40}$/;
-export const MAX_GRAFANA_FOLDERS = 20;
-export const MAX_GRAFANA_RULES = 100;
-const MAX_GRAFANA_FOLDER_CHARS = 255;
-
 /** Mirrors backend/app/domain/schedule.py. */
 const LOCAL_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const WEEKDAYS: { day: Weekday; label: string }[] = [
@@ -86,78 +65,9 @@ export function timezoneOptions(): string[] {
   }
 }
 
-export type MatchOp = LabelMatcher["op"];
-
-/** PromQL label matching operators; regular expressions are fully anchored (RE2 syntax). */
-export const MATCH_OPS: { op: MatchOp; label: string }[] = [
-  { op: "=", label: "equals" },
-  { op: "!=", label: "does not equal" },
-  { op: "=~", label: "matches regex" },
-  { op: "!~", label: "does not match regex" },
-];
-
-export interface MatcherDraft {
-  name: string;
-  op: MatchOp;
-  value: string;
-}
-
-export const emptyMatcher = (name = ""): MatcherDraft => ({ name, op: "=", value: "" });
-
-export interface TagDraft {
-  key: string;
-  value: string;
-}
-
-export interface ProjectDraft {
+export interface ProjectDraft extends SourceDraft {
   name: string;
   description: string;
-  matchers: MatcherDraft[];
-  /** Prometheus source; an empty URL means none. */
-  url: string;
-  tlsVerify: boolean;
-  /** The credential of each source kind, "" for none (kept while a source is switched off). */
-  auth: Record<SourceKind, string>;
-  /** Custom rules of the Prometheus source, in collection order. */
-  customRules: CustomRuleDraft[];
-  cloudflare: boolean;
-  zoneId: string;
-  /** Comma- or space-separated; empty analyses the whole zone. */
-  hostnames: string;
-  cfApiUrl: string;
-  sentry: boolean;
-  sentryOrg: string;
-  /** Comma- or space-separated project slugs. */
-  sentryProjects: string;
-  /** Tag filters for every project; rows left completely empty are ignored. */
-  sentryTags: TagDraft[];
-  /** Empty analyses every environment. */
-  sentryEnvironment: string;
-  sentryApiUrl: string;
-  sentryTlsVerify: boolean;
-  wazuh: boolean;
-  wazuhUrl: string;
-  /** Comma- or space-separated agent names (case is kept). */
-  wazuhAgents: string;
-  /** Comma- or space-separated agent groups (case is kept); resolved via the monitoring index. */
-  wazuhGroups: string;
-  wazuhMonitoringIndex: string;
-  /** Agent label filters; rows left completely empty are ignored. */
-  wazuhLabels: TagDraft[];
-  wazuhIndex: string;
-  wazuhTlsVerify: boolean;
-  grafana: boolean;
-  grafanaUrl: string;
-  grafanaOrgId: number;
-  /** Comma- or newline-separated folder titles or UIDs (titles may contain spaces). */
-  grafanaFolders: string;
-  /** Comma- or space-separated alert rule UIDs. */
-  grafanaRuleUids: string;
-  /** Rule label matchers; rows left completely empty are ignored. */
-  grafanaRuleLabels: MatcherDraft[];
-  /** Alert instance label matchers; rows left completely empty are ignored. */
-  grafanaInstanceLabels: MatcherDraft[];
-  grafanaTlsVerify: boolean;
   scheduled: boolean;
   scheduleTime: string;
   scheduleTimezone: string;
@@ -168,48 +78,11 @@ export interface ProjectDraft {
   keepReports: number;
 }
 
-export type { FieldErrors } from "./auth";
-import type { FieldErrors } from "./auth";
-
 export function emptyDraft(): ProjectDraft {
   return {
+    ...emptySourceDraft(),
     name: "",
     description: "",
-    matchers: [
-      emptyMatcher("project"),
-      emptyMatcher("env"),
-    ],
-    url: "",
-    tlsVerify: true,
-    auth: { prometheus: "", cloudflare: "", sentry: "", wazuh: "", grafana: "" },
-    customRules: [],
-    cloudflare: false,
-    zoneId: "",
-    hostnames: "",
-    cfApiUrl: CLOUDFLARE_GRAPHQL_URL,
-    sentry: false,
-    sentryOrg: "",
-    sentryProjects: "",
-    sentryTags: [],
-    sentryEnvironment: "",
-    sentryApiUrl: SENTRY_URL,
-    sentryTlsVerify: true,
-    wazuh: false,
-    wazuhUrl: "",
-    wazuhAgents: "",
-    wazuhGroups: "",
-    wazuhMonitoringIndex: WAZUH_MONITORING_INDEX_PATTERN,
-    wazuhLabels: [],
-    wazuhIndex: WAZUH_INDEX_PATTERN,
-    wazuhTlsVerify: true,
-    grafana: false,
-    grafanaUrl: "",
-    grafanaOrgId: 1,
-    grafanaFolders: "",
-    grafanaRuleUids: "",
-    grafanaRuleLabels: [],
-    grafanaInstanceLabels: [],
-    grafanaTlsVerify: true,
     scheduled: false,
     scheduleTime: DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: browserTimezone(),
@@ -220,36 +93,18 @@ export function emptyDraft(): ProjectDraft {
   };
 }
 
-type StoredSource = ProjectSummary["sources"][number];
-type PrometheusSource = Extract<StoredSource, { kind: "prometheus" }>;
-type CloudflareSource = Extract<StoredSource, { kind: "cloudflare" }>;
-type SentrySource = Extract<StoredSource, { kind: "sentry" }>;
-type WazuhSource = Extract<StoredSource, { kind: "wazuh" }>;
-type GrafanaSource = Extract<StoredSource, { kind: "grafana" }>;
-
-export const prometheusSource = (project: { sources: StoredSource[] } | null | undefined) =>
-  project?.sources.find((s): s is PrometheusSource => s.kind === "prometheus") ?? null;
-export const cloudflareSource = (project: { sources: StoredSource[] } | null | undefined) =>
-  project?.sources.find((s): s is CloudflareSource => s.kind === "cloudflare") ?? null;
-export const sentrySource = (project: { sources: StoredSource[] } | null | undefined) =>
-  project?.sources.find((s): s is SentrySource => s.kind === "sentry") ?? null;
-export const wazuhSource = (project: { sources: StoredSource[] } | null | undefined) =>
-  project?.sources.find((s): s is WazuhSource => s.kind === "wazuh") ?? null;
-export const grafanaSource = (project: { sources: StoredSource[] } | null | undefined) =>
-  project?.sources.find((s): s is GrafanaSource => s.kind === "grafana") ?? null;
-
 /** One chip for a filter accepting any of `values`: an equality for one, PromQL-style alternation for several. */
 function anyOfChip(name: string, values: string[]): LabelMatcher {
   return { name, op: values.length === 1 ? "=" : "=~", value: values.join("|") };
 }
 
 /** A Cloudflare source's hostname filter as matcher chips (none when it analyses every hostname). */
-export function cloudflareFilters(source: CloudflareSource): LabelMatcher[] {
+export function cloudflareFilters(source: NonNullable<ReturnType<typeof cloudflareSource>>): LabelMatcher[] {
   return source.hostnames.length ? [anyOfChip("host", source.hostnames)] : [];
 }
 
 /** A Sentry source's project, environment and tag filters as matcher chips. */
-export function sentryFilters(source: SentrySource): LabelMatcher[] {
+export function sentryFilters(source: NonNullable<ReturnType<typeof sentrySource>>): LabelMatcher[] {
   return [
     anyOfChip("project", source.projects),
     ...(source.environment ? [{ name: "environment", op: "=" as const, value: source.environment }] : []),
@@ -258,52 +113,10 @@ export function sentryFilters(source: SentrySource): LabelMatcher[] {
 }
 
 export function draftFrom(project: ProjectSummary): ProjectDraft {
-  const source = prometheusSource(project);
-  const cloudflare = cloudflareSource(project);
-  const sentry = sentrySource(project);
-  const wazuh = wazuhSource(project);
-  const grafana = grafanaSource(project);
   return {
+    ...sourceDraftFrom(project),
     name: project.name,
     description: project.description ?? "",
-    matchers: project.matchers.map((m) => ({ ...m })),
-    url: source?.url ?? "",
-    tlsVerify: source?.tls_verify ?? true,
-    auth: {
-      prometheus: credentialIdOf(source?.auth),
-      cloudflare: credentialIdOf(cloudflare?.auth),
-      sentry: credentialIdOf(sentry?.auth),
-      wazuh: credentialIdOf(wazuh?.auth),
-      grafana: credentialIdOf(grafana?.auth),
-    },
-    customRules: (source?.custom_rules ?? []).map(ruleDraftFrom),
-    cloudflare: !!cloudflare,
-    zoneId: cloudflare?.zone_id ?? "",
-    hostnames: cloudflare?.hostnames.join(", ") ?? "",
-    cfApiUrl: cloudflare?.api_url ?? CLOUDFLARE_GRAPHQL_URL,
-    sentry: !!sentry,
-    sentryOrg: sentry?.organization ?? "",
-    sentryProjects: sentry?.projects.join(", ") ?? "",
-    sentryTags: sentry?.tags?.map((t) => ({ ...t })) ?? [],
-    sentryEnvironment: sentry?.environment ?? "",
-    sentryApiUrl: sentry?.api_url ?? SENTRY_URL,
-    sentryTlsVerify: sentry?.tls_verify ?? true,
-    wazuh: !!wazuh,
-    wazuhUrl: wazuh?.api_url ?? "",
-    wazuhAgents: wazuh?.agents?.join(", ") ?? "",
-    wazuhGroups: wazuh?.groups?.join(", ") ?? "",
-    wazuhMonitoringIndex: wazuh?.monitoring_index_pattern ?? WAZUH_MONITORING_INDEX_PATTERN,
-    wazuhLabels: wazuh?.labels?.map((l) => ({ ...l })) ?? [],
-    wazuhIndex: wazuh?.index_pattern ?? WAZUH_INDEX_PATTERN,
-    wazuhTlsVerify: wazuh?.tls_verify ?? true,
-    grafana: !!grafana,
-    grafanaUrl: grafana?.api_url ?? "",
-    grafanaOrgId: grafana?.org_id ?? 1,
-    grafanaFolders: grafana?.folders?.join(", ") ?? "",
-    grafanaRuleUids: grafana?.rule_uids?.join(", ") ?? "",
-    grafanaRuleLabels: grafana?.rule_labels?.map((m) => ({ ...m })) ?? [],
-    grafanaInstanceLabels: grafana?.instance_labels?.map((m) => ({ ...m })) ?? [],
-    grafanaTlsVerify: grafana?.tls_verify ?? true,
     scheduled: !!project.schedule,
     scheduleTime: project.schedule?.time ?? DEFAULT_SCHEDULE_TIME,
     scheduleTimezone: project.schedule?.timezone ?? browserTimezone(),
@@ -317,211 +130,6 @@ export function draftFrom(project: ProjectSummary): ProjectDraft {
 /** A new project prefilled from ``project``, using the same credentials. */
 export function cloneDraft(project: ProjectSummary): ProjectDraft {
   return { ...draftFrom(project), name: `${project.name} (copy)`.slice(0, MAX_NAME_CHARS) };
-}
-
-/** Lower-cased, unique, sorted items of a comma- or space-separated list. */
-export function parseList(raw: string): string[] {
-  const items = raw
-    .split(/[\s,]+/)
-    .map((h) => h.trim().toLowerCase())
-    .filter(Boolean);
-  return [...new Set(items)].sort();
-}
-
-/** Unique, sorted items of a comma- or space-separated list, case kept (Wazuh agent names). */
-export function parseNames(raw: string): string[] {
-  return [...new Set(raw.split(/[\s,]+/).filter(Boolean))].sort();
-}
-
-/** Unique, sorted items of a comma- or newline-separated list, case and inner spaces kept (Grafana folders). */
-export function parseFolders(raw: string): string[] {
-  return [...new Set(raw.split(/[,\n]+/).map((f) => f.trim()).filter(Boolean))].sort();
-}
-
-export const parseHostnames = (raw: string) => parseList(raw.replace(/\.(?=[\s,]|$)/g, ""));
-
-function urlError(raw: string): string | null {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return "Expected an http(s) URL such as http://localhost:8428";
-  }
-  if (url.protocol === "synthetic:") return url.host ? null : "Expected synthetic://<scenario>";
-  if (!["http:", "https:"].includes(url.protocol) || !url.hostname) return "Expected an http(s) URL such as http://localhost:8428";
-  if (url.username || url.password) return "Must not contain credentials; use the authentication fields";
-  if (url.search || url.hash) return "Must not contain a query string or fragment";
-  return null;
-}
-
-/** Labels scope Prometheus queries, so they are required only with a Prometheus source; without
- * one, rows left without a value are ignored (neither validated nor sent). */
-export function validateMatchers(matchers: MatcherDraft[], required = true): FieldErrors {
-  const errors: FieldErrors = {};
-  const used = matchers.filter((m) => required || m.value);
-  if (used.length === 0 && required) errors.matchers = "Add at least one label";
-  // A negative matcher alone would select nearly every series (the server also rejects a
-  // regex that matches an empty value, which RE2 syntax keeps us from checking here).
-  else if (required && !used.some((m) => m.op === "=" || m.op === "=~")) errors.matchers = "Add at least one = or =~ label";
-  if (used.length > MAX_MATCHERS) errors.matchers = `At most ${MAX_MATCHERS} labels`;
-
-  const seen = new Set<string>();
-  matchers.forEach((m, i) => {
-    if (!required && !m.value) return;
-    const name = m.name.trim();
-    if (!LABEL_NAME.test(name)) errors[`matchers.${i}.name`] = "Letters, digits and _; must not start with a digit";
-    else if (name.startsWith(RESERVED_LABEL_PREFIX)) errors[`matchers.${i}.name`] = "Labels starting with __ are reserved";
-    else if (seen.has(name)) errors[`matchers.${i}.name`] = "Duplicate label";
-    seen.add(name);
-
-    if (!m.value) errors[`matchers.${i}.value`] = "Required";
-    else if (m.value.length > MAX_LABEL_VALUE_CHARS) errors[`matchers.${i}.value`] = `At most ${MAX_LABEL_VALUE_CHARS} characters`;
-  });
-  return errors;
-}
-
-export function validateSource(draft: ProjectDraft, required = false): FieldErrors {
-  const errors: FieldErrors = {};
-  const url = draft.url.trim();
-  if (!url) {
-    if (required) errors["prometheus.url"] = "Required to test the connection";
-    return errors;
-  }
-
-  const bad = urlError(url);
-  if (bad) errors["prometheus.url"] = bad;
-  return errors;
-}
-
-export function validateCloudflare(draft: ProjectDraft): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!draft.cloudflare) return errors;
-  if (!ZONE_ID.test(draft.zoneId.trim().toLowerCase())) errors["cloudflare.zone_id"] = "Expected a zone ID of 32 hex characters";
-  const hostnames = parseHostnames(draft.hostnames);
-  const bad = hostnames.filter((h) => !HOSTNAME.test(h));
-  if (bad.length) errors["cloudflare.hostnames"] = `Invalid hostnames: ${bad.join(", ")}`;
-  else if (hostnames.length > MAX_HOSTNAMES) errors["cloudflare.hostnames"] = `At most ${MAX_HOSTNAMES} hostnames`;
-  const apiUrl = draft.cfApiUrl.trim();
-  const badUrl = apiUrl ? urlError(apiUrl) : "Required";
-  if (badUrl) errors["cloudflare.api_url"] = badUrl;
-  const synthetic = apiUrl.startsWith("synthetic:");
-  return { ...errors, ...validateSourceCredential("cloudflare", draft.auth.cloudflare, synthetic) };
-}
-
-export function validateSentry(draft: ProjectDraft): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!draft.sentry) return errors;
-  const slugError = "Lower-case letters, digits, - and _";
-  if (!SENTRY_SLUG.test(draft.sentryOrg.trim().toLowerCase())) errors["sentry.organization"] = draft.sentryOrg.trim() ? slugError : "Required";
-  const projects = parseList(draft.sentryProjects);
-  const badProjects = projects.filter((p) => !SENTRY_SLUG.test(p));
-  if (!projects.length) errors["sentry.projects"] = "Required";
-  else if (badProjects.length) errors["sentry.projects"] = `Invalid project slugs: ${badProjects.join(", ")}`;
-  else if (projects.length > MAX_SENTRY_PROJECTS) errors["sentry.projects"] = `At most ${MAX_SENTRY_PROJECTS} projects`;
-  Object.assign(errors, validateSentryTags(draft.sentryTags));
-  const environment = draft.sentryEnvironment.trim();
-  if (environment && (!SENTRY_ENVIRONMENT.test(environment) || environment === "None")) errors["sentry.environment"] = "No spaces or /, at most 64 characters";
-  const apiUrl = draft.sentryApiUrl.trim();
-  const badUrl = apiUrl ? urlError(apiUrl) : "Required";
-  if (badUrl) errors["sentry.api_url"] = badUrl;
-  const synthetic = apiUrl.startsWith("synthetic:");
-  return { ...errors, ...validateSourceCredential("sentry", draft.auth.sentry, synthetic) };
-}
-
-export function validateSentryTags(tags: TagDraft[]): FieldErrors {
-  const errors: FieldErrors = {};
-  const seen = new Set<string>();
-  if (usedTags(tags).length > MAX_SENTRY_TAGS) errors["sentry.tags"] = `At most ${MAX_SENTRY_TAGS} tags`;
-  tags.forEach((t, i) => {
-    const key = t.key.trim();
-    if (!key && !t.value) return;
-    if (!SENTRY_TAG_KEY.test(key)) errors[`sentry.tags.${i}.key`] = "Letters, digits, _ . : - (max 32)";
-    else if (seen.has(key)) errors[`sentry.tags.${i}.key`] = "Duplicate tag";
-    seen.add(key);
-    if (!t.value) errors[`sentry.tags.${i}.value`] = "Required";
-    else if (t.value.length > MAX_SENTRY_TAG_VALUE_CHARS) errors[`sentry.tags.${i}.value`] = `At most ${MAX_SENTRY_TAG_VALUE_CHARS} characters`;
-    else if (/[\r\n]/.test(t.value)) errors[`sentry.tags.${i}.value`] = "No line breaks";
-  });
-  return errors;
-}
-
-const usedTags = (tags: TagDraft[]) => tags.filter((t) => t.key.trim() || t.value);
-
-export function validateWazuh(draft: ProjectDraft): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!draft.wazuh) return errors;
-  const apiUrl = draft.wazuhUrl.trim();
-  const badUrl = apiUrl ? urlError(apiUrl) : "Required";
-  if (badUrl) errors["wazuh.api_url"] = badUrl;
-  const agents = parseNames(draft.wazuhAgents);
-  const badAgents = agents.filter((a) => !WAZUH_AGENT.test(a));
-  if (badAgents.length) errors["wazuh.agents"] = `Invalid agent names: ${badAgents.join(", ")}`;
-  else if (agents.length > MAX_WAZUH_AGENTS) errors["wazuh.agents"] = `At most ${MAX_WAZUH_AGENTS} agents`;
-  const groups = parseNames(draft.wazuhGroups);
-  const badGroups = groups.filter((g) => !WAZUH_GROUP.test(g) || g === "." || g === "..");
-  if (badGroups.length) errors["wazuh.groups"] = `Invalid group names: ${badGroups.join(", ")}`;
-  else if (groups.length > MAX_WAZUH_GROUPS) errors["wazuh.groups"] = `At most ${MAX_WAZUH_GROUPS} groups`;
-  if (groups.length && !WAZUH_INDEX.test(draft.wazuhMonitoringIndex.trim())) errors["wazuh.monitoring_index_pattern"] = "One lower-case index pattern, e.g. wazuh-monitoring-*";
-  const labels = usedTags(draft.wazuhLabels);
-  if (labels.length > MAX_WAZUH_LABELS) errors["wazuh.labels"] = `At most ${MAX_WAZUH_LABELS} labels`;
-  const seen = new Set<string>();
-  draft.wazuhLabels.forEach((l, i) => {
-    const key = l.key.trim();
-    if (!key && !l.value) return;
-    if (!WAZUH_LABEL_KEY.test(key)) errors[`wazuh.labels.${i}.key`] = "Letters, digits, _ . - (max 64)";
-    else if (seen.has(key)) errors[`wazuh.labels.${i}.key`] = "Duplicate label";
-    seen.add(key);
-    if (!l.value) errors[`wazuh.labels.${i}.value`] = "Required";
-    else if (l.value.length > MAX_WAZUH_LABEL_VALUE_CHARS) errors[`wazuh.labels.${i}.value`] = `At most ${MAX_WAZUH_LABEL_VALUE_CHARS} characters`;
-    else if (/[\r\n]/.test(l.value)) errors[`wazuh.labels.${i}.value`] = "No line breaks";
-  });
-  if (!agents.length && !groups.length && !labels.length) errors["wazuh.agents"] ??= "Select agents by name, group or label";
-  if (!WAZUH_INDEX.test(draft.wazuhIndex.trim())) errors["wazuh.index_pattern"] = "One lower-case index pattern, e.g. wazuh-alerts-4.x-*";
-  const synthetic = apiUrl.startsWith("synthetic:");
-  return { ...errors, ...validateSourceCredential("wazuh", draft.auth.wazuh, synthetic) };
-}
-
-const usedMatchers = (rows: MatcherDraft[]) => rows.filter((m) => m.name.trim() || m.value);
-
-/** Optional label matcher rows of a source, e.g. "grafana.instance_labels". */
-function validateMatcherRows(rows: MatcherDraft[], field: string): FieldErrors {
-  const errors: FieldErrors = {};
-  if (usedMatchers(rows).length > MAX_MATCHERS) errors[field] = `At most ${MAX_MATCHERS} labels`;
-  const seen = new Set<string>();
-  rows.forEach((m, i) => {
-    const name = m.name.trim();
-    if (!name && !m.value) return;
-    if (!LABEL_NAME.test(name)) errors[`${field}.${i}.name`] = "Letters, digits and _; must not start with a digit";
-    else if (name.startsWith(RESERVED_LABEL_PREFIX)) errors[`${field}.${i}.name`] = "Labels starting with __ are reserved";
-    else if (seen.has(name)) errors[`${field}.${i}.name`] = "Duplicate label";
-    seen.add(name);
-    if (!m.value) errors[`${field}.${i}.value`] = "Required";
-    else if (m.value.length > MAX_LABEL_VALUE_CHARS) errors[`${field}.${i}.value`] = `At most ${MAX_LABEL_VALUE_CHARS} characters`;
-  });
-  return errors;
-}
-
-export function validateGrafana(draft: ProjectDraft): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!draft.grafana) return errors;
-  const apiUrl = draft.grafanaUrl.trim();
-  const badUrl = apiUrl ? urlError(apiUrl) : "Required";
-  if (badUrl) errors["grafana.api_url"] = badUrl;
-  if (!Number.isInteger(draft.grafanaOrgId) || draft.grafanaOrgId < 1) errors["grafana.org_id"] = "A whole number of at least 1";
-  const folders = parseFolders(draft.grafanaFolders);
-  if (folders.some((f) => f.length > MAX_GRAFANA_FOLDER_CHARS)) errors["grafana.folders"] = `At most ${MAX_GRAFANA_FOLDER_CHARS} characters per folder`;
-  else if (folders.length > MAX_GRAFANA_FOLDERS) errors["grafana.folders"] = `At most ${MAX_GRAFANA_FOLDERS} folders`;
-  const uids = parseNames(draft.grafanaRuleUids);
-  const badUids = uids.filter((u) => !GRAFANA_UID.test(u));
-  if (badUids.length) errors["grafana.rule_uids"] = `Invalid rule UIDs: ${badUids.join(", ")}`;
-  else if (uids.length > MAX_GRAFANA_RULES) errors["grafana.rule_uids"] = `At most ${MAX_GRAFANA_RULES} rules`;
-  Object.assign(errors, validateMatcherRows(draft.grafanaRuleLabels, "grafana.rule_labels"));
-  Object.assign(errors, validateMatcherRows(draft.grafanaInstanceLabels, "grafana.instance_labels"));
-  if (!folders.length && !uids.length && !usedMatchers(draft.grafanaRuleLabels).length) {
-    errors["grafana.folders"] ??= "Select alert rules by folder, UID or rule label";
-  }
-  const synthetic = apiUrl.startsWith("synthetic:");
-  return { ...errors, ...validateSourceCredential("grafana", draft.auth.grafana, synthetic) };
 }
 
 export function validateSchedule(draft: ProjectDraft): FieldErrors {
@@ -545,114 +153,15 @@ export function validateDraft(draft: ProjectDraft): FieldErrors {
   const name = draft.name.trim();
   if (!name) errors.name = "Required";
   else if (name.length > MAX_NAME_CHARS) errors.name = `At most ${MAX_NAME_CHARS} characters`;
-  const rules = draft.url.trim() ? validateCustomRules(draft.customRules) : {};
-  return { ...errors, ...validateMatchers(draft.matchers, !!draft.url.trim()), ...validateSource(draft), ...rules, ...validateCloudflare(draft), ...validateSentry(draft), ...validateWazuh(draft), ...validateGrafana(draft), ...validateSchedule(draft), ...validateRetention(draft) };
+  return { ...errors, ...validateSources(draft), ...validateSchedule(draft), ...validateRetention(draft) };
 }
 
-type SourceInput = NonNullable<ProjectInput["sources"]>[number];
-
-type PrometheusSourceInput = Extract<SourceInput, { kind: "prometheus" }>;
-
-export function prometheusInput(draft: ProjectDraft): PrometheusSourceInput {
-  return {
-    kind: "prometheus",
-    url: draft.url.trim(),
-    tls_verify: draft.tlsVerify,
-    auth: sourceAuthInput(draft.auth.prometheus),
-    // Omitted is the same as none, so drafts without rules send what they always did.
-    ...(draft.customRules.length ? { custom_rules: draft.customRules.map(ruleInput) } : {}),
-  };
-}
-
-export function cloudflareInput(draft: ProjectDraft): SourceInput {
-  return {
-    kind: "cloudflare",
-    zone_id: draft.zoneId.trim().toLowerCase(),
-    hostnames: parseHostnames(draft.hostnames),
-    api_url: draft.cfApiUrl.trim(),
-    auth: sourceAuthInput(draft.auth.cloudflare),
-  } as SourceInput;
-}
-
-export function sentryInput(draft: ProjectDraft): SourceInput {
-  return {
-    kind: "sentry",
-    organization: draft.sentryOrg.trim().toLowerCase(),
-    projects: parseList(draft.sentryProjects),
-    tags: usedTags(draft.sentryTags).map((t) => ({ key: t.key.trim(), value: t.value })),
-    environment: draft.sentryEnvironment.trim() || null,
-    api_url: draft.sentryApiUrl.trim(),
-    tls_verify: draft.sentryTlsVerify,
-    auth: sourceAuthInput(draft.auth.sentry),
-  } as SourceInput;
-}
-
-export function wazuhInput(draft: ProjectDraft): SourceInput {
-  return {
-    kind: "wazuh",
-    api_url: draft.wazuhUrl.trim(),
-    index_pattern: draft.wazuhIndex.trim(),
-    agents: parseNames(draft.wazuhAgents),
-    groups: parseNames(draft.wazuhGroups),
-    monitoring_index_pattern: draft.wazuhMonitoringIndex.trim() || WAZUH_MONITORING_INDEX_PATTERN,
-    labels: usedTags(draft.wazuhLabels).map((l) => ({ key: l.key.trim(), value: l.value })),
-    tls_verify: draft.wazuhTlsVerify,
-    auth: sourceAuthInput(draft.auth.wazuh),
-  } as SourceInput;
-}
-
-export function grafanaInput(draft: ProjectDraft): SourceInput {
-  const matchers = (rows: MatcherDraft[]) => usedMatchers(rows).map((m) => ({ name: m.name.trim(), op: m.op, value: m.value }));
-  return {
-    kind: "grafana",
-    api_url: draft.grafanaUrl.trim(),
-    org_id: draft.grafanaOrgId,
-    folders: parseFolders(draft.grafanaFolders),
-    rule_uids: parseNames(draft.grafanaRuleUids),
-    rule_labels: matchers(draft.grafanaRuleLabels),
-    instance_labels: matchers(draft.grafanaInstanceLabels),
-    tls_verify: draft.grafanaTlsVerify,
-    auth: sourceAuthInput(draft.auth.grafana),
-  } as SourceInput;
-}
-
-/** The input of one configured source kind. */
-export function sourceInput(draft: ProjectDraft, kind: SourceKind): SourceInput {
-  switch (kind) {
-    case "prometheus":
-      return prometheusInput(draft);
-    case "cloudflare":
-      return cloudflareInput(draft);
-    case "sentry":
-      return sentryInput(draft);
-    case "wazuh":
-      return wazuhInput(draft);
-    case "grafana":
-      return grafanaInput(draft);
-  }
-}
-
-/** Configured source kinds in the order they are sent (server errors refer to their index). */
-export function sourceKinds(draft: ProjectDraft): SourceKind[] {
-  const kinds: SourceKind[] = [];
-  if (draft.url.trim()) kinds.push("prometheus");
-  if (draft.cloudflare) kinds.push("cloudflare");
-  if (draft.sentry) kinds.push("sentry");
-  if (draft.wazuh) kinds.push("wazuh");
-  if (draft.grafana) kinds.push("grafana");
-  return kinds;
-}
-
-/** Matchers to send; without a Prometheus URL, rows left without a value are dropped. */
-export const matchersInput = (draft: ProjectDraft) =>
-  draft.matchers.filter((m) => draft.url.trim() || m.value).map((m) => ({ name: m.name.trim(), op: m.op, value: m.value }));
-
-export function toInput(draft: ProjectDraft): ProjectInput {
-  return {
+export function prepareProjectSubmission(draft: ProjectDraft) {
+  const sources = prepareSourceSubmission(draft);
+  const body: ProjectInput = {
     name: draft.name.trim(),
     description: draft.description.trim() || null,
-    matchers: matchersInput(draft),
-    sources: sourceKinds(draft).map((kind) => sourceInput(draft, kind)),
+    ...sources.fields,
     schedule: draft.scheduled
       ? {
           time: draft.scheduleTime,
@@ -663,7 +172,10 @@ export function toInput(draft: ProjectDraft): ProjectInput {
       : null,
     keep_reports: draft.limitReports ? draft.keepReports : null,
   };
+  return { body, fieldErrors: sources.fieldErrors };
 }
+
+export const toInput = (draft: ProjectDraft): ProjectInput => prepareProjectSubmission(draft).body;
 
 /** "Daily at 08:00 (Europe/Berlin)", "Weekdays at …", "Mon, Wed at …". */
 export function scheduleSummary(schedule: ReportSchedule): string {
@@ -679,21 +191,7 @@ export function scheduleSummary(schedule: ReportSchedule): string {
   return `${when} at ${schedule.time} (${schedule.timezone})`;
 }
 
-/**
- * Field errors from a 422 problem, keyed like validateDraft ("matchers.0.name", "prometheus.url"):
- * "sources.<i>.x" refers to the i-th sent source, "source.x" to the tested one.
- */
-export function serverFieldErrors(problem: Problem, kinds: SourceKind[] = [], tested?: SourceKind): FieldErrors {
-  const errors: FieldErrors = {};
-  for (const e of problem.errors ?? []) {
-    let field = (e.field ?? "").replace(/^body\./, "");
-    field = field.replace(/^sources\.(\d+)\./, (match, i: string) => (kinds[Number(i)] ? `${kinds[Number(i)]}.` : match));
-    if (tested) field = field.replace(/^source\./, `${tested}.`);
-    field = normalizeDestinationField(field);
-    errors[field] ??= e.message ?? "Invalid";
-  }
-  return errors;
-}
+export { serverFieldErrors } from "./fieldErrors";
 
 /** Host, port and path prefix of a source URL; "synthetic: <scenario>" for demo sources. */
 export function sourceHost(url: string): string {
@@ -706,48 +204,8 @@ export function sourceHost(url: string): string {
   }
 }
 
-export type HealthKey = "ok" | "checking" | "unreachable" | "auth" | "no_series" | "no_traffic" | "unreadable" | "error";
-
-export const HEALTH_LABELS: Record<HealthKey, { label: string; icon: string }> = {
-  ok: { label: "Reachable", icon: "✓" },
-  checking: { label: "Checking…", icon: "◌" },
-  unreachable: { label: "Unreachable", icon: "!" },
-  auth: { label: "Auth failed", icon: "!" },
-  no_series: { label: "No matching series", icon: "◐" },
-  no_traffic: { label: "No traffic", icon: "◐" },
-  unreadable: { label: "Credentials unreadable", icon: "!" },
-  error: { label: "Check failed", icon: "!" },
-};
-
-export function testKey(test: ConnectionTest): HealthKey {
-  if (!test.reachable) return "unreachable";
-  if (test.auth_ok === false) return "auth";
-  // A quiet application or host legitimately reports no Sentry events or Wazuh alerts, so only
-  // metrics and edge warn.
-  if (test.matched_series === 0 && test.kind !== "sentry" && test.kind !== "wazuh") return test.kind === "cloudflare" ? "no_traffic" : "no_series";
-  return "ok";
-}
-
-export const SOURCE_KIND_LABELS: Record<SourceKind, string> = {
-  prometheus: "Prometheus",
-  cloudflare: "Cloudflare",
-  sentry: "Sentry",
-  wazuh: "Wazuh",
-  grafana: "Grafana",
-};
-
-export const sourceKindLabel = (kind: SourceKind) => SOURCE_KIND_LABELS[kind];
-
-/** What a connection test counts: matching series (Prometheus), requests (Cloudflare), events (Sentry) or alerts (Wazuh) in 24 h,
- * or current alert instances (Grafana). */
-export function testVolume(test: ConnectionTest): string | null {
-  if (test.matched_series === null || test.matched_series === undefined) return null;
-  if (test.kind === "cloudflare") return `${test.matched_series.toLocaleString("en")} requests in 24 h`;
-  if (test.kind === "sentry") return `${test.matched_series.toLocaleString("en")} events in 24 h`;
-  if (test.kind === "wazuh") return `${test.matched_series.toLocaleString("en")} alerts in 24 h`;
-  if (test.kind === "grafana") return `${test.matched_series.toLocaleString("en")} matching alert instances`;
-  return `${test.matched_series} matching series`;
-}
+export { HEALTH_LABELS, SOURCE_KIND_LABELS, sourceKindLabel, testKey, testVolume } from "./projectSources/display";
+export type { HealthKey } from "./projectSources/display";
 
 /** Every source of a report; 2.0 reports only have ``source``. */
 export function reportSources(report: ReportSummary): SourceInfo[] {

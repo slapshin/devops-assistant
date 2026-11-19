@@ -28,6 +28,14 @@ An analysis opens every source of the project (`SourceProvider.open` yields one 
 - A project may set **report retention** (`keep_reports`, null keeps all). `SqliteReportRepository.prune_reports` deletes the project's finished analyses older than its newest N reports (reports cascade; queued/running jobs are never touched). The `JobRunner` prunes after each saved report (a pruning error is logged and never changes the job's outcome), and saving the project prunes immediately, so lowering N takes effect at once.
 - Migration 0003 turned each distinct pre-project `(project, env)` into a project and rewrote saved snapshots to report schema 2.0; the deprecated `METRICS_*` settings are imported once into those projects at startup.
 
+### Source editing in the web form
+
+`frontend/src/lib/projectSources/` owns source draft defaults and hydration, normalization, validation, submission ordering, connection-test freshness, custom-rule preview context and source error placement. Its fixed source catalog coordinates save and connection-test rules. Persisted contracts remain generated from the backend's Pydantic models.
+
+`projects.ts` composes those source rules with project metadata, scheduling and retention. `prepareProjectSubmission` captures the payload and its field-error mapper together, so a late validation response uses the submitted source order even if the user has since enabled or disabled sources. Disabled source draft values and credential references remain available for re-enabling.
+
+`useSourceEditor` owns local connection-test results and warnings while the existing TanStack Query mutation owns requests. An in-flight test retains its original connection signature: when it completes after an edit, the result is shown as stale. Validation errors still appear on the originating source, including late responses after edits. Custom-rule preview validates the Prometheus connection and scope independently of unfinished rules. Custom rules remain in connection-test requests, but are excluded from connection freshness and the preview base, preserving the existing behavior.
+
 ## Version policy
 
 - Resolve current stable, mutually compatible runtimes, frameworks, SDKs, and tooling when T001/T002 execute. Record versions, lookup date, official sources, and reasons for compatibility exceptions in `docs/DECISIONS.md`.
