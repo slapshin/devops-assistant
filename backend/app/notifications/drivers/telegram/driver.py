@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from app.domain.notifications import (
+    BOT_TOKEN,
     AnyDestination,
     ChannelKind,
     TelegramChat,
@@ -16,7 +17,6 @@ from app.notifications.drivers.telegram.client import TelegramApi, TelegramApiEr
 from app.notifications.drivers.telegram.render import TEST_TEXT, render_telegram
 from app.notifications.message import ReportMessage
 
-BOT_TOKEN = "bot_token"
 NOT_CONFIGURED = "Telegram delivery is turned off (TELEGRAM_PROVIDER=none)."
 MAX_RETRY_AFTER_SECONDS = 5
 """A 429 asking to wait at most this long is retried once; longer waits fail."""
@@ -69,9 +69,9 @@ class TelegramDriver:
         await _send(api, chat, TEST_TEXT, silent=False)
         return f"sent to {chat_title(found)} ({found.get('type', 'chat')})"
 
-    async def chats(self, token: str | None) -> TelegramChatList:
+    async def chats(self, secrets: dict[str, str]) -> TelegramChatList:
         """The bot and the chats in its pending updates, most recent first."""
-        api = self.open(token)
+        api = self.open(secrets.get(BOT_TOKEN))
         me = await api.get_me()
         found: dict[str, TelegramChat] = {}
         for update in reversed(await api.get_updates()):

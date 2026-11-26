@@ -17,6 +17,7 @@ from pydantic import TypeAdapter
 from app.domain.common import format_utc
 from app.domain.ids import new_channel_id
 from app.domain.notifications import (
+    BOT_TOKEN,
     AnyDestination,
     ChannelKind,
     ChannelUsage,
@@ -29,7 +30,6 @@ from app.domain.notifications import (
 from app.storage.db import notification_channels, projects, schedule_notifications
 from app.storage.secrets import SecretBox, SecretsUnreadable
 
-BOT_TOKEN = "bot_token"
 _DESTINATION: TypeAdapter[AnyDestination] = TypeAdapter(Destination)
 
 

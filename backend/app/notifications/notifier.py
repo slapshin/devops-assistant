@@ -20,7 +20,7 @@ from app.domain.notifications import (
     destination_count,
 )
 from app.domain.report import ReportSummary
-from app.notifications.drivers import Drivers
+from app.notifications.drivers import ChannelDrivers
 from app.notifications.drivers.base import (
     DELIVERY_TIMEOUT_SECONDS,
     ChannelNotConfigured,
@@ -42,7 +42,7 @@ class ReportNotifier:
         projects: SqliteProjectRepository,
         reports: SqliteReportRepository,
         channels: SqliteChannelRepository,
-        drivers: Drivers,
+        drivers: ChannelDrivers,
         public_url: str | None,
     ) -> None:
         self.projects = projects
@@ -121,12 +121,10 @@ class ReportNotifier:
         addressed = destination_count(destination)
         if (skipped := skip_reason(notification.policy, message)) is not None:
             return _outcome(channel, NotificationStatus.SKIPPED, 0, skipped)
-        driver = self.drivers.get(destination.kind)
-        if driver is None:
-            missing = f"No {destination.kind} driver on this server."
-            return _outcome(channel, NotificationStatus.NOT_CONFIGURED, addressed, missing)
-        if (unavailable := driver.unavailable()) is not None:
-            return _outcome(channel, NotificationStatus.NOT_CONFIGURED, addressed, unavailable)
+        try:
+            driver = self.drivers.available(destination.kind)
+        except ChannelNotConfigured as exc:
+            return _outcome(channel, NotificationStatus.NOT_CONFIGURED, addressed, exc.reason)
 
         silent = not has_problem(notification.policy, message)
         try:

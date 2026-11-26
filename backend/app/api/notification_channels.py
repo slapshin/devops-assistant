@@ -1,17 +1,13 @@
 """Notification channel routes (T026, T027): CRUD, kinds the server can deliver to, test
 messages, and Telegram chat lookup. Secrets are write-only and never echoed in problems."""
 
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Response
 
 from app.api.problems import ProblemError, problem_responses, validation_problem
 from app.api.routes import ServicesDep
-from app.container import Services
 from app.domain.jobs import ErrorCode
 from app.domain.notifications import (
     ChannelKind,
-    ChannelKindInfo,
     ChannelKindList,
     ChannelTestRequest,
     ChannelTestResult,
@@ -21,9 +17,12 @@ from app.domain.notifications import (
     TelegramChatList,
     TelegramChatsRequest,
 )
-from app.notifications.drivers.base import ChannelDriver, ChannelNotConfigured, DeliveryError
-from app.notifications.drivers.telegram.client import TelegramApiError
-from app.notifications.drivers.telegram.driver import BOT_TOKEN, TelegramDriver
+from app.notifications.operations import (
+    OperationFailed,
+    OperationNotConfigured,
+    TelegramWebhookSet,
+    TokenRequired,
+)
 from app.storage.channels import (
     ChannelInUse,
     ChannelNameTaken,
@@ -33,8 +32,6 @@ from app.storage.channels import (
 from app.storage.secrets import SecretsUnreadable
 
 router = APIRouter(prefix="/api/notification-channels", tags=["notification channels"])
-
-WEBHOOK_CONFLICT = 409
 
 
 def _not_found(channel_id: str) -> ProblemError:
@@ -86,13 +83,30 @@ def _write_error(exc: Exception) -> ProblemError:
     raise exc
 
 
-def _driver(services: Services, kind: ChannelKind) -> ChannelDriver:
-    driver = services.notifier.drivers.get(kind)
-    if driver is None:
-        raise _not_configured(kind, f"No {kind} driver on this server.")
-    if (reason := driver.unavailable()) is not None:
-        raise _not_configured(kind, reason)
-    return driver
+def _operation_error(exc: Exception) -> ProblemError:
+    match exc:
+        case OperationNotConfigured(kind=kind, reason=reason):
+            return _not_configured(kind, reason)
+        case OperationFailed(title=title, reason=reason):
+            return _failed(title, reason)
+        case TelegramWebhookSet(reason=reason):
+            return ProblemError(
+                409, ErrorCode.TELEGRAM_WEBHOOK_SET, "The bot has a webhook", reason
+            )
+        case TokenRequired():
+            return validation_problem("body.bot_token", "enter the bot token")
+    return _write_error(exc)
+
+
+OPERATION_ERRORS = (
+    OperationNotConfigured,
+    OperationFailed,
+    TelegramWebhookSet,
+    TokenRequired,
+    ChannelSecretRequired,
+    SecretsUnreadable,
+    ChannelNotFound,
+)
 
 
 @router.get("", response_model=NotificationChannelList)
@@ -103,12 +117,7 @@ async def list_channels(services: ServicesDep) -> NotificationChannelList:
 @router.get("/kinds", response_model=ChannelKindList)
 async def list_kinds(services: ServicesDep) -> ChannelKindList:
     """Every channel kind and whether this server can deliver to it."""
-    items = []
-    for kind in ChannelKind:
-        driver = services.notifier.drivers.get(kind)
-        reason = driver.unavailable() if driver else f"No {kind} driver on this server."
-        items.append(ChannelKindInfo(kind=kind, available=reason is None, reason=reason))
-    return ChannelKindList(items=items)
+    return ChannelKindList(items=services.channel_operations.kinds())
 
 
 @router.post(
@@ -127,25 +136,10 @@ async def create_channel(
 async def send_test(body: ChannelTestRequest, services: ServicesDep) -> ChannelTestResult:
     """Send a short test message to a destination, saved or not; an omitted secret comes from
     ``channel_id``."""
-    kind = body.destination.kind
-    driver = _driver(services, kind)
     try:
-        destination, secrets = await services.channels.secrets_for(
-            body.destination, body.channel_id
-        )
-    except (ChannelSecretRequired, SecretsUnreadable, ChannelNotFound) as exc:
-        raise _write_error(exc) from None
-    try:
-        detail = await driver.test(destination, secrets)
-    except ChannelNotConfigured as exc:
-        raise _not_configured(kind, exc.reason) from None
-    except DeliveryError as exc:
-        raise _failed("Sending the test message failed", exc.reason) from None
-    except Exception as exc:  # never echo library messages: they may hold tokens
-        raise _failed(
-            "Sending the test message failed", f"Unexpected error: {type(exc).__name__}"
-        ) from None
-    return ChannelTestResult(kind=kind, detail=detail, sent_at=datetime.now(UTC))
+        return await services.channel_operations.send_test(body.destination, body.channel_id)
+    except OPERATION_ERRORS as exc:
+        raise _operation_error(exc) from None
 
 
 @router.post(
@@ -154,27 +148,10 @@ async def send_test(body: ChannelTestRequest, services: ServicesDep) -> ChannelT
 async def telegram_chats(body: TelegramChatsRequest, services: ServicesDep) -> TelegramChatList:
     """A bot (its token, or the one stored for ``channel_id``) and the chats that recently
     messaged it or added it."""
-    driver = _driver(services, ChannelKind.TELEGRAM)
-    assert isinstance(driver, TelegramDriver)
-    token = body.bot_token.get_secret_value().strip() if body.bot_token else None
-    if token is None and body.channel_id is not None:
-        try:
-            _, secrets = await services.channels.resolve(body.channel_id)
-        except (ChannelNotFound, SecretsUnreadable) as exc:
-            raise _write_error(exc) from None
-        token = secrets.get(BOT_TOKEN)
-    if not token:
-        raise validation_problem("body.bot_token", "enter the bot token")
     try:
-        return await driver.chats(token)
-    except TelegramApiError as exc:
-        if exc.error_code == WEBHOOK_CONFLICT:
-            raise ProblemError(
-                409, ErrorCode.TELEGRAM_WEBHOOK_SET, "The bot has a webhook", exc.reason
-            ) from None
-        raise _failed("Telegram request failed", exc.reason) from None
-    except DeliveryError as exc:
-        raise _failed("Telegram request failed", exc.reason) from None
+        return await services.channel_operations.telegram_chats(body.bot_token, body.channel_id)
+    except OPERATION_ERRORS as exc:
+        raise _operation_error(exc) from None
 
 
 @router.get("/{channel_id}", response_model=NotificationChannel, responses=problem_responses(404))

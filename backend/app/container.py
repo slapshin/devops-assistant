@@ -6,6 +6,7 @@ from app.domain.detector_config import DetectorConfig
 from app.domain.projects import ConnectionTest
 from app.jobs import JobRunner
 from app.notifications.notifier import ReportNotifier
+from app.notifications.operations import ChannelOperations
 from app.scheduler import ReportScheduler
 from app.settings import Settings
 from app.sources.connections import SourceConnections
@@ -28,6 +29,7 @@ class Services:
     credentials: SqliteCredentialRepository
     channels: SqliteChannelRepository
     notifier: ReportNotifier
+    channel_operations: ChannelOperations
     update_checker: UpdateChecker
     health_cache: dict[str, tuple[float, str, list[ConnectionTest]]] = field(default_factory=dict)
     """project_id -> (monotonic time, project updated_at, last connection test)."""

@@ -8,17 +8,21 @@ from typing import Any
 
 import httpx
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from app.domain.common import Severity
 from app.domain.jobs import AnalysisJob, ErrorCode, JobError, JobState
 from app.domain.notifications import (
+    BOT_TOKEN,
+    ChannelKind,
     NotificationPolicy,
     NotifyWhen,
     TelegramDestination,
 )
 from app.domain.report import AnalysisReport, ReportSummary
 from app.main import create_app
+from app.notifications.drivers import Drivers
 from app.notifications.drivers.base import DeliveryError
 from app.notifications.drivers.telegram.client import BotApiClient, TelegramApiError
 from app.notifications.drivers.telegram.driver import TelegramDriver
@@ -277,7 +281,7 @@ async def test_chats_lists_recent_chats_newest_first() -> None:
         assert json.loads(request.content) == {"limit": 100, "timeout": 0}
         return ok(updates)
 
-    found = await driver_with(handler).chats(TOKEN)
+    found = await driver_with(handler).chats({BOT_TOKEN: TOKEN})
 
     assert found.bot_username == "ops_bot"
     assert [(c.chat_id, c.title, c.type, c.is_forum) for c in found.items] == [
@@ -294,7 +298,7 @@ async def test_webhook_conflict_is_explained() -> None:
     )
 
     with pytest.raises(TelegramApiError) as raised:
-        await driver.chats(TOKEN)
+        await driver.chats({BOT_TOKEN: TOKEN})
 
     assert raised.value.error_code == 409
     assert "enter the chat ID" in raised.value.reason
@@ -303,9 +307,14 @@ async def test_webhook_conflict_is_explained() -> None:
 # --- API --------------------------------------------------------------------------------------
 
 
-def make_client(tmp_path: Path, **config: Any) -> TestClient:
+def make_client(tmp_path: Path, drivers: Drivers | None = None, **config: Any) -> TestClient:
     settings = load_settings(_env_file=None, data_dir=tmp_path, ai_provider="fake", **config)
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings, drivers=drivers))
+
+
+def telegram_only(handler: Handler) -> Drivers:
+    """A server whose only driver is a Telegram one talking to ``handler``."""
+    return {ChannelKind.TELEGRAM: driver_with(handler)}
 
 
 CHANNEL: dict[str, Any] = {
@@ -361,3 +370,84 @@ def test_turned_off_telegram_is_reported(tmp_path: Path) -> None:
 
         assert res.status_code == 409
         assert res.json()["code"] == "channel_not_configured"
+
+
+def test_webhook_conflict_is_a_distinct_problem(tmp_path: Path) -> None:
+    conflict = error(409, "Conflict: can't use getUpdates method while webhook is active")
+    drivers = telegram_only(
+        lambda r: ok({"username": "b"}) if r.url.path.endswith("/getMe") else conflict
+    )
+    with make_client(tmp_path, drivers) as client:
+        res = client.post("/api/notification-channels/telegram/chats", json={"bot_token": TOKEN})
+
+    assert res.status_code == 409
+    assert res.json()["code"] == ErrorCode.TELEGRAM_WEBHOOK_SET
+    assert "enter the chat ID" in res.json()["detail"]
+    assert TOKEN not in res.text
+
+
+def test_refused_test_message_is_a_delivery_failure(tmp_path: Path) -> None:
+    drivers = telegram_only(
+        lambda r: (
+            ok({"type": "group"})
+            if r.url.path.endswith("/getChat")
+            else error(403, "Forbidden: bot is not a member of the group chat")
+        )
+    )
+    with make_client(tmp_path, drivers) as client:
+        res = client.post(
+            "/api/notification-channels/test", json={"destination": CHANNEL["destination"]}
+        )
+
+    assert res.status_code == 502
+    assert res.json()["code"] == ErrorCode.DELIVERY_FAILED
+    assert res.json()["title"] == "Sending the test message failed"
+    assert TOKEN not in res.text
+
+
+def test_secret_bearing_failures_never_reach_the_response(tmp_path: Path) -> None:
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(f"cannot reach {request.url}", request=request)
+
+    def leaky(token: str) -> Any:
+        raise RuntimeError(f"POST {BASE}/bot{token}/getMe")
+
+    with make_client(tmp_path / "network", telegram_only(unreachable)) as client:
+        network = [
+            client.post(
+                "/api/notification-channels/test", json={"destination": CHANNEL["destination"]}
+            ),
+            client.post("/api/notification-channels/telegram/chats", json={"bot_token": TOKEN}),
+        ]
+    with make_client(tmp_path / "leaky", {ChannelKind.TELEGRAM: TelegramDriver(leaky)}) as client:
+        unexpected = [
+            client.post(
+                "/api/notification-channels/test", json={"destination": CHANNEL["destination"]}
+            ),
+            client.post("/api/notification-channels/telegram/chats", json={"bot_token": TOKEN}),
+        ]
+
+    assert [r.status_code for r in network + unexpected] == [502] * 4
+    assert all(r.json()["detail"] == "Telegram API unreachable: ConnectError" for r in network)
+    assert all(r.json()["detail"] == "Unexpected error: RuntimeError" for r in unexpected)
+    assert all(TOKEN not in r.text for r in network + unexpected)
+
+
+def test_unreadable_stored_token_is_reported(tmp_path: Path) -> None:
+    with make_client(tmp_path, telegram_provider="fake") as client:
+        channel_id = create_channel(client)
+    stored = {k: v for k, v in CHANNEL["destination"].items() if k != "bot_token"}
+
+    with make_client(
+        tmp_path, telegram_provider="fake", secret_key=Fernet.generate_key().decode()
+    ) as client:
+        tested = client.post(
+            "/api/notification-channels/test",
+            json={"channel_id": channel_id, "destination": stored},
+        )
+        chats = client.post(
+            "/api/notification-channels/telegram/chats", json={"channel_id": channel_id}
+        )
+
+    assert [tested.status_code, chats.status_code] == [409, 409]
+    assert {tested.json()["code"], chats.json()["code"]} == {ErrorCode.CREDENTIALS_UNREADABLE}
