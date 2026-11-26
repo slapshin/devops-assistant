@@ -22,8 +22,9 @@ from app.container import Services
 from app.domain.detector_config import DetectorConfig
 from app.domain.interfaces import ExplanationProvider, MetricsSource
 from app.jobs import JobRunner, RunnerLimits
-from app.notifications.drivers import Drivers, build_drivers
+from app.notifications.drivers import ChannelDrivers, Drivers, build_drivers
 from app.notifications.notifier import ReportNotifier
+from app.notifications.operations import ChannelOperations
 from app.scheduler import ReportScheduler
 from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
@@ -86,9 +87,8 @@ def build_services(
     sources = SourceConnections(projects, override=source)
     pipeline = AnalysisPipeline(sources, RobustDetector(), config, provider, unavailable, reason)
     channels = SqliteChannelRepository(repo.engine, box)
-    if drivers is None:
-        drivers = build_drivers(settings)
-    notifier = ReportNotifier(projects, repo, channels, drivers, settings.app_public_url)
+    registry = ChannelDrivers(build_drivers(settings) if drivers is None else drivers)
+    notifier = ReportNotifier(projects, repo, channels, registry, settings.app_public_url)
     runner = JobRunner(repo, pipeline, config, settings.explanation_status, limits, notifier)
     scheduler = ReportScheduler(projects, runner)
     return Services(
@@ -102,6 +102,7 @@ def build_services(
         credentials,
         channels,
         notifier,
+        ChannelOperations(registry, channels),
         update_checker(settings),
     )
 

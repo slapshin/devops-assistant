@@ -61,6 +61,10 @@ class ChannelKind(StrEnum):
     TELEGRAM = "telegram"
 
 
+BOT_TOKEN = "bot_token"
+"""Name of a Telegram channel's secret: its bot token (stored encrypted, never echoed)."""
+
+
 class NotifyWhen(StrEnum):
     ALWAYS = "always"
     """Every finished scheduled analysis, including ones without findings."""
