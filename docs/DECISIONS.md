@@ -332,6 +332,7 @@ Per bucket: `episode_count`, `anomalous_minutes`, `peak_severity`, `affected_ent
 | Related metrics | per finding: ≤ 40 candidates compared, ≤ 5 kept; ≤ 4,000 comparisons per run; one chart per (series, window), only for kept comparisons. Over the report budget they are dropped first (`related_dropped`, findings marked `dropped_budget`), before any finding evidence |
 | AI input | top 20 findings by severity, ≤ 40,000 characters of evidence summaries; no raw series, no credentials, no URLs with secrets |
 | AI call | timeout 60 s, 1 retry on transient errors |
+| Channel test message, Telegram chat discovery | each driver call 20 s (the scheduled-delivery bound), then `502 delivery_failed` "Exceeded 20 s." |
 
 Retention: saved reports are **not deleted automatically** in this release. `GET /api/config` exposes report count and database size. T009 added `python -m app.maintenance prune --older-than N` (a dry run unless `--yes`) and `backup <file>` (SQLite online backup); see [OPERATIONS.md](OPERATIONS.md).
 
