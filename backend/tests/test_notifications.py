@@ -826,6 +826,28 @@ def test_test_message_endpoint(tmp_path: Path) -> None:
         assert bad.status_code == 422
 
 
+def test_hanging_mail_server_fails_the_test_message_within_the_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Hanging:
+        async def send(self, message: EmailMessage) -> None:
+            await asyncio.Event().wait()
+
+    def hanging(drivers: dict[ChannelKind, Any]) -> None:
+        drivers[ChannelKind.EMAIL].transport = Hanging()
+
+    monkeypatch.setattr("app.notifications.operations.DELIVERY_TIMEOUT_SECONDS", 0.05)
+    with make_client(tmp_path, hanging, email_provider="fake") as client:
+        res = client.post(
+            "/api/notification-channels/test", json={"destination": EMAIL_CHANNEL["destination"]}
+        )
+
+    assert res.status_code == 502
+    assert res.json()["code"] == ErrorCode.DELIVERY_FAILED
+    assert res.json()["title"] == "Sending the test message failed"
+    assert res.json()["detail"] == "Exceeded 0.05 s."
+
+
 def test_notification_settings_are_validated() -> None:
     configured = load_settings(_env_file=None, smtp_host="mail", smtp_from="a@example.com")
 
