@@ -7,6 +7,7 @@ import email
 import email.policy
 import json
 import smtplib
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
@@ -34,6 +35,7 @@ from app.domain.notifications import (
 from app.domain.report import AnalysisReport, ReportSummary
 from app.domain.schedule import ReportSchedule
 from app.main import create_app
+from app.notifications.drivers import build_drivers
 from app.notifications.drivers.email.render import RenderedEmail, render_email
 from app.notifications.drivers.email.transport import SmtpTransport, build_message
 from app.notifications.message import ReportMessage, ranked
@@ -267,9 +269,15 @@ def test_report_values_are_escaped_and_never_break_headers() -> None:
 # --- delivery ---------------------------------------------------------------------------------
 
 
-def make_client(tmp_path: Path, **config: Any) -> TestClient:
+def make_client(
+    tmp_path: Path, adapt: Callable[[dict[ChannelKind, Any]], None] | None = None, **config: Any
+) -> TestClient:
+    """A server built from ``config``; ``adapt`` swaps driver adapters before it starts."""
     settings = load_settings(_env_file=None, data_dir=tmp_path, ai_provider="fake", **config)
-    return TestClient(create_app(settings))
+    drivers: dict[ChannelKind, Any] = build_drivers(settings)
+    if adapt is not None:
+        adapt(drivers)
+    return TestClient(create_app(settings, drivers=drivers))
 
 
 def create_channel(client: TestClient, body: dict[str, Any]) -> str:
@@ -317,11 +325,6 @@ def wait_idle(client: TestClient) -> None:
     runner = client.app.state.services.runner  # type: ignore[attr-defined]
     assert client.portal is not None
     client.portal.call(runner.idle)
-
-
-def drivers(client: TestClient) -> dict[ChannelKind, Any]:
-    found: dict[ChannelKind, Any] = client.app.state.services.notifier.drivers  # type: ignore[attr-defined]
-    return found
 
 
 def due_time() -> datetime:
@@ -440,8 +443,10 @@ def test_a_failing_channel_never_changes_the_job_or_other_channels(tmp_path: Pat
         async def send(self, message: EmailMessage) -> None:
             raise smtplib.SMTPRecipientsRefused({"oncall@example.com": (550, b"no such user")})
 
-    with make_client(tmp_path, email_provider="fake", telegram_provider="fake") as client:
-        drivers(client)[ChannelKind.EMAIL].transport = Broken()
+    def broken(drivers: dict[ChannelKind, Any]) -> None:
+        drivers[ChannelKind.EMAIL].transport = Broken()
+
+    with make_client(tmp_path, broken, email_provider="fake", telegram_provider="fake") as client:
         email_id, telegram_id = two_channels(client)
         scheduled_project(client, due_time(), [notify(email_id), notify(telegram_id)])
 
@@ -484,9 +489,12 @@ def test_slow_channels_time_out_and_unexpected_errors_hide_their_message(
             return ""
 
     monkeypatch.setattr("app.notifications.notifier.DELIVERY_TIMEOUT_SECONDS", 0.05)
-    with make_client(tmp_path, email_provider="fake") as client:
-        drivers(client)[ChannelKind.EMAIL].transport = Hanging()
-        drivers(client)[ChannelKind.TELEGRAM] = Leaky()
+
+    def slow_and_leaky(drivers: dict[ChannelKind, Any]) -> None:
+        drivers[ChannelKind.EMAIL].transport = Hanging()
+        drivers[ChannelKind.TELEGRAM] = Leaky()
+
+    with make_client(tmp_path, slow_and_leaky, email_provider="fake") as client:
         email_id, telegram_id = two_channels(client)
         scheduled_project(client, due_time(), [notify(email_id), notify(telegram_id)])
 
