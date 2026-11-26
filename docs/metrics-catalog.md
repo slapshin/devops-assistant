@@ -10,7 +10,7 @@ Templates write each selector as `metric{{{s}, …}}`. `{s}` expands to the proj
 - any matcher block lacks **any** of the project's matchers with their operators (this covers both operands of every ratio and every gate query), or
 - a declared metric name appears without a matcher block.
 
-String literals are masked before the check, so label values cannot fake a selector. As a second line of defence, the source drops any returned series whose matcher labels do not satisfy the scope's matchers and records this in `exclusions`. Every result series is labelled with the scope's `=` matchers. The project connection test (`app/sources/prometheus/probe.py`) uses the same scope rules.
+String literals are masked before the check, so label values cannot fake a selector. As a second line of defence, the source drops any returned series whose matcher labels do not satisfy the scope's matchers and records this in `exclusions`. Every result series is labelled with the scope's `=` matchers. The project connection test (`app/sources/prometheus/connect.py`) uses the same scope rules.
 
 ## Semantics
 
