@@ -16,7 +16,7 @@ from app.domain.projects import PrometheusConnection
 from app.main import create_app
 from app.settings import load_settings
 from app.sources.prometheus.client import PrometheusClient
-from app.sources.prometheus.probe import probe
+from app.sources.prometheus.connect import probe_prometheus
 from app.sources.prometheus.source import PrometheusMetricsSource
 from app.storage.secrets import SecretBox, SecretsUnreadable
 
@@ -339,7 +339,7 @@ async def run_probe(handler: Any) -> Any:
     conn = PrometheusConnection(url="http://vm.example", bearer_token=SecretStr(TOKEN))
     client = PrometheusClient.from_connection(conn, transport=httpx.MockTransport(handler))
 
-    return await probe(PrometheusMetricsSource(client), client, SCOPE)
+    return await probe_prometheus(PrometheusMetricsSource(client), SCOPE)
 
 
 def empty(request: httpx.Request) -> httpx.Response:

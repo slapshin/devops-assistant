@@ -1,18 +1,41 @@
-"""Connection test of a Prometheus-compatible source: matching series, history, families."""
+"""Opening a Prometheus-compatible source from its connection, and its connection test
+(matching series, history, families)."""
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
+import httpx
+
 from app.domain.common import STEP_SECONDS, Scope, SourceKind
-from app.domain.interfaces import MetricsSource
-from app.domain.projects import ConnectionTest
+from app.domain.projects import ConnectionTest, PrometheusConnection, synthetic_url
 from app.domain.report import AnalysisWindows
 from app.sources.probe import guarded, summarise_families
 from app.sources.prometheus.client import PrometheusClient
 from app.sources.prometheus.promql import scope_matchers
+from app.sources.prometheus.source import PrometheusMetricsSource
+from app.sources.prometheus.synthetic import SyntheticMetricsSource
+
+type PrometheusSource = PrometheusMetricsSource | SyntheticMetricsSource
 
 HISTORY_PROBE_DAYS = 30
 HISTORY_PROBE_STEP_SECONDS = 3600
 SECONDS_PER_DAY = 86400
+
+
+@asynccontextmanager
+async def connect_prometheus(
+    conn: PrometheusConnection, transport: httpx.AsyncBaseTransport | None = None
+) -> AsyncGenerator[PrometheusSource]:
+    if (scenario := synthetic_url(conn.url)) is not None:
+        yield SyntheticMetricsSource(scenario, conn.custom_rules)
+        return
+
+    client = PrometheusClient.from_connection(conn, transport=transport)
+    try:
+        yield PrometheusMetricsSource(client, custom_rules=conn.custom_rules)
+    finally:
+        await client.aclose()
 
 
 async def _matched_series(client: PrometheusClient, scope: Scope, at: int) -> int:
@@ -31,9 +54,8 @@ async def _history_days(client: PrometheusClient, scope: Scope, at: int) -> floa
     return round((at - min(stamps)) / SECONDS_PER_DAY, 2) if stamps else None
 
 
-async def _measure(
-    source: MetricsSource, client: PrometheusClient | None, scope: Scope, now: datetime
-) -> ConnectionTest:
+async def _measure(source: PrometheusSource, scope: Scope, now: datetime) -> ConnectionTest:
+    client = source.client if isinstance(source, PrometheusMetricsSource) else None
     at = int(now.timestamp()) // STEP_SECONDS * STEP_SECONDS
     matched = history = None
     if client is not None:  # fail fast on reachability and auth before capability discovery
@@ -59,7 +81,5 @@ async def _measure(
     )
 
 
-async def probe(
-    source: MetricsSource, client: PrometheusClient | None, scope: Scope
-) -> ConnectionTest:
-    return await guarded(SourceKind.PROMETHEUS, lambda now: _measure(source, client, scope, now))
+async def probe_prometheus(source: PrometheusSource, scope: Scope) -> ConnectionTest:
+    return await guarded(SourceKind.PROMETHEUS, lambda now: _measure(source, scope, now))

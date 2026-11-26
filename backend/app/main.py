@@ -27,7 +27,7 @@ from app.notifications.notifier import ReportNotifier
 from app.scheduler import ReportScheduler
 from app.service import AnalysisPipeline
 from app.settings import ConfigError, Settings, load_settings
-from app.sources.factory import ProjectSources
+from app.sources.connections import SourceConnections
 from app.static import mount_ui
 from app.storage.channels import SqliteChannelRepository
 from app.storage.credentials import SqliteCredentialRepository
@@ -83,7 +83,7 @@ def build_services(
     box = load_secret_box(settings)
     projects = SqliteProjectRepository(repo.engine, box)
     credentials = SqliteCredentialRepository(repo.engine, box)
-    sources = ProjectSources(projects, override=source)
+    sources = SourceConnections(projects, override=source)
     pipeline = AnalysisPipeline(sources, RobustDetector(), config, provider, unavailable, reason)
     channels = SqliteChannelRepository(repo.engine, box)
     if drivers is None:
