@@ -8,42 +8,19 @@ from fastapi import APIRouter, Response
 from app.api.problems import ProblemError, problem_responses, validation_problem
 from app.api.routes import ServicesDep
 from app.container import Services
-from app.domain.common import STEP_SECONDS, LabelMatcher, Scope, floor_to_step
+from app.domain.common import floor_to_step
 from app.domain.custom_rules import CustomRulePreview
 from app.domain.jobs import ErrorCode
 from app.domain.projects import (
-    CloudflareConnection,
-    CloudflareSourceInput,
     ConnectionTest,
     ConnectionTestRequest,
     CustomRulePreviewRequest,
-    GrafanaConnection,
-    GrafanaSourceInput,
     Project,
     ProjectInput,
     ProjectList,
     ProjectSummary,
-    PrometheusConnection,
-    PrometheusSourceInput,
-    SentryConnection,
-    SentrySourceInput,
-    SourceConnection,
-    SourceInput,
-    WazuhConnection,
-    WazuhSourceInput,
-    synthetic_url,
 )
-from app.sources.cloudflare.connect import connect_cloudflare, probe_cloudflare
-from app.sources.cloudflare.synthetic import SCENARIOS as CLOUDFLARE_SCENARIOS
-from app.sources.factory import connect
-from app.sources.grafana.connect import connect_grafana, probe_grafana
-from app.sources.grafana.synthetic import SCENARIOS as GRAFANA_SCENARIOS
-from app.sources.prometheus.probe import probe
-from app.sources.prometheus.synthetic import SCENARIOS
-from app.sources.sentry.connect import connect_sentry, probe_sentry
-from app.sources.sentry.synthetic import SCENARIOS as SENTRY_SCENARIOS
-from app.sources.wazuh.connect import connect_wazuh, probe_wazuh
-from app.sources.wazuh.synthetic import SCENARIOS as WAZUH_SCENARIOS
+from app.sources.connections import ScenarioUnknown, check_scenario
 from app.storage.projects import CredentialInvalid, ProjectNameTaken, UnknownChannel
 from app.storage.secrets import SecretsUnreadable
 
@@ -71,33 +48,12 @@ def _unreadable() -> ProblemError:
     )
 
 
-DRAFT_PROJECT_ID = "draft"
-DRAFT_PROJECT_NAME = "Connection test"
-
-
-def _check_scenario(source: SourceInput, field_prefix: str) -> None:
-    match source:
-        case PrometheusSourceInput(url=url):
-            field, scenarios = "url", sorted(SCENARIOS)
-        case CloudflareSourceInput(api_url=url):
-            field, scenarios = "api_url", sorted(CLOUDFLARE_SCENARIOS)
-        case SentrySourceInput(api_url=url):
-            field, scenarios = "api_url", sorted(SENTRY_SCENARIOS)
-        case WazuhSourceInput(api_url=url):
-            field, scenarios = "api_url", sorted(WAZUH_SCENARIOS)
-        case GrafanaSourceInput(api_url=url):
-            field, scenarios = "api_url", sorted(GRAFANA_SCENARIOS)
-    scenario = synthetic_url(url)
-    if scenario is not None and scenario not in scenarios:
-        raise _invalid(
-            f"{field_prefix}.{field}",
-            f"unknown synthetic scenario; expected one of {scenarios}",
-        )
-
-
 def _validate(data: ProjectInput) -> None:
     for i, source in enumerate(data.sources):
-        _check_scenario(source, f"body.sources.{i}")
+        try:
+            check_scenario(source)
+        except ScenarioUnknown as exc:
+            raise _invalid(f"body.sources.{i}.{exc.field}", exc.message) from None
 
 
 def _write_error(exc: Exception, field_prefix: str) -> ProblemError:
@@ -111,7 +67,10 @@ def _write_error(exc: Exception, field_prefix: str) -> ProblemError:
             )
         case UnknownChannel(field=field, message=message):
             return _invalid(f"body.{field}", message)
-        case CredentialInvalid(field=field, message=message):
+        case (
+            CredentialInvalid(field=field, message=message)
+            | ScenarioUnknown(field=field, message=message)
+        ):
             return _invalid(f"{field_prefix}.{field}", message)
         case SecretsUnreadable():
             return _unreadable()
@@ -191,39 +150,14 @@ async def delete_project(project_id: str, services: ServicesDep) -> Response:
     return Response(status_code=204)
 
 
-async def _probe(conn: SourceConnection, scope: Scope) -> ConnectionTest:
-    match conn:
-        case PrometheusConnection():
-            async with connect(conn) as (source, client):
-                return await probe(source, client, scope)
-        case CloudflareConnection():
-            async with connect_cloudflare(conn) as cloudflare:
-                return await probe_cloudflare(cloudflare, scope)
-        case SentryConnection():
-            async with connect_sentry(conn) as sentry:
-                return await probe_sentry(sentry, scope)
-        case WazuhConnection():
-            async with connect_wazuh(conn) as wazuh:
-                return await probe_wazuh(wazuh, scope)
-        case GrafanaConnection():
-            async with connect_grafana(conn) as grafana:
-                return await probe_grafana(grafana, scope)
-
-
-def _draft_scope(matchers: list[LabelMatcher]) -> Scope:
-    return Scope(project_id=DRAFT_PROJECT_ID, project_name=DRAFT_PROJECT_NAME, matchers=matchers)
-
-
 @router.post(
     "/test-connection", response_model=ConnectionTest, responses=problem_responses(404, 409, 422)
 )
 async def test_connection(body: ConnectionTestRequest, services: ServicesDep) -> ConnectionTest:
-    _check_scenario(body.source, "body.source")
     try:
-        conn = await services.projects.resolve_connection(body.source)
-    except (CredentialInvalid, SecretsUnreadable) as exc:
+        return await services.sources.test_draft(body.source, body.matchers)
+    except (ScenarioUnknown, CredentialInvalid, SecretsUnreadable) as exc:
         raise _write_error(exc, "body.source") from None
-    return await _probe(conn, _draft_scope(body.matchers))
 
 
 @router.post(
@@ -235,18 +169,11 @@ async def preview_custom_rule(
     body: CustomRulePreviewRequest, services: ServicesDep
 ) -> CustomRulePreview:
     """Run one custom rule's query over the last 24 h; query errors are reported in the body."""
-    _check_scenario(body.source, "body.source")
-    try:
-        conn = await services.projects.resolve_connection(body.source)
-    except (CredentialInvalid, SecretsUnreadable) as exc:
-        raise _write_error(exc, "body.source") from None
-    if not isinstance(conn, PrometheusConnection):  # pragma: no cover - the body is Prometheus
-        raise _invalid("body.source.kind", "custom rules need a Prometheus source")
     end_time = floor_to_step(datetime.now(UTC))
-    async with connect(conn) as (source, _):
-        return await source.preview_rule(
-            body.rule, _draft_scope(body.matchers), end_time, STEP_SECONDS
-        )
+    try:
+        return await services.sources.preview_rule(body.source, body.rule, body.matchers, end_time)
+    except (ScenarioUnknown, CredentialInvalid, SecretsUnreadable) as exc:
+        raise _write_error(exc, "body.source") from None
 
 
 async def project_health(services: Services, project: Project) -> list[ConnectionTest]:
@@ -259,13 +186,9 @@ async def project_health(services: Services, project: Project) -> list[Connectio
         return cached[2]
 
     try:
-        connections = await services.projects.connections(project.project_id)
+        result = await services.sources.health(project)
     except SecretsUnreadable:
         raise _unreadable() from None
-    scope = Scope(
-        project_id=project.project_id, project_name=project.name, matchers=project.matchers
-    )
-    result = [await _probe(conn, scope) for conn in connections]
     services.health_cache[project.project_id] = (time.monotonic(), version, result)
     return result
 

@@ -8,7 +8,7 @@ from app.jobs import JobRunner
 from app.notifications.notifier import ReportNotifier
 from app.scheduler import ReportScheduler
 from app.settings import Settings
-from app.sources.factory import ProjectSources
+from app.sources.connections import SourceConnections
 from app.storage.channels import SqliteChannelRepository
 from app.storage.credentials import SqliteCredentialRepository
 from app.storage.projects import SqliteProjectRepository
@@ -20,7 +20,7 @@ from app.version import UpdateChecker
 class Services:
     settings: Settings
     config: DetectorConfig
-    sources: ProjectSources
+    sources: SourceConnections
     repo: SqliteReportRepository
     runner: JobRunner
     projects: SqliteProjectRepository

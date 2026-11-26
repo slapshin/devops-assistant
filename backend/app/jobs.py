@@ -30,7 +30,7 @@ from app.domain.jobs import (
     StageStatus,
 )
 from app.domain.report import AnalysisReport, AnalysisRequest, ReportState
-from app.sources.factory import SourceNotConfigured
+from app.sources.connections import SourceNotConfigured
 from app.storage.secrets import SecretsUnreadable
 
 log = logging.getLogger("app.jobs")
