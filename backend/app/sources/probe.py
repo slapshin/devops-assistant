@@ -1,6 +1,5 @@
-"""Bounded, read-only connection test shared by every source kind."""
+"""Read-only connection test shared by every source kind: error mapping and family summary."""
 
-import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
@@ -10,6 +9,7 @@ from app.domain.metrics import CapabilityStatus, MetricCapability
 from app.domain.projects import ConnectionTest, FamilyCapability
 
 PROBE_TIMEOUT_SECONDS = 30
+"""End-to-end bound of one connection test (open, measure, close); see SourceConnections."""
 UNREACHABLE_KINDS = (SourceErrorKind.UNAVAILABLE, SourceErrorKind.TIMEOUT)
 STATUS_RANK = {
     CapabilityStatus.SUPPORTED: 3,
@@ -19,8 +19,20 @@ STATUS_RANK = {
 }
 
 
-def _now() -> datetime:
+def probe_time() -> datetime:
+    """The ``checked_at`` of a connection test started now."""
     return datetime.now(UTC).replace(microsecond=0)
+
+
+def timed_out(kind: SourceKind, checked_at: datetime) -> ConnectionTest:
+    """The failed test of a source that did not answer within ``PROBE_TIMEOUT_SECONDS``."""
+    return ConnectionTest(
+        kind=kind,
+        reachable=False,
+        auth_ok=None,
+        message=f"No answer within {PROBE_TIMEOUT_SECONDS} s.",
+        checked_at=checked_at,
+    )
 
 
 def summarise_families(capabilities: list[MetricCapability]) -> list[FamilyCapability]:
@@ -40,18 +52,14 @@ def summarise_families(capabilities: list[MetricCapability]) -> list[FamilyCapab
 async def guarded(
     kind: SourceKind, measure: Callable[[datetime], Awaitable[ConnectionTest]]
 ) -> ConnectionTest:
-    """Run a bounded connection test; timeouts and source errors become a failed test."""
-    now = _now()
+    """Run a connection test; source errors become a failed test.
+
+    The time bound is not applied here: SourceConnections bounds the whole test, opening and
+    closing the source included.
+    """
+    now = probe_time()
     try:
-        return await asyncio.wait_for(measure(now), PROBE_TIMEOUT_SECONDS)
-    except TimeoutError:
-        return ConnectionTest(
-            kind=kind,
-            reachable=False,
-            auth_ok=None,
-            message=f"No answer within {PROBE_TIMEOUT_SECONDS} s.",
-            checked_at=now,
-        )
+        return await measure(now)
     except SourceError as exc:
         if exc.kind is SourceErrorKind.AUTH:
             return ConnectionTest(
