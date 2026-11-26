@@ -1,5 +1,6 @@
 """Telegram notifications (T027): rendering, Bot API client, driver, and API."""
 
+import asyncio
 import json
 import logging
 from collections.abc import Callable
@@ -451,3 +452,31 @@ def test_unreadable_stored_token_is_reported(tmp_path: Path) -> None:
 
     assert [tested.status_code, chats.status_code] == [409, 409]
     assert {tested.json()["code"], chats.json()["code"]} == {ErrorCode.CREDENTIALS_UNREADABLE}
+
+
+def test_hanging_bot_api_fails_within_the_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Hanging(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+    drivers: Drivers = {
+        ChannelKind.TELEGRAM: TelegramDriver(lambda token: BotApiClient(BASE, token, Hanging()))
+    }
+    monkeypatch.setattr("app.notifications.operations.DELIVERY_TIMEOUT_SECONDS", 0.05)
+    with make_client(tmp_path, drivers) as client:
+        tested = client.post(
+            "/api/notification-channels/test", json={"destination": CHANNEL["destination"]}
+        )
+        chats = client.post("/api/notification-channels/telegram/chats", json={"bot_token": TOKEN})
+
+    assert [tested.status_code, chats.status_code] == [502, 502]
+    assert {tested.json()["code"], chats.json()["code"]} == {ErrorCode.DELIVERY_FAILED}
+    assert [tested.json()["title"], chats.json()["title"]] == [
+        "Sending the test message failed",
+        "Telegram request failed",
+    ]
+    assert all(r.json()["detail"] == "Exceeded 0.05 s." for r in (tested, chats))
+    assert all(TOKEN not in r.text for r in (tested, chats))

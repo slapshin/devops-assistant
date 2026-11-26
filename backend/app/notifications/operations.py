@@ -3,10 +3,13 @@
 Each operation checks that the server can deliver to the kind, resolves the secret (a draft
 one, or the one stored for a saved channel), calls the driver, and turns every failure into a
 safe error: a driver's ``DeliveryError`` reason is secret-free by contract, any other
-exception is reported by its type only, since library messages may embed tokens. Scheduled
-delivery stays in ``ReportNotifier``; both share ``ChannelDrivers``.
+exception is reported by its type only, since library messages may embed tokens. Every driver
+call is bounded by ``DELIVERY_TIMEOUT_SECONDS``, the same bound as scheduled delivery, so a
+hanging mail server or Bot API never holds a request open. Scheduled delivery stays in
+``ReportNotifier``; both share ``ChannelDrivers``.
 """
 
+import asyncio
 from collections.abc import Awaitable
 from datetime import UTC, datetime
 
@@ -21,7 +24,12 @@ from app.domain.notifications import (
     TelegramChatList,
 )
 from app.notifications.drivers import ChannelDrivers
-from app.notifications.drivers.base import ChannelDriver, ChannelNotConfigured, DeliveryError
+from app.notifications.drivers.base import (
+    DELIVERY_TIMEOUT_SECONDS,
+    ChannelDriver,
+    ChannelNotConfigured,
+    DeliveryError,
+)
 from app.notifications.drivers.telegram.client import TelegramApiError
 from app.notifications.drivers.telegram.driver import TelegramDriver
 from app.storage.channels import SqliteChannelRepository
@@ -118,9 +126,11 @@ class ChannelOperations:
 async def _safely[T](
     kind: ChannelKind, title: str, call: Awaitable[T], *, webhook_conflict: bool = False
 ) -> T:
-    """Await a driver call, turning every failure into a safe operation error."""
+    """Await a driver call within the delivery bound, turning every failure into a safe error."""
     try:
-        return await call
+        return await asyncio.wait_for(call, DELIVERY_TIMEOUT_SECONDS)
+    except TimeoutError:
+        raise OperationFailed(title, f"Exceeded {DELIVERY_TIMEOUT_SECONDS:g} s.") from None
     except ChannelNotConfigured as exc:
         raise OperationNotConfigured(kind, exc.reason) from None
     except TelegramApiError as exc:
